@@ -42,8 +42,8 @@ func run() error {
 	}
 	defer app.Setup().Stop()
 
-	if cfg.AllowRemote && cfg.GatewayToken == "" {
-		logger.Warn("ALLOW_REMOTE=1 without GATEWAY_TOKEN: /api/* is unauthenticated on the LAN; set a token or bind to loopback.")
+	if !config.IsLoopbackHost(cfg.Host) && cfg.GatewayToken == "" {
+		logger.Warn("listening on %s without GATEWAY_TOKEN: /api/* is unauthenticated for anyone who can reach this address", cfg.Host)
 	}
 
 	address := net.JoinHostPort(cfg.Host, fmt.Sprint(cfg.Port))

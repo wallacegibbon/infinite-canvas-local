@@ -18,7 +18,6 @@ import (
 func testConfig(t *testing.T) *config.Config {
 	t.Helper()
 	return &config.Config{
-		AllowRemote:   false,
 		CorsOrigins:   []string{"http://localhost:3000"},
 		PublicBaseURL: "http://127.0.0.1:8190",
 	}
@@ -110,6 +109,43 @@ func TestCORSRejectsUnknownOrigin(t *testing.T) {
 	}
 }
 
+// The canvas and the gateway are two ports on one address. Requiring that pair to be listed in
+// CORS_ORIGINS is what made a LAN address fail with no useful error, so the same-host case is
+// allowed by rule; anything served from a different host still needs the list.
+func TestCORSSameHostOriginIsAllowed(t *testing.T) {
+	cfg := testConfig(t)
+	handler := CORS(cfg)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	request := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	request.Host = "192.168.3.232:8190"
+	request.Header.Set("Origin", "http://192.168.3.232:3000")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if got := recorder.Header().Get("Access-Control-Allow-Origin"); got != "http://192.168.3.232:3000" {
+		t.Errorf("allow-origin = %q, want the canvas origin echoed", got)
+	}
+}
+
+func TestCORSRejectsOtherHostOnTheSameNetwork(t *testing.T) {
+	cfg := testConfig(t)
+	handler := CORS(cfg)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	request := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	request.Host = "192.168.3.232:8190"
+	request.Header.Set("Origin", "http://192.168.3.99:3000")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if got := recorder.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("allow-origin = %q, want empty for another machine", got)
+	}
+}
+
 func TestCORSPreflight(t *testing.T) {
 	cfg := testConfig(t)
 	handler := CORS(cfg)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -159,9 +195,8 @@ func TestGuardAllowsSameSiteWrite(t *testing.T) {
 	}
 }
 
-func TestGuardRequiresTokenInRemoteMode(t *testing.T) {
+func TestGuardRequiresConfiguredToken(t *testing.T) {
 	cfg := testConfig(t)
-	cfg.AllowRemote = true
 	cfg.GatewayToken = "secret"
 	called := false
 	handler := Guard(cfg)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -189,7 +224,6 @@ func TestGuardRequiresTokenInRemoteMode(t *testing.T) {
 
 func TestGuardDoesNotTokenProtectGeneration(t *testing.T) {
 	cfg := testConfig(t)
-	cfg.AllowRemote = true
 	cfg.GatewayToken = "secret"
 	called := false
 	handler := Guard(cfg)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

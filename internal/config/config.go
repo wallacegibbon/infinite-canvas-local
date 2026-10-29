@@ -58,7 +58,6 @@ type Config struct {
 	MaxImageCount       int
 	ResourceConcurrency int
 
-	AllowRemote  bool
 	GatewayToken string
 }
 
@@ -142,7 +141,6 @@ func Load(opts ...Option) (*Config, error) {
 		MaxWorkflowBytes:    int64(intValue(os.Getenv("MAX_WORKFLOW_BYTES"), 5*1024*1024)),
 		MaxImageCount:       intValue(os.Getenv("MAX_IMAGE_COUNT"), 15),
 		ResourceConcurrency: intValue(os.Getenv("RESOURCE_CONCURRENCY"), 2),
-		AllowRemote:         strings.TrimSpace(os.Getenv("ALLOW_REMOTE")) == "1",
 		GatewayToken:        strings.TrimSpace(os.Getenv("GATEWAY_TOKEN")),
 	}
 
@@ -168,11 +166,12 @@ func Load(opts ...Option) (*Config, error) {
 	}
 	cfg.PublicBaseURL = strings.TrimRight(cfg.PublicBaseURL, "/")
 
-	if !cfg.AllowRemote && !IsLoopbackHost(cfg.Host) {
-		return nil, fmt.Errorf("refusing to bind a non-loopback address; set ALLOW_REMOTE=1 if LAN access is really intended")
-	}
-	if contains(cfg.CorsOrigins, "*") && !cfg.AllowRemote {
-		return nil, fmt.Errorf("CORS_ORIGINS must not be a wildcard; list the canvas origins explicitly, or set ALLOW_REMOTE=1")
+	// HOST is bound exactly as given: 192.168.3.232 is as much "local" as 127.0.0.1 for
+	// someone who wants their phone on the same network, and a gateway that refuses to start
+	// teaches nothing. main.go warns when the bind is reachable from the network and /api/*
+	// has no token, which is the part that actually matters.
+	if contains(cfg.CorsOrigins, "*") {
+		return nil, fmt.Errorf("CORS_ORIGINS must not be a wildcard; list the canvas origins explicitly (a canvas served from the same host as the gateway is allowed automatically)")
 	}
 
 	for _, dir := range []string{cfg.WorkflowDir, cfg.DataDir, cfg.OutputDir} {

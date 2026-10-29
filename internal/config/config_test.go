@@ -18,7 +18,7 @@ func isolateEnv(t *testing.T) {
 		"COMFY_RETRY_ATTEMPTS", "COMFY_RETRY_DELAY_MS", "TASK_RETENTION_DAYS",
 		"MAX_STORED_TASKS", "CLEANUP_INTERVAL_MS", "SESSION_STALE_SEC",
 		"MAX_UPLOAD_BYTES", "MAX_WORKFLOW_BYTES", "MAX_IMAGE_COUNT",
-		"RESOURCE_CONCURRENCY", "ALLOW_REMOTE", "GATEWAY_TOKEN", "GATEWAY_ROOT",
+		"RESOURCE_CONCURRENCY", "GATEWAY_TOKEN", "GATEWAY_ROOT",
 	} {
 		t.Setenv(name, "")
 	}
@@ -59,26 +59,30 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
-func TestNonLoopbackHostIsRejected(t *testing.T) {
+// HOST is bound as given. A LAN address is how the workbench is reached from a phone, so there
+// is no second switch to remember: the only thing the gateway still refuses is a wildcard CORS
+// list, because that hands /v1/* to any page in the browser.
+func TestNonLoopbackHostIsAccepted(t *testing.T) {
 	isolateEnv(t)
 	root := t.TempDir()
 	t.Setenv("GATEWAY_ROOT", root)
 	t.Setenv("DATA_DIR", filepath.Join(root, "data"))
 	t.Setenv("OUTPUT_DIR", filepath.Join(root, "out"))
-	t.Setenv("HOST", "0.0.0.0")
+	t.Setenv("HOST", "192.168.3.232")
 
-	if _, err := Load(); err == nil {
-		t.Fatal("binding a public interface without ALLOW_REMOTE must fail")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load with a LAN HOST: %v", err)
 	}
-
-	t.Setenv("ALLOW_REMOTE", "1")
-	t.Setenv("GATEWAY_TOKEN", "secret")
-	if _, err := Load(); err != nil {
-		t.Fatalf("Load with ALLOW_REMOTE: %v", err)
+	if cfg.Host != "192.168.3.232" {
+		t.Errorf("host = %q", cfg.Host)
+	}
+	if cfg.PublicBaseURL != "http://192.168.3.232:8190" {
+		t.Errorf("public base url = %q, want it derived from HOST", cfg.PublicBaseURL)
 	}
 }
 
-func TestCorsWildcardRequiresRemoteMode(t *testing.T) {
+func TestCorsWildcardIsRejected(t *testing.T) {
 	isolateEnv(t)
 	root := t.TempDir()
 	t.Setenv("GATEWAY_ROOT", root)
@@ -87,7 +91,7 @@ func TestCorsWildcardRequiresRemoteMode(t *testing.T) {
 	t.Setenv("CORS_ORIGINS", "*")
 
 	if _, err := Load(); err == nil {
-		t.Fatal("a wildcard CORS origin must be refused on a loopback-only gateway")
+		t.Fatal("a wildcard CORS origin must be refused")
 	}
 }
 

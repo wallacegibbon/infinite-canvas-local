@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -76,7 +77,7 @@ func CORS(cfg *config.Config) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
 			wildcard := containsString(cfg.CorsOrigins, "*")
-			allowed := wildcard || isLoopbackOrigin(origin) || (origin != "" && containsString(cfg.CorsOrigins, origin))
+			allowed := wildcard || isAllowedOrigin(cfg, r, origin)
 			if allowed {
 				if wildcard {
 					w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -98,12 +99,12 @@ func CORS(cfg *config.Config) Middleware {
 	}
 }
 
-// Guard enforces two protections: a token for /api/* in remote mode, and a
+// Guard enforces two protections: a token on /api/* when GATEWAY_TOKEN is set, and a
 // block on cross-site browser writes.
 func Guard(cfg *config.Config) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if cfg.AllowRemote && cfg.GatewayToken != "" && strings.HasPrefix(r.URL.Path, "/api/") {
+			if cfg.GatewayToken != "" && strings.HasPrefix(r.URL.Path, "/api/") {
 				if r.Header.Get("X-Gateway-Token") != cfg.GatewayToken {
 					writeOkFalse(w, http.StatusUnauthorized, "missing a valid gateway token")
 					return
@@ -114,7 +115,7 @@ func Guard(cfg *config.Config) Middleware {
 			default:
 				origin := r.Header.Get("Origin")
 				site := r.Header.Get("Sec-Fetch-Site")
-				if site == "cross-site" || !isAllowedOrigin(cfg, origin) {
+				if site == "cross-site" || !isAllowedOrigin(cfg, r, origin) {
 					writeOkFalse(w, http.StatusForbidden, "cross-site request rejected")
 					return
 				}
@@ -155,11 +156,28 @@ func isLoopbackOrigin(origin string) bool {
 	return config.IsLoopbackHost(parsed.Hostname())
 }
 
-func isAllowedOrigin(cfg *config.Config, origin string) bool {
+// sameHostOrigin reports whether the canvas and the gateway were reached under the same host
+// name, which is the normal single-machine layout (canvas on :3000, gateway on :8190, one
+// address). That is what makes a LAN address work without maintaining a CORS_ORIGINS list per
+// ip:port pair, and it keeps the list meaningful: a page served from another host still has to
+// be listed explicitly.
+func sameHostOrigin(r *http.Request, origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Hostname() == "" {
+		return false
+	}
+	host := r.Host
+	if name, _, splitErr := net.SplitHostPort(r.Host); splitErr == nil {
+		host = name
+	}
+	return strings.EqualFold(strings.Trim(host, "[]"), parsed.Hostname())
+}
+
+func isAllowedOrigin(cfg *config.Config, r *http.Request, origin string) bool {
 	if origin == "" {
 		return true
 	}
-	if isLoopbackOrigin(origin) {
+	if isLoopbackOrigin(origin) || sameHostOrigin(r, origin) {
 		return true
 	}
 	return containsString(cfg.CorsOrigins, origin) ||

@@ -68,7 +68,7 @@ Every variable is optional; the defaults match the previous implementation.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `HOST` | `127.0.0.1` | Listen address. Non-loopback requires `ALLOW_REMOTE=1`. |
+| `HOST` | `127.0.0.1` | Listen address, bound as given. `0.0.0.0` accepts every interface. |
 | `PORT` | `8190` | Listen port. |
 | `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI base URL. |
 | `COMFYUI_DIR` | *(empty)* | ComfyUI install dir. Used to locate model roots. |
@@ -78,9 +78,14 @@ Every variable is optional; the defaults match the previous implementation.
 | `DATA_DIR` | `<root>/data` | Tasks, locks, preferences. |
 | `OUTPUT_DIR` | `<data>/outputs` | Generated files served under `/files/`. |
 | `PUBLIC_BASE_URL` | `http://HOST:PORT` | Absolute prefix for returned URLs. |
-| `CORS_ORIGINS` | canvas + ComfyUI origins | Comma-separated allow list. `*` requires `ALLOW_REMOTE=1`. |
-| `ALLOW_REMOTE` | `0` | Permit a non-loopback bind. |
-| `GATEWAY_TOKEN` | *(empty)* | Required header `X-Gateway-Token` on `/api/*` in remote mode. |
+| `CORS_ORIGINS` | canvas + ComfyUI origins | Extra allow list for canvases on another host. A canvas on the gateway's own host is allowed by rule. `*` is refused. |
+
+`HOST` is not a policy switch: `HOST=192.168.3.232` binds the LAN address exactly like
+`127.0.0.1` binds loopback, and the gateway says so in a startup warning when that address is
+reachable from the network and no `GATEWAY_TOKEN` is set. Browser access is allowed when the
+canvas is served from the same host name as the gateway — the usual `:3000` canvas and `:8190`
+gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a *different* host does.
+| `GATEWAY_TOKEN` | *(empty)* | When set, `/api/*` requires the `X-Gateway-Token` header. `/v1/*` never does. |
 | `REQUEST_TIMEOUT_MS` | `600000` | Image generation timeout. |
 | `VIDEO_TIMEOUT_MS` | `0` | Video timeout; `0` means no limit. |
 | `POLL_INTERVAL_MS` | `750` | ComfyUI history poll interval. |

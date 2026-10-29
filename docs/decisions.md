@@ -304,3 +304,26 @@ support becomes a prerequisite for that work.
 `infinite-canvas/web/src/components/layout/app-providers.tsx`. The rendered output is
 unchanged — the built page still emits `class="css-1tzwyuk ant-app"` and
 `--ant-color-bg-base:#000`, i.e. the same antd hashed theme as before the removal.
+
+---
+
+## 19. `HOST` is bound as given; there is no `ALLOW_REMOTE`
+
+**Decision** The gateway listens on whatever `HOST` says, loopback or LAN address, with no
+second switch. `ALLOW_REMOTE` is gone, and so is the startup refusal it gated. What remains is
+a warning when the address is reachable from the network and no `GATEWAY_TOKEN` is set.
+
+**Why** A workbench whose gateway is on `192.168.3.232:8190` so a phone can use it *is* the
+local setup — calling that "remote" and making the user flip a flag to reach their own machine
+was a gate with no bug behind it. It also failed quietly in the worst way: the canvas started,
+the gateway exited, and the UI showed "gateway disconnected". The real risk is not the bind
+address but an unauthenticated `/api/*`, and that is what the warning names.
+
+**Cost** One keystroke less between a machine and the network. Anyone who wants the old
+behaviour back has `HOST=127.0.0.1`, which is still the default. `CORS_ORIGINS` no longer
+accepts `*` under any condition — the canvas origin is matched by host, so the wildcard was
+only ever an accident waiting to happen.
+
+**Where** `internal/config/config.go`, `internal/httpx/middleware.go` (`sameHostOrigin`),
+`main.go`, `.env.example`, `docs/gateway.md`.
+
