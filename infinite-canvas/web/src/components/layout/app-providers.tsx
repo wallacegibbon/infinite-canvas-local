@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { ProConfigProvider } from "@ant-design/pro-components";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App, ConfigProvider } from "antd";
 import enUS from "antd/es/locale/en_US";
@@ -25,8 +24,6 @@ const queryClient = new QueryClient({
     },
 });
 
-// 见 docs/known-issues.md 第 10 条：本文件只用到 @ant-design/pro-components 的 ProConfigProvider
-// （仅重新提供 antd 的 theme/locale 上下文）。升级 antd 或移除该依赖前先看那条 TODO。
 export function AppProviders({ children }: { children: ReactNode }) {
     const { i18n, t } = useTranslation();
     const theme = useThemeStore((state) => state.theme);
@@ -47,14 +44,12 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
     return (
         <ConfigProvider locale={locale === "zh-CN" ? zhCN : enUS} theme={getAntThemeConfig(dark)}>
-            <ProConfigProvider dark={dark}>
-                <App>
-                    <QueryClientProvider client={queryClient}>
-                        <ClientRootInit>{children}</ClientRootInit>
-                        <GatewayReconnectBanner />
-                    </QueryClientProvider>
-                </App>
-            </ProConfigProvider>
+            <App>
+                <QueryClientProvider client={queryClient}>
+                    <ClientRootInit>{children}</ClientRootInit>
+                    <GatewayReconnectBanner />
+                </QueryClientProvider>
+            </App>
         </ConfigProvider>
     );
 }
