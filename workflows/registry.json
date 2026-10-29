@@ -6,7 +6,7 @@
       "name": "image-z-image-turbo",
       "type": "image",
       "file": "z-image-turbo.json",
-      "description": "Z-Image Turbo 文生图（4–8 步蒸馏）；默认 bf16 底模，Qwen3-4B 文本编码器 + ae VAE，无负面提示（ConditioningZeroOut）。",
+      "description": "Z-Image Turbo text-to-image (4-8 step distill); bf16 base model by default with the Qwen3-4B text encoder and the ae VAE; no negative prompt (ConditioningZeroOut).",
       "lora": {
         "filter": "Z-Image|ZIT|Kook_Zimage"
       },
@@ -76,16 +76,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "sampler",
-          "label": "采样器",
+          "label": "Sampler",
           "type": "select",
           "default": "euler",
           "options": [
@@ -98,7 +98,7 @@
         },
         {
           "key": "scheduler",
-          "label": "调度器",
+          "label": "Scheduler",
           "type": "select",
           "default": "simple",
           "options": [
@@ -133,7 +133,7 @@
         "param": "unet",
         "classType": "UNETLoader",
         "input": "unet_name",
-        "label": "底模",
+        "label": "Base model",
         "filter": "z-image|z_image|ZiT",
         "prefix": "zit",
         "aliases": {
@@ -271,16 +271,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "steps",
-          "label": "步数",
+          "label": "Steps",
           "type": "number",
           "min": 1,
           "max": 30,
@@ -298,17 +298,17 @@
         },
         {
           "key": "transition_step",
-          "label": "SelfLift 切换步",
+          "label": "SelfLift switch step",
           "type": "number",
           "min": 1,
           "max": 7,
           "step": 1,
           "default": 6,
-          "description": "8 步时最大 7"
+          "description": "At most 7 at 8 steps"
         },
         {
           "key": "lowres_scale",
-          "label": "SelfLift 低清比例",
+          "label": "SelfLift low-res ratio",
           "type": "number",
           "min": 0.25,
           "max": 1,
@@ -317,7 +317,7 @@
         },
         {
           "key": "rho",
-          "label": "SelfLift 锚点校正",
+          "label": "SelfLift anchor correction",
           "type": "number",
           "min": 0,
           "max": 1,
@@ -343,7 +343,7 @@
           "default": 1
         }
       ],
-      "label": "H3 多参（VDN）",
+      "label": "H3 multi-reference (VDN)",
       "minMedia": 1
     },
     {
@@ -446,16 +446,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "steps",
-          "label": "步数",
+          "label": "Steps",
           "type": "number",
           "min": 1,
           "max": 30,
@@ -473,17 +473,17 @@
         },
         {
           "key": "transition_step",
-          "label": "SelfLift 切换步",
+          "label": "SelfLift switch step",
           "type": "number",
           "min": 1,
           "max": 7,
           "step": 1,
           "default": 6,
-          "description": "8 步时最大 7"
+          "description": "At most 7 at 8 steps"
         },
         {
           "key": "lowres_scale",
-          "label": "SelfLift 低清比例",
+          "label": "SelfLift low-res ratio",
           "type": "number",
           "min": 0.25,
           "max": 1,
@@ -492,7 +492,7 @@
         },
         {
           "key": "rho",
-          "label": "SelfLift 锚点校正",
+          "label": "SelfLift anchor correction",
           "type": "number",
           "min": 0,
           "max": 1,
@@ -518,7 +518,7 @@
           "default": 1
         }
       ],
-      "label": "H3 文生视频（VDN）"
+      "label": "H3 text-to-video (VDN)"
     },
     {
       "id": "video-h3-frames",
@@ -635,16 +635,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "steps",
-          "label": "步数",
+          "label": "Steps",
           "type": "number",
           "min": 1,
           "max": 30,
@@ -662,17 +662,17 @@
         },
         {
           "key": "transition_step",
-          "label": "SelfLift 切换步",
+          "label": "SelfLift switch step",
           "type": "number",
           "min": 1,
           "max": 7,
           "step": 1,
           "default": 6,
-          "description": "8 步时最大 7"
+          "description": "At most 7 at 8 steps"
         },
         {
           "key": "lowres_scale",
-          "label": "SelfLift 低清比例",
+          "label": "SelfLift low-res ratio",
           "type": "number",
           "min": 0.25,
           "max": 1,
@@ -681,7 +681,7 @@
         },
         {
           "key": "rho",
-          "label": "SelfLift 锚点校正",
+          "label": "SelfLift anchor correction",
           "type": "number",
           "min": 0,
           "max": 1,
@@ -707,7 +707,7 @@
           "default": 1
         }
       ],
-      "label": "H3 首尾帧（VDN）"
+      "label": "H3 first/last frame (VDN)"
     },
     {
       "id": "video-h3-ref2va-novdn",
@@ -834,16 +834,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "steps",
-          "label": "步数",
+          "label": "Steps",
           "type": "number",
           "min": 1,
           "max": 30,
@@ -861,17 +861,17 @@
         },
         {
           "key": "transition_step",
-          "label": "SelfLift 切换步",
+          "label": "SelfLift switch step",
           "type": "number",
           "min": 1,
           "max": 7,
           "step": 1,
           "default": 6,
-          "description": "8 步时最大 7"
+          "description": "At most 7 at 8 steps"
         },
         {
           "key": "lowres_scale",
-          "label": "SelfLift 低清比例",
+          "label": "SelfLift low-res ratio",
           "type": "number",
           "min": 0.25,
           "max": 1,
@@ -880,7 +880,7 @@
         },
         {
           "key": "rho",
-          "label": "SelfLift 锚点校正",
+          "label": "SelfLift anchor correction",
           "type": "number",
           "min": 0,
           "max": 1,
@@ -906,7 +906,7 @@
           "default": 1
         }
       ],
-      "label": "H3 多参（无VDN）",
+      "label": "H3 multi-reference (no VDN)",
       "minMedia": 1
     },
     {
@@ -1009,16 +1009,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "steps",
-          "label": "步数",
+          "label": "Steps",
           "type": "number",
           "min": 1,
           "max": 30,
@@ -1036,17 +1036,17 @@
         },
         {
           "key": "transition_step",
-          "label": "SelfLift 切换步",
+          "label": "SelfLift switch step",
           "type": "number",
           "min": 1,
           "max": 7,
           "step": 1,
           "default": 6,
-          "description": "8 步时最大 7"
+          "description": "At most 7 at 8 steps"
         },
         {
           "key": "lowres_scale",
-          "label": "SelfLift 低清比例",
+          "label": "SelfLift low-res ratio",
           "type": "number",
           "min": 0.25,
           "max": 1,
@@ -1055,7 +1055,7 @@
         },
         {
           "key": "rho",
-          "label": "SelfLift 锚点校正",
+          "label": "SelfLift anchor correction",
           "type": "number",
           "min": 0,
           "max": 1,
@@ -1081,7 +1081,7 @@
           "default": 1
         }
       ],
-      "label": "H3 文生视频（无VDN）"
+      "label": "H3 text-to-video (no VDN)"
     },
     {
       "id": "video-h3-frames-novdn",
@@ -1198,16 +1198,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "steps",
-          "label": "步数",
+          "label": "Steps",
           "type": "number",
           "min": 1,
           "max": 30,
@@ -1225,17 +1225,17 @@
         },
         {
           "key": "transition_step",
-          "label": "SelfLift 切换步",
+          "label": "SelfLift switch step",
           "type": "number",
           "min": 1,
           "max": 7,
           "step": 1,
           "default": 6,
-          "description": "8 步时最大 7"
+          "description": "At most 7 at 8 steps"
         },
         {
           "key": "lowres_scale",
-          "label": "SelfLift 低清比例",
+          "label": "SelfLift low-res ratio",
           "type": "number",
           "min": 0.25,
           "max": 1,
@@ -1244,7 +1244,7 @@
         },
         {
           "key": "rho",
-          "label": "SelfLift 锚点校正",
+          "label": "SelfLift anchor correction",
           "type": "number",
           "min": 0,
           "max": 1,
@@ -1270,7 +1270,7 @@
           "default": 1
         }
       ],
-      "label": "H3 首尾帧（无VDN）"
+      "label": "H3 first/last frame (no VDN)"
     },
     {
       "id": "video-esrgan_2x",
@@ -1283,7 +1283,7 @@
       "defaults": {},
       "presets": {},
       "importedAt": "2026-10-24T11:41:05.053Z",
-      "label": "ESRGAN 2x 放大",
+      "label": "ESRGAN 2x upscale",
       "source": {
         "kind": "comfyui",
         "name": "ESRGAN_2x放大.json"
@@ -1336,7 +1336,7 @@
       "parameters": [
         {
           "key": "resolution",
-          "label": "目标短边",
+          "label": "Target short edge",
           "type": "number",
           "min": 256,
           "max": 4096,
@@ -1345,7 +1345,7 @@
         },
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
@@ -1353,7 +1353,7 @@
           "default": 42
         }
       ],
-      "label": "SeedVR2 视频超分"
+      "label": "SeedVR2 video upscale"
     },
     {
       "id": "image-krea2-aesthetics",
@@ -1429,12 +1429,12 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         }
       ],
       "lora": {
@@ -1448,7 +1448,7 @@
         "param": "unet",
         "classType": "UNETLoader",
         "input": "unet_name",
-        "label": "底模",
+        "label": "Base model",
         "filter": "krea2",
         "prefix": "k2",
         "aliases": {
@@ -1465,12 +1465,12 @@
     {
       "id": "image-seedvr2-upscale",
       "name": "image-seedvr2-upscale",
-      "label": "SeedVR2 超分",
+      "label": "SeedVR2 upscale",
       "type": "image",
       "category": "upscale",
       "hidden": true,
       "file": "image-seedvr2-upscale.json",
-      "description": "SeedVR2 7B 图像超分；目标短边可调，输出保持宽高比。",
+      "description": "SeedVR2 7B image upscale; the target short edge is adjustable and the aspect ratio is preserved.",
       "bindings": {
         "image": {
           "node": "10",
@@ -1513,14 +1513,14 @@
       "parameters": [
         {
           "key": "dit_model",
-          "label": "SeedVR2 模型",
+          "label": "SeedVR2 model",
           "type": "select",
           "optionsFrom": "SeedVR2LoadDiTModel.model",
           "default": "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors"
         },
         {
           "key": "resolution",
-          "label": "目标短边",
+          "label": "Target short edge",
           "type": "number",
           "min": 512,
           "max": 4096,
@@ -1535,11 +1535,11 @@
           "max": 36,
           "step": 1,
           "default": 0,
-          "description": "显存不足时增大"
+          "description": "Raise this when VRAM runs out"
         },
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 0,
           "max": 4294967295,
@@ -1548,7 +1548,7 @@
         },
         {
           "key": "color_correction",
-          "label": "色彩校正",
+          "label": "Color correction",
           "type": "select",
           "default": "lab",
           "options": [
@@ -1565,12 +1565,12 @@
     {
       "id": "image-esrgan-upscale",
       "name": "image-esrgan-upscale",
-      "label": "ESRGAN 快速放大",
+      "label": "ESRGAN fast upscale",
       "type": "image",
       "category": "upscale",
       "hidden": true,
       "file": "image-esrgan-upscale.json",
-      "description": "RealESRGAN / 4x 模型快速放大；按所选模型倍率输出。",
+      "description": "Fast upscale with the RealESRGAN / 4x models; the output scale comes from the selected model.",
       "bindings": {
         "image": {
           "node": "1",
@@ -1589,11 +1589,11 @@
       "parameters": [
         {
           "key": "upscale_model",
-          "label": "放大模型",
+          "label": "Upscale model",
           "type": "select",
           "optionsFrom": "UpscaleModelLoader.model_name",
           "default": "RealESRGAN_x2plus.pth",
-          "description": "2x/4x 由模型决定；4x 输出尺寸较大。"
+          "description": "2x or 4x is decided by the model; 4x output is much larger."
         }
       ]
     },
@@ -1605,10 +1605,10 @@
       "description": "Qwen-Image 2.1 Turbo. Text-to-image, multi-image edit, true-mask inpaint, outpaint; native RGBA via prompt template.",
       "file": "image-qwen21-edit-turbo.json",
       "variantLabels": {
-        "edit": "多图编辑",
-        "inpaint": "局部重绘",
-        "outpaint": "扩图",
-        "t2i": "文生图"
+        "edit": "Multi-image edit",
+        "inpaint": "Inpaint",
+        "outpaint": "Outpaint",
+        "t2i": "Text to image"
       },
       "lora": {
         "filter": "Qwen21|qwen_image_2.1|Qwen-Image-2.1"
@@ -1657,12 +1657,12 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "cfg",
@@ -1675,20 +1675,20 @@
         },
         {
           "key": "resolution",
-          "label": "参考图分辨率",
+          "label": "Reference resolution",
           "type": "number",
           "min": 512,
           "max": 2048,
           "step": 32,
           "default": 1024,
-          "description": "参考图缩放到约该边长；输出尺寸跟随第一张参考图"
+          "description": "Reference images are scaled to roughly this edge; the output follows the first reference image"
         }
       ],
       "variants": {
         "edit": {
           "file": "image-qwen21-edit-turbo.json",
-          "label": "多图编辑",
-          "description": "1–4 张参考图的指令编辑与融合",
+          "label": "Multi-image edit",
+          "description": "Instructed edits and blending across 1-4 reference images",
           "outputSize": {
             "node": "13",
             "latentNode": "10",
@@ -1698,8 +1698,8 @@
         },
         "inpaint": {
           "file": "image-qwen21-inpaint.json",
-          "label": "局部重绘",
-          "description": "原图 + 二值蒙版，latent 蒙版约束，只改框内",
+          "label": "Inpaint",
+          "description": "Source plus a binary mask, constrained in latent space, only inside the mask",
           "bindings": {
             "prompt": {
               "node": "7",
@@ -1748,8 +1748,8 @@
         },
         "outpaint": {
           "file": "image-qwen21-outpaint.json",
-          "label": "扩图",
-          "description": "原图 + 四边 padding，Qwen outpaint LoRA 补画新区域",
+          "label": "Outpaint",
+          "description": "Source plus padding on all four sides, filled in by the Qwen outpaint LoRA",
           "bindings": {
             "prompt": {
               "node": "10",
@@ -1846,8 +1846,8 @@
         },
         "t2i": {
           "file": "image-qwen21-t2i.json",
-          "label": "文生图",
-          "description": "纯文生图，不需要参考图；支持原生透明背景",
+          "label": "Text to image",
+          "description": "Text to image with no reference images; native transparency supported",
           "bindings": {
             "prompt": {
               "node": "5",
@@ -1894,9 +1894,9 @@
     {
       "id": "image-moss-sft-8step",
       "name": "image-moss-sft-8step",
-      "label": "MOSS-Image 极速 8步",
+      "label": "MOSS-Image fast 8-step",
       "type": "image",
-      "description": "MOSS-Image SFT bf16 + Qwen3.5 9B + FLUX.2 VAE；内置 8-step DMD LoRA，默认 8 步 / cfg1 / euler simple，极速出图。",
+      "description": "MOSS-Image SFT bf16 + Qwen3.5 9B + FLUX.2 VAE with a built-in 8-step DMD LoRA; 8 steps / cfg 1 / euler simple by default, tuned for speed.",
       "file": "image-moss-sft-8step.json",
       "bindings": {
         "prompt": {
@@ -1972,16 +1972,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "steps",
-          "label": "步数",
+          "label": "Steps",
           "type": "number",
           "min": 1,
           "max": 60,
@@ -1999,7 +1999,7 @@
         },
         {
           "key": "sampler",
-          "label": "采样器",
+          "label": "Sampler",
           "type": "select",
           "default": "euler",
           "options": [
@@ -2012,7 +2012,7 @@
         },
         {
           "key": "scheduler",
-          "label": "调度器",
+          "label": "Scheduler",
           "type": "select",
           "default": "simple",
           "options": [
@@ -2025,7 +2025,7 @@
         },
         {
           "key": "lora_strength",
-          "label": "8步 LoRA 强度",
+          "label": "8-step LoRA strength",
           "type": "number",
           "min": 0,
           "max": 2,
@@ -2045,7 +2045,7 @@
     {
       "id": "image-qwen21-angle",
       "name": "image-qwen21-angle",
-      "label": "Qwen Image 2.1 多角度",
+      "label": "Qwen Image 2.1 multi-angle",
       "type": "image",
       "description": "Qwen-Image 2.1 Turbo + Qwen Multiangle Camera. Local angle regeneration with 0-360 horizontal, -30-60 vertical and zoom.",
       "file": "image-qwen21-angle.json",
@@ -2227,16 +2227,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "steps",
-          "label": "步数",
+          "label": "Steps",
           "type": "number",
           "min": 1,
           "max": 30,
@@ -2254,17 +2254,17 @@
         },
         {
           "key": "transition_step",
-          "label": "SelfLift 切换步",
+          "label": "SelfLift switch step",
           "type": "number",
           "min": 1,
           "max": 7,
           "step": 1,
           "default": 6,
-          "description": "8 步时最大 7"
+          "description": "At most 7 at 8 steps"
         },
         {
           "key": "lowres_scale",
-          "label": "SelfLift 低清比例",
+          "label": "SelfLift low-res ratio",
           "type": "number",
           "min": 0.25,
           "max": 1,
@@ -2273,7 +2273,7 @@
         },
         {
           "key": "rho",
-          "label": "SelfLift 锚点校正",
+          "label": "SelfLift anchor correction",
           "type": "number",
           "min": 0,
           "max": 1,
@@ -2299,16 +2299,16 @@
           "default": 1
         }
       ],
-      "label": "H3 角色替换（Character Swap 1.5）",
+      "label": "H3 character swap (Character Swap 1.5)",
       "minMedia": 1,
       "hidden": false
     },
     {
       "id": "image-moss-balanced-8step",
       "name": "image-moss-balanced-8step",
-      "label": "MOSS Balanced 极速 8步",
+      "label": "MOSS Balanced fast 8-step",
       "type": "image",
-      "description": "MOSS-Image Base+SFT 按 Balanced 预设融合（strength 1.0）后的 bf16 模型 + 8-step DMD LoRA；默认 8 步 / cfg1 / euler simple。需先跑一次融合保存生成 moss_balanced_s100.safetensors。",
+      "description": "MOSS-Image Base+SFT merged with the Balanced preset (strength 1.0) as a bf16 model plus the 8-step DMD LoRA; 8 steps / cfg 1 / euler simple by default. Run the merge once first to produce moss_balanced_s100.safetensors.",
       "file": "image-moss-balanced-8step.json",
       "bindings": {
         "prompt": {
@@ -2384,16 +2384,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "steps",
-          "label": "步数",
+          "label": "Steps",
           "type": "number",
           "min": 1,
           "max": 60,
@@ -2411,7 +2411,7 @@
         },
         {
           "key": "sampler",
-          "label": "采样器",
+          "label": "Sampler",
           "type": "select",
           "default": "euler",
           "options": [
@@ -2424,7 +2424,7 @@
         },
         {
           "key": "scheduler",
-          "label": "调度器",
+          "label": "Scheduler",
           "type": "select",
           "default": "simple",
           "options": [
@@ -2437,7 +2437,7 @@
         },
         {
           "key": "lora_strength",
-          "label": "8步 LoRA 强度",
+          "label": "8-step LoRA strength",
           "type": "number",
           "min": 0,
           "max": 2,
@@ -2457,9 +2457,9 @@
     {
       "id": "image-moss-sft-int8-8step",
       "name": "image-moss-sft-int8-8step",
-      "label": "MOSS-Image 低显存 int8 8步",
+      "label": "MOSS-Image low-VRAM int8 8-step",
       "type": "image",
-      "description": "MOSS-Image SFT int8 convrot + Qwen3.5 INT8 文本编码器 + 全量 FLUX.2 VAE + 8步 LoRA；低显存变体，不提供 Balanced。",
+      "description": "MOSS-Image SFT int8 convrot + Qwen3.5 INT8 text encoder + full FLUX.2 VAE + 8-step LoRA; the low-VRAM variant, with no Balanced merge.",
       "file": "image-moss-sft-int8-8step.json",
       "bindings": {
         "prompt": {
@@ -2535,16 +2535,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "steps",
-          "label": "步数",
+          "label": "Steps",
           "type": "number",
           "min": 1,
           "max": 60,
@@ -2562,7 +2562,7 @@
         },
         {
           "key": "sampler",
-          "label": "采样器",
+          "label": "Sampler",
           "type": "select",
           "default": "euler",
           "options": [
@@ -2575,7 +2575,7 @@
         },
         {
           "key": "scheduler",
-          "label": "调度器",
+          "label": "Scheduler",
           "type": "select",
           "default": "simple",
           "options": [
@@ -2588,7 +2588,7 @@
         },
         {
           "key": "lora_strength",
-          "label": "8步 LoRA 强度",
+          "label": "8-step LoRA strength",
           "type": "number",
           "min": 0,
           "max": 2,
@@ -2611,7 +2611,7 @@
       "label": "Krea2 Turbo",
       "type": "image",
       "file": "image-krea2-turbo.json",
-      "description": "Krea 2 Turbo FP8 文生图，Qwen3-VL 4B 文本编码器 + Qwen Image VAE；8 步蒸馏，CFG 1。",
+      "description": "Krea 2 Turbo FP8 text-to-image with the Qwen3-VL 4B text encoder and the Qwen Image VAE; 8-step distill at CFG 1.",
       "lora": {
         "filter": "Krea2|krea2|K2-"
       },
@@ -2686,16 +2686,16 @@
       "parameters": [
         {
           "key": "seed",
-          "label": "种子",
+          "label": "Seed",
           "type": "number",
           "min": 1,
           "max": 2147483647,
           "step": 1,
-          "description": "留空则每次随机"
+          "description": "Leave empty for a random seed each time"
         },
         {
           "key": "sampler",
-          "label": "采样器",
+          "label": "Sampler",
           "type": "select",
           "default": "euler",
           "options": [
@@ -2708,7 +2708,7 @@
         },
         {
           "key": "scheduler",
-          "label": "调度器",
+          "label": "Scheduler",
           "type": "select",
           "default": "simple",
           "options": [
@@ -2743,7 +2743,7 @@
         "param": "unet",
         "classType": "UNETLoader",
         "input": "unet_name",
-        "label": "底模",
+        "label": "Base model",
         "filter": "krea2",
         "prefix": "k2t",
         "aliases": {
