@@ -246,10 +246,11 @@ function statusTag(item: ResourceItem, copy: Copy) {
 }
 
 /**
- * 给禁用的控件挂一句解释。
+ * Attach an explanation to a disabled control.
  *
- * 禁用的 button/checkbox 不派发鼠标事件，Tooltip 直接套上去永远不弹，所以外面套一层 span
- * 接事件；没有 hint 时原样返回，不额外加节点。
+ * A disabled button/checkbox dispatches no mouse events, so a Tooltip wrapped around it
+ * would never open; the extra span in between receives the events instead. Without a hint
+ * the child is returned unchanged, so no extra node is added.
  */
 function WithHint({ hint, children }: { hint?: string; children: React.ReactNode }) {
     if (!hint) return <>{children}</>;
@@ -423,7 +424,7 @@ function WorkflowResourceRow({
 
 export function ResourceCenterPanel({ compact = false, footer }: { compact?: boolean; footer?: React.ReactNode }) {
     const { message, modal } = App.useApp();
-    // 网关断线由统一横幅提示，这里不再逐条弹错。
+    // A dropped gateway is reported by the shared banner; do not raise one error per request.
     const showError = (error: unknown) => {
         if (isGatewayDown()) return;
         message.error(error instanceof Error ? error.message : String(error));

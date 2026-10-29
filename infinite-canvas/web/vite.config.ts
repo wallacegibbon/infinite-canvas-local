@@ -6,7 +6,7 @@ import { defineConfig, type Plugin } from "vite";
 
 const webDir = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(webDir, "../..");
-// 版本号可选：没有 VERSION 文件时用 dev，不影响构建。
+// The version string is optional: without a VERSION file the bundle says "dev".
 const versionPath = [resolve(appRoot, "VERSION"), resolve(webDir, "../VERSION")].find((file) => existsSync(file));
 const localVersion = versionPath ? readFileSync(versionPath, "utf8").trim() || "dev" : "dev";
 

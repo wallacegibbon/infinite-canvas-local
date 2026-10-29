@@ -180,6 +180,10 @@ Three design notes worth knowing before changing anything:
 
 The backend is English-only: log lines, error messages and warnings are all English,
 and no Go package is localized. Translation lives exclusively in the canvas frontend.
+The same rule covers the rest of the repository — documentation, code comments and
+commit messages are English too, with UI copy and model-facing data as the only
+exceptions (see [`decisions.md`](decisions.md) #17 and the Language section of the
+[README](../README.md)).
 
 Error `code` values are stable (`model_not_found`, `missing_reference_image`,
 `LIMIT_FILE_SIZE`, …), so the frontend can map them to localized text instead of

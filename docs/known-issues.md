@@ -131,6 +131,10 @@ i.e. exactly when the workflow is *hidden* from the model picker.
 
 Two batches are done (47 + 10 strings); the rest is mechanical work.
 
+Not in the table, because the shape is different: `components/layout/resource-center-panel.tsx`
+(101 Chinese lines) keeps its own `copyByLocale` object with `zh` and `en` side by side instead
+of using the dictionaries. Same violation — one file, so it is the cheap place to start.
+
 **Careful** Some Chinese is *data*, not copy: the MOSS region labels and their regex, the H3
 mode strings (`文生视频(T2VA)` …) sent to the gateway, and the language glyph on the switcher.
 Those must not be translated.
@@ -184,43 +188,46 @@ git filter-repo --invert-paths \
 
 Deleting `.git` and re-initialising also works, but loses 292 commits of history.
 
+
 ---
 
-## 10. `legacy-peer-deps` is pinned until pro-components supports Ant Design 6
+## 10. Chinese prose remains in the vendored canvas docs
 
-**Symptom** `npm install` / `npm ci` in `infinite-canvas/web` aborts:
+**Where** `infinite-canvas/plugins/canvas/**/README.md` — the plugin READMEs, ~150 Chinese
+lines in 10 files (`canvas/README.md` 66, `sdk/` 19, `registry/` 18, `markdown/` 11,
+`template/` 11, the remaining five 7 each) — plus the historical
+`infinite-canvas/CHANGELOG.md` (265 Chinese lines).
 
-```
-npm error ERESOLVE could not resolve
-npm error While resolving: @ant-design/pro-components@3.0.0-beta.3
-npm error Found: antd@6.4.2
-npm error Could not resolve dependency:
-npm error peer antd@^5.11.2 from @ant-design/pro-components@3.0.0-beta.3
-```
+**Why it is listed** [decisions.md #17](decisions.md) requires English for documentation and
+comments. These files came in with the upstream canvas subtree and predate the rule.
 
-**Cause** The app is on `antd@^6`, but every published `@ant-design/pro-components`
-(`3.0.0-beta.3` and even `3.1.15-*` on the `latest` tag) still declares
-`antd: ^4.24.15 || ^5.11.2` as a peer. Nothing in the tree uses a Pro component: the only
-import is `ProConfigProvider` in `web/src/components/layout/app-providers.tsx`, a wrapper
-that just re-provides the antd theme/locale context — it runs fine on antd 6, the peer range
-is simply stale. Downgrading antd to 5 to satisfy the resolver is the wrong trade.
+**Fix** Translate the plugin READMEs first: they document the plugin API, so they are the part
+a contributor actually reads. `CHANGELOG.md` is release history — leave the existing entries as
+written and write new ones in English, or translate it wholesale if the history should read in
+one language.
 
-**Workaround in place** `infinite-canvas/web/.npmrc` sets `legacy-peer-deps=true`, so plain
-`npm ci` (and therefore `make web`) works without flags. The trade-off is that npm no longer
-fails on *any* peer conflict in that subtree, so a genuinely broken peer range would be
-installed silently.
+**Not affected** `web/src/i18n/locales/zh-CN.ts` (the translation dictionary itself),
+`internal/prompt/*` (model input, decisions #9) and ComfyUI protocol strings such as
+`文生视频(T2VA)` inside otherwise-English docs — that is quoted data, not prose.
 
-**TODO — pick one when touching the canvas deps**
+## 11. The canvas subtree ships three lockfiles, one is maintained
 
-1. Drop `@ant-design/pro-components` and replace `<ProConfigProvider dark={dark}>` with a
-   plain passthrough (or fold `dark` into the existing `ConfigProvider`). Cheapest and
-   removes ~1 MB of JS, but it changes antd's css-hash nesting — recheck dark/light tokens
-   and the `ant-app` styles in `web/src/styles/`.
-2. Or bump `@ant-design/pro-components` once a build declares `antd: ^6`, delete
-   `.npmrc`, run `npm ci` and `make web` again.
+**Symptom** `npm`, `bun` and `pnpm` lockfiles all sit in `infinite-canvas/web`
+(`package-lock.json`, `bun.lock`, `pnpm-lock.yaml`), and `pnpm-workspace.yaml` is still the
+upstream stub (`allowBuilds:
+  esbuild: set this to true or false`). Only
+`package-lock.json` is maintained, because `make web` runs `npm ci`.
 
-Either way the install has to go back to strict peer resolution, otherwise the next antd
-major upgrade is silent. Related: any antd upgrade should be validated with `make web` +
-`make web-check` (the vendor chunk in `vite.config.ts` keys on `antd`/`@ant-design`/`rc-*`,
-so a new scope would land in the generic `vendor` chunk instead).
+**Cause** The canvas was vendored with all three. Nothing in this repo selects pnpm, so
+`pnpm-lock.yaml` drifted first.
 
+**Effect right now** `@ant-design/pro-components` was removed from `package.json` and
+`package-lock.json`, but `bun.lock` and `pnpm-lock.yaml` still pin it and its 130
+dependencies, so `bun install` / `pnpm install` would resolve a different (strictly larger)
+tree than `make web`.
+
+**Fix** Pick one package manager. Given `"test": "bun test"` in `package.json`, either keep
+`bun.lock` and regenerate it with `bun install` (then add a `make` target that uses it), or
+drop `bun.lock`, `pnpm-lock.yaml` and `pnpm-workspace.yaml` and run the three `tests/` files
+under vite/vitest instead. Until then, delete the stale files once `bun install` has been run
+elsewhere, or regenerate them in the same commit that changes a dependency.

@@ -258,3 +258,49 @@ A gateway that restarts it would race with whatever the user is doing.
 **Cost** "ComfyUI is not reachable" is a normal state the UI has to handle, not an error.
 
 **Where** `internal/comfy/client.go`, `start.sh`, `README.md` (process table).
+
+---
+
+## 17. Everything written for a human is English
+
+**Decision** Documentation, code comments, log lines, error messages and commit messages are
+English. User-visible copy is not written in the source at all: it lives in the i18n
+dictionaries (`infinite-canvas/web/src/i18n`) and is translated there. The two exceptions are
+the ones already argued for: model-facing Chinese and protocol values (#9), and UI copy as
+data (#8).
+
+**Why** One prose language keeps `grep`, diffs, bug reports and commit history readable, and
+the frontend is bilingual anyway — a Chinese string in a component is not "a Chinese UI", it
+is a string that only ever renders in Chinese and cannot be reviewed by the half of the
+audience that reads English. Writing the rule down is the only way to stop the next
+contribution from adding one more.
+
+**Cost** Chinese prose that predates the rule has to be translated (tracked in
+`docs/known-issues.md` #10), and a reviewer has to reject inline copy even when it works in
+the current UI language.
+
+**Where** `README.md` (Language), `docs/gateway.md` (Language policy),
+`docs/known-issues.md` #6 and #10, decisions #8 and #9.
+
+---
+
+## 18. `@ant-design/pro-components` is dropped, not worked around
+
+**Decision** The canvas does not depend on `@ant-design/pro-components`. `AppProviders`
+wraps the tree in antd's `ConfigProvider` + `App` and nothing else.
+
+**Why** Every published build of that package declares `antd: ^4.24.15 || ^5.11.2` as a peer
+while this app runs antd 6, so `npm ci` aborted with ERESOLVE and the only way to install was
+`legacy-peer-deps=true` for the whole subtree — a flag that also silences the *next* real peer
+conflict. The single import was `ProConfigProvider`, a wrapper that only re-provides antd's
+theme and locale context (plus an SWR provider nothing used); the app has no Pro component, so
+there was nothing to keep. Removing it lets installs go back to strict peer resolution, drops
+130 packages and ~29 kB of gzipped JS.
+
+**Cost** Anyone who later wants ProTable/ProForm has to add the package back, and antd 6
+support becomes a prerequisite for that work.
+
+**Where** `infinite-canvas/web/package.json`,
+`infinite-canvas/web/src/components/layout/app-providers.tsx`. The rendered output is
+unchanged — the built page still emits `class="css-1tzwyuk ant-app"` and
+`--ant-color-bg-base:#000`, i.e. the same antd hashed theme as before the removal.

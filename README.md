@@ -49,6 +49,22 @@ the canvas frontend is a self-contained third-party subtree beside it:
 └── start.sh           # starts the gateway and previews the canvas
 ```
 
+## Language
+
+Everything written for a human is **English**: documentation, code comments, log lines, error
+messages and commit messages. Two kinds of text do not follow the rule, and only because they
+are data or user-facing copy rather than prose:
+
+- **UI copy** lives in the i18n dictionaries (`infinite-canvas/web/src/i18n`), never inline in
+  a component, so the same screen can be read in Chinese and English.
+- **Model-facing and protocol Chinese** — H3 writing instructions in `internal/prompt`, the
+  Chinese-matching regexes, and ComfyUI mode strings such as `文生视频(T2VA)` — stays Chinese
+  because translating it would change generation behaviour or break parsing.
+
+The reasoning and the exact exceptions: [`docs/decisions.md`](docs/decisions.md) #8, #9, #17.
+Chinese prose that still predates the rule is listed in
+[`docs/known-issues.md`](docs/known-issues.md) #10.
+
 ## Quick start
 
 ```bash
