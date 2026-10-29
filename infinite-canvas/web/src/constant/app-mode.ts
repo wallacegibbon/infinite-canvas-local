@@ -7,9 +7,19 @@ export const LOCAL_ONLY = import.meta.env.VITE_LOCAL_ONLY !== "0";
 
 function runtimeGatewayBaseUrl() {
     if (RUNTIME_LOCAL_GATEWAY_URL) return RUNTIME_LOCAL_GATEWAY_URL.replace(/\/+$/, "").endsWith("/v1") ? RUNTIME_LOCAL_GATEWAY_URL.replace(/\/+$/, "") : `${RUNTIME_LOCAL_GATEWAY_URL.replace(/\/+$/, "")}/v1`;
-    const host = RUNTIME_LOCAL_GATEWAY_HOST || "127.0.0.1";
+    const host = RUNTIME_LOCAL_GATEWAY_HOST || pageHostname() || "127.0.0.1";
     const port = RUNTIME_LOCAL_GATEWAY_PORT || "8190";
     return `http://${host}:${port}/v1`;
+}
+
+// The gateway listens on the machine that serves this bundle, so the page's own hostname is
+// the right address for it: a canvas opened as http://192.168.3.232:3000 must reach
+// http://192.168.3.232:8190, not the loopback of whatever device holds the browser. Only a
+// non-browser context (and a wildcard bind, which start.sh cannot turn into a URL) falls back
+// to 127.0.0.1.
+function pageHostname(): string {
+    if (typeof window === "undefined") return "";
+    return window.location?.hostname || "";
 }
 
 export const LOCAL_GATEWAY_BASE_URL = import.meta.env.VITE_LOCAL_GATEWAY_URL || runtimeGatewayBaseUrl();

@@ -84,6 +84,28 @@ ComfyUI `http://127.0.0.1:8188` must already be running; the workbench only conn
 > `web/src/` run `make web` again (`make web-check` typechecks without emitting); `./start.sh`
 > refuses to start without a bundle and says so.
 
+### Reaching the workbench from another device
+
+`HOST` is a listen address, not a policy switch: put the machine's LAN address there and the
+gateway binds it, the same way `127.0.0.1` binds loopback. Nothing else has to be enabled.
+
+```bash
+# .env
+HOST=192.168.3.232          # the gateway; also the address the browser will call
+PORT=8190
+CANVAS_HOST=192.168.3.232   # what `vite preview` serves
+CANVAS_PORT=3000
+```
+
+`./start.sh` derives everything else from those two addresses: it writes the gateway URL into
+`dist/config.js` (`window.__RUNTIME_CONFIG__.LOCAL_GATEWAY_URL`, so the browser does not fall
+back to its own loopback) and lists the canvas origin for `CORS_ORIGINS`. Open
+`http://192.168.3.232:3000` from the phone and the canvas talks to `http://192.168.3.232:8190`.
+
+Two things to know when the gateway is reachable from the network: `/api/*` is unauthenticated
+until `GATEWAY_TOKEN` is set (the gateway warns about this at startup), and `CORS_ORIGINS` is
+only needed for a canvas served from a *different* host than the gateway.
+
 Gateway endpoints and environment variables: [`docs/gateway.md`](docs/gateway.md).
 
 ## Processes and interface ownership

@@ -1,3 +1,6 @@
-// 运行时配置：构建时由 vite 从 public/ 原样复制到 dist/。
-// 留空即关闭统计等可选能力；需要时在此直接赋值 window.__RUNTIME_CONFIG__。
+// Runtime configuration, copied from public/ into dist/ at build time.
+// start.sh overwrites this file on every run with the gateway address taken from .env
+// (window.__RUNTIME_CONFIG__.LOCAL_GATEWAY_URL), so edit .env rather than this file.
+// Leaving it empty disables optional features such as analytics; assign
+// window.__RUNTIME_CONFIG__ here when a value has to be baked into the bundle.
 window.__RUNTIME_CONFIG__ = window.__RUNTIME_CONFIG__ || {};
