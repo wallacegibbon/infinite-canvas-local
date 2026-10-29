@@ -25,6 +25,8 @@ const queryClient = new QueryClient({
     },
 });
 
+// 见 docs/known-issues.md 第 10 条：本文件只用到 @ant-design/pro-components 的 ProConfigProvider
+// （仅重新提供 antd 的 theme/locale 上下文）。升级 antd 或移除该依赖前先看那条 TODO。
 export function AppProviders({ children }: { children: ReactNode }) {
     const { i18n, t } = useTranslation();
     const theme = useThemeStore((state) => state.theme);

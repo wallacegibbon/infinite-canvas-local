@@ -61,8 +61,8 @@ VITE_BIN="$ROOT/infinite-canvas/web/node_modules/.bin/vite"
 GATEWAY_BIN="$ROOT/bin/comfyui-gateway"
 
 command -v node >/dev/null 2>&1 || { echo "node not found; install Node.js first" >&2; exit 1; }
-[ -x "$VITE_BIN" ] || { echo "missing $VITE_BIN; run: cd infinite-canvas/web && npm install" >&2; exit 1; }
-[ -f "$ROOT/infinite-canvas/web/dist/index.html" ] || { echo "canvas bundle is missing; run: cd infinite-canvas/web && npm run build" >&2; exit 1; }
+[ -x "$VITE_BIN" ] || { echo "missing $VITE_BIN; run: make web-deps (or make web)" >&2; exit 1; }
+[ -f "$ROOT/infinite-canvas/web/dist/index.html" ] || { echo "canvas bundle is missing; run: make web" >&2; exit 1; }
 
 pids=()
 cleanup() {

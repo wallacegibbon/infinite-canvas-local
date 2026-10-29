@@ -10,6 +10,13 @@ GO      ?= go
 BIN_DIR := bin
 BIN     := $(BIN_DIR)/comfyui-gateway
 PKG     := .
+
+# The canvas is a separate npm project under infinite-canvas/web. `build` stays
+# Go-only on purpose (one static binary), so the bundle has its own entry points:
+# `web-deps` installs, `web` builds, `web-check` typechecks.
+WEB_DIR   := infinite-canvas/web
+NPM       ?= npm
+WEB_STAMP := $(WEB_DIR)/node_modules/.package-lock.json
 # Every Go package lives in main.go or under internal/. Listing them keeps the gates
 # off the vendored frontend: `./...` would walk infinite-canvas/web/node_modules, and a
 # stray .go file in a future npm package would then break `make check`.
@@ -22,7 +29,7 @@ LDFLAGS := -s -w
 export CGO_ENABLED := 0
 
 .DEFAULT_GOAL := build
-.PHONY: build run test test-race test-v vet fmt fmt-check lint check check-full verify-static size clean tidy web help
+.PHONY: build run test test-race test-v vet fmt fmt-check lint check check-full verify-static size clean tidy web web-deps web-check web-clean help
 
 build: ## Compile the gateway binary into bin/
 	@mkdir -p $(BIN_DIR)
@@ -32,8 +39,26 @@ build: ## Compile the gateway binary into bin/
 run: ## Run the gateway from source
 	$(GO) run $(PKG)
 
-web: ## Build the canvas bundle (infinite-canvas/web)
-	cd infinite-canvas/web && npm run build
+web-deps: ## Install canvas dependencies when node_modules is missing or stale
+	@if [ ! -f $(WEB_STAMP) ] || [ $(WEB_DIR)/package-lock.json -nt $(WEB_STAMP) ]; then \
+		echo "installing canvas dependencies ($(WEB_DIR))"; \
+		cd $(WEB_DIR) && $(NPM) ci || exit 1; \
+	else \
+		echo "canvas dependencies up to date"; \
+	fi
+
+web: ## Build the canvas bundle into infinite-canvas/web/dist
+	@$(MAKE) --no-print-directory web-deps
+	cd $(WEB_DIR) && $(NPM) run build
+	@test -f $(WEB_DIR)/dist/index.html || { echo "ERROR: canvas build produced no dist/index.html"; exit 1; }
+	@echo "built $(WEB_DIR)/dist"
+
+web-check: ## Typecheck the canvas sources (tsc --noEmit)
+	@$(MAKE) --no-print-directory web-deps
+	cd $(WEB_DIR) && $(NPM) run typecheck
+
+web-clean: ## Remove the canvas build output
+	rm -rf $(WEB_DIR)/dist
 
 test: ## Run the test suite
 	$(GO) test $(PKGS)

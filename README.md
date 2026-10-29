@@ -45,7 +45,7 @@ the canvas frontend is a self-contained third-party subtree beside it:
 ├── infinite-canvas/   # canvas frontend (third-party, ships its own web/ and build)
 ├── docs/              # gateway API and env vars, prompt optimization, runtime deps
 ├── tools/             # development scripts
-├── Makefile           # make build / check / check-full / verify-static / web
+├── Makefile           # make build / check / check-full / verify-static / web / web-check
 └── start.sh           # starts the gateway and previews the canvas
 ```
 
@@ -53,7 +53,7 @@ the canvas frontend is a self-contained third-party subtree beside it:
 
 ```bash
 # Dependencies (first run)
-(cd infinite-canvas/web && npm install --legacy-peer-deps && npm run build)   # or: make web
+make web               # installs infinite-canvas/web deps if needed, then vite build
 make build             # Go gateway, static binary; start.sh builds it too if missing
 
 # Configure and start
@@ -65,7 +65,8 @@ Canvas `http://127.0.0.1:3000` · gateway `http://127.0.0.1:8190`
 ComfyUI `http://127.0.0.1:8188` must already be running; the workbench only connects, never starts it.
 
 > The canvas bundle `infinite-canvas/web/dist/` is build output and is not tracked. After changing
-> `web/src/` run `npm run build` again; `./start.sh` refuses to start without it and says so.
+> `web/src/` run `make web` again (`make web-check` typechecks without emitting); `./start.sh`
+> refuses to start without a bundle and says so.
 
 Gateway endpoints and environment variables: [`docs/gateway.md`](docs/gateway.md).
 

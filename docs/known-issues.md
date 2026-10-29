@@ -183,3 +183,44 @@ git filter-repo --invert-paths \
 ```
 
 Deleting `.git` and re-initialising also works, but loses 292 commits of history.
+
+---
+
+## 10. `legacy-peer-deps` is pinned until pro-components supports Ant Design 6
+
+**Symptom** `npm install` / `npm ci` in `infinite-canvas/web` aborts:
+
+```
+npm error ERESOLVE could not resolve
+npm error While resolving: @ant-design/pro-components@3.0.0-beta.3
+npm error Found: antd@6.4.2
+npm error Could not resolve dependency:
+npm error peer antd@^5.11.2 from @ant-design/pro-components@3.0.0-beta.3
+```
+
+**Cause** The app is on `antd@^6`, but every published `@ant-design/pro-components`
+(`3.0.0-beta.3` and even `3.1.15-*` on the `latest` tag) still declares
+`antd: ^4.24.15 || ^5.11.2` as a peer. Nothing in the tree uses a Pro component: the only
+import is `ProConfigProvider` in `web/src/components/layout/app-providers.tsx`, a wrapper
+that just re-provides the antd theme/locale context — it runs fine on antd 6, the peer range
+is simply stale. Downgrading antd to 5 to satisfy the resolver is the wrong trade.
+
+**Workaround in place** `infinite-canvas/web/.npmrc` sets `legacy-peer-deps=true`, so plain
+`npm ci` (and therefore `make web`) works without flags. The trade-off is that npm no longer
+fails on *any* peer conflict in that subtree, so a genuinely broken peer range would be
+installed silently.
+
+**TODO — pick one when touching the canvas deps**
+
+1. Drop `@ant-design/pro-components` and replace `<ProConfigProvider dark={dark}>` with a
+   plain passthrough (or fold `dark` into the existing `ConfigProvider`). Cheapest and
+   removes ~1 MB of JS, but it changes antd's css-hash nesting — recheck dark/light tokens
+   and the `ant-app` styles in `web/src/styles/`.
+2. Or bump `@ant-design/pro-components` once a build declares `antd: ^6`, delete
+   `.npmrc`, run `npm ci` and `make web` again.
+
+Either way the install has to go back to strict peer resolution, otherwise the next antd
+major upgrade is silent. Related: any antd upgrade should be validated with `make web` +
+`make web-check` (the vendor chunk in `vite.config.ts` keys on `antd`/`@ant-design`/`rc-*`,
+so a new scope would land in the generic `vendor` chunk instead).
+
