@@ -78,10 +78,12 @@ func TestFatalWriteErrors(t *testing.T) {
 func TestSourceErrorsKeepsEveryReason(t *testing.T) {
 	failures := &sourceErrors{}
 	failures.add("modelscope.cn", errors.New("HTTP 403"))
+	// Non-ASCII causes have to survive aggregation byte for byte: mirrors answer in their own
+	// language and the panel shows what they said.
 	failures.add("hf-mirror.com", errors.New("连接超时"))
 
-	aggregated := failures.err("该资源没有可用的下载地址")
-	if aggregated.Error() == "该资源没有可用的下载地址" {
+	aggregated := failures.err("no usable download source for this resource")
+	if aggregated.Error() == "no usable download source for this resource" {
 		t.Fatal("the generic fallback replaced the real reasons")
 	}
 	for _, want := range []string{"modelscope.cn", "HTTP 403", "hf-mirror.com", "连接超时"} {
@@ -93,7 +95,7 @@ func TestSourceErrorsKeepsEveryReason(t *testing.T) {
 
 func TestSourceErrorsFallsBackWhenEmpty(t *testing.T) {
 	failures := &sourceErrors{}
-	if got := failures.err("没有可用地址").Error(); got != "没有可用地址" {
+	if got := failures.err("no usable source").Error(); got != "no usable source" {
 		t.Errorf("fallback = %q", got)
 	}
 }
@@ -102,7 +104,7 @@ func TestSourceErrorsEscalatesDiskFailure(t *testing.T) {
 	failures := &sourceErrors{}
 	failures.add("modelscope.cn", syscall.ENOSPC)
 
-	aggregated := failures.err("没有可用地址")
+	aggregated := failures.err("no usable source")
 	if !isFatal(aggregated) {
 		t.Error("a disk-full failure must escalate to fatal so the job stops")
 	}

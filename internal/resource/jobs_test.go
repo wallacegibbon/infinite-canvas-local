@@ -176,7 +176,7 @@ poll:
 	manager.mu.Unlock()
 	// downloadFile's last phase is the checksum; only the job runner marks "done".
 	if finalStatus != "verifying" {
-		t.Errorf("final item status = %q, want \"verifying\" (the panel shows 校验中 there)", finalStatus)
+		t.Errorf("final item status = %q, want \"verifying\" (the panel maps it to its verifying copy)", finalStatus)
 	}
 	if finalBytes != int64(len(payload)) {
 		t.Errorf("final byte counter = %d, want %d", finalBytes, len(payload))
