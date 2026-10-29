@@ -6,6 +6,33 @@ export default {
     theme: { toggle: "切换主题" },
     gateway: {
         reconnecting: "本地网关连接断开，正在自动重连…",
+        // Workflow metadata arrives in English from workflows/registry.json; these are the
+        // Chinese labels for the workflows that ship here, keyed by the model id and variant
+        // mode the gateway sends. Unknown ids fall back to the English text — see
+        // src/lib/gateway-labels.ts.
+        models: {
+            "video-h3-ref2va": { label: "H3 多参（VDN）" },
+            "video-h3-t2v": { label: "H3 文生视频（VDN）" },
+            "video-h3-frames": { label: "H3 首尾帧（VDN）" },
+            "video-h3-ref2va-novdn": { label: "H3 多参（无 VDN）" },
+            "video-h3-t2v-novdn": { label: "H3 文生视频（无 VDN）" },
+            "video-h3-frames-novdn": { label: "H3 首尾帧（无 VDN）" },
+            "video-h3-character-swap": { label: "H3 角色替换（Character Swap 1.5）" },
+            "video-ESRGAN_2x放大": { label: "ESRGAN 2x 放大" },
+            "video-seedvr2-upscale": { label: "SeedVR2 视频超分" },
+            "image-seedvr2-upscale": { label: "SeedVR2 超分" },
+            "image-esrgan-upscale": { label: "ESRGAN 快速放大" },
+            "image-moss-sft-8step": { label: "MOSS-Image 极速 8 步" },
+            "image-moss-balanced-8step": { label: "MOSS Balanced 极速 8 步" },
+            "image-moss-sft-int8-8step": { label: "MOSS-Image 低显存 int8 8 步" },
+            "image-qwen21-angle": { label: "Qwen Image 2.1 多角度" },
+        },
+        variants: {
+            t2i: "文生图",
+            edit: "多图编辑",
+            inpaint: "局部重绘",
+            outpaint: "扩图",
+        },
     },
     common: {
         cancel: "取消",
@@ -39,7 +66,7 @@ export default {
         video: { title: "视频设置", quality: "清晰度", size: "尺寸", seconds: "秒数", followSource: "跟随原视频", interpolation: "插帧", interpolationOff: "关闭", interpolation2x: "2×", interpolation3x: "3×", interpolationHint: "RIFE 后处理，生成后约增加 20–35 秒；仅本地网关生效", selfLiftMode: "精修", selfLiftFast: "快速", selfLiftQuality: "质量", selfLiftHint: "两档总 NFE 相同；质量档把更多步放在全分辨率", speedTier: "速度档", speedTierTurbo: "极速", speedTierFast: "快速", mode: "模式", modes: { frames: "首尾帧模式", text: "文生", textH3: "文生", framesH3: "首尾帧", reference: "全能参考模式", referenceH3: "多参", textHint: "纯文生：不接任何图片/音频/视频", framesHint: "首尾帧：1–2 张图；可选首帧、尾帧或首尾帧", referenceHint: "多参：1–6 图 + 0–2 音频 + 0–1 视频，至少一种媒体；不支持首尾帧", framePosition: "首尾帧位置", firstFrame: "首帧", lastFrame: "尾帧", bothFrames: "首尾帧" }, resolution: "分辨率", ratio: "比例", duration: "时长", smart: "智能", output: "输出", generateAudio: "生成声音", watermark: "添加水印", adaptive: "自适应", sizes: { landscape: "横屏", portrait: "竖屏", square: "方形", widescreen: "宽屏", tall: "长图", auto: "自动" }, ratios: { landscape: "横屏", portrait: "竖屏", square: "方形", standardLandscape: "标准横屏", standardPortrait: "标准竖屏", cinematic: "宽银幕", adaptive: "自适应" } },
         audio: { title: "音频设置", voice: "声音", format: "格式", speed: "语速", instructions: "声音指令", instructionsPlaceholder: "例如：自然、温暖、适合旁白。" },
         text: { title: "文本设置", reasoning: "推理强度", count: "生成次数" },
-        model: { select: "选择模型", assign: "请先在渠道里为{{capability}}指定模型", noMatch: "暂无匹配的{{capability}}模型", addFirst: "请先到配置里添加渠道和模型", defaultBase: "默认底模", capabilities: { image: "生图", video: "视频", text: "文本", audio: "音频" } },
+        model: { select: "选择模型", withChannel: "{{model}}（{{channel}}）", assign: "请先在渠道里为{{capability}}指定模型", noMatch: "暂无匹配的{{capability}}模型", addFirst: "请先到配置里添加渠道和模型", defaultBase: "默认底模", capabilities: { image: "生图", video: "视频", text: "文本", audio: "音频" } },
     },
     generation: { pending: ["正在创建图片", "马上就好了", "再等等", "正在整理细节"] },
     imageReferences: { label: "图片{{index}}", separator: "、", promptPrefix: "参考图片编号：{{labels}}。请按这些编号理解提示词中的图片引用。\n\n{{prompt}}" },

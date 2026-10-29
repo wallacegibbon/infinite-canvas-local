@@ -327,3 +327,43 @@ only ever an accident waiting to happen.
 **Where** `internal/config/config.go`, `internal/httpx/middleware.go` (`sameHostOrigin`),
 `main.go`, `.env.example`, `docs/gateway.md`.
 
+
+---
+
+## 20. Workflow metadata is English in the registry and translated by id in the canvas
+
+**Decision** `workflows/registry.json` carries English `label`, `description`, `variantLabels`
+and `parameters[].label/description` — it is data the gateway serves, so it follows #8. The
+canvas translates the strings it displays, in `web/src/lib/gateway-labels.ts`, keyed by the
+stable identifier the gateway already sends:
+
+```ts
+gatewayModelLabel(modelId, gatewayLabel)   // gateway.models.<id>.label
+gatewayVariantLabel(mode, gatewayLabel)    // gateway.variants.<mode>
+gatewayModelDescription(modelId, gatewayLabel)
+```
+
+An id the dictionary does not know falls back to the English text, so a hand-written or
+newly added workflow still renders instead of showing a raw key.
+
+**Why not bilingual registry strings** A `{ "zh": …, "en": … }` shape would have changed the
+`/v1/models` contract, every consumer of `metadata.label`, and the registry schema, for
+metadata that only the canvas displays. Ids (`image-moss-sft-8step`, `inpaint`) are already in
+the response and cannot change without breaking stored channel configs, which makes them the
+natural dictionary key.
+
+**Why the lookup names the language explicitly** `src/i18n/index.ts` sets
+`fallbackLng: "zh-CN"`, so a plain `t()` answers with Chinese in the English UI as well. The
+helper asks `getFixedT("zh-CN")` and only when `resolvedLanguage` is `zh-CN`.
+
+**Cost** Two places describe one workflow: the registry (English, API consumers) and the
+dictionary (Chinese, this UI). A workflow added by hand shows English in both languages until
+someone adds the zh entries — visible, not silent.
+
+**Where** `workflows/registry.json`, `infinite-canvas/web/src/lib/gateway-labels.ts`,
+`web/src/i18n/locales/zh-CN.ts` (`gateway.models`, `gateway.variants`), `use-config-store.ts`
+(`modelOptionLabel`, `baseModelOptions`), `resource-center-panel.tsx` (variant list).
+
+**Not translated on purpose** `parameters[].label/description` for the API and plugin consumers
+stay English only (nothing in the canvas renders them yet), `bindings.prompt.default` is model
+input (#9), and `name` / `source.name` / `lora.filter` are identifiers and patterns.

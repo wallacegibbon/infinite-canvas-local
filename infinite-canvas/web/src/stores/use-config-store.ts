@@ -4,6 +4,7 @@ import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
+import { gatewayModelLabel } from "@/lib/gateway-labels";
 import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_GATEWAY_CHANNEL_ID, LOCAL_GATEWAY_MODELS, LOCAL_GATEWAY_MODEL_VALUES, LOCAL_ONLY } from "@/constant/app-mode";
 import { normalizeProgressRingSkin, type ProgressRingSkinId } from "@/lib/canvas/progress-ring-skins";
 
@@ -296,7 +297,7 @@ export function baseModelOptions(config: AiConfig, value: string) {
         .filter((model) => model.workflowId === workflowId)
         .map((model) => ({
             value: encodeChannelModel(found.channel.id, model.name),
-            label: model.baseModelLabel || model.label || model.name,
+            label: gatewayModelLabel(model.name, model.baseModelLabel || model.label || model.name),
             isDefault: !model.baseModel,
             name: model.name,
         }));
@@ -667,8 +668,11 @@ export function modelOptionLabel(config: AiConfig, value: string) {
     if (!decoded) return value;
     const channel = config.channels.find((item) => item.id === decoded.channelId);
     const model = channel?.models.find((item) => item.name === decoded.model);
-    if (model?.label) return model.label;
-    return channel ? `${decoded.model}（${channel.name}）` : decoded.model;
+    // The label arrives in English from the gateway registry; the dictionary supplies the
+    // Chinese one, keyed by the model id, and the gateway text is the fallback.
+    const label = gatewayModelLabel(decoded.model, model?.label);
+    if (label !== decoded.model) return label;
+    return channel ? i18n.t("settingsPanels.model.withChannel", { model: decoded.model, channel: channel.name }) : decoded.model;
 }
 
 export function modelOptionsFromChannels(channels: ModelChannel[]) {

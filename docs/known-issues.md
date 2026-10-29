@@ -243,28 +243,3 @@ tree than `make web`.
 drop `bun.lock`, `pnpm-lock.yaml` and `pnpm-workspace.yaml` and run the three `tests/` files
 under vite/vitest instead. Until then, delete the stale files once `bun install` has been run
 elsewhere, or regenerate them in the same commit that changes a dependency.
-
-## 12. The workflow registry sends Chinese labels to the model picker
-
-**Symptom** `/v1/models` and `/api/resources/status` return half-translated metadata, and the
-canvas renders it verbatim: model labels (`MOSS-Image 极速 8步`, `H3 首尾帧（VDN）`), workflow
-descriptions (`SeedVR2 7B 图像超分；目标短边可调…`) and parameter labels
-(`种子`, `步数`, `采样器`, `底模`), while some neighbouring description fields are already
-English (`Switch the base model for this workflow; the CLIP and VAE must match it.`).
-
-**Cause** `workflows/registry.json` is authored by hand next to the workflow graphs; 136 lines
-of it are Chinese, in exactly the fields the canvas displays. [decisions #8](decisions.md) puts
-backend text in English, but this file is data the frontend cannot translate: the canvas has no
-mapping from a registry string to a dictionary key.
-
-**Fix** Rewrite the user-visible fields of the registry in English (`label`, `description`,
-`variantLabels`, `variants.*.label/description`, `parameters[].label/description`,
-`baseModels[].label`). Leave the identifiers alone — `workflows[].name`, `source.name` and
-`lora.filter` are matched, not displayed. The default prompt in `bindings.prompt.default` is
-model input, so it follows decisions #9 rather than this rule.
-
-**Scale** 53 distinct strings: 66 parameter labels, 24 parameter descriptions, 15 model labels,
-7 workflow descriptions.
-
-**Alternative** Keep Chinese and teach the frontend to translate registry metadata by key,
-which is the correct answer only if the registry is meant to stay bilingual.

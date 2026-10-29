@@ -19,6 +19,7 @@ import {
     type ResourcePack,
     type ResourceStatus,
 } from "@/services/api/resources";
+import { gatewayVariantLabel } from "@/lib/gateway-labels";
 import { isGatewayDown } from "@/services/api/gateway-status";
 
 const copyByLocale = {
@@ -954,7 +955,11 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                                     </div>
                                                                     <div className={`truncate text-[10px] ${workflow.enabled === false ? "text-stone-400 dark:text-stone-500" : "text-emerald-700/70 dark:text-emerald-300/60"}`}>{workflow.id}</div>
                                                                     {Object.values(workflow.variantLabels || {}).length ? (
-                                                                        <div className="mt-0.5 truncate text-[10px] text-stone-400 dark:text-stone-500">{Object.values(workflow.variantLabels || {}).join(" · ")}</div>
+                                                                        <div className="mt-0.5 truncate text-[10px] text-stone-400 dark:text-stone-500">
+                                                                            {Object.entries(workflow.variantLabels || {})
+                                                                                .map(([mode, label]) => gatewayVariantLabel(mode, label))
+                                                                                .join(" · ")}
+                                                                        </div>
                                                                     ) : null}
                                                                 </button>
                                                                 {workflow.modelVisible === false ? (
