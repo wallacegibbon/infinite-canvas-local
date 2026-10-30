@@ -101,13 +101,13 @@ ComfyUI `http://127.0.0.1:8188` must already be running; the workbench only conn
 
 ### Reaching the workbench from another device
 
-`HOST` is a listen address, not a policy switch: put the machine's LAN address there and the
+`GATEWAY_HOST` is a listen address, not a policy switch: put the machine's LAN address there and the
 gateway binds it, the same way `127.0.0.1` binds loopback. Nothing else has to be enabled.
 
 ```bash
 # .env
-HOST=192.168.3.232          # the gateway; also the address the browser will call
-PORT=8190
+GATEWAY_HOST=192.168.3.232  # the gateway; also the address the browser will call
+GATEWAY_PORT=8190
 CANVAS_HOST=192.168.3.232   # what `vite preview` serves
 CANVAS_PORT=3000
 ```

@@ -20,8 +20,11 @@ const Version = "0.1.0"
 // immutable after construction, so it may be shared across goroutines.
 type Config struct {
 	RootDir string
-	Port    int
-	Host    string
+	// GatewayHost/GatewayPort are the gateway's own listen address, so they are named that way:
+	// a bare HOST/PORT is what every other tool in an environment also sets, and picking those
+	// up by accident is a real bug (a stray PORT=3000 would move the gateway).
+	GatewayPort int
+	GatewayHost string
 
 	ComfyURL            string
 	ComfyPython         string
@@ -61,11 +64,11 @@ type Config struct {
 // Option overrides a single field, mirroring the old loadConfig(overrides).
 type Option func(*Config)
 
-// WithPort overrides the listen port.
-func WithPort(port int) Option { return func(c *Config) { c.Port = port } }
+// WithGatewayPort overrides the listen port.
+func WithGatewayPort(port int) Option { return func(c *Config) { c.GatewayPort = port } }
 
-// WithHost overrides the listen address.
-func WithHost(host string) Option { return func(c *Config) { c.Host = host } }
+// WithGatewayHost overrides the listen address.
+func WithGatewayHost(host string) Option { return func(c *Config) { c.GatewayHost = host } }
 
 // WithComfyURL overrides the ComfyUI base URL.
 func WithComfyURL(url string) Option { return func(c *Config) { c.ComfyURL = url } }
@@ -105,8 +108,8 @@ func Load(opts ...Option) (*Config, error) {
 
 	cfg := &Config{
 		RootDir:             root,
-		Port:                intValue(os.Getenv("PORT"), 8190),
-		Host:                stringOr(os.Getenv("HOST"), "127.0.0.1"),
+		GatewayPort:         intValue(os.Getenv("GATEWAY_PORT"), 8190),
+		GatewayHost:         stringOr(os.Getenv("GATEWAY_HOST"), "127.0.0.1"),
 		ComfyURL:            stringOr(os.Getenv("COMFY_URL"), "http://127.0.0.1:8188"),
 		ComfyPython:         strings.TrimSpace(os.Getenv("COMFY_PYTHON")),
 		ComfyModelsShared:   boolValue(os.Getenv("COMFY_MODELS_SHARED")),
@@ -148,11 +151,11 @@ func Load(opts ...Option) (*Config, error) {
 	cfg.ComfyURL = strings.TrimRight(cfg.ComfyURL, "/")
 
 	if cfg.PublicBaseURL == "" {
-		cfg.PublicBaseURL = fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
+		cfg.PublicBaseURL = fmt.Sprintf("http://%s:%d", cfg.GatewayHost, cfg.GatewayPort)
 	}
 	cfg.PublicBaseURL = strings.TrimRight(cfg.PublicBaseURL, "/")
 
-	// HOST is bound exactly as given: 192.168.3.232 is as much "local" as 127.0.0.1 for
+	// GATEWAY_HOST is bound exactly as given: 192.168.3.232 is as much "local" as 127.0.0.1 for
 	// someone who wants their phone on the same network, and a gateway that refuses to start
 	// teaches nothing. main.go warns when the bind is reachable from the network and /api/*
 	// has no token, which is the part that actually matters.

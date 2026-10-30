@@ -147,7 +147,7 @@ func newTestGateway(t *testing.T, fake *fakeComfy) *Server {
 		config.WithWorkflowDir(workflowDir),
 		config.WithDataDir(dataDir),
 		config.WithOutputDir(outputDir),
-		config.WithHost("127.0.0.1"),
+		config.WithGatewayHost("127.0.0.1"),
 		config.WithoutScanOnStart(),
 		config.WithPollInterval(10),
 		config.WithRequestTimeout(5000),

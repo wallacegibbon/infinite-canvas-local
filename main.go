@@ -41,11 +41,11 @@ func run() error {
 		return err
 	}
 
-	if !config.IsLoopbackHost(cfg.Host) && cfg.GatewayToken == "" {
-		logger.Warn("listening on %s without GATEWAY_TOKEN: /api/* is unauthenticated for anyone who can reach this address", cfg.Host)
+	if !config.IsLoopbackHost(cfg.GatewayHost) && cfg.GatewayToken == "" {
+		logger.Warn("listening on %s without GATEWAY_TOKEN: /api/* is unauthenticated for anyone who can reach this address", cfg.GatewayHost)
 	}
 
-	address := net.JoinHostPort(cfg.Host, fmt.Sprint(cfg.Port))
+	address := net.JoinHostPort(cfg.GatewayHost, fmt.Sprint(cfg.GatewayPort))
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return fmt.Errorf("cannot listen on %s: %w", address, err)

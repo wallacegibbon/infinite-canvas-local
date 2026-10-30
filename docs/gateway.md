@@ -68,19 +68,19 @@ Every variable is optional; the defaults match the previous implementation.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `HOST` | `127.0.0.1` | Listen address, bound as given. `0.0.0.0` accepts every interface. |
-| `PORT` | `8190` | Listen port. |
+| `GATEWAY_HOST` | `127.0.0.1` | Gateway listen address, bound as given. `0.0.0.0` accepts every interface. |
+| `GATEWAY_PORT` | `8190` | Gateway listen port. |
 | `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI base URL. |
 | `COMFY_PYTHON` | *(empty)* | Interpreter shown in the "runtime deps" hint. |
 | `COMFY_MODELS_SHARED` | *(empty)* | `1` = the gateway can write into ComfyUI's model folders (same machine, or a mount). Model installs stay off without it. |
 | `WORKFLOW_DIR` | `<root>/workflows` | Registry directory. |
 | `DATA_DIR` | `<root>/data` | Tasks, locks, preferences. |
 | `OUTPUT_DIR` | `<data>/outputs` | Generated files served under `/files/`. |
-| `PUBLIC_BASE_URL` | `http://HOST:PORT` | Absolute prefix for returned URLs. |
+| `PUBLIC_BASE_URL` | `http://GATEWAY_HOST:GATEWAY_PORT` | Absolute prefix for returned URLs. |
 | `CORS_ORIGINS` | canvas + ComfyUI origins | Extra allow list for canvases on another host. A canvas on the gateway's own host is allowed by rule. `*` is refused. |
 
-`HOST` is not a policy switch: `HOST=192.168.3.232` binds the LAN address exactly like
-`127.0.0.1` binds loopback, and the gateway says so in a startup warning when that address is
+`GATEWAY_HOST` is not a policy switch: `GATEWAY_HOST=192.168.3.232` binds the LAN address exactly
+like `127.0.0.1` binds loopback, and the gateway says so in a startup warning when that address is
 reachable from the network and no `GATEWAY_TOKEN` is set. Browser access is allowed when the
 canvas is served from the same host name as the gateway — the usual `:3000` canvas and `:8190`
 gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a *different* host does.

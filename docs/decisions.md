@@ -308,9 +308,9 @@ unchanged — the built page still emits `class="css-1tzwyuk ant-app"` and
 
 ---
 
-## 19. `HOST` is bound as given; there is no `ALLOW_REMOTE`
+## 19. `GATEWAY_HOST` is bound as given; there is no `ALLOW_REMOTE`
 
-**Decision** The gateway listens on whatever `HOST` says, loopback or LAN address, with no
+**Decision** The gateway listens on whatever `GATEWAY_HOST` says, loopback or LAN address, with no
 second switch. `ALLOW_REMOTE` is gone, and so is the startup refusal it gated. What remains is
 a warning when the address is reachable from the network and no `GATEWAY_TOKEN` is set.
 
@@ -321,7 +321,7 @@ the gateway exited, and the UI showed "gateway disconnected". The real risk is n
 address but an unauthenticated `/api/*`, and that is what the warning names.
 
 **Cost** One keystroke less between a machine and the network. Anyone who wants the old
-behaviour back has `HOST=127.0.0.1`, which is still the default. `CORS_ORIGINS` no longer
+behaviour back has `GATEWAY_HOST=127.0.0.1`, which is still the default. `CORS_ORIGINS` no longer
 accepts `*` under any condition — the canvas origin is matched by host, so the wildcard was
 only ever an accident waiting to happen.
 

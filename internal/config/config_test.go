@@ -11,7 +11,7 @@ import (
 func isolateEnv(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{
-		"PORT", "HOST", "COMFY_URL", "COMFY_PYTHON", "COMFY_FRONTEND_DIR",
+		"GATEWAY_PORT", "GATEWAY_HOST", "COMFY_URL", "COMFY_PYTHON", "COMFY_FRONTEND_DIR",
 		"COMFY_MODELS_SHARED",
 		"SCAN_ON_START",
 		"WORKFLOW_DIR", "DATA_DIR", "OUTPUT_DIR", "PUBLIC_BASE_URL", "CORS_ORIGINS",
@@ -37,8 +37,8 @@ func TestDefaults(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 
-	if cfg.Port != 8190 || cfg.Host != "127.0.0.1" {
-		t.Errorf("listen = %s:%d", cfg.Host, cfg.Port)
+	if cfg.GatewayPort != 8190 || cfg.GatewayHost != "127.0.0.1" {
+		t.Errorf("listen = %s:%d", cfg.GatewayHost, cfg.GatewayPort)
 	}
 	if cfg.ComfyURL != "http://127.0.0.1:8188" {
 		t.Errorf("ComfyURL = %q", cfg.ComfyURL)
@@ -60,7 +60,7 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
-// HOST is bound as given. A LAN address is how the workbench is reached from a phone, so there
+// GATEWAY_HOST is bound as given. A LAN address is how the workbench is reached from a phone, so there
 // is no second switch to remember: the only thing the gateway still refuses is a wildcard CORS
 // list, because that hands /v1/* to any page in the browser.
 func TestNonLoopbackHostIsAccepted(t *testing.T) {
@@ -69,17 +69,17 @@ func TestNonLoopbackHostIsAccepted(t *testing.T) {
 	t.Setenv("GATEWAY_ROOT", root)
 	t.Setenv("DATA_DIR", filepath.Join(root, "data"))
 	t.Setenv("OUTPUT_DIR", filepath.Join(root, "out"))
-	t.Setenv("HOST", "192.168.3.232")
+	t.Setenv("GATEWAY_HOST", "192.168.3.232")
 
 	cfg, err := Load()
 	if err != nil {
-		t.Fatalf("Load with a LAN HOST: %v", err)
+		t.Fatalf("Load with a LAN GATEWAY_HOST: %v", err)
 	}
-	if cfg.Host != "192.168.3.232" {
-		t.Errorf("host = %q", cfg.Host)
+	if cfg.GatewayHost != "192.168.3.232" {
+		t.Errorf("gateway host = %q", cfg.GatewayHost)
 	}
 	if cfg.PublicBaseURL != "http://192.168.3.232:8190" {
-		t.Errorf("public base url = %q, want it derived from HOST", cfg.PublicBaseURL)
+		t.Errorf("public base url = %q, want it derived from GATEWAY_HOST", cfg.PublicBaseURL)
 	}
 }
 
@@ -102,7 +102,7 @@ func TestInvalidNumbersFallBack(t *testing.T) {
 	t.Setenv("GATEWAY_ROOT", root)
 	t.Setenv("DATA_DIR", filepath.Join(root, "data"))
 	t.Setenv("OUTPUT_DIR", filepath.Join(root, "out"))
-	t.Setenv("PORT", "not-a-number")
+	t.Setenv("GATEWAY_PORT", "not-a-number")
 	t.Setenv("POLL_INTERVAL_MS", "-5")
 	t.Setenv("MAX_IMAGE_COUNT", "abc")
 
@@ -110,8 +110,8 @@ func TestInvalidNumbersFallBack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Port != 8190 {
-		t.Errorf("Port = %d, want the default", cfg.Port)
+	if cfg.GatewayPort != 8190 {
+		t.Errorf("GatewayPort = %d, want the default", cfg.GatewayPort)
 	}
 	if cfg.PollIntervalMs != 750 {
 		t.Errorf("PollIntervalMs = %d, want the default", cfg.PollIntervalMs)
