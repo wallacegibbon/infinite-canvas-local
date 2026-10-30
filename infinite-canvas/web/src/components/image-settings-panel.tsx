@@ -7,19 +7,10 @@ import { type CanvasTheme } from "@/lib/canvas-theme";
 import { computeMediaSize, inferMediaRatio, inferMediaScale, mediaRatioOptions, mediaScaleOptions, readMediaDimensions } from "@/lib/media-size";
 import type { AiConfig } from "@/stores/use-config-store";
 
-const qualityOptions = [
-    { value: "auto", labelKey: "auto" },
-    { value: "low", labelKey: "low" },
-    { value: "medium", labelKey: "medium" },
-    { value: "high", labelKey: "high" },
-    { value: "xhigh", labelKey: "xhigh" },
-    { value: "max", labelKey: "max" },
-];
 const DIMENSION_STEP = 16;
 
-export const imageQualityOptions = qualityOptions.map((item) => ({ value: item.value, get label() { return i18n.t(`settingsPanels.common.${item.labelKey}`); } }));
+/** Read by the config modal's aspect-ratio select. */
 export const imageAspectOptions = mediaRatioOptions.map((item) => ({ value: item.value, label: item.value === "auto" ? i18n.t("settingsPanels.common.auto") : item.value }));
-export const imageScaleOptions = mediaScaleOptions.map((value) => ({ value, label: value === "auto" ? i18n.t("settingsPanels.common.auto") : value }));
 
 type ImageSettingsPanelProps = {
     config: AiConfig;
@@ -196,9 +187,6 @@ function randomSeed() {
     return Math.floor(Math.random() * 2147483646) + 1;
 }
 
-export function imageQualityLabel(value: string) {
-    return qualityOptions.some((item) => item.value === value) ? i18n.t(`settingsPanels.common.${value}`) : value;
-}
 
 export function imageSizeLabel(size: string) {
     const scale = inferMediaScale(size);

@@ -22,8 +22,6 @@ const videoModeOptions = [
 ];
 
 export const videoResolutionOptions = resolutionOptions.map((item) => ({ value: item.value, label: item.label }));
-export const videoSizeOptions = videoRatioOptions.map((item) => ({ value: item.value, get label() { return item.value === "auto" ? i18n.t("settingsPanels.common.auto") : item.value; } }));
-export const videoSecondsRange = { min: VIDEO_SECONDS_MIN, max: VIDEO_SECONDS_MAX };
 
 type VideoSettingsPanelProps = {
     config: AiConfig;

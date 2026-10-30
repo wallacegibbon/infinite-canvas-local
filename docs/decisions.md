@@ -866,3 +866,45 @@ So the pruning pass took `prompts`, `imageWorkbench`, `videoWorkbench` and the d
 route.
 
 **Where** `src/i18n/locales/{zh-CN,en-US}.ts`.
+
+---
+
+## 35. What the dependency audit removed, and what it kept against its own rule
+
+**Removed** `@uiw/react-codemirror`, `@codemirror/lang-javascript`, `@codemirror/lang-json` (the
+model script editor that used them was deleted in #28), `@tanstack/react-query` (only the provider
+was rendered; no `useQuery` anywhere, so the client was a cache that always stayed empty),
+`class-variance-authority` (no `cva()`), `react-router` (redundant — `react-router-dom` 7 declares
+it as a regular dependency), and `streamdown` (a markdown renderer whose components were never
+used; only its stylesheet was imported, for a `.agent-streamdown` element that no longer exists,
+which also took 147 lines of dead CSS with it).
+
+**Moved to `devDependencies`** `tailwindcss`, `tw-animate-css`, `shadcn` — resolved when the CSS is
+built, never at runtime.
+
+**Kept even though each is small and single-use**, because replacing them is a rewrite, not a
+deletion, and each one earns its place:
+
+- `copy-to-clipboard` — `navigator.clipboard` is **undefined on a plain-HTTP origin**, which is what
+  this app is served from (`http://192.168.3.232:3000`). Its `execCommand` fallback is load-bearing.
+- `nanoid` — for the same reason the codebase avoids `crypto.randomUUID`: that API only exists in a
+  secure context. `nanoid` works over plain HTTP.
+- `three` — the angle dialog's camera-orbit preview.
+- `motion` — the canvas side panel's animation.
+- `fflate` — the asset package zip. `axios`, `file-saver`, `localforage` — the network, download and
+  storage layers.
+
+**Also removed while auditing** two analytics IDs in `constant/runtime-config.ts`. Nothing imported
+them, no script was ever assembled, and no docs or `.env` entry mentioned them, so the feature was
+never wired to anything.
+
+**The rule applied to the kit's own props** Three props were declared in a component's type, passed
+by a call site, and never read by the implementation: `Alert.showIcon`, `Empty.image`,
+`Dropdown.trigger`. A prop that lies is worse than a missing one — the call site looks configured.
+Five more were implemented but never exercised (`Space.direction`, `Field.htmlFor`,
+`TagInput.disabled`, `Tag`'s red and purple) and were deleted so the branches cannot rot.
+
+**One list left alone on purpose** ~120 exported symbols have no importer. Most are types in
+`types/canvas-plugin.ts`, which is the **published plugin contract** mirrored by
+`plugins/canvas/sdk/src/types.ts` — plugin authors import them, so "unused in this repo" means the
+opposite of dead. The rest are candidates for a later pass, one at a time, with a browser.
