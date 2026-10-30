@@ -1195,3 +1195,40 @@ panel open while a crop dialog floats above it). Only the modal ten were collaps
 almost all of them mechanical renames the compiler checked.
 
 **Where** `infinite-canvas/web/src/pages/canvas/project.tsx`.
+
+## 43. The node editors are a module with a nine-key contract, not a closure
+
+**Decision** Nine editors moved out of `project.tsx` into
+`pages/canvas/hooks/use-image-editors.ts` (crop, split, mask, outpaint, MOSS layout, super-resolve,
+fast upscale, multi-angle) and `pages/canvas/hooks/use-video-editors.ts` (video upscale, frame
+interpolation). `project.tsx` was 3,981 lines; it is now 3,459. Five modules appeared:
+the two hooks, `hooks/node-editor-deps.ts` (a type), `lib/canvas/canvas-generated-video.ts` and
+`lib/canvas/canvas-node-status.ts`.
+
+**Why these nine and not "generation"** They were the only large, genuinely closed region left.
+Every one of them follows the same shape — take the node you were handed, append a child beside it,
+wire a connection, select the child, open its composer, and (where it generates) drive exactly one
+request. Not one of them *reads* the graph. That is what made the extraction honest: the whole
+surface they need is six setters, two request-registry calls and `closeNodeTool`. Everything else —
+`effectiveConfig`, `isAiConfigReady`, `openConfigDialog`, `t` — they can read themselves from the
+stores, so it is not in the contract.
+
+`dialogNodeId` and the ten-entry `activeNodeTool` record stayed in the page: the page owns *which*
+editor is open, the editor module only owns what happens once you press confirm. Rendering the ten
+dialogs stayed in the page too — they are page furniture, positioned against page state.
+
+**Two things fell out of the move**
+
+- `applyGeneratedVideo` and the 420 px video cap were used by both the poller (which stays) and the
+  video editors (which left), so they went to `lib/canvas/canvas-generated-video.ts` rather than
+  being duplicated or imported page-ward from a hook.
+- `NODE_STATUS_*` were four `"idle" | "loading" | "success" | "error"` literals declared in
+  `project.tsx` and re-typed by hand in the node components. Now that two more modules needed them
+  they moved to `lib/canvas/canvas-node-status.ts`.
+
+**What this is not** It is not a line-count win: 522 lines left the page and 603 arrived elsewhere,
+because each hook carries its own imports and the contract type is written down instead of being
+implicit. The win is that "what a node editor may touch" is now a 23-line type you can read in one
+screen, and that proving an editor correct no longer means standing up a 3,459-line component.
+
+**Where** `infinite-canvas/web/src/pages/canvas/hooks/`, `infinite-canvas/web/src/lib/canvas/`.

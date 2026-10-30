@@ -7,21 +7,24 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
-import { requestEdit, requestGeneration, requestImageAngle, requestImageQuestion, requestUpscale } from "@/services/api/image";
+import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
 import { bindStepProgress, unbindStepProgress } from "@/services/api/step-progress";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
-import { createVideoGenerationTask, createVideoInterpolateTask, createVideoUpscaleTask, isVideoTaskFailed, storeGeneratedVideo, waitForVideoGenerationTask, type VideoPreview } from "@/services/api/video";
-import { channelModelOf, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { createVideoGenerationTask, isVideoTaskFailed, storeGeneratedVideo, waitForVideoGenerationTask, type VideoPreview } from "@/services/api/video";
+import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { ensureImagePreview, resolveImageUrl, uploadImage } from "@/services/image-storage";
-import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
+import { uploadMediaFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
-import { imageReferenceLabel } from "@/lib/image-reference-prompt";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { cropDataUrl, splitDataUrl } from "@/lib/canvas/canvas-image-data";
 import { fitNodeSize, nodeSizeFromRatio } from "@/lib/canvas/canvas-node-size";
+import { VIDEO_NODE_MAX_HEIGHT, VIDEO_NODE_MAX_WIDTH, applyGeneratedVideo } from "@/lib/canvas/canvas-generated-video";
+import { NODE_STATUS_ERROR, NODE_STATUS_IDLE, NODE_STATUS_LOADING, NODE_STATUS_SUCCESS } from "@/lib/canvas/canvas-node-status";
+import { useImageEditors } from "@/pages/canvas/hooks/use-image-editors";
+import { useVideoEditors } from "@/pages/canvas/hooks/use-video-editors";
+import type { NodeEditorDeps } from "@/pages/canvas/hooks/node-editor-deps";
 import { captureVideoFrame, type VideoFramePosition } from "@/lib/canvas/canvas-video-frame";
 
 import { NODE_DEFAULT_SIZE, getNodeSpec } from "@/constant/canvas";
@@ -31,7 +34,6 @@ import { CanvasConfigNodePanel } from "@/components/canvas/canvas-config-node-pa
 import { CanvasManagerDialog } from "@/components/canvas/canvas-manager-dialog";
 import { AssetsManagerDialog } from "@/components/assets/assets-manager-dialog";
 import { CanvasNodeContextMenu } from "@/components/canvas/canvas-context-menu";
-import type { CanvasImageAngleParams } from "@/components/canvas/canvas-node-angle-dialog";
 
 // The angle dialog drags in three.js (~136 kB gzip) for one control panel that most sessions
 // never open, so it is loaded on demand instead of on first paint. The dynamic import keeps
@@ -39,13 +41,13 @@ import type { CanvasImageAngleParams } from "@/components/canvas/canvas-node-ang
 const CanvasNodeAngleDialog = lazy(() =>
     import("@/components/canvas/canvas-node-angle-dialog").then((module) => ({ default: module.CanvasNodeAngleDialog })),
 );
-import { CanvasNodeCropDialog, type CanvasImageCropRect } from "@/components/canvas/canvas-node-crop-dialog";
-import { CanvasNodeMaskEditDialog, type CanvasImageMaskEditPayload } from "@/components/canvas/canvas-node-mask-edit-dialog";
-import { CanvasNodeOutpaintDialog, type CanvasOutpaintPayload } from "@/components/canvas/canvas-node-outpaint-dialog";
-import { CanvasNodeMossLayoutDialog, type CanvasMossLayoutPayload } from "@/components/canvas/canvas-node-moss-layout-dialog";
-import { CanvasNodeSplitDialog, type CanvasImageSplitParams } from "@/components/canvas/canvas-node-split-dialog";
-import { CanvasNodeSuperResolveDialog, type CanvasSuperResolveParams } from "@/components/canvas/canvas-node-super-resolve-dialog";
-import { CanvasNodeVideoUpscaleDialog, type CanvasVideoUpscaleParams } from "@/components/canvas/canvas-node-video-upscale-dialog";
+import { CanvasNodeCropDialog } from "@/components/canvas/canvas-node-crop-dialog";
+import { CanvasNodeMaskEditDialog } from "@/components/canvas/canvas-node-mask-edit-dialog";
+import { CanvasNodeOutpaintDialog } from "@/components/canvas/canvas-node-outpaint-dialog";
+import { CanvasNodeMossLayoutDialog } from "@/components/canvas/canvas-node-moss-layout-dialog";
+import { CanvasNodeSplitDialog } from "@/components/canvas/canvas-node-split-dialog";
+import { CanvasNodeSuperResolveDialog } from "@/components/canvas/canvas-node-super-resolve-dialog";
+import { CanvasNodeVideoUpscaleDialog } from "@/components/canvas/canvas-node-video-upscale-dialog";
 import { buildNodeGenerationContext, buildNodeGenerationInputs, buildNodeResponseMessages, hydrateNodeGenerationContext, type NodeGenerationInput } from "@/components/canvas/canvas-node-generation";
 import { CanvasNodeHoverToolbar, CanvasNodeInfoModal } from "@/components/canvas/canvas-node-hover-toolbar";
 import { CanvasSelectionToolbar } from "@/components/canvas/canvas-selection-toolbar";
@@ -66,8 +68,6 @@ import { recallNodeSettings } from "@/lib/canvas/node-settings-memory";
 import { applyGroupSelection, applyUngroupSelection, canGroupSelectedNodes, canUngroupSelectedNodes, collectGroupMemberNodes, findContainingGroupId, findGroupDropTarget, focusViewportForNode, getConnectionTargetAnchor, getGroupWrapRect, normalizeConnection, snapNodesIntoGroup } from "@/lib/canvas/canvas-node-geometry";
 import {
     audioExtension,
-    buildAngleLabel,
-    buildAnglePrompt,
     buildGenerationConfig,
     findRetrySourceNode,
     generationReferenceUrls,
@@ -128,27 +128,10 @@ type CanvasGenerationRequest = {
 type CanvasNodeTool = "info" | "crop" | "maskEdit" | "outpaint" | "mossLayout" | "split" | "upscale" | "superResolve" | "videoUpscale" | "angle";
 type CanvasNodeToolState = { kind: CanvasNodeTool; nodeId: string } | null;
 
-const VIDEO_NODE_MAX_WIDTH = 420;
-const VIDEO_NODE_MAX_HEIGHT = 420;
 // Stable empty reference array prevents `... || []` from invalidating CanvasNode's React.memo on every render.
 const EMPTY_REFERENCES: CanvasResourceReference[] = [];
 const CONNECTION_HANDLE_HIT_RADIUS = 40;
 const CONNECTION_NODE_HIT_PADDING = 32;
-const NODE_STATUS_IDLE = "idle" as const;
-const NODE_STATUS_LOADING = "loading" as const;
-const NODE_STATUS_SUCCESS = "success" as const;
-const NODE_STATUS_ERROR = "error" as const;
-
-function applyGeneratedVideo(item: CanvasNodeData, video: UploadedFile, extra: CanvasNodeData["metadata"] = {}): CanvasNodeData {
-    const videoSize = fitNodeSize(video.width || item.width, video.height || item.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
-    return {
-        ...item,
-        width: videoSize.width,
-        height: videoSize.height,
-        position: { x: item.position.x + item.width / 2 - videoSize.width / 2, y: item.position.y + item.height / 2 - videoSize.height / 2 },
-        metadata: { ...item.metadata, ...videoMetadata(video), ...extra },
-    };
-}
 
 export default function CanvasPage() {
     const [mounted, setMounted] = useState(false);
@@ -1999,518 +1982,13 @@ function InfiniteCanvasPage() {
         [t],
     );
 
-    const cropImageNode = useCallback(async (node: CanvasNodeData, crop: CanvasImageCropRect) => {
-        if (!node.metadata?.content) return;
-        const cropped = await cropDataUrl(node.metadata.content, crop);
-        const image = await uploadImage(cropped);
-        const width = Math.min(node.width, Math.max(220, image.width));
-        const childId = nanoid();
-        const child: CanvasNodeData = {
-            id: childId,
-            type: CanvasNodeType.Image,
-            title: "Cropped Image",
-            position: { x: node.position.x + node.width + 96, y: node.position.y },
-            width,
-            height: width * (image.height / image.width),
-            metadata: {
-                ...imageMetadata(image),
-                prompt: node.metadata?.prompt,
-            },
-        };
-        setNodes((prev) => [...prev, child]);
-        setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
-        setSelectedNodeIds(new Set([childId]));
-        setDialogNodeId(childId);
-        closeNodeTool();
-    }, []);
-
-    const splitImageNode = useCallback(
-        async (node: CanvasNodeData, params: CanvasImageSplitParams) => {
-            if (!node.metadata?.content) return;
-            closeNodeTool();
-            const pieces = await splitDataUrl(node.metadata.content, params);
-            const gap = 16;
-            const cellWidth = node.width / params.columns;
-            const cellHeight = node.height / params.rows;
-            const startX = node.position.x + node.width + 96;
-            const startY = node.position.y;
-            const childNodes = await Promise.all(
-                pieces.map(async (piece) => {
-                    const image = await uploadImage(piece.dataUrl);
-                    const id = nanoid();
-                    return {
-                        id,
-                        type: CanvasNodeType.Image,
-                        title: t("canvas.runtime.splitTitle", { name: node.title || t("assets.kinds.image"), row: piece.row + 1, column: piece.column + 1 }),
-                        position: { x: startX + piece.column * (cellWidth + gap), y: startY + piece.row * (cellHeight + gap) },
-                        width: cellWidth,
-                        height: cellHeight,
-                        metadata: {
-                            ...imageMetadata(image),
-                            prompt: node.metadata?.prompt,
-                        },
-                    } satisfies CanvasNodeData;
-                }),
-            );
-            setNodes((prev) => [...prev, ...childNodes]);
-            setConnections((prev) => [...prev, ...childNodes.map((child) => ({ id: nanoid(), fromNodeId: node.id, toNodeId: child.id }))]);
-            setSelectedNodeIds(new Set(childNodes.map((child) => child.id)));
-            setSelectedConnectionId(null);
-            setDialogNodeId(null);
-            toast.success(t("canvas.runtime.splitSuccess", { count: childNodes.length }));
-        },
-        [t],
+    // The node editors live in their own modules; this object is the entire surface they get.
+    const nodeEditorDeps: NodeEditorDeps = useMemo(
+        () => ({ setNodes, setConnections, setSelectedNodeIds, setSelectedConnectionId, setDialogNodeId, setRunningNodeId, closeNodeTool, startGenerationRequest, finishGenerationRequest }),
+        [closeNodeTool, finishGenerationRequest, setConnections, setDialogNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds, setRunningNodeId, startGenerationRequest],
     );
-
-    const maskEditImageNode = useCallback(
-        async (node: CanvasNodeData, payload: CanvasImageMaskEditPayload) => {
-            if (!node.metadata?.content) return;
-            const isQwenImage = channelModelOf(effectiveConfig, buildGenerationConfig(effectiveConfig, node, "image").model)?.model.workflowId === "image-qwen21";
-            const generationConfig = {
-                ...buildGenerationConfig(effectiveConfig, node, "image"),
-                count: "1",
-                size: node.metadata?.size || "auto",
-                ...(isQwenImage ? { imageMode: "inpaint" } : {}),
-            };
-            if (payload.generate && !isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
-                return;
-            }
-            const userPrompt = payload.prompt.trim();
-            const prompt = isQwenImage ? userPrompt : t("canvas.runtime.maskPrompt", { source: imageReferenceLabel(0), mask: imageReferenceLabel(1), prompt: userPrompt });
-            closeNodeTool();
-            const maskImage = await uploadImage(payload.maskDataUrl);
-            const generationMask = isQwenImage ? await uploadImage(payload.binaryMaskDataUrl) : null;
-            const maskNodeId = nanoid();
-            const childId = nanoid();
-            const source = { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey };
-            const maskSource = { id: maskNodeId, name: "mask.png", type: maskImage.mimeType || "image/png", dataUrl: maskImage.url, storageKey: maskImage.storageKey };
-            const references = [source, generationMask ? { ...maskSource, dataUrl: generationMask.url, storageKey: generationMask.storageKey } : maskSource];
-            const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, references);
-            const childMetadata = payload.generate ? { prompt, status: NODE_STATUS_LOADING, ...generationMetadata } : { prompt };
-            setNodes((prev) => [
-                ...prev,
-                {
-                    id: maskNodeId,
-                    type: CanvasNodeType.Image,
-                    title: t("canvas.runtime.maskNodeTitle"),
-                    position: { x: node.position.x, y: node.position.y + node.height + 96 },
-                    width: node.width,
-                    height: node.height,
-                    metadata: imageMetadata(maskImage),
-                },
-                {
-                    id: childId,
-                    type: CanvasNodeType.Image,
-                    title: userPrompt.slice(0, 32) || t("canvas.runtime.maskResult"),
-                    position: { x: node.position.x + node.width + 96, y: node.position.y },
-                    width: node.width,
-                    height: node.height,
-                    metadata: childMetadata,
-                },
-            ]);
-            setConnections((prev) => [
-                ...prev,
-                { id: nanoid(), fromNodeId: node.id, toNodeId: childId },
-                { id: nanoid(), fromNodeId: maskNodeId, toNodeId: childId },
-            ]);
-            setSelectedNodeIds(new Set([childId]));
-            setSelectedConnectionId(null);
-            setDialogNodeId(childId);
-            if (!payload.generate) return;
-            setRunningNodeId(childId);
-            const controller = startGenerationRequest(childId, node.id, childId);
-            try {
-                const image = await requestEdit(generationConfig, prompt, references, { signal: controller.signal }).then((items) => items[0]);
-                const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
-                const size = fitNodeSize(uploaded.width, uploaded.height, node.width, node.height);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt, ...generationMetadata } } : item)));
-            } catch (error) {
-                if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.maskFailed");
-                toast.error(errorDetails);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
-            } finally {
-                finishGenerationRequest(childId, controller);
-                setRunningNodeId(null);
-            }
-        },
-        [effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, startGenerationRequest, t],
-    );
-
-    const outpaintImageNode = useCallback(
-        async (node: CanvasNodeData, payload: CanvasOutpaintPayload) => {
-            if (!node.metadata?.content) return;
-            const generationConfig = {
-                ...buildGenerationConfig(effectiveConfig, node, "image"),
-                count: "1",
-                size: "auto",
-                imageMode: "outpaint",
-                outpaint: { left: payload.left, top: payload.top, right: payload.right, bottom: payload.bottom, width: payload.width, height: payload.height },
-            };
-            if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
-                return;
-            }
-            closeNodeTool();
-            const childId = nanoid();
-            const source = { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey };
-            const references = [source];
-            const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, references);
-            setNodes((prev) => [
-                ...prev,
-                {
-                    id: childId,
-                    type: CanvasNodeType.Image,
-                    title: payload.prompt.slice(0, 32) || t("canvas.outpaint.resultTitle"),
-                    position: { x: node.position.x + node.width + 96, y: node.position.y },
-                    width: node.width,
-                    height: node.height,
-                    metadata: { prompt: payload.prompt, status: NODE_STATUS_LOADING, ...generationMetadata },
-                },
-            ]);
-            setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
-            setSelectedNodeIds(new Set([childId]));
-            setSelectedConnectionId(null);
-            setDialogNodeId(childId);
-            setRunningNodeId(childId);
-            const controller = startGenerationRequest(childId, node.id, childId);
-            try {
-                const image = await requestEdit(generationConfig, payload.prompt, references, { signal: controller.signal }).then((items) => items[0]);
-                const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
-                const size = fitNodeSize(uploaded.width, uploaded.height, node.width, node.height);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt: payload.prompt, ...generationMetadata } } : item)));
-            } catch (error) {
-                if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.outpaint.failed");
-                toast.error(errorDetails);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
-            } finally {
-                finishGenerationRequest(childId, controller);
-                setRunningNodeId(null);
-            }
-        },
-        [effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, startGenerationRequest],
-    );
-
-    const mossLayoutImageNode = useCallback(
-        async (node: CanvasNodeData, payload: CanvasMossLayoutPayload) => {
-            const generationConfig = {
-                ...buildGenerationConfig(effectiveConfig, node, "image"),
-                count: "1",
-                size: `${payload.width || 1024}x${payload.height || 1024}`,
-                imageMode: "layout",
-                layout: payload,
-            };
-            if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
-                return;
-            }
-            closeNodeTool();
-            setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, imageMode: "layout", layout: payload } } : item)));
-            const childId = nanoid();
-            const generationMetadata = buildImageGenerationMetadata("generation", generationConfig, 1, []);
-            setNodes((prev) => [
-                ...prev,
-                {
-                    id: childId,
-                    type: CanvasNodeType.Image,
-                    title: payload.summary.slice(0, 32) || t("canvas.mossLayout.resultTitle"),
-                    position: { x: node.position.x + node.width + 96, y: node.position.y },
-                    width: node.width,
-                    height: node.height,
-                    metadata: { prompt: payload.summary, status: NODE_STATUS_LOADING, layout: payload, ...generationMetadata },
-                },
-            ]);
-            setSelectedNodeIds(new Set([childId]));
-            setSelectedConnectionId(null);
-            setDialogNodeId(childId);
-            setRunningNodeId(childId);
-            const controller = startGenerationRequest(childId, node.id, childId);
-            try {
-                const image = await requestGeneration(generationConfig, payload.summary, { signal: controller.signal }).then((items) => items[0]);
-                if (!image) throw new Error(t("canvas.mossLayout.noImage"));
-                const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
-                const size = fitNodeSize(uploaded.width, uploaded.height, node.width, node.height);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt: payload.summary, layout: payload, ...generationMetadata } } : item)));
-            } catch (error) {
-                if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.mossLayout.failed");
-                toast.error(errorDetails);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
-            } finally {
-                finishGenerationRequest(childId, controller);
-                setRunningNodeId(null);
-            }
-        },
-        [effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, startGenerationRequest],
-    );
-
-    const superResolveImageNode = useCallback(async (node: CanvasNodeData, params: CanvasSuperResolveParams,
-        title: string,
-    ) => {
-        if (!node.metadata?.content) return;
-        const childId = nanoid();
-        const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
-        setRunningNodeId(childId);
-        setNodes((prev) => [
-            ...prev,
-            {
-                id: childId,
-                type: CanvasNodeType.Image,
-                title,
-                position: { x: node.position.x + node.width + 96, y: node.position.y },
-                width: imageConfig.width,
-                height: imageConfig.height,
-                metadata: { prompt: node.metadata?.prompt, status: NODE_STATUS_LOADING },
-            },
-        ]);
-        setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
-        setSelectedNodeIds(new Set([childId]));
-        setDialogNodeId(childId);
-        const controller = startGenerationRequest(childId, node.id, childId);
-        try {
-            const image = await requestUpscale(
-                effectiveConfig,
-                {
-                    id: node.id,
-                    name: `${node.title || node.id}.png`,
-                    type: node.metadata.mimeType || "image/png",
-                    dataUrl: node.metadata.content,
-                    storageKey: node.metadata.storageKey,
-                },
-                { workflowId: params.workflowId, params: params.params, signal: controller.signal },
-            ).then((items) => items[0]);
-            const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
-            const size = fitNodeSize(uploaded.width, uploaded.height, imageConfig.width, imageConfig.height);
-            setNodes((prev) =>
-                prev.map((item) =>
-                    item.id === childId
-                        ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), status: NODE_STATUS_SUCCESS } }
-                        : item,
-                ),
-            );
-        } catch (error) {
-            if (isGenerationCanceled(error)) return;
-            const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
-            setNodes((prev) =>
-                prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)),
-            );
-        } finally {
-            finishGenerationRequest(childId, controller);
-            setRunningNodeId(null);
-        }
-    }, [effectiveConfig, finishGenerationRequest, startGenerationRequest, t]);
-
-    const runSuperResolve = useCallback(
-        (node: CanvasNodeData, params: CanvasSuperResolveParams) => superResolveImageNode(node, params, t("canvas.superResolve.title")),
-        [superResolveImageNode, t],
-    );
-    const runFastUpscale = useCallback(
-        (node: CanvasNodeData, params: CanvasSuperResolveParams) => superResolveImageNode(node, params, t("canvas.superResolve.fastTitle")),
-        [superResolveImageNode, t],
-    );
-
-    const upscaleVideoNode = useCallback(
-        async (node: CanvasNodeData, params: CanvasVideoUpscaleParams) => {
-            if (!node.metadata?.content) return;
-            const childId = nanoid();
-            const sourceWidth = node.metadata?.naturalWidth || node.width;
-            const sourceHeight = node.metadata?.naturalHeight || node.height;
-            const size = fitNodeSize(sourceWidth, sourceHeight, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
-            setRunningNodeId(childId);
-            setNodes((prev) => [
-                ...prev,
-                {
-                    id: childId,
-                    type: CanvasNodeType.Video,
-                    title: t("canvas.videoUpscale.resultTitle"),
-                    position: { x: node.position.x + node.width + 96, y: node.position.y },
-                    width: size.width,
-                    height: size.height,
-                    metadata: { prompt: node.metadata?.prompt, status: NODE_STATUS_LOADING },
-                },
-            ]);
-            setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
-            setSelectedNodeIds(new Set([childId]));
-            setSelectedConnectionId(null);
-            setDialogNodeId(childId);
-            const controller = startGenerationRequest(childId, node.id, childId);
-            try {
-                const task = await createVideoUpscaleTask(
-                    effectiveConfig,
-                    {
-                        name: `${node.title || node.id}.mp4`,
-                        type: node.metadata?.mimeType || "video/mp4",
-                        url: node.metadata?.content,
-                        storageKey: node.metadata?.storageKey,
-                    },
-                    { scale: params.scale, resolution: params.resolution, fps: params.fps },
-                    { signal: controller.signal },
-                );
-                setNodes((prev) =>
-                    prev.map((item) =>
-                        item.id === childId
-                            ? { ...item, metadata: { ...item.metadata, videoTaskId: task.id, videoTaskProvider: "openai", model: task.model, params: { scale: params.scale, resolution: params.resolution } } }
-                            : item,
-                    ),
-                );
-                const video = await storeGeneratedVideo(await waitForVideoGenerationTask(effectiveConfig, task, { signal: controller.signal }));
-                setNodes((prev) =>
-                    prev.map((item) =>
-                        item.id === childId
-                            ? applyGeneratedVideo(item, video, {
-                                  prompt: node.metadata?.prompt,
-                                  model: "video-seedvr2-upscale",
-                                  videoMode: "upscale",
-                                  previewUrl: undefined,
-                                  previewMime: undefined,
-                                  previewStep: undefined,
-                                  previewTotal: undefined,
-                              })
-                            : item,
-                    ),
-                );
-            } catch (error) {
-                if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
-                toast.error(errorDetails);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
-            } finally {
-                finishGenerationRequest(childId, controller);
-                setRunningNodeId((current) => (current === childId ? null : current));
-            }
-        },
-        [effectiveConfig, finishGenerationRequest, startGenerationRequest, t],
-    );
-
-    const interpolateVideoNode = useCallback(
-        async (node: CanvasNodeData) => {
-            if (!node.metadata?.content) return;
-            const childId = nanoid();
-            const sourceWidth = node.metadata?.naturalWidth || node.width;
-            const sourceHeight = node.metadata?.naturalHeight || node.height;
-            const size = fitNodeSize(sourceWidth, sourceHeight, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
-            setRunningNodeId(childId);
-            setNodes((prev) => [
-                ...prev,
-                {
-                    id: childId,
-                    type: CanvasNodeType.Video,
-                    title: t("canvas.nodeToolbar.interpolateTitle"),
-                    position: { x: node.position.x + node.width + 96, y: node.position.y },
-                    width: size.width,
-                    height: size.height,
-                    metadata: { prompt: node.metadata?.prompt, status: NODE_STATUS_LOADING },
-                },
-            ]);
-            setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
-            setSelectedNodeIds(new Set([childId]));
-            setSelectedConnectionId(null);
-            setDialogNodeId(childId);
-            const controller = startGenerationRequest(childId, node.id, childId);
-            try {
-                const task = await createVideoInterpolateTask(
-                    effectiveConfig,
-                    {
-                        name: `${node.title || node.id}.mp4`,
-                        type: node.metadata?.mimeType || "video/mp4",
-                        url: node.metadata?.content,
-                        storageKey: node.metadata?.storageKey,
-                    },
-                    { multiplier: 2 },
-                    { signal: controller.signal },
-                );
-                setNodes((prev) =>
-                    prev.map((item) =>
-                        item.id === childId
-                            ? { ...item, metadata: { ...item.metadata, videoTaskId: task.id, videoTaskProvider: "openai", model: "video-rife", params: { multiplier: 2 } } }
-                            : item,
-                    ),
-                );
-                const video = await storeGeneratedVideo(await waitForVideoGenerationTask(effectiveConfig, task, { signal: controller.signal }));
-                setNodes((prev) =>
-                    prev.map((item) =>
-                        item.id === childId
-                            ? applyGeneratedVideo(item, video, {
-                                  prompt: node.metadata?.prompt,
-                                  model: "video-rife",
-                                  videoMode: "interpolate",
-                                  previewUrl: undefined,
-                                  previewMime: undefined,
-                                  previewStep: undefined,
-                                  previewTotal: undefined,
-                              })
-                            : item,
-                    ),
-                );
-            } catch (error) {
-                if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
-                toast.error(errorDetails);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
-            } finally {
-                finishGenerationRequest(childId, controller);
-                setRunningNodeId((current) => (current === childId ? null : current));
-            }
-        },
-        [effectiveConfig, finishGenerationRequest, startGenerationRequest, t],
-    );
-
-    const generateAngleNode = useCallback(
-        async (node: CanvasNodeData, params: CanvasImageAngleParams) => {
-            if (!node.metadata?.content) return;
-            const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1" };
-            if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
-                return;
-            }
-            const childId = nanoid();
-            const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
-            const title = buildAngleLabel(params);
-            const prompt = buildAnglePrompt(params);
-            const sourceReference = {
-                id: node.id,
-                name: `${node.title || node.id}.png`,
-                type: node.metadata.mimeType || "image/png",
-                dataUrl: node.metadata.content,
-                storageKey: node.metadata.storageKey,
-            };
-            const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [sourceReference]);
-            closeNodeTool();
-            setRunningNodeId(childId);
-            setNodes((prev) => [
-                ...prev,
-                {
-                    id: childId,
-                    type: CanvasNodeType.Image,
-                    title,
-                    position: { x: node.position.x + node.width + 96, y: node.position.y },
-                    width: imageConfig.width,
-                    height: imageConfig.height,
-                    metadata: { prompt, status: NODE_STATUS_LOADING, ...generationMetadata },
-                },
-            ]);
-            setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
-            setSelectedNodeIds(new Set([childId]));
-            setDialogNodeId(childId);
-            const controller = startGenerationRequest(childId, node.id, childId);
-            try {
-                const image = await requestImageAngle(generationConfig, prompt, params, [sourceReference], { signal: controller.signal }).then((items) => items[0]);
-                const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
-                const size = fitNodeSize(uploaded.width, uploaded.height, imageConfig.width, imageConfig.height);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt, ...generationMetadata } } : item)));
-            } catch (error) {
-                if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
-            } finally {
-                finishGenerationRequest(childId, controller);
-                setRunningNodeId(null);
-            }
-        },
-        [effectiveConfig, finishGenerationRequest, openConfigDialog, startGenerationRequest, t],
-    );
+    const { cropImageNode, splitImageNode, maskEditImageNode, outpaintImageNode, mossLayoutImageNode, runSuperResolve, runFastUpscale, generateAngleNode } = useImageEditors(nodeEditorDeps);
+    const { upscaleVideoNode, interpolateVideoNode } = useVideoEditors(nodeEditorDeps);
 
     const handleFontSizeChange = useCallback((nodeId: string, fontSize: number) => {
         setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, fontSize } } : node)));
