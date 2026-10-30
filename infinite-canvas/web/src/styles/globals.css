@@ -150,34 +150,6 @@
 }
 
 @layer utilities {
-    .ai-title-aurora {
-        background: linear-gradient(90deg, #111827 0%, #111827 36%, #6b7280 54%, #111827 72%, #111827 100%);
-        background-size: 220% 100%;
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-        animation: ai-title-aurora 7s ease-in-out infinite;
-    }
-
-    .dark .ai-title-aurora {
-        background: linear-gradient(90deg, #fafaf9 0%, #fafaf9 36%, #a8a29e 54%, #fafaf9 72%, #fafaf9 100%);
-        background-size: 220% 100%;
-        -webkit-background-clip: text;
-        background-clip: text;
-    }
-
-    @keyframes ai-title-aurora {
-        0%,
-        100% {
-            background-position: 0% 50%;
-            filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0));
-        }
-        50% {
-            background-position: 100% 50%;
-            filter: drop-shadow(0 12px 28px rgba(28, 25, 23, 0.08));
-        }
-    }
-
     .hide-scrollbar {
         -ms-overflow-style: none;
         scrollbar-width: none;
