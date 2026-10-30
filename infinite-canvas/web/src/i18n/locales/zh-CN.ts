@@ -322,7 +322,6 @@ export default {
             freeFailed: "清理显存失败"
         },
         defaultTitle: "无限画布 {{count}}",
-        library: "画布库",
         title: "无限画布",
         fishWhip: { bubble: "我将守护你的进程" },
         imported: "已导入 {{count}} 个画布",

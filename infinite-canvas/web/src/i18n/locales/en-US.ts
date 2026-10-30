@@ -295,7 +295,6 @@ export default {
             freeFailed: "Failed to free VRAM"
         },
         defaultTitle: "Infinite Canvas {{count}}",
-        library: "Canvas library",
         title: "Infinite Canvas",
         fishWhip: { bubble: "I will guard your process." },
         imported: "Imported {{count}} canvases",

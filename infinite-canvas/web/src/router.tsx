@@ -1,8 +1,7 @@
-import { createBrowserRouter, Outlet } from "react-router-dom";
+import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 
 import UserLayout from "@/layouts/user-layout";
 import AssetsPage from "@/pages/assets";
-import CanvasPage from "@/pages/canvas";
 import CanvasProjectPage from "@/pages/canvas/project";
 import { CanvasEntry } from "@/pages/canvas/entry";
 import ConfigPage from "@/pages/config";
@@ -18,8 +17,9 @@ export const router = createBrowserRouter([
         children: [
             { path: "/", element: <CanvasEntry /> },
             { path: "/assets", element: <AssetsPage /> },
-            { path: "/canvas", element: <CanvasPage /> },
             { path: "/canvas/:id", element: <CanvasProjectPage /> },
+            // The list is a panel now, not a page. Old bookmarks land back on a canvas.
+            { path: "/canvas", element: <Navigate replace to="/" /> },
             { path: "/config", element: <ConfigPage /> },
         ],
     },

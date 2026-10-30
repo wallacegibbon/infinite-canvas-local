@@ -1095,6 +1095,20 @@ when a reference image cannot be read, which is why neither was noticed. They we
 check that compares every literal `t("…")` against the flattened dictionary — the inverse of
 the dead-key pass in #38, and worth running whenever keys move.
 
+**Follow-up: the list itself became a panel** `pages/canvas/index.tsx` (116 lines) is gone and
+`/canvas` no longer renders a page. The list floats over the canvas you are already in, opened
+from the switcher or the canvas menu. It is the same body — multi-select, batch export, import,
+delete — because that part was always right; only the container changed.
+
+The test that settled it: is this worth a URL? A canvas is — it can be shared, bookmarked, and
+reloaded into the same state. A list of canvases cannot: nobody shares "my canvases", refreshing
+it means nothing, and Back is worse than Escape. What a route bought was an unmount of the canvas,
+a route change, and a full remount to get back to where you already were.
+
+Two details worth keeping. `CanvasDeleteProjectsDialog` renders as a sibling of the manager, not
+a child, so the two are independent radix roots rather than a nested focus trap. And `/canvas`
+still resolves — to a redirect, so old bookmarks land on a canvas instead of a 404.
+
 **Where** `src/pages/canvas/entry.tsx`, `src/router.tsx`, `stores/canvas/use-canvas-store.ts`
-(`lastProjectId`), `components/canvas/canvas-top-bar.tsx` (the canvas switcher this made
-obvious: switching used to mean leaving the canvas for a 625-line list page).
+(`lastProjectId`), `components/canvas/canvas-top-bar.tsx` (the switcher this made obvious:
+switching used to mean leaving the canvas for the list page), `components/canvas/canvas-manager-dialog.tsx`.

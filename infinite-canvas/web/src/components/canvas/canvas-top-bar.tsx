@@ -10,6 +10,7 @@ import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { CanvasSystemStatus } from "@/components/canvas/canvas-system-status";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
+import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
 import { useCanvasSidePanelStore } from "@/stores/use-canvas-side-panel-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 
@@ -24,7 +25,6 @@ export function CanvasTopBar({
     canUndo,
     canRedo,
     onSwitchProject,
-    onProjects,
     onCreateProject,
     onDeleteProject,
     onExportProject,
@@ -43,7 +43,6 @@ export function CanvasTopBar({
     canUndo: boolean;
     canRedo: boolean;
     onSwitchProject: (id: string) => void;
-    onProjects: () => void;
     onCreateProject: () => void;
     onDeleteProject: () => void;
     onExportProject: () => void;
@@ -60,6 +59,8 @@ export function CanvasTopBar({
     const sidePanelOpen = useCanvasSidePanelStore((state) => state.panelOpen);
     const toggleSidePanel = useCanvasSidePanelStore((state) => state.togglePanel);
     const projects = useCanvasStore((state) => state.projects);
+    // The list is a panel over the canvas now, not a route.
+    const openManager = useCanvasUiStore((state) => state.setManagerOpen);
     // Current canvas first, the rest most-recent-first: switching is a "where am I" question,
     // so the answer you are most likely looking for should not be buried.
     const orderedProjects = useMemo(() => {
@@ -95,7 +96,7 @@ export function CanvasTopBar({
                     <Dropdown
                         menu={{
                             items: [
-                                { key: "projects", icon: <Images className="size-4" />, label: t("canvas.projects"), onClick: onProjects },
+                                { key: "projects", icon: <Images className="size-4" />, label: t("canvas.projects"), onClick: () => openManager(true) },
                                 { type: "divider" },
                                 { key: "new", icon: <Plus className="size-4" />, label: t("canvas.create"), onClick: onCreateProject },
                                 { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: t("canvas.deleteCurrent"), onClick: onDeleteProject },
@@ -146,7 +147,7 @@ export function CanvasTopBar({
                                         { type: "divider" as const },
                                         { key: "rename", icon: <Pencil className="size-4" />, label: t("canvas.project.rename"), onClick: onStartTitleEditing },
                                         { key: "new", icon: <Plus className="size-4" />, label: t("canvas.create"), onClick: onCreateProject },
-                                        { key: "all", icon: <Images className="size-4" />, label: t("canvas.projects"), onClick: onProjects },
+                                        { key: "all", icon: <Images className="size-4" />, label: t("canvas.projects"), onClick: () => openManager(true) },
                                     ],
                                 }}
                             >

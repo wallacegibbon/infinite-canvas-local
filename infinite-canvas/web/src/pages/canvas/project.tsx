@@ -28,6 +28,7 @@ import { NODE_DEFAULT_SIZE, getNodeSpec } from "@/constant/canvas";
 import { ActiveConnectionPath, ConnectionPath } from "@/components/canvas/canvas-connections";
 import { CanvasConfigComposer } from "@/components/canvas/canvas-config-composer";
 import { CanvasConfigNodePanel } from "@/components/canvas/canvas-config-node-panel";
+import { CanvasManagerDialog } from "@/components/canvas/canvas-manager-dialog";
 import { CanvasNodeContextMenu } from "@/components/canvas/canvas-context-menu";
 import type { CanvasImageAngleParams } from "@/components/canvas/canvas-node-angle-dialog";
 
@@ -516,7 +517,7 @@ function InfiniteCanvasPage() {
         setProjectLoaded(false);
         const project = openProject(projectId);
         if (!project) {
-            navigate("/canvas", { replace: true });
+            navigate("/", { replace: true });
             return;
         }
         // Remember where the browser was, so `/` can send it back here.
@@ -3608,6 +3609,7 @@ function InfiniteCanvasPage() {
         <main className="flex h-full min-h-0 overflow-hidden" style={{ background: theme.canvas.background, color: theme.node.text }}>
             <CanvasSidePanel nodes={nodes} selectedNodeIds={selectedNodeIds} onFocusNode={focusNode} onPreviewNode={setPreviewNodeId} onPreviewImage={handleSidebarPreviewImage} onHoverNode={handleSidebarHoverNode} onHoverImage={handleSidebarHoverImage} onInsertAsset={handleAssetInsert} />
             <section className="relative min-w-0 flex-1 overflow-hidden">
+                <CanvasManagerDialog />
                 <CanvasTopBar
                     title={currentProject?.title || t("canvas.projectPage.untitledCanvas")}
                     titleDraft={titleDraft}
@@ -3619,7 +3621,6 @@ function InfiniteCanvasPage() {
                     canUndo={historyState.canUndo}
                     canRedo={historyState.canRedo}
                     onSwitchProject={(id) => navigate(`/canvas/${id}`)}
-                    onProjects={() => navigate("/canvas")}
                     onCreateProject={createAndOpenProject}
                     onDeleteProject={deleteCurrentProject}
                     onExportProject={exportCurrentProject}

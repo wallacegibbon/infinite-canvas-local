@@ -1,5 +1,5 @@
 import { Check, Download, Pencil, Trash2, X } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { useTranslation } from "react-i18next";
 
@@ -12,7 +12,6 @@ import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 export function CanvasProjectCard({ project }: { project: CanvasProject }) {
     const { i18n, t } = useTranslation();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
     const renameProject = useCanvasStore((state) => state.renameProject);
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const editingId = useCanvasUiStore((state) => state.editingProjectId);
@@ -22,10 +21,14 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
     const stopEditing = useCanvasUiStore((state) => state.stopEditingProject);
     const toggleSelected = useCanvasUiStore((state) => state.toggleSelectedProjectId);
     const setDeleteIds = useCanvasUiStore((state) => state.setDeleteProjectIds);
+    const setManagerOpen = useCanvasUiStore((state) => state.setManagerOpen);
     const editing = editingId === project.id;
     const selected = selectedIds.includes(project.id);
+    // No query passthrough any more: the manager is a panel, not a route, so there is no URL
+    // to carry parameters through. Nothing ever built such a link anyway.
     const open = () => {
-        navigate(`/canvas/${project.id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`);
+        setManagerOpen(false);
+        navigate(`/canvas/${project.id}`);
     };
     const saveTitle = () => {
         renameProject(project.id, editingTitle);
