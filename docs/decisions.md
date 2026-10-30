@@ -818,7 +818,7 @@ shims (#30) made each component cheap to replace one at a time, and the last fou
 work — the antd chunk stayed at 714 kB from 42 files down to 6, then collapsed 714 → 249 → 219 → 93
 → nothing as `Select`, `Form`, and the providers left.
 
-**What it returned** antd JS chunk 916 kB → 0; frontend modules 4126 → 2564; dependencies 31 → 28.
+**What it returned** antd JS chunk 916 kB → 0; vite modules 4126 → 2564; dependencies 32 → 29.
 `lib/canvas-overlay.ts` no longer contains a single third-party class name — the contract #23 wrote
 ("when antd goes, that array goes and the canvas is not touched") is now literally true: the array
 went, and the canvas code above it did not change.
