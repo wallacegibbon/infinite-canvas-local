@@ -78,9 +78,9 @@ files (stronger instruction) or in `internal/prompt`.
 
 ---
 
-## 4. "Restart needed" is shown for a missing custom node
+## 4. "Restart needed" is shown for a missing custom node *(fixed — decisions #48)*
 
-**Where** `infinite-canvas/web/src/components/layout/resource-center-panel.tsx`, the workflow
+**Where** `infinite-canvas/web/src/components/settings/resource-center-panel.tsx`, the workflow
 status tag:
 
 ```tsx
@@ -93,17 +93,18 @@ workflow.missing ? <Tag>{copy.missing} {workflow.missing}</Tag>
 blocked by an uninstalled custom node reads "Restart needed". The label promises a restart,
 which will not help.
 
-**Fix** Distinguish the reason (missing nodes vs pending restart) and give the tag its own
-copy.
+**Fix** *(applied)* A workflow carrying `problems` now reports `workflowBlocked` ("Load failed")
+and only a genuinely pending restart reads "Restart needed".
 
 ---
 
-## 5. "Canvas entry" tag is shown inverted
+## 5. "Canvas entry" tag is shown inverted *(fixed — decisions #48)*
 
 **Where** Same file. The `canvasEntry` tag renders when `workflow.modelVisible === false`,
 i.e. exactly when the workflow is *hidden* from the model picker.
 
-**Fix** Either invert the condition or rename the label to "Hidden from picker".
+**Fix** *(applied)* The label now says what the condition is — "Hidden from picker" — rather than
+inverting the condition, which would have changed behaviour on a guess about intent.
 
 ---
 
@@ -239,3 +240,32 @@ warning is once per open and only in the console.
 **Fix** Either upgrade radix once it uses `inert` instead of `aria-hidden` for `hideOthers`, or move
 focus to the dialog's cancel button in `onPointerDown` of the trigger. Not done, because both are
 larger than the symptom.
+
+---
+
+## 12. Corrupt persisted state is silently indistinguishable from "you have nothing"
+
+**Where** `stores/canvas/use-canvas-store.ts:57` and `stores/use-asset-store.ts:52`, both custom
+`persist` storages:
+
+```ts
+const parsed = JSON.parse(value) as StorageValue<CanvasStore>;
+```
+
+**What happens** If the stored blob is not valid JSON — a truncated write, a schema change that
+makes `parsed.state.assets.map` throw, a manual edit — the parse throws inside `getItem`. Zustand
+catches it, calls `onRehydrateStorage` with the error, and the listener ignores the error and sets
+`hydrated: true`. The app then comes up with **empty defaults**.
+
+**Why that is worse than it sounds** The user sees an empty canvas list over data that is still in
+IndexedDB, with no message. The only trace is a console error from the persist middleware. There is
+no "your saved state could not be read" anywhere in the UI, so the natural conclusion is that the
+canvases were deleted.
+
+**Fix** Wrap both parses in `try`/`catch`, return `null` on failure so hydration proceeds with
+defaults deliberately, and surface the failure once (a toast, or a banner on the canvas list) so the
+state is not silently swapped for an empty one. Not done yet: the user-visible half is a product
+decision, and the parse half alone changes nothing a user can see.
+
+**Not verified** Whether a real-world corruption has ever happened. This was found by reading the
+code, not by reproducing.

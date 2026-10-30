@@ -1401,3 +1401,65 @@ is now exactly zero, which is a stronger statement than "tsc passes".
 image, selected, composer open, and was deleted afterwards. Console empty.
 
 **Where** `infinite-canvas/web/src/pages/canvas/hooks/use-content-ingress.ts`.
+
+## 48. Three small correctness fixes found by a full read of the frontend
+
+The audit that produced #41–#47 stopped after the first four items. This is the pass that finished
+it: 168 files, 29,850 lines, read rather than grepped for keywords.
+
+**What the scan said about the codebase overall** Zero `any`, zero `@ts-ignore`, zero empty
+`catch`. Seven non-null assertions, five `eslint-disable`, and every one of the five carries a
+comment saying why — three of them in `canvas-node-prompt-panel.tsx` exist to keep a text input from
+being reset mid-typing. There is no category of "type system bypassed everywhere". The problems are
+in the seams between files, which is exactly what a compiler cannot see.
+
+### The side-panel width had two owners
+
+`use-canvas-side-panel-store.ts` declares `WIDTH_KEY = "canvas-side-panel-width"` and reads it at
+boot. The *write* was a bare literal in `canvas-side-panel.tsx`, on pointer-up:
+
+```ts
+localStorage.setItem("canvas-side-panel-width", String(nextWidth));
+```
+
+Two files, one key, no link between them. Change the constant and the panel silently stops
+remembering its width; change the literal and the same. And `setWidth` was the only setter in that
+store that did not persist — `openPanel`, `closePanel` and `setNodeViewMode` all do — so the store
+was internally inconsistent about what "set" means.
+
+Writing on every pointer-move would hammer localStorage, which is presumably why it was done at
+pointer-up in the component. So the store grew `commitWidth()`, which writes the current width, and
+the component calls that instead. Same write frequency, one owner, and `setWidth` is again just the
+live setter it looks like.
+
+### Two known bugs, both in the resource centre
+
+Known issues #4 and #5 had been sitting there with the fix written down. #4: the workflow status tag
+fell through to "Restart needed" for *any* unavailable workflow, including one blocked by an
+uninstalled custom node — a label promising something a restart will not deliver. It is now a
+three-way branch, and a workflow carrying `problems` says "Load failed".
+
+#5: the "Canvas entry" tag rendered exactly when `modelVisible === false`, i.e. when the workflow is
+hidden from the picker. The audit offered "invert the condition or rename the label"; the label was
+renamed to "Hidden from picker", because inverting a condition on a guess about intent changes
+behaviour, and this one does not.
+
+Both were one file away from the `components/layout` → `components/settings` move in #46, which is
+how they got found again — known issue #4 still pointed at the old path.
+
+### One thing found, documented, not fixed
+
+`use-canvas-store` and `use-asset-store` both `JSON.parse` persisted state with no guard. A corrupt
+blob makes the parse throw, zustand swallows it into `onRehydrateStorage`, that listener ignores the
+error, and the app comes up with empty defaults over data that is still in IndexedDB. Recorded as
+known issue #12 rather than fixed here, because the half that matters — telling the user their saved
+state could not be read — is a product decision, and the parse half on its own changes nothing
+anybody can see.
+
+**Verified** `npm run check`, strict `tsc`, 39 tests, build. The width fix was checked end to end in
+the browser: drag the resizer 280 → 400, reload, the panel comes back at 400. The two tag fixes
+were not exercised, because they need the gateway to report a workflow with problems or a hidden
+one, and the local gateway reports neither.
+
+**Where** `stores/canvas/use-canvas-side-panel-store.ts`, `components/canvas/canvas-side-panel.tsx`,
+`components/settings/resource-center-panel.tsx`, `i18n/locales/`.

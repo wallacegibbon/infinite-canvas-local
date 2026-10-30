@@ -35,6 +35,8 @@ type CanvasSidePanelStore = {
     panelClosing: boolean;
     nodeViewMode: CanvasNodeViewMode;
     setWidth: (width: number) => void;
+    /** Write the current width to storage. Called when a drag ends, not on every pixel. */
+    commitWidth: () => void;
     setNodeViewMode: (mode: CanvasNodeViewMode) => void;
     openPanel: () => void;
     closePanel: () => void;
@@ -48,6 +50,9 @@ export const useCanvasSidePanelStore = create<CanvasSidePanelStore>((set, get) =
     panelClosing: false,
     nodeViewMode: initialNodeView(),
     setWidth: (width) => set({ width }),
+    commitWidth: () => {
+        if (typeof window !== "undefined") localStorage.setItem(WIDTH_KEY, String(get().width));
+    },
     setNodeViewMode: (mode) => {
         if (typeof window !== "undefined") localStorage.setItem(NODE_VIEW_KEY, mode);
         set({ nodeViewMode: mode });

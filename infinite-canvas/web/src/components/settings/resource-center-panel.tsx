@@ -685,11 +685,16 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                             <div className="space-y-2">
                                                 {workflowDependencies.map((workflow, index) => {
                                                     const workflowExpanded = expandedWorkflows.has(workflow.id);
+                                                    // "Restart needed" used to be the fallback for every unavailable workflow,
+                                                    // so one blocked by an uninstalled custom node promised a restart that would
+                                                    // not help. A workflow carrying problems reports those instead.
                                                     const workflowTag = workflow.missing
                                                         ? <Tag color="orange">{copy.missing} {workflow.missing}</Tag>
                                                         : workflow.available
                                                             ? <Tag color="green">{copy.workflowReady}</Tag>
-                                                            : <Tag color="gold">{copy.workflowRestart}</Tag>;
+                                                            : workflow.problems.length
+                                                              ? <Tag color="orange">{copy.workflowBlocked}</Tag>
+                                                              : <Tag color="gold">{copy.workflowRestart}</Tag>;
                                                     const problemText = workflow.problems.map((problem) => problem.message).filter(Boolean).join("；");
                                                     return (
                                                         <div

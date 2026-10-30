@@ -72,6 +72,7 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, onFocusNode, onPreview
     const panelMounted = useCanvasSidePanelStore((state) => state.panelMounted);
     const panelClosing = useCanvasSidePanelStore((state) => state.panelClosing);
     const setWidth = useCanvasSidePanelStore((state) => state.setWidth);
+    const commitWidth = useCanvasSidePanelStore((state) => state.commitWidth);
     const [resizing, setResizing] = useState(false);
     // CSS transitions do not run on an element's first paint, so a freshly mounted panel would
     // appear at full width. It renders at 0 for one frame, then flips — that two-pass is what
@@ -103,7 +104,7 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, onFocusNode, onPreview
             setWidth(nextWidth);
         };
         const onUp = () => {
-            localStorage.setItem("canvas-side-panel-width", String(nextWidth));
+            commitWidth();
             window.removeEventListener("pointermove", onMove);
             window.removeEventListener("pointerup", onUp);
             setResizing(false);
