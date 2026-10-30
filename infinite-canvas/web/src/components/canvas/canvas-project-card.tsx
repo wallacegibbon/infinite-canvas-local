@@ -6,23 +6,23 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/kit/button";
 import { Input } from "@/components/kit/input";
 import { useCanvasStore, type CanvasProject } from "@/stores/canvas/use-canvas-store";
-import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
-import { usePanelStore } from "@/stores/use-panel-store";
+import { useCanvasListStore } from "@/stores/canvas/use-canvas-list-store";
+import { useCanvasPanelStore } from "@/stores/canvas/use-canvas-panel-store";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 
 export function CanvasProjectCard({ project }: { project: CanvasProject }) {
     const { i18n, t } = useTranslation();
     const navigate = useNavigate();
     const renameProject = useCanvasStore((state) => state.renameProject);
-    const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
-    const editingId = useCanvasUiStore((state) => state.editingProjectId);
-    const editingTitle = useCanvasUiStore((state) => state.editingProjectTitle);
-    const startEditing = useCanvasUiStore((state) => state.startEditingProject);
-    const setEditingTitle = useCanvasUiStore((state) => state.setEditingProjectTitle);
-    const stopEditing = useCanvasUiStore((state) => state.stopEditingProject);
-    const toggleSelected = useCanvasUiStore((state) => state.toggleSelectedProjectId);
-    const setDeleteIds = useCanvasUiStore((state) => state.setDeleteProjectIds);
-    const setManagerOpen = usePanelStore((state) => state.setCanvasManagerOpen);
+    const selectedIds = useCanvasListStore((state) => state.selectedProjectIds);
+    const editingId = useCanvasListStore((state) => state.editingProjectId);
+    const editingTitle = useCanvasListStore((state) => state.editingProjectTitle);
+    const startEditing = useCanvasListStore((state) => state.startEditingProject);
+    const setEditingTitle = useCanvasListStore((state) => state.setEditingProjectTitle);
+    const stopEditing = useCanvasListStore((state) => state.stopEditingProject);
+    const toggleSelected = useCanvasListStore((state) => state.toggleSelectedProjectId);
+    const setDeleteIds = useCanvasListStore((state) => state.setDeleteProjectIds);
+    const setManagerOpen = useCanvasPanelStore((state) => state.setCanvasManagerOpen);
     const editing = editingId === project.id;
     const selected = selectedIds.includes(project.id);
     // No query passthrough any more: the manager is a panel, not a route, so there is no URL

@@ -10,8 +10,8 @@ import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { CanvasSystemStatus } from "@/components/canvas/canvas-system-status";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
-import { usePanelStore } from "@/stores/use-panel-store";
-import { useCanvasSidePanelStore } from "@/stores/use-canvas-side-panel-store";
+import { useCanvasPanelStore } from "@/stores/canvas/use-canvas-panel-store";
+import { useCanvasSidePanelStore } from "@/stores/canvas/use-canvas-side-panel-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 
 export function CanvasTopBar({
@@ -60,8 +60,8 @@ export function CanvasTopBar({
     const toggleSidePanel = useCanvasSidePanelStore((state) => state.togglePanel);
     const projects = useCanvasStore((state) => state.projects);
     // The list and the asset library are panels over the canvas, not routes.
-    const openManager = usePanelStore((state) => state.setCanvasManagerOpen);
-    const openAssets = usePanelStore((state) => state.setAssetsOpen);
+    const openManager = useCanvasPanelStore((state) => state.setCanvasManagerOpen);
+    const openAssets = useCanvasPanelStore((state) => state.setAssetsOpen);
     // Current canvas first, the rest most-recent-first: switching is a "where am I" question,
     // so the answer you are most likely looking for should not be buried.
     const orderedProjects = useMemo(() => {

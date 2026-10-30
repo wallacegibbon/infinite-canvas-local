@@ -523,10 +523,11 @@ export default {
             quotaUnavailable: "当前浏览器不提供配额估算",
             quotaProgress: "站点配额使用率",
             mainDatabase: "Infinite Canvas 主数据",
+            pluginDatabase: "Infinite Canvas 插件数据",
             records: "{{count}} 条",
             refresh: "刷新统计",
             readFailed: "读取本地存储失败",
-            stores: { appState: "应用状态", images: "图片文件", imagePreviews: "图片缩略图", media: "音视频文件", imageLogs: "生图记录", videoLogs: "视频记录", agentMessages: "Agent 消息", promptCache: "提示词缓存" }
+            stores: { appState: "应用状态", images: "图片文件", imagePreviews: "图片缩略图", media: "音视频文件", imageLogs: "生图记录", videoLogs: "视频记录" }
         },
         importedChannelCreated: "已新增渠道“{{name}}”，原有渠道未改动",
         importedChannelUpdated: "已更新渠道“{{name}}”的连接配置",

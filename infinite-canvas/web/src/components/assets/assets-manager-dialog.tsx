@@ -23,7 +23,7 @@ import { getMediaBlob } from "@/services/file-storage";
 import { getImageBlob, getImagePreviewRevision, subscribeImagePreviews, uploadImage } from "@/services/image-storage";
 import { cn } from "@/lib/utils";
 import { assetCoverUrl, useAssetStore, type Asset, type AssetKind, type ImageAsset } from "@/stores/use-asset-store";
-import { usePanelStore } from "@/stores/use-panel-store";
+import { useCanvasPanelStore } from "@/stores/canvas/use-canvas-panel-store";
 import { exportAssets, readAssetPackage } from "./asset-transfer";
 
 type AssetFormValues = {
@@ -57,8 +57,8 @@ const kindOptions = ["all", "text", "image", "video"] as const;
  */
 export function AssetsManagerDialog() {
     const { t } = useTranslation();
-    const open = usePanelStore((state) => state.assetsOpen);
-    const setOpen = usePanelStore((state) => state.setAssetsOpen);
+    const open = useCanvasPanelStore((state) => state.assetsOpen);
+    const setOpen = useCanvasPanelStore((state) => state.setAssetsOpen);
     const copyText = useCopyText();
     const [values, setValues] = useState<AssetFormValues>(EMPTY_ASSET_FORM);
     const [errors, setErrors] = useState<Partial<Record<keyof AssetFormValues, string>>>({});

@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/kit/button";
 import { Spin } from "@/components/kit/display";
 import { Progress, Alert } from "@/components/kit/feedback";
+import { PLUGIN_DATABASE } from "@/services/localforage-databases";
 import { readLocalStorageUsage, type LocalStorageUsage } from "@/services/local-storage-usage";
 
 const storeLabelKeys: Record<string, string> = {
@@ -16,8 +17,6 @@ const storeLabelKeys: Record<string, string> = {
     media_files: "media",
     image_generation_logs: "imageLogs",
     video_generation_logs: "videoLogs",
-    agent_chat_messages: "agentMessages",
-    prompt_cache: "promptCache",
 };
 
 export function ConfigLocalStorage({ active }: { active: boolean }) {
@@ -86,7 +85,7 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
                 <section key={database.name} className="overflow-hidden rounded-lg border border-stone-200 dark:border-stone-800">
                     <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-4 py-3 dark:border-stone-800">
                         <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold">{t("config.localStorage.mainDatabase")}</div>
+                            <div className="truncate text-sm font-semibold">{database.name === PLUGIN_DATABASE ? t("config.localStorage.pluginDatabase") : t("config.localStorage.mainDatabase")}</div>
                             <div className="mt-0.5 truncate font-mono text-[11px] text-stone-500">{database.name} · v{database.version}</div>
                         </div>
                         <div className="shrink-0 text-sm font-medium tabular-nums">{formatStorageBytes(database.bytes)}</div>

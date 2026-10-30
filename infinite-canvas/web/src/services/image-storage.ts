@@ -3,6 +3,7 @@ import localforage from "localforage";
 import { nanoid } from "nanoid";
 import i18n from "@/i18n";
 import { createImageThumbnail } from "@/lib/image-thumbnail";
+import { APP_DATABASE } from "@/services/localforage-databases";
 
 export type UploadedImage = {
     url: string;
@@ -13,10 +14,10 @@ export type UploadedImage = {
     mimeType: string;
 };
 
-const store = localforage.createInstance({ name: "infinite-canvas", storeName: "image_files" });
-const previewStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_previews" });
-const imageLogStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_generation_logs" });
-const videoLogStore = localforage.createInstance({ name: "infinite-canvas", storeName: "video_generation_logs" });
+const store = localforage.createInstance({ name: APP_DATABASE, storeName: "image_files" });
+const previewStore = localforage.createInstance({ name: APP_DATABASE, storeName: "image_previews" });
+const imageLogStore = localforage.createInstance({ name: APP_DATABASE, storeName: "image_generation_logs" });
+const videoLogStore = localforage.createInstance({ name: APP_DATABASE, storeName: "video_generation_logs" });
 const objectUrls = new Map<string, string>();
 const previewUrls = new Map<string, string>();
 const previewListeners = new Set<() => void>();

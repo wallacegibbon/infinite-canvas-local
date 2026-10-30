@@ -4,7 +4,7 @@ import { Download, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ResourceCenterPanel } from "@/components/layout/resource-center-panel";
+import { ResourceCenterPanel } from "@/components/settings/resource-center-panel";
 import { fetchResourceStatus, type ResourceStatus } from "@/services/api/resources";
 
 const SKIP_KEY = "resource-setup-skipped";

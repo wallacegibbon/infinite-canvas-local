@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useConfigStore } from "@/stores/use-config-store";
-import { usePanelStore } from "@/stores/use-panel-store";
+import { useCanvasPanelStore } from "@/stores/canvas/use-canvas-panel-store";
 
 /**
  * `/config` is not a page any more. Settings are a panel over the canvas, reached from the
@@ -12,7 +12,7 @@ import { usePanelStore } from "@/stores/use-panel-store";
  */
 export function AssetsEntry() {
     const navigate = useNavigate();
-    const setAssetsOpen = usePanelStore((state) => state.setAssetsOpen);
+    const setAssetsOpen = useCanvasPanelStore((state) => state.setAssetsOpen);
 
     useEffect(() => {
         setAssetsOpen(true);

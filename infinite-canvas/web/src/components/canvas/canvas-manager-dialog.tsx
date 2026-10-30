@@ -13,8 +13,8 @@ import { readZip } from "@/lib/zip";
 import { setMediaBlob } from "@/services/file-storage";
 import { setImageBlob } from "@/services/image-storage";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
-import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
-import { usePanelStore } from "@/stores/use-panel-store";
+import { useCanvasListStore } from "@/stores/canvas/use-canvas-list-store";
+import { useCanvasPanelStore } from "@/stores/canvas/use-canvas-panel-store";
 import type { CanvasExportFile } from "@/types/canvas-export";
 
 /**
@@ -33,14 +33,14 @@ export function CanvasManagerDialog() {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const inputRef = useRef<HTMLInputElement>(null);
-    const open = usePanelStore((state) => state.canvasManagerOpen);
-    const setOpen = usePanelStore((state) => state.setCanvasManagerOpen);
+    const open = useCanvasPanelStore((state) => state.canvasManagerOpen);
+    const setOpen = useCanvasPanelStore((state) => state.setCanvasManagerOpen);
     const hydrated = useCanvasStore((state) => state.hydrated);
     const projects = useCanvasStore((state) => state.projects);
     const createProject = useCanvasStore((state) => state.createProject);
     const importProject = useCanvasStore((state) => state.importProject);
-    const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
-    const setDeleteIds = useCanvasUiStore((state) => state.setDeleteProjectIds);
+    const selectedIds = useCanvasListStore((state) => state.selectedProjectIds);
+    const setDeleteIds = useCanvasListStore((state) => state.setDeleteProjectIds);
 
     const enterProject = (id: string) => {
         setOpen(false);

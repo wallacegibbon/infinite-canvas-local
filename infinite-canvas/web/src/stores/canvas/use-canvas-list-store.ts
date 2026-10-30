@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type CanvasUiStore = {
+type CanvasListStore = {
     editingProjectId: string | null;
     editingProjectTitle: string;
     selectedProjectIds: string[];
@@ -13,7 +13,7 @@ type CanvasUiStore = {
     removeSelectedProjectIds: (ids: string[]) => void;
 };
 
-export const useCanvasUiStore = create<CanvasUiStore>((set) => ({
+export const useCanvasListStore = create<CanvasListStore>((set) => ({
     editingProjectId: null,
     editingProjectTitle: "",
     selectedProjectIds: [],

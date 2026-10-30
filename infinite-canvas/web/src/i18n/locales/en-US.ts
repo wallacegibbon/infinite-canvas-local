@@ -496,10 +496,11 @@ export default {
             quotaUnavailable: "Quota estimation is unavailable in this browser",
             quotaProgress: "Site quota usage",
             mainDatabase: "Infinite Canvas data",
+            pluginDatabase: "Infinite Canvas plugin data",
             records: "{{count}} records",
             refresh: "Refresh usage",
             readFailed: "Failed to read local storage",
-            stores: { appState: "App state", images: "Image files", imagePreviews: "Image thumbnails", media: "Audio and video files", imageLogs: "Image history", videoLogs: "Video history", agentMessages: "Agent messages", promptCache: "Prompt cache" }
+            stores: { appState: "App state", images: "Image files", imagePreviews: "Image thumbnails", media: "Audio and video files", imageLogs: "Image history", videoLogs: "Video history" }
         },
         importedChannelCreated: "Added provider “{{name}}” without changing existing providers",
         importedChannelUpdated: "Updated connection settings for provider “{{name}}”",

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import { AppConfigModal } from "@/components/layout/app-config-modal";
-import { ResourceSetupGate } from "@/components/layout/resource-setup-gate";
+import { AppConfigModal } from "@/components/settings/app-config-modal";
+import { ResourceSetupGate } from "@/components/settings/resource-setup-gate";
 
 /**
  * The only layout left.

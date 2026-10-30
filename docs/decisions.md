@@ -1300,3 +1300,70 @@ type-checked, but the runtime path itself remains unexercised — worth one clic
 node that has actually failed.
 
 **Where** `infinite-canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`.
+
+## 46. Three pieces of housekeeping, and what two of them turned out to be
+
+All three came out of the same audit as #41–#45 and all three changed shape once I read the code.
+
+### `components/layout/` was 80% settings
+
+Ten files lived under a name that described two of them. `app-providers` and `client-root-init`
+are the app shell; the rest are the settings feature — the config modal (610 lines), the resource
+centre (881), the channel editor, the model picker, the storage-usage panel and the setup gate that
+opens the resource centre when nothing is configured.
+
+Six files moved to `components/settings/`. `components/layout/` keeps four: providers, root init,
+the reconnect banner and the status actions. The split is by *what the file is*, not by where it
+renders — all ten render from the same two places.
+
+### The stores had no rule
+
+`stores/` held `use-panel-store` and `use-canvas-side-panel-store` next to `use-asset-store` and
+`use-theme-store`, while `stores/canvas/` held the graph and the plugin registry. Two of those four
+are about a canvas and two are about the app, and nothing said which was which.
+
+The rule now holds and is visible from the directory listing: **`stores/` is app-wide** (assets,
+config, theme); **`stores/canvas/` is everything about a canvas** (the graph, plugins, the floating
+panels, the side panel, the canvas list). Three files moved and two were renamed:
+
+| was | is |
+|---|---|
+| `stores/use-panel-store.ts` | `stores/canvas/use-canvas-panel-store.ts` |
+| `stores/use-canvas-side-panel-store.ts` | `stores/canvas/use-canvas-side-panel-store.ts` |
+| `stores/canvas/use-canvas-ui-store.ts` | `stores/canvas/use-canvas-list-store.ts` |
+
+**The merge I proposed and did not do** The audit said to fold `useCanvasUiStore` into
+`usePanelStore`. Reading them, that is wrong: `useCanvasPanelStore` answers "which floating panel is
+open", which is app-level navigation state that outlives any panel; `useCanvasListStore` holds which
+canvas rows are ticked and which one is being renamed, which is widget state that belongs to one
+open panel. Merging them would have produced a store with two different lifetimes inside it. The
+name was the problem — `ui` said nothing — not the split.
+
+### The storage panel reported a number that was quietly wrong
+
+`local-storage-usage.ts` measured one database, hardcoded, named `"infinite-canvas"`. But plugins
+write to a second one, `"infinite-canvas-plugins"`, one object store per plugin id. A canvas with
+heavy plugins therefore showed less than the browser was actually holding against the quota, and
+nothing anywhere said so.
+
+All the database and store names are now in `services/localforage-databases.ts`, which four files
+import instead of repeating the strings, and the reader measures both databases.
+
+It also no longer creates what it measures. `indexedDB.open(name)` *creates* a database that is not
+there, so the old reader would have materialised an empty `infinite-canvas` on a fresh profile just
+by visiting the settings tab. `indexedDB.databases()` answers "which exist" without touching
+anything; the open is only reached for names the browser confirms.
+
+**Two labels were pointing at stores that no longer exist** `agent_chat_messages` and `prompt_cache`
+were in `storeLabelKeys` — and their translations in both dictionaries. `check:i18n` could not see
+they were dead because the lookup is a template literal, and a template literal registers as a
+*prefix*, so everything under `config.localStorage.stores.` counted as reachable. Removed from both
+locales along with the labels: 1108 → 1107 keys.
+
+**Verified** `npm run check`, strict `tsc`, 39 tests, build. In the browser the panel renders
+`infinite-canvas · v7` with the real per-store breakdown, and `indexedDB.databases()` after visiting
+the tab still returns exactly one database — the absent plugin one was reported as absent rather
+than created and shown empty.
+
+**Where** `components/settings/`, `stores/canvas/`, `services/localforage-databases.ts`,
+`services/local-storage-usage.ts`.

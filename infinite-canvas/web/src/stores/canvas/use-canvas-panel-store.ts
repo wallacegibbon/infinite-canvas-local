@@ -18,7 +18,7 @@ type PanelStore = {
     setAssetsOpen: (open: boolean) => void;
 };
 
-export const usePanelStore = create<PanelStore>((set) => ({
+export const useCanvasPanelStore = create<PanelStore>((set) => ({
     canvasManagerOpen: false,
     assetsOpen: false,
     setCanvasManagerOpen: (canvasManagerOpen) => set({ canvasManagerOpen }),
