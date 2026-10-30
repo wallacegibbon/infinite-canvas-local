@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Home, Images, Menu, PanelLeftClose, PanelLeftOpen, Plus, Redo2, Trash2, Undo2, Upload } from "lucide-react";
-import { Dropdown } from "antd";
+
 import { useTranslation } from "react-i18next";
 
 import { Dialog } from "@/components/kit/dialog";
+import { Dropdown } from "@/components/kit/floating";
 import { Tooltip } from "@/components/kit/tooltip";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { CanvasSystemStatus } from "@/components/canvas/canvas-system-status";

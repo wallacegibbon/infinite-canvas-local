@@ -8,6 +8,7 @@ export default {
         reconnecting: "Local gateway disconnected. Reconnecting…",
     },
     common: {
+        perPage: "per page",
         cancel: "Cancel",
         save: "Save",
         yes: "Yes",

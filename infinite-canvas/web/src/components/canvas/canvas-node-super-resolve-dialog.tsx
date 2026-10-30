@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Collapse, Select } from "antd";
+import { Select } from "antd";
 import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { InputNumber } from "@/components/kit/input";
+import { Collapse } from "@/components/kit/nav";
 import { Segmented } from "@/components/kit/segmented";
 import { readImageMeta } from "@/lib/image-utils";
 import { requestUpscaleWorkflows, type UpscaleParameter, type UpscaleWorkflow } from "@/services/api/image";

@@ -1,9 +1,9 @@
 import { FileText, Image as ImageIcon, Layers, Music2, Plus, Puzzle, Video, X } from "lucide-react";
-import { Popover } from "antd";
+
 import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
-
+import { Popover } from "@/components/kit/floating";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { getGroupResourceNodes } from "@/lib/canvas/canvas-resource-references";
 import { getImagePreviewRevision, previewUrlFor, subscribeImagePreviews } from "@/services/image-storage";

@@ -1,11 +1,13 @@
 import { Button } from "@/components/kit/button";
+import { Card } from "@/components/kit/card";
 import { Switch, Checkbox } from "@/components/kit/choice";
 import { Dialog } from "@/components/kit/dialog";
 import { Space } from "@/components/kit/display";
 import { Tag } from "@/components/kit/tag";
+import { Typography } from "@/components/kit/text";
 import { Tooltip } from "@/components/kit/tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Card, Form, Typography, theme as antdTheme } from "antd";
+import { Form, theme as antdTheme } from "antd";
 import { Ellipsis, Image as ImageIcon, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 

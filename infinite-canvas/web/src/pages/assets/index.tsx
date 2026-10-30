@@ -1,14 +1,18 @@
 import { Copy, Download, PencilLine, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Card, Drawer, Form, Image, Pagination, Select, Typography } from "antd";
+import { Drawer, Form, Select } from "antd";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
+import { Card } from "@/components/kit/card";
 import { Dialog } from "@/components/kit/dialog";
 import { Empty, Space } from "@/components/kit/display";
 import { Input } from "@/components/kit/input";
+import { Image } from "@/components/kit/media";
+import { Pagination } from "@/components/kit/nav";
 import { CheckableTag, Tag } from "@/components/kit/tag";
+import { Typography } from "@/components/kit/text";
 import { toast } from "@/components/kit/toast";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { formatBytes, readFileAsDataUrl } from "@/lib/image-utils";
@@ -288,6 +292,7 @@ export default function AssetsPage() {
                             pageSize={pageSize}
                             total={filteredAssets.length}
                             showSizeChanger
+                            perPageLabel={t("common.perPage")}
                             pageSizeOptions={[10, 20, 50, 100]}
                             onChange={(nextPage, nextPageSize) => {
                                 setPage(nextPage);

@@ -35,6 +35,7 @@ export default {
         },
     },
     common: {
+        perPage: "条/页",
         cancel: "取消",
         save: "保存",
         yes: "是",

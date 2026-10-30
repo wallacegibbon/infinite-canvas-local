@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Tabs } from "antd";
+
 import { AlertTriangle, Puzzle, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +8,7 @@ import { Switch } from "@/components/kit/choice";
 import { confirm } from "@/components/kit/confirm";
 import { Dialog } from "@/components/kit/dialog";
 import { Input } from "@/components/kit/input";
+import { Tabs } from "@/components/kit/nav";
 import { toast } from "@/components/kit/toast";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { installPluginFromUrl, setPluginEnabled, uninstallPlugin, updatePlugin } from "@/lib/canvas/plugin-loader";
