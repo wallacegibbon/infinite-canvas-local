@@ -622,7 +622,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
             {mode !== "text" && originalPrompt && !optimizeRunning && !optimizeResult && !optimizeError ? (
                 <OriginalPromptDisclosure key={`${node.id}:${originalPrompt}`} text={originalPrompt} label={t("canvas.promptPanel.originalPrompt")} hint={t("canvas.promptPanel.originalPromptHint")} theme={theme} />
             ) : null}
-            <Dialog title={t("canvas.promptPanel.editorTitle")} open={expanded} width={760} onClose={() => { commitPrompt(); setExpanded(false); }}>
+            <Dialog title={t("canvas.promptPanel.editorTitle")} open={expanded} size="panel" onClose={() => { commitPrompt(); setExpanded(false); }}>
                 <div data-canvas-no-zoom className="pt-2" onWheelCapture={(event) => event.stopPropagation()}>
                     <CanvasNodeReferenceBar nodeId={node.id} nodes={nodes} connectedNodes={connectedNodes} leadingNode={sourceImageReference ? node : undefined} onDisconnect={onDisconnectReference} onStartSelection={(nodeId) => { setExpanded(false); onStartReferenceSelection?.(nodeId); }} addDisabled={isH3T2V} addDisabledHint={t("canvas.promptPanel.videoTextAddDisabled")} />
                     {textVideoHasReferences ? <div className="mb-2 text-xs leading-4 text-[#ef4444]">{t("canvas.promptPanel.videoTextRefsWarning")}</div> : null}

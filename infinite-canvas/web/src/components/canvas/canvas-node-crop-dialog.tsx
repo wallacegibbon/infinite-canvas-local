@@ -73,7 +73,7 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
     };
 
     return (
-        <Dialog title={t("canvas.editors.cropTitle")} open={open && Boolean(dataUrl)} onClose={onClose} width={780}>
+        <Dialog title={t("canvas.editors.cropTitle")} open={open && Boolean(dataUrl)} onClose={onClose} size="panel">
             <div className="space-y-4">
                 <div
                     ref={viewport.viewportRef}

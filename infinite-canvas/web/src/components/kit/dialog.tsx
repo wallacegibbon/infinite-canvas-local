@@ -7,10 +7,18 @@ import { cn } from "@/lib/utils";
 /**
  * The app's dialog, replacing antd's `Modal`.
  *
- * The props mirror what the 27 call sites actually used — `open`/`onClose`/`title`/`footer`/
- * `width` — rather than antd's full surface, so a call site cannot quietly depend on a
- * feature this does not have. It is always centred, because 23 of the 27 asked for that and
- * the rest are content panels where centring is not a regression.
+ * The props mirror what the call sites actually need — `open`/`onClose`/`title`/`footer`/`size`
+ * — rather than antd's full surface, so a call site cannot quietly depend on a feature this does
+ * not have. It is always centred, because all but a handful asked for that and the rest are
+ * content panels where centring is not a regression.
+ *
+ * **`size` is not a hint.** `panel` is one fixed width *and* one fixed height, shared by every
+ * floating panel in the app, because a window that resizes to its contents breaks the one thing
+ * a window is for: the user's sense of where it is and how big it is. Switch between the canvas
+ * list, the asset library and settings and the frame does not move; switch tabs inside settings
+ * and the frame does not move either. Short content leaves space at the bottom, which is the
+ * price and is accepted. Only two things are exempt: a confirmation, where a 1000px box around
+ * one sentence would be its own kind of wrong, and an image preview, whose size *is* the image.
  *
  * Behaviour worth knowing:
  *   - The body scrolls; the dialog is capped at 90dvh. `bodyStyle`/`bodyClassName` still
@@ -41,7 +49,8 @@ type DialogProps = {
     children?: ReactNode;
     /** Rendered as a right-aligned action row. Omit entirely for no footer. */
     footer?: ReactNode;
-    width?: number | string;
+    /** See the note above: `panel` is fixed, `form` fits its contents, `auto` fits its media. */
+    size: "panel" | "form" | "auto";
     className?: string;
     bodyClassName?: string;
     bodyStyle?: CSSProperties;
@@ -51,7 +60,14 @@ type DialogProps = {
     maskClosable?: boolean;
 };
 
-export function Dialog({ open, onClose, title, label, children, footer, width = 520, className, bodyClassName, bodyStyle, closable = true, maskClosable = true }: DialogProps) {
+const SIZE_CLASS: Record<DialogProps["size"], string> = {
+    // Fixed in both directions on purpose — see the note on `size` above.
+    panel: "h-[min(760px,88dvh)] w-[1000px]",
+    form: "max-h-[90dvh] w-[520px]",
+    auto: "max-h-[90dvh] w-auto",
+};
+
+export function Dialog({ open, onClose, title, label, children, footer, size, className, bodyClassName, bodyStyle, closable = true, maskClosable = true }: DialogProps) {
     return (
         <RadixDialog.Root
             open={open}
@@ -71,9 +87,9 @@ export function Dialog({ open, onClose, title, label, children, footer, width = 
                     onPointerDownOutside={(event) => {
                         if (!maskClosable) event.preventDefault();
                     }}
-                    style={{ width }}
                     className={cn(
-                        "fixed left-1/2 top-1/2 z-[1301] flex max-h-[90dvh] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl outline-none dark:border-stone-800 dark:bg-stone-900 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+                        "fixed left-1/2 top-1/2 z-[1301] flex max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl outline-none dark:border-stone-800 dark:bg-stone-900 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+                        SIZE_CLASS[size],
                         className,
                     )}
                 >

@@ -126,7 +126,7 @@ export function CanvasSystemStatus() {
                 </span>
                 {oom ? <span className="size-1.5 rounded-full" style={{ background: "#dc2626" }} title={t("canvas.systemStatus.oomBadge")} /> : null}
             </button>
-            <Dialog title={t("canvas.systemStatus.title")} open={open} onClose={() => setOpen(false)} width={440}>
+            <Dialog title={t("canvas.systemStatus.title")} open={open} onClose={() => setOpen(false)} size="form">
                 <div className="space-y-4 pt-1 text-sm" style={{ color: theme.node.text }}>
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-xs" style={{ color: theme.node.muted }}>

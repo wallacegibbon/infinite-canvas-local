@@ -152,7 +152,7 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
     const confirmParams = { ...params, horizontalLines, verticalLines, rows, columns };
 
     return (
-        <Dialog label={t("canvas.editors.splitTitle")} open={open && Boolean(dataUrl)} onClose={onClose} width={780}>
+        <Dialog label={t("canvas.editors.splitTitle")} open={open && Boolean(dataUrl)} onClose={onClose} size="panel">
             <div className="space-y-5" data-canvas-no-zoom>
                 <div>
                     <h2 className="text-xl font-semibold">{t("canvas.editors.splitTitle")}</h2>

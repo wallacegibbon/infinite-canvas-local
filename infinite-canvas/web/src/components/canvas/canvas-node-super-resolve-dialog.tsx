@@ -174,7 +174,7 @@ export function CanvasNodeSuperResolveDialog({
     };
 
     return (
-        <Dialog label={t("canvas.superResolve.title")} open={open && Boolean(dataUrl)} onClose={onClose} width={820}>
+        <Dialog label={t("canvas.superResolve.title")} open={open && Boolean(dataUrl)} onClose={onClose} size="panel">
             <div className="space-y-5">
                 <h2 className="text-xl font-semibold">{title || t("canvas.superResolve.title")}</h2>
                 <div className="grid gap-6 md:grid-cols-[minmax(260px,1fr)_360px]">

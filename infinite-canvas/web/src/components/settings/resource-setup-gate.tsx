@@ -59,7 +59,7 @@ export function ResourceSetupGate() {
                 </div>
             }
             open={open}
-            width={860}
+            size="panel"
             closable={false}
             onClose={skip}
             bodyStyle={{ maxHeight: "72vh" }}

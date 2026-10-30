@@ -1511,3 +1511,55 @@ afterwards and checked: two nodes, correct title, no banner, console empty.
 
 **Where** `stores/use-storage-recovery-store.ts`, `lib/persist-recovery.ts`,
 `components/layout/storage-recovery-banner.tsx`, both persisted stores.
+
+## 50. Every floating panel is 1000×646, or it is not a panel
+
+**Decision** `Dialog` no longer takes `width`. It takes a required `size` from a closed set, and
+`size` is not a hint:
+
+```ts
+const SIZE_CLASS = {
+    panel: "h-[min(760px,88dvh)] w-[1000px]",
+    form:  "max-h-[90dvh] w-[520px]",
+    auto:  "max-h-[90dvh] w-auto",
+};
+```
+
+Thirty call sites were classified. Nineteen are `panel` — the canvas list, the asset library, the
+settings modal, the plugin manager, the asset picker, the model picker, the quick-tools settings,
+the prompt editor, and all eight image/video editors. Nine are `form` — confirmations, the shortcut
+sheet, system status, the cloud-API editor, the card-skin picker, runtime help. Two are `auto`, and
+only two: the image preview and the media preview, whose size *is* the image.
+
+**The problem it fixes** Before this, every dialog's width was a literal between 440 and 1100 and
+**not one of the thirty set a height** — height was whatever the content happened to be, capped at
+90dvh. So:
+
+- settings (980) → asset library (1100) → canvas list (920) → plugin manager (640): the frame moved
+  sideways by 180px between any two of them, and vertically by whatever the content did;
+- inside settings, switching between Providers, Prompt API, Preferences, Add workflows and Local
+  storage resized the same window five times, because those five tabs have very different content.
+
+A window that resizes to its contents stops reading as a window. The user's sense of "where I am" in
+a spatial UI depends on the frame staying put.
+
+**Why not one size for everything** A confirmation is one sentence and a paragraph. Forcing it to
+1000×646 would be its own kind of wrong — a giant box that shouts about something small. Keeping
+`form` content-sized preserves that, and nothing is lost, because a confirmation is not a place you
+*are*, it is a question you answer. `auto` stays for the same reason from the other direction: a
+preview's size is information, not layout.
+
+**Why `size` is required and there is no default** A default would have let an unclassified call
+site keep its old behaviour silently. Making it required turned the compiler into the checklist:
+after the kit changed, `tsc` listed all thirty sites and could not be satisfied until each was
+classified.
+
+**Accepted cost** A panel with little content leaves space at the bottom. The video upscale editor
+is the clearest case. Measured on a 734px-tall window the panel is 646 tall (`88dvh`); on a 1080p
+screen it is 760, and only the tallest editors scroll.
+
+**Measured after the change** Settings across all five tabs: 1000×646, 1000×646, 1000×646, 1000×646,
+1000×646. Canvas list: 1000×646. Asset library: 1000×646. Crop editor: 1000×646. Clear-canvas
+confirmation: 520×161, unchanged.
+
+**Where** `components/kit/dialog.tsx` and the thirty call sites.

@@ -243,7 +243,7 @@ export function AssetsManagerDialog() {
 
     return (
         <>
-            <Dialog open={open} onClose={() => setOpen(false)} title={t("assets.title")} width={1100} bodyStyle={{ maxHeight: "76vh" }} bodyClassName="pr-1">
+            <Dialog open={open} onClose={() => setOpen(false)} title={t("assets.title")} size="panel" bodyClassName="pr-1">
                 <div className="pb-4">
                     <p className="text-sm text-stone-500 dark:text-stone-400">{t("assets.description")}</p>
 
@@ -342,7 +342,7 @@ export function AssetsManagerDialog() {
             <Dialog
                 title={editingAsset ? t("assets.edit") : t("assets.add")}
                 open={isAssetOpen}
-                width={980}
+                size="panel"
                 onClose={() => setIsAssetOpen(false)}
                 footer={
                     <>
@@ -475,6 +475,7 @@ export function AssetsManagerDialog() {
                         </Button>
                     </>
                 }
+                size="form"
             >
                 {t("assets.deleteConfirm", { name: deletingAsset?.title })}
             </Dialog>

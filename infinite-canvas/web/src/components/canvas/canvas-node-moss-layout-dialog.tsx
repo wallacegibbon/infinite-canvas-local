@@ -185,7 +185,7 @@ export function CanvasNodeMossLayoutDialog({ open, dataUrl, promptDefault = "", 
     };
 
     return (
-        <Dialog label={t("canvas.mossLayout.title")} open={open} onClose={onClose} width={1040}>
+        <Dialog label={t("canvas.mossLayout.title")} open={open} onClose={onClose} size="panel">
             <div className="grid gap-5 lg:grid-cols-[minmax(460px,1fr)_360px]" data-canvas-no-zoom>
                 <div className="space-y-2">
                     <div

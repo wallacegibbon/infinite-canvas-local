@@ -33,6 +33,7 @@ export function CanvasDeleteProjectsDialog() {
                     </Button>
                 </>
             }
+            size="form"
         >
             <p className="text-sm text-stone-500">{t("canvas.project.deleteDescription", { count: ids.length })}</p>
         </Dialog>

@@ -75,7 +75,7 @@ export function CanvasManagerDialog() {
 
     return (
         <>
-            <Dialog open={open} onClose={() => setOpen(false)} title={t("canvas.title")} width={920} bodyClassName="pr-1">
+            <Dialog open={open} onClose={() => setOpen(false)} title={t("canvas.title")} size="panel" bodyClassName="pr-1">
                 <div className="flex flex-wrap items-center justify-end gap-2">
                     {selectedIds.length ? (
                         <>

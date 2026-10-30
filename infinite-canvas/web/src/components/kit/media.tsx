@@ -32,7 +32,7 @@ export function Image({ src, alt, preview, className, style }: { src?: string; a
                 needs the lightbox to exist. */}
             <img src={src} alt={alt} style={style} className={cn(!controlled && preview !== false && "cursor-zoom-in", className)} onClick={!controlled && preview !== false ? () => setVisible(true) : undefined} />
             {preview !== false ? (
-                <Dialog open={visible} onClose={() => setVisible(false)} width="auto" bodyClassName="p-0" label={alt}>
+                <Dialog open={visible} onClose={() => setVisible(false)} size="auto" bodyClassName="p-0" label={alt}>
                     {enlarged ? <img src={enlarged} alt={alt} className="max-h-[80vh] max-w-[80vw] object-contain" /> : null}
                 </Dialog>
             ) : null}

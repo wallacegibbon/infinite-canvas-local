@@ -2705,7 +2705,7 @@ function InfiniteCanvasPage() {
                     title={t("canvas.runtime.imageDetails")}
                     open={Boolean(previewContent)}
                     onClose={() => setPreviewNodeId(null)}
-                    width="auto"
+                    size="auto"
                     bodyClassName="p-0"
                     bodyStyle={{ display: "flex", justifyContent: "center", alignItems: "center", maxHeight: "80vh" }}
                 >
@@ -2724,6 +2724,7 @@ function InfiniteCanvasPage() {
                             </Button>
                         </>
                     }
+                    size="form"
                 >
                     <p className="text-sm opacity-60">{t("canvas.runtime.clearDescription")}</p>
                 </Dialog>

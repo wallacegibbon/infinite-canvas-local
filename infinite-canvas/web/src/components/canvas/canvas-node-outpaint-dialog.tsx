@@ -187,7 +187,7 @@ export function CanvasNodeOutpaintDialog({ dataUrl, open, promptDefault = "", on
     };
 
     return (
-        <Dialog label={t("canvas.outpaint.title")} open={open && Boolean(dataUrl)} onClose={onClose} width={980}>
+        <Dialog label={t("canvas.outpaint.title")} open={open && Boolean(dataUrl)} onClose={onClose} size="panel">
             <div className="grid gap-5 lg:grid-cols-[minmax(420px,1fr)_300px]" data-canvas-no-zoom>
                 <div
                     ref={boardRef}

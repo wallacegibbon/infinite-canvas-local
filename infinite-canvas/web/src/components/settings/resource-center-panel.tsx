@@ -530,7 +530,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                 {!status?.indexError && status?.indexWarning ? <div className="mt-2 break-all text-[11px] text-stone-500 dark:text-stone-400"><span className="inline-flex items-center gap-1.5"><AlertTriangle className="size-3.5 shrink-0" />{copy.indexWarning}</span>{status.indexWarning}</div> : null}
             </div>
 
-            <Dialog open={runtimeHelpOpen} onClose={() => setRuntimeHelpOpen(false)} width={620} title={copy.runtimeHelp}>
+            <Dialog open={runtimeHelpOpen} onClose={() => setRuntimeHelpOpen(false)} size="form" title={copy.runtimeHelp}>
                 <div className="space-y-3 text-sm">
                     <div className="text-xs leading-5 text-stone-500 dark:text-stone-400">{copy.runtimeHelpIntro}</div>
                     <div className="rounded-md border border-stone-200 p-2 dark:border-stone-800">

@@ -46,7 +46,7 @@ export function CanvasNodeVideoUpscaleDialog({ open, node, onClose, onConfirm }:
         <Dialog
             open={open}
             onClose={onClose}
-            width={560}
+            size="panel"
             title={
                 <span className="flex items-center gap-2">
                     <Maximize2 className="size-4" />

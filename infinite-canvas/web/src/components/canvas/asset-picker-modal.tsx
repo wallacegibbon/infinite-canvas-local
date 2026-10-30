@@ -24,7 +24,7 @@ type Props = {
 export function AssetPickerModal({ open, onInsert, onClose }: Props) {
     const { t } = useTranslation();
     return (
-        <Dialog title={t("canvas.assetPicker.title")} open={open} onClose={onClose} width={860} bodyClassName="min-h-[480px] pt-0">
+        <Dialog title={t("canvas.assetPicker.title")} open={open} onClose={onClose} size="panel" bodyClassName="min-h-[480px] pt-0">
             <MyAssetsTab onInsert={onInsert} />
         </Dialog>
     );

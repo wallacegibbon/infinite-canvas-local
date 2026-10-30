@@ -92,7 +92,7 @@ export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onCl
     return (
         <Dialog
             open={open}
-            width={880}
+            size="panel"
             onClose={onClose}
             title={
                 <span>

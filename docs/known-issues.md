@@ -264,3 +264,23 @@ writing and rewrites the main key.
 instead of being migrated. Nothing breaks today because the missing fields fall back to falsy, but
 the mechanism that should catch it does not exist.
 
+
+---
+
+## 13. The repo is not formatted with its own Prettier config
+
+**Symptom** `npx prettier --check src` reports `Code style issues found in 78 files`.
+
+**Cause** `.prettierrc.json` sets `printWidth: 255`, which is what the very long single-line import
+statements in this repo match. But 78 files contain lines prettier would still reflow — import lists
+over 255 characters, and callsites it would collapse or split differently. Whatever produced that
+style, it was not `npm run format`.
+
+**Why it matters** `npm run format` exists and `npm run format:check` exists, but neither is part of
+`npm run check`, so the drift is invisible until somebody runs it — and then `--write` produces a
+2400-line diff across 45 files, which buries whatever change they actually wanted to make. That
+happened during decisions #50 and had to be reverted.
+
+**Fix** Run `npm run format` once, as its own commit with nothing else in it, and add
+`format:check` to `npm run check` so it cannot drift again. Not done here because a formatting-only
+commit should not share a commit with a behaviour change.

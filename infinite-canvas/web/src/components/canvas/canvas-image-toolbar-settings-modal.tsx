@@ -132,7 +132,7 @@ export function ImageToolSettingsModal({
         <Dialog
             title={t("canvas.imageTools.customize")}
             open={open}
-            width={760}
+            size="panel"
             onClose={onCancel}
             footer={
                 <div className="flex w-full items-center justify-between gap-3">

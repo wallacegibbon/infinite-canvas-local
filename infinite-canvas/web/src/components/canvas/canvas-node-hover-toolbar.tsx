@@ -264,7 +264,7 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
     );
 
     return (
-        <Dialog title={title} open={open && Boolean(node)} onClose={onClose}>
+        <Dialog title={title} open={open && Boolean(node)} onClose={onClose} size="panel">
             {node ? (
                 <div className="h-[56vh] min-h-[360px] select-text text-sm" data-canvas-shortcuts-ignore>
                     {view === "info" ? (

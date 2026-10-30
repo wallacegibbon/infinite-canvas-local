@@ -483,7 +483,7 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
             <ChannelEditorDrawer open={Boolean(editingChannel)} channel={editingChannel} onSave={saveChannel} onClose={() => setEditingChannelId("")} />
             <Dialog
                 open={Boolean(passwordSkinId)}
-                width={420}
+                size="form"
                 maskClosable={false}
                 title={passwordSkinId ? t("config.preferences.cardSkinUnlockTitle", { name: t(`config.preferences.cardSkins.${passwordSkinId}.label`) }) : ""}
                 onClose={closeSkinPasswordModal}
@@ -516,7 +516,7 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
             </Dialog>
             <Dialog
                 open={cloudApiEditorOpen}
-                width={520}
+                size="form"
                 title={editingCloudApiId ? t("config.cloudApi.editTitle") : t("config.cloudApi.addTitle")}
                 onClose={() => setCloudApiEditorOpen(false)}
                 footer={
@@ -569,7 +569,7 @@ export function AppConfigModal() {
                 </div>
             }
             open={isConfigOpen}
-            width={980}
+            size="panel"
             onClose={() => setConfigDialogOpen(false)}
             bodyStyle={{ maxHeight: "72vh" }}
             bodyClassName="pr-3"

@@ -34,7 +34,7 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
     const update = <Key extends keyof CanvasImageAngleParams>(key: Key, value: CanvasImageAngleParams[Key]) => setParams((current) => ({ ...current, [key]: value }));
 
     return (
-        <Dialog label={t("canvas.editors.angleTitle")} open={open && Boolean(dataUrl)} onClose={onClose} width={1000}>
+        <Dialog label={t("canvas.editors.angleTitle")} open={open && Boolean(dataUrl)} onClose={onClose} size="panel">
             <div className="space-y-5">
                 <div>
                     <h2 className="text-xl font-semibold">{t("canvas.editors.angleTitle")}</h2>

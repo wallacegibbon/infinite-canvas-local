@@ -133,7 +133,7 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
     ];
 
     return (
-        <Dialog title={t("canvas.plugins.title")} open={open} onClose={onClose} width={640}>
+        <Dialog title={t("canvas.plugins.title")} open={open} onClose={onClose} size="panel">
             <div className="space-y-3">
                 <div className="flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "#f59e0b55", background: "#f59e0b14", color: theme.node.text }}>
                     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
