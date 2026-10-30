@@ -24,7 +24,6 @@ type Config struct {
 	Host    string
 
 	ComfyURL            string
-	ComfyDir            string
 	ComfyPython         string
 	ComfyModelsShared   bool // COMFY_MODELS_SHARED=1; installs are refused without it (internal/resource/install_policy.go)
 	PromptThinkingParam string
@@ -83,9 +82,6 @@ func WithOutputDir(dir string) Option { return func(c *Config) { c.OutputDir = d
 // WithComfyPython overrides the ComfyUI interpreter path hint.
 func WithComfyPython(path string) Option { return func(c *Config) { c.ComfyPython = path } }
 
-// WithComfyDir overrides the ComfyUI installation directory.
-func WithComfyDir(dir string) Option { return func(c *Config) { c.ComfyDir = dir } }
-
 // WithComfyFrontendDir overrides the ComfyUI frontend directory.
 func WithComfyFrontendDir(dir string) Option { return func(c *Config) { c.ComfyFrontendDir = dir } }
 
@@ -112,7 +108,6 @@ func Load(opts ...Option) (*Config, error) {
 		Port:                intValue(os.Getenv("PORT"), 8190),
 		Host:                stringOr(os.Getenv("HOST"), "127.0.0.1"),
 		ComfyURL:            stringOr(os.Getenv("COMFY_URL"), "http://127.0.0.1:8188"),
-		ComfyDir:            strings.TrimSpace(os.Getenv("COMFYUI_DIR")),
 		ComfyPython:         strings.TrimSpace(os.Getenv("COMFY_PYTHON")),
 		ComfyModelsShared:   boolValue(os.Getenv("COMFY_MODELS_SHARED")),
 		PromptThinkingParam: stringOr(os.Getenv("PROMPT_THINKING_PARAM"), "none"),
@@ -149,7 +144,6 @@ func Load(opts ...Option) (*Config, error) {
 	cfg.WorkflowDir = absPath(cfg.WorkflowDir)
 	cfg.DataDir = absPath(cfg.DataDir)
 	cfg.OutputDir = absPath(cfg.OutputDir)
-	cfg.ComfyDir = absPath(cfg.ComfyDir)
 	cfg.ComfyFrontendDir = absPath(cfg.ComfyFrontendDir)
 	cfg.ComfyURL = strings.TrimRight(cfg.ComfyURL, "/")
 

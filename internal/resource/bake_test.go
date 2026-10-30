@@ -2,6 +2,7 @@ package resource
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -9,9 +10,9 @@ import (
 
 func TestBakeResourceReportsTheRealCommand(t *testing.T) {
 	root := t.TempDir()
-	manager := quietManager(t)
+	comfyRoot := filepath.Join(root, "ComfyUI")
+	manager := quietManagerAt(t, comfyRoot)
 	manager.cfg.RootDir = root
-	manager.cfg.ComfyDir = root + "/ComfyUI"
 	manager.cfg.ComfyPython = "/venv/bin/python"
 	manager.index = &Index{Resources: []*Resource{
 		{ID: "moss_image_base_bf16", Type: "model", Target: "diffusion_models/moss_image_base_bf16.safetensors"},
@@ -26,7 +27,7 @@ func TestBakeResourceReportsTheRealCommand(t *testing.T) {
 		Builder:  map[string]any{"preset": "Balanced", "strength": float64(1)},
 	}
 
-	err := manager.bakeRequiredError(bake, manager.cfg.ComfyDir)
+	err := manager.bakeRequiredError(bake, manager.ComfyRoot())
 	if err == nil {
 		t.Fatal("bake resource produced no error")
 	}
@@ -46,9 +47,9 @@ func TestBakeResourceReportsTheRealCommand(t *testing.T) {
 		"tools/bake-moss-preset.py",
 		"--preset Balanced",
 		"--strength 1",
-		"--base " + manager.cfg.ComfyDir + "/models/diffusion_models/moss_image_base_bf16.safetensors",
-		"--sft " + manager.cfg.ComfyDir + "/models/diffusion_models/moss_image_sft_bf16.safetensors",
-		"--out " + manager.cfg.ComfyDir + "/models/diffusion_models/moss_balanced_s100.safetensors",
+		"--base " + comfyRoot + "/models/diffusion_models/moss_image_base_bf16.safetensors",
+		"--sft " + comfyRoot + "/models/diffusion_models/moss_image_sft_bf16.safetensors",
+		"--out " + comfyRoot + "/models/diffusion_models/moss_balanced_s100.safetensors",
 	} {
 		if !strings.Contains(manual.command, want) {
 			t.Errorf("command is missing %q:\n%s", want, manual.command)
@@ -68,7 +69,7 @@ func TestBakeResourceWithoutPythonStillHasACommand(t *testing.T) {
 	}}
 	bake := &Resource{ID: "merged", Type: "bake", Target: "diffusion_models/merged.safetensors", Requires: []string{"base"}}
 
-	err := manager.bakeRequiredError(bake, manager.cfg.ComfyDir)
+	err := manager.bakeRequiredError(bake, manager.ComfyRoot())
 	var manual *manualStepError
 	if !errors.As(err, &manual) {
 		t.Fatalf("error is %T, want *manualStepError", err)
@@ -84,7 +85,6 @@ func TestBakeResourceWithoutPythonStillHasACommand(t *testing.T) {
 
 func TestInstallNeverStartsWithABakeItem(t *testing.T) {
 	manager := quietManager(t)
-	manager.cfg.ComfyDir = t.TempDir()
 	manager.index = &Index{
 		Resources: []*Resource{
 			{ID: "base", Type: "model", Target: "diffusion_models/base.safetensors"},

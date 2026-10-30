@@ -66,12 +66,12 @@ func TestInstallPolicyFollowsTheFlagOnly(t *testing.T) {
 // A refused install must not depend on the local filesystem: the same config on a host with
 // and without the folders has to reach the same verdict.
 func TestInstallPolicyIgnoresTheLocalFilesystem(t *testing.T) {
-	manager := quietManager(t)
+	// ComfyUI is installed and reported here; the policy still has the last word.
+	manager := quietManagerAt(t, t.TempDir())
 	manager.cfg.ComfyModelsShared = false
-	manager.cfg.ComfyDir = t.TempDir() // a real ComfyUI directory exists here
 
 	if manager.InstallPolicy().Allowed {
-		t.Error("an existing COMFYUI_DIR must not enable installs on its own")
+		t.Error("a known ComfyUI directory must not enable installs on its own")
 	}
 }
 
@@ -97,13 +97,12 @@ func TestWriteFailureHintNamesTheFolderNotTheDisk(t *testing.T) {
 // A target folder that cannot be created stops the job with a message naming the folder —
 // including when the cause is "not there", which used to be neither fatal nor explained.
 func TestInstallStopsWhenTheTargetFolderCannotBeCreated(t *testing.T) {
-	manager := quietManager(t)
 	// A regular file where the ComfyUI directory should be: MkdirAll fails with ENOTDIR.
 	blocker := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	manager.cfg.ComfyDir = filepath.Join(blocker, "ComfyUI")
+	manager := quietManagerAt(t, filepath.Join(blocker, "ComfyUI"))
 	manager.index = &Index{Resources: []*Resource{{
 		ID:      "m1",
 		Type:    "model",
@@ -140,11 +139,11 @@ func TestInstallStopsWhenTheTargetFolderCannotBeCreated(t *testing.T) {
 	t.Error("the install job did not finish within 5s")
 }
 
-// Without a reported folder layout and without COMFYUI_DIR there is nowhere to write, and
-// the refusal has to say which of the two is missing.
+// Without a reported folder layout there is nowhere to write, and the refusal has to name
+// what ComfyUI failed to report.
 func TestInstallRefusesWhenTheComfyUIDirectoryIsUnknown(t *testing.T) {
-	manager := quietManager(t)
-	manager.cfg.ComfyDir = ""
+	// No folder layout was reported: nothing knows where ComfyUI lives.
+	manager := quietManagerAt(t, "")
 	manager.index = &Index{Resources: []*Resource{{
 		ID:      "m1",
 		Type:    "model",
@@ -161,7 +160,7 @@ func TestInstallRefusesWhenTheComfyUIDirectoryIsUnknown(t *testing.T) {
 	if !errors.As(err, &apiErr) || apiErr.Code != "install_root_unknown" {
 		t.Fatalf("err = %v, want install_root_unknown", err)
 	}
-	for _, want := range []string{"COMFYUI_DIR", "/internal/folder_paths"} {
+	for _, want := range []string{"custom_nodes", "/internal/folder_paths"} {
 		if !strings.Contains(apiErr.Message, want) {
 			t.Errorf("message %q does not mention %q", apiErr.Message, want)
 		}

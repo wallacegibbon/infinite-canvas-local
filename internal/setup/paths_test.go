@@ -10,37 +10,17 @@ import (
 	"comfyui-gateway/internal/logx"
 )
 
-// The layers of InstallRoot, most trustworthy first. The case that matters is the third
-// one: a model folder outside the ComfyUI tree must not decide where custom nodes go.
-func TestInstallRootPrefersWhatComfyUIReports(t *testing.T) {
+// One rule: the parent of the custom_nodes folder ComfyUI reports. Nothing else is
+// consulted, because nothing else knows where an install should write.
+func TestInstallRootComesFromTheReportedCustomNodes(t *testing.T) {
 	cases := []struct {
-		name     string
-		comfyDir string
-		paths    map[string]any
-		want     string
+		name  string
+		paths map[string]any
+		want  string
 	}{
-		{
-			name:     "operator wins over everything",
-			comfyDir: "/opt/ComfyUI",
-			paths:    map[string]any{"custom_nodes": []any{"/elsewhere/custom_nodes"}},
-			want:     "/opt/ComfyUI",
-		},
 		{
 			name:  "custom_nodes is used when reported",
 			paths: map[string]any{"custom_nodes": []any{"/opt/ComfyUI/custom_nodes"}},
-			want:  "/opt/ComfyUI",
-		},
-		{
-			name: "a model folder outside the tree does not move the root",
-			paths: map[string]any{
-				"custom_nodes": []any{"/opt/ComfyUI/custom_nodes"},
-				"checkpoints":  []any{"/mnt/models/checkpoints"},
-			},
-			want: "/opt/ComfyUI",
-		},
-		{
-			name:  "older builds only report model folders",
-			paths: map[string]any{"checkpoints": []any{"/opt/ComfyUI/models/checkpoints"}},
 			want:  "/opt/ComfyUI",
 		},
 		{
@@ -49,19 +29,24 @@ func TestInstallRootPrefersWhatComfyUIReports(t *testing.T) {
 			want:  "/opt/ComfyUI",
 		},
 		{
-			name: "nothing reported and nothing configured",
+			name: "model folders are not a substitute",
+			paths: map[string]any{
+				"checkpoints":      []any{"/opt/ComfyUI/models/checkpoints"},
+				"diffusion_models": []any{"/mnt/models/diffusion_models"},
+			},
 			want: "",
 		},
 		{
 			name:  "empty entries are skipped",
-			paths: map[string]any{"custom_nodes": []any{"", "  "}, "checkpoints": []any{""}},
+			paths: map[string]any{"custom_nodes": []any{"", "  "}},
 			want:  "",
 		},
+		{name: "nothing reported", want: ""},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if got := InstallRoot(testCase.comfyDir, testCase.paths); got != testCase.want {
+			if got := InstallRoot(testCase.paths); got != testCase.want {
 				t.Errorf("InstallRoot = %q, want %q", got, testCase.want)
 			}
 		})

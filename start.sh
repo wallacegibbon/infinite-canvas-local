@@ -50,7 +50,9 @@ if [ -f "$ROOT/.env" ]; then
 fi
 
 export COMFY_URL="${COMFY_URL:-http://127.0.0.1:8188}"
-export COMFYUI_DIR="${COMFYUI_DIR:-$HOME/comfy/ComfyUI}"
+# Only start.sh needs to know where ComfyUI lives (the optional START_COMFY branch);
+# the gateway asks ComfyUI itself.
+COMFY_START_DIR="${COMFY_START_DIR:-$HOME/comfy/ComfyUI}"
 export HOST="${HOST:-127.0.0.1}"
 export PORT="${PORT:-8190}"
 
@@ -103,8 +105,8 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 if [ "${START_COMFY:-0}" = "1" ]; then
-  echo "→ ComfyUI   ${COMFYUI_DIR} (${COMFY_PYTHON:-python} main.py ${COMFY_ARGS:-})"
-  ( cd "$COMFYUI_DIR" && exec "${COMFY_PYTHON:-python}" main.py ${COMFY_ARGS:-} ) & pids+=($!)
+  echo "→ ComfyUI   ${COMFY_START_DIR} (${COMFY_PYTHON:-python} main.py ${COMFY_ARGS:-})"
+  ( cd "$COMFY_START_DIR" && exec "${COMFY_PYTHON:-python}" main.py ${COMFY_ARGS:-} ) & pids+=($!)
 fi
 
 # The gateway is a static binary: build it once when it is missing (needs the Go toolchain),

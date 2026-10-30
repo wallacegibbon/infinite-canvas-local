@@ -175,27 +175,15 @@ func ExtraModelPathsFor(root, comfyDir string) map[string][]string {
 	return merged
 }
 
-// InstallRoot resolves where ComfyUI is installed, which is where an install has to write.
+// InstallRoot resolves where ComfyUI is installed, from the folder layout it reports.
 //
-// The layers, most trustworthy first:
-//
-//  1. COMFYUI_DIR — the operator said so.
-//  2. The parent of a "custom_nodes" folder ComfyUI reported — ComfyUI said so, and it is
-//     exactly the folder an install needs.
-//  3. Two levels up from a reported model folder (<root>/models/<type>) — an inference, and
-//     the one that breaks when extra_model_paths points models outside the tree.
-//  4. "" — cannot tell. Callers must refuse rather than invent a path.
-func InstallRoot(comfyDir string, folderPaths map[string]any) string {
-	if comfyDir != "" {
-		return comfyDir
-	}
+// One rule: the parent of the "custom_nodes" folder ComfyUI reports. That is the folder an
+// install writes into, and ComfyUI is the only thing that knows where it is, so no
+// configuration, no inference from model folders (which extra_model_paths can put anywhere)
+// and no guessing. Empty means ComfyUI did not report it, and callers must refuse.
+func InstallRoot(folderPaths map[string]any) string {
 	if dir := firstReportedDir(folderPaths, "custom_nodes"); dir != "" {
 		return filepath.Dir(dir)
-	}
-	for _, key := range []string{"diffusion_models", "unet", "checkpoints"} {
-		if dir := firstReportedDir(folderPaths, key); dir != "" {
-			return filepath.Dir(filepath.Dir(dir))
-		}
 	}
 	return ""
 }
@@ -220,7 +208,7 @@ func firstReportedDir(folderPaths map[string]any, key string) string {
 }
 
 // CollectModelRoots lists every directory a logical model type may live in.
-func CollectModelRoots(dir string, folderPaths map[string]any, comfyDir, comfyRoot string) []string {
+func CollectModelRoots(dir string, folderPaths map[string]any, root string) []string {
 	keys, ok := ModelDirKeys[dir]
 	if !ok {
 		keys = []string{dir}
@@ -253,12 +241,8 @@ func CollectModelRoots(dir string, folderPaths map[string]any, comfyDir, comfyRo
 		}
 	}
 
-	base := comfyRoot
-	if base == "" {
-		base = comfyDir
-	}
-	if base != "" {
-		extra := ExtraModelPathsFor(base, comfyDir)
+	if root != "" {
+		extra := ExtraModelPathsFor(root, "")
 		for _, key := range keys {
 			for _, entry := range extra[key] {
 				add(entry)
@@ -266,12 +250,9 @@ func CollectModelRoots(dir string, folderPaths map[string]any, comfyDir, comfyRo
 		}
 	}
 
-	for _, baseDir := range []string{comfyRoot, comfyDir} {
-		if baseDir == "" {
-			continue
-		}
+	if root != "" {
 		for _, key := range keys {
-			add(filepath.Join(baseDir, "models", key))
+			add(filepath.Join(root, "models", key))
 		}
 	}
 	return roots

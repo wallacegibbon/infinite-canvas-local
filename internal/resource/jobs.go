@@ -133,9 +133,8 @@ func (m *Manager) Install(ids, packs []string) (*Job, error) {
 		return nil, httpxBadRequest("model_install_disabled", installRefusedMessage(policy))
 	}
 
-	// Writing needs a directory. ComfyUI can supply one (the folder layout it reports), the
-	// operator can (COMFYUI_DIR); when neither does, say which one is missing instead of
-	// inventing a relative path.
+	// Writing needs a directory, and only ComfyUI knows which one: its reported custom_nodes
+	// folder. When it does not report one, say so instead of inventing a relative path.
 	if root == "" {
 		return nil, httpxBadRequest("install_root_unknown", m.installRootUnknownMessage())
 	}

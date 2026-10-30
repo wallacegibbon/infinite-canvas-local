@@ -110,6 +110,18 @@ type Options struct {
 	Comfy         *comfy.Client
 	Logger        *logx.Logger
 	MainModelFile func(workflowID string) string
+	// FolderPaths seeds the folder catalog a scan would otherwise fill in. Tests use it to
+	// stand in for a running ComfyUI; a scan overwrites it.
+	FolderPaths map[string]any
+}
+
+// cloneFolders copies a seeded folder catalog so a caller cannot mutate it later.
+func cloneFolders(paths map[string]any) map[string]any {
+	out := make(map[string]any, len(paths))
+	for key, value := range paths {
+		out[key] = value
+	}
+	return out
 }
 
 // New builds a manager and reads its persisted state.
@@ -130,7 +142,7 @@ func New(opts Options) *Manager {
 		auto:              map[string]map[string]string{},
 		available:         map[string]*Availability{},
 		loaderCatalog:     map[string][]string{},
-		folderPathCatalog: map[string]any{},
+		folderPathCatalog: cloneFolders(opts.FolderPaths),
 		nodeClasses:       map[string]bool{},
 		status: Status{
 			Phase:     "idle",
@@ -351,11 +363,11 @@ func (m *Manager) aliasTargetExistsLocked(classType, value string) bool {
 
 // modelRootsLocked resolves the directories a logical model type lives in.
 func (m *Manager) modelRootsLocked(dir string) []string {
-	return CollectModelRoots(dir, m.folderPathCatalog, m.cfg.ComfyDir, m.comfyRootLocked())
+	return CollectModelRoots(dir, m.folderPathCatalog, m.comfyRootLocked())
 }
 
 func (m *Manager) comfyRootLocked() string {
-	return InstallRoot(m.cfg.ComfyDir, m.folderPathCatalog)
+	return InstallRoot(m.folderPathCatalog)
 }
 
 // SetModelAlias records one alias override and rescans.

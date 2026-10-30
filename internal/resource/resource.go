@@ -441,16 +441,13 @@ func targetParts(target string) (dir string, file string) {
 
 // ComfyRoot returns the ComfyUI installation directory, if known.
 //
-// Empty means "cannot tell" — either ComfyUI never reported its folder layout and
-// COMFYUI_DIR is unset. Installs refuse in that state instead of guessing a path.
+// Empty means ComfyUI never reported its folder layout. Installs refuse in that state
+// instead of guessing a path.
 func (m *Manager) ComfyRoot() string {
-	if m.cfg.ComfyDir != "" {
-		return m.cfg.ComfyDir
-	}
 	if m.setup == nil {
 		return ""
 	}
-	return setup.InstallRoot("", m.setup.FolderPaths())
+	return setup.InstallRoot(m.setup.FolderPaths())
 }
 
 // ComfyPython returns the interpreter ComfyUI uses, for the runtime-deps hint.
@@ -485,7 +482,7 @@ func (m *Manager) modelDirs(dir, root string) []string {
 	if m.setup != nil {
 		paths = m.setup.FolderPaths()
 	}
-	return setup.CollectModelRoots(dir, paths, m.cfg.ComfyDir, root)
+	return setup.CollectModelRoots(dir, paths, root)
 }
 
 // loaderClassFor maps a model directory to the loader node that reads it.

@@ -1,6 +1,9 @@
 package resource
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // InstallPolicy says whether this gateway may download models at all.
 //
@@ -44,11 +47,15 @@ func (m *Manager) installRootUnknownMessage() string {
 	if version != "" {
 		detected = "ComfyUI " + version
 	}
+	where := ""
+	if url := strings.TrimSpace(m.cfg.ComfyURL); url != "" {
+		where = " at " + url
+	}
 	return fmt.Sprintf(
-		"cannot tell where %s is installed: it did not report its folder layout (GET /internal/folder_paths) "+
-			"and COMFYUI_DIR is unset. Set COMFYUI_DIR=/path/to/ComfyUI, or upgrade ComfyUI at %s so it serves "+
-			"that endpoint.",
-		detected, m.cfg.ComfyURL)
+		"cannot tell where %s is installed: %s did not report a custom_nodes folder "+
+			"(GET /internal/folder_paths), which is the only thing that says where an install may write. "+
+			"Upgrade ComfyUI%s so it serves that endpoint, or stop hiding /internal/* behind a proxy.",
+		detected, detected, where)
 }
 
 // installRefusedMessage explains the refusal in terms the user can act on. Both fixes are

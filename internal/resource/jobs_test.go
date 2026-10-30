@@ -18,10 +18,26 @@ import (
 	"comfyui-gateway/internal/setup"
 )
 
+// comfyLayout stands in for the folder layout a running ComfyUI reports. The gateway no
+// longer takes a ComfyUI directory in its config, so tests speak the same language.
+func comfyLayout(t *testing.T, root string) map[string]any {
+	t.Helper()
+	if root == "" {
+		return nil // ComfyUI reported nothing: the root is unknown
+	}
+	return map[string]any{"custom_nodes": []any{filepath.Join(root, "custom_nodes")}}
+}
+
 // quietManager builds a Manager with just enough wiring for the download and job
-// paths: a logger, a lock file, and no ComfyUI setup (nil on purpose — the paths
-// under test must not depend on a live ComfyUI).
+// paths: a logger, a lock file, and a folder layout pointing at a scratch directory
+// quietManager is quietManagerAt with a scratch ComfyUI directory.
 func quietManager(t *testing.T) *Manager {
+	t.Helper()
+	return quietManagerAt(t, t.TempDir())
+}
+
+// quietManagerAt is quietManager with ComfyUI installed at root.
+func quietManagerAt(t *testing.T, root string) *Manager {
 	t.Helper()
 	dataDir := t.TempDir()
 	logger := logx.NewWithWriter("test", io.Discard)
@@ -29,10 +45,10 @@ func quietManager(t *testing.T) *Manager {
 	// it (folder paths, loader options, model aliases), and an unscanned one is harmless.
 	// ComfyModelsShared mirrors what .env.example ships: installs are refused unless the
 	// deployment states that ComfyUI's model folders are reachable.
-	cfg := &config.Config{RootDir: t.TempDir(), DataDir: dataDir, ComfyDir: t.TempDir(), ComfyModelsShared: true}
+	cfg := &config.Config{RootDir: t.TempDir(), DataDir: dataDir, ComfyModelsShared: true}
 	return &Manager{
 		cfg:       cfg,
-		setup:     setup.New(setup.Options{Config: cfg, Logger: logger}),
+		setup:     setup.New(setup.Options{Config: cfg, Logger: logger, FolderPaths: comfyLayout(t, root)}),
 		logger:    logger,
 		lockPath:  filepath.Join(dataDir, "resource-lock.json"),
 		lock:      map[string]any{"version": 1, "installed": map[string]any{}},
@@ -290,9 +306,8 @@ func TestInstallJobFinishesWithDoneStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager := quietManager(t)
+	manager := quietManagerAt(t, filepath.Join(root, "ComfyUI"))
 	manager.cfg.RootDir = root
-	manager.cfg.ComfyDir = filepath.Join(root, "ComfyUI")
 	manager.cfg.ResourceConcurrency = 2
 	manager.index = &Index{Resources: []*Resource{{
 		ID:     "node-a",
@@ -330,7 +345,7 @@ func TestInstallJobFinishesWithDoneStatus(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	if _, err := os.Stat(filepath.Join(manager.cfg.ComfyDir, "custom_nodes", "node-a", "__init__.py")); err != nil {
+	if _, err := os.Stat(filepath.Join(manager.ComfyRoot(), "custom_nodes", "node-a", "__init__.py")); err != nil {
 		t.Errorf("bundled node was not installed: %v", err)
 	}
 }
