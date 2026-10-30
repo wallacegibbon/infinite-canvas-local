@@ -1,11 +1,12 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
-import {Input,Select} from "antd";
+import { Select } from "antd";
 import { Check, ChevronRight, Download, Eye, FileText, Image as ImageIcon, LayoutGrid, ListChecks, Music2, Plus, Rows3, Search, Settings2, Square, Trash2, Type, Video } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 
 import { confirm } from "@/components/kit/confirm";
 import { Empty } from "@/components/kit/display";
+import { Input } from "@/components/kit/input";
 import { CheckableTag } from "@/components/kit/tag";
 import { toast } from "@/components/kit/toast";
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";

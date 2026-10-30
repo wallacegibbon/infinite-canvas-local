@@ -1,9 +1,10 @@
 import { Check, Download, Pencil, Trash2, X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Input } from "antd";
+
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
+import { Input } from "@/components/kit/input";
 import { useCanvasStore, type CanvasProject } from "@/stores/canvas/use-canvas-store";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";

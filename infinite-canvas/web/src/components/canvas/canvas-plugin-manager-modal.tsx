@@ -1,11 +1,13 @@
 import { useMemo, useState, type ReactNode } from "react";
-import {Input,Switch,Tabs} from "antd";
+import { Tabs } from "antd";
 import { AlertTriangle, Puzzle, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
+import { Switch } from "@/components/kit/choice";
 import { confirm } from "@/components/kit/confirm";
 import { Dialog } from "@/components/kit/dialog";
+import { Input } from "@/components/kit/input";
 import { toast } from "@/components/kit/toast";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { installPluginFromUrl, setPluginEnabled, uninstallPlugin, updatePlugin } from "@/lib/canvas/plugin-loader";

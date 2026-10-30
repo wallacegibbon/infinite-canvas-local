@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Input } from "antd";
+
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-
 import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
+import { Input } from "@/components/kit/input";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import type { CanvasMossLayout, CanvasMossLayoutRegion } from "@/types/canvas";
 

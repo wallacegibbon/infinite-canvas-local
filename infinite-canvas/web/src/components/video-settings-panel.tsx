@@ -1,8 +1,9 @@
 import { type ReactNode, useEffect } from "react";
-import { Slider } from "antd";
+
 import { Lock } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Slider } from "@/components/kit/input";
 import i18n from "@/i18n";
 import { ImageSettingsTheme, SeedSetting } from "@/components/image-settings-panel";
 import { type CanvasTheme } from "@/lib/canvas-theme";

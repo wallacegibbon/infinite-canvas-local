@@ -1,10 +1,12 @@
-import { Checkbox, Input, Tabs } from "antd";
+import { Tabs } from "antd";
 import { RefreshCw, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
+import { Checkbox } from "@/components/kit/choice";
 import { Dialog } from "@/components/kit/dialog";
+import { Input } from "@/components/kit/input";
 import { toast } from "@/components/kit/toast";
 import { fetchChannelModels } from "@/services/api/image";
 import type { ModelChannel } from "@/stores/use-config-store";

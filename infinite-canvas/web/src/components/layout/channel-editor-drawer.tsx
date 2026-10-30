@@ -1,10 +1,11 @@
-import { Drawer, Input } from "antd";
+import { Drawer } from "antd";
 import { ListPlus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
 import { Space } from "@/components/kit/display";
+import { Input } from "@/components/kit/input";
 import { Segmented } from "@/components/kit/segmented";
 import { guessCapability, normalizeChannelModels, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 import { ModelSelectModal } from "./model-select-modal";

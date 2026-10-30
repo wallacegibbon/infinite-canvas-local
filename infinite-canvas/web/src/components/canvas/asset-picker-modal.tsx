@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { Input, Pagination } from "antd";
+import { Pagination } from "antd";
 import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Dialog } from "@/components/kit/dialog";
 import { Empty } from "@/components/kit/display";
+import { Input } from "@/components/kit/input";
 import { CheckableTag, Tag } from "@/components/kit/tag";
 import { cn } from "@/lib/utils";
 import { getImagePreviewRevision, subscribeImagePreviews } from "@/services/image-storage";

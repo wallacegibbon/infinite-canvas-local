@@ -1,10 +1,12 @@
-import { Form, Input, Radio, Select, Switch, Tabs } from "antd";
+import { Form, Select, Tabs } from "antd";
 import { ArrowLeft, ArrowRight, ChevronDown, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
+import { Switch, Radio } from "@/components/kit/choice";
 import { Dialog } from "@/components/kit/dialog";
+import { Input } from "@/components/kit/input";
 import { toast } from "@/components/kit/toast";
 import { confirm } from "@/components/kit/confirm";
 import { ModelPicker, WorkflowModelPicker } from "@/components/model-picker";
@@ -266,7 +268,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                     <div className="mb-2 text-xs text-stone-500">{t("config.cloudApi.outputLanguageDescription")}</div>
                                     <Radio.Group
                                         value={config.promptOptimizeLanguage === "en" ? "en" : "zh"}
-                                        onChange={(event) => updateConfig("promptOptimizeLanguage", event.target.value)}
+                                        onChange={(event) => updateConfig("promptOptimizeLanguage", event.target.value as "zh" | "en")}
                                         optionType="button"
                                     >
                                         <Radio.Button value="zh">中文</Radio.Button>
@@ -420,7 +422,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                     </div>
                                 </Form.Item>
                                 <Form.Item label={t("config.preferences.regenerateBehavior")} className="mb-4">
-                                    <Radio.Group value={config.nodeRegenerateBehavior} onChange={(event) => updateConfig("nodeRegenerateBehavior", event.target.value)} className="flex flex-col gap-2">
+                                    <Radio.Group value={config.nodeRegenerateBehavior} onChange={(event) => updateConfig("nodeRegenerateBehavior", event.target.value as "new-node" | "overwrite")} className="flex flex-col gap-2">
                                         <Radio value="overwrite">
                                             <span className="block text-sm font-medium">{t("config.preferences.regenerateBehaviorOverwrite")}</span>
                                             <span className="mt-0.5 block text-xs opacity-60">{t("config.preferences.regenerateBehaviorOverwriteDescription")}</span>
