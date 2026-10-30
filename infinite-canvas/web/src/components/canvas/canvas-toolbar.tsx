@@ -1,9 +1,10 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Segmented, Switch } from "antd";
+import { Switch } from "antd";
 import { CircleDot, Eraser, Grid2x2, Group, Hand, Image as ImageIcon, Info, LocateFixed, Moon, MousePointer2, Palette, Puzzle, Redo2, Square, Sun, Trash2, Type, Undo2, Upload, Video } from "lucide-react";
 
 import { Button } from "@/components/kit/button";
+import { Segmented } from "@/components/kit/segmented";
 import { canvasThemes, type CanvasBackgroundMode, type CanvasColorTheme, type CanvasTheme } from "@/lib/canvas-theme";
 import { getNodePluginId, listNodeDefinitions, useNodeRegistryVersion } from "@/lib/canvas/node-registry";
 import { getNodeSpec } from "@/constant/canvas";
@@ -221,7 +222,7 @@ export function CanvasToolbar({
                     </div>
                     <div className="mt-3 px-1 pb-1.5 text-[11px] font-medium opacity-50">{t("canvas.toolbar.gridStyle")}</div>
                     <Segmented
-                        className="w-full !p-1 [&_.ant-segmented-group]:!flex [&_.ant-segmented-item]:!min-h-8 [&_.ant-segmented-item]:!flex-1 [&_.ant-segmented-item-label]:!min-h-8 [&_.ant-segmented-item-label]:!leading-8"
+                        block
                         value={backgroundMode}
                         onChange={(value) => onBackgroundModeChange(value as CanvasBackgroundMode)}
                         options={[

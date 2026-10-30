@@ -1,9 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Input, Popconfirm, Switch, Tabs } from "antd";
+import {Input,Switch,Tabs} from "antd";
 import { AlertTriangle, Puzzle, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
+import { confirm } from "@/components/kit/confirm";
 import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -63,9 +64,14 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
                         title={t("canvas.plugins.updateFromSource")}
                         onClick={() => runOnPlugin(record, async () => void (await updatePlugin(record)), t("canvas.plugins.updated"))}
                     />
-                    <Popconfirm title={t("canvas.plugins.uninstallTitle")} okText={t("canvas.plugins.uninstall")} cancelText={t("canvas.editors.cancel")} onConfirm={() => uninstallPlugin(record.id)}>
-                        <Button type="text" size="small" danger icon={<Trash2 className="size-4" />} title={t("canvas.plugins.uninstall")} />
-                    </Popconfirm>
+                    <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<Trash2 className="size-4" />}
+                        title={t("canvas.plugins.uninstall")}
+                        onClick={() => confirm({ title: t("canvas.plugins.uninstallTitle"), okText: t("canvas.plugins.uninstall"), cancelText: t("canvas.editors.cancel"), onOk: () => uninstallPlugin(record.id) })}
+                    />
                 </>
             )}
         </>

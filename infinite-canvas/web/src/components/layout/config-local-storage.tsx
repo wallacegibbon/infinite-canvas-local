@@ -1,4 +1,4 @@
-import { Alert, Progress } from "antd";
+
 import type { TFunction } from "i18next";
 import { Database, HardDrive, Layers3, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
 import { Spin } from "@/components/kit/display";
+import { Progress, Alert } from "@/components/kit/feedback";
 import { readLocalStorageUsage, type LocalStorageUsage } from "@/services/local-storage-usage";
 
 const storeLabelKeys: Record<string, string> = {

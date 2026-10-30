@@ -1,10 +1,11 @@
-import { Checkbox, Progress } from "antd";
+import { Checkbox } from "antd";
 import { AlertTriangle, ChevronDown, Download, HardDriveDownload, RefreshCw, Server, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
+import { Progress } from "@/components/kit/feedback";
 import { Tag } from "@/components/kit/tag";
 import { toast } from "@/components/kit/toast";
 import { Tooltip } from "@/components/kit/tooltip";

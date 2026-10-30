@@ -305,7 +305,7 @@
         box-shadow: none !important;
     }
 
-    .canvas-config-mode .ant-segmented-item:not(.ant-segmented-item-selected) .ant-segmented-item-label {
+    .canvas-config-mode [data-slot="segmented-item"]:not([data-active="true"]) {
     color: var(--canvas-node-text, inherit);
 }
 
@@ -423,12 +423,12 @@
         overflow-y: auto;
     }
 
-    .canvas-image-settings-popover .ant-segmented {
+    .canvas-image-settings-popover [data-slot="segmented"] {
         border-radius: 999px;
         padding: 3px;
     }
 
-    .canvas-image-settings-popover .ant-segmented-item {
+    .canvas-image-settings-popover [data-slot="segmented-item"] {
         border-radius: 999px;
     }
 

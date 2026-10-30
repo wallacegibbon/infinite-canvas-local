@@ -1,9 +1,10 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
-import { Input, Popconfirm, Select } from "antd";
+import {Input,Select} from "antd";
 import { Check, ChevronRight, Download, Eye, FileText, Image as ImageIcon, LayoutGrid, ListChecks, Music2, Plus, Rows3, Search, Settings2, Square, Trash2, Type, Video } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 
+import { confirm } from "@/components/kit/confirm";
 import { Empty } from "@/components/kit/display";
 import { CheckableTag } from "@/components/kit/tag";
 import { toast } from "@/components/kit/toast";
@@ -568,15 +569,14 @@ function AssetCard({ asset, theme, onInsert, onRemove }: { asset: Asset; theme: 
                 >
                     <Plus className="size-4" />
                 </button>
-                <Popconfirm title={t("canvas.sidePanel.removeAssetTitle")} okText={t("canvas.sidePanel.remove")} cancelText={t("common.cancel")} okButtonProps={{ danger: true }} onConfirm={onRemove}>
-                    <button
+                <button
                         type="button"
                         className="grid size-8 place-items-center rounded-full bg-white/90 text-stone-700 shadow-sm backdrop-blur transition hover:bg-white hover:text-red-500 dark:bg-black/60 dark:text-stone-100 dark:hover:bg-black/80 dark:hover:text-red-400"
                         aria-label={t("canvas.sidePanel.removeAsset")}
+                        onClick={() => confirm({ title: t("canvas.sidePanel.removeAssetTitle"), okText: t("canvas.sidePanel.remove"), cancelText: t("common.cancel"), danger: true, onOk: onRemove })}
                     >
                         <Trash2 className="size-4" />
                     </button>
-                </Popconfirm>
             </div>
         </div>
     );
