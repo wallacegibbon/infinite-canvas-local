@@ -1,7 +1,6 @@
 import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ImageSettingsTheme } from "@/components/image-settings-panel";
 import { audioFormatOptions, audioSpeedLabel, audioVoiceOptions, normalizeAudioFormatValue, normalizeAudioSpeedValue, normalizeAudioVoiceValue } from "@/lib/audio-generation";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import type { AiConfig } from "@/stores/use-config-store";
@@ -25,7 +24,7 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
     const speed = normalizeAudioSpeedValue(config.audioSpeed);
 
     return (
-        <ImageSettingsTheme theme={theme}>
+        <>
             <div className={className} style={{ color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()}>
                 {showTitle ? <div className="text-lg font-semibold">{t("settingsPanels.audio.title")}</div> : null}
                 <SettingGroup title={t("settingsPanels.audio.voice")} color={theme.node.muted}>
@@ -78,7 +77,7 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
                     />
                 </SettingGroup>
             </div>
-        </ImageSettingsTheme>
+        </>
     );
 }
 

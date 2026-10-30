@@ -1,5 +1,4 @@
 import { type ReactNode, useState } from "react";
-import { ConfigProvider } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { Switch } from "@/components/kit/choice";
@@ -56,7 +55,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
     };
 
     return (
-        <ImageSettingsTheme theme={theme}>
+        <>
             <div
                 className={className}
                 style={{ color: theme.node.text }}
@@ -145,7 +144,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
                 ) : null}
                 {showSeed ? <SeedSetting fixed={config.seedFixed === "true"} seed={config.seed || ""} theme={theme} onChange={onConfigChange} /> : null}
             </div>
-        </ImageSettingsTheme>
+        </>
     );
 }
 
@@ -195,22 +194,6 @@ export function SeedSetting({ fixed, seed, theme, onChange }: { fixed: boolean; 
 
 function randomSeed() {
     return Math.floor(Math.random() * 2147483646) + 1;
-}
-
-export function ImageSettingsTheme({ theme, children }: { theme: CanvasTheme; children: ReactNode }) {
-    return (
-        <ConfigProvider
-            theme={{
-                token: { colorBgContainer: theme.toolbar.panel, colorBgElevated: theme.toolbar.panel, colorBorder: theme.node.stroke, colorPrimary: theme.node.activeStroke, colorText: theme.node.text, colorTextLightSolid: theme.node.panel },
-                components: {
-                    Button: { defaultBg: theme.toolbar.panel, defaultBorderColor: theme.node.stroke, defaultColor: theme.node.text },
-                    Slider: { railBg: theme.node.stroke, railHoverBg: theme.node.stroke, trackBg: theme.node.activeStroke, handleColor: theme.node.text, handleActiveColor: theme.node.text },
-                },
-            }}
-        >
-            {children}
-        </ConfigProvider>
-    );
 }
 
 export function imageQualityLabel(value: string) {

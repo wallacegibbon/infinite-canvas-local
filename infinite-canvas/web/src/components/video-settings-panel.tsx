@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { Slider } from "@/components/kit/input";
 import i18n from "@/i18n";
-import { ImageSettingsTheme, SeedSetting } from "@/components/image-settings-panel";
+import { SeedSetting } from "@/components/image-settings-panel";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { videoWorkflowId, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
 import { clampVideoSeconds, computeVideoSize, inferVideoRatio, parseVideoResolution, readVideoDimensions, VIDEO_SECONDS_MAX, VIDEO_SECONDS_MIN, videoRatioOptions } from "@/lib/media-size";
@@ -78,7 +78,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
     };
 
     return (
-        <ImageSettingsTheme theme={theme}>
+        <>
             <div className={className} style={{ color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()}>
                 {showTitle ? <div className="text-lg font-semibold">{t("settingsPanels.video.title")}</div> : null}
                 <SettingGroup title={t("settingsPanels.video.resolution")} color={theme.node.muted}>
@@ -194,7 +194,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
                     ) : null}
                 </SettingGroup>
             </div>
-        </ImageSettingsTheme>
+        </>
     );
 }
 

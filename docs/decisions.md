@@ -785,3 +785,64 @@ from outside the `Button`/`Modal`/`Tooltip` subtree that the remaining component
 **Where** `components/kit/select.tsx`, `components/kit/tag-input.tsx`, `styles/globals.css`, and the
 four call sites (`pages/assets/index.tsx`, `components/canvas/canvas-side-panel.tsx`,
 `components/canvas/canvas-node-super-resolve-dialog.tsx`, `components/layout/app-config-modal.tsx`).
+
+---
+
+## 32. Drawers are a side of `kit/dialog`
+
+**Decision** `kit/drawer.tsx` reuses the dialog's header / scrolling body / optional footer and
+adds `placement` and a width. antd expressed width three ways — `width={640}`, `size={280}` and
+`size="large"` — so both `width` and `size` are accepted and resolved to a number (`large` was 736).
+`extra` keeps antd's header-right action slot, which the channel editor fills with its save/cancel
+pair.
+
+**z-index** 1350/1351: above a dialog (1300) because the channel editor opens *from* the config
+modal, and below a confirmation (1400) because deleting an asset from the detail drawer must still
+raise one.
+
+**Where** `components/kit/drawer.tsx` and the three call sites.
+
+---
+
+## 33. antd is gone; here is what that cost and what it returned
+
+**Decision** antd, `@ant-design/icons` and `dayjs` are no longer dependencies. Every component the
+app used has a kit equivalent in `components/kit/`, and `Form` has no equivalent at all — its two
+real uses hold their values in plain `useState` and its 15 label-only uses became `kit/field`.
+
+**Why reverse #23** #23 said antd stays and its two leaks get quarantined. That was the right call
+while the goal was to keep merging upstream. Once the goal became long-term maintainability of a
+small local app, quarantine turned out to be a way-station: the seams (#23, #24) and the prop-name
+shims (#30) made each component cheap to replace one at a time, and the last four (`Select`,
+`Drawer`, `Form`, theme) went the same way. The bundle numbers say the quarantine was doing real
+work — the antd chunk stayed at 714 kB from 42 files down to 6, then collapsed 714 → 249 → 219 → 93
+→ nothing as `Select`, `Form`, and the providers left.
+
+**What it returned** antd JS chunk 916 kB → 0; frontend modules 4126 → 2564; dependencies 31 → 28.
+`lib/canvas-overlay.ts` no longer contains a single third-party class name — the contract #23 wrote
+("when antd goes, that array goes and the canvas is not touched") is now literally true: the array
+went, and the canvas code above it did not change.
+
+**What it cost** Three behaviours are narrower than antd's, and they are worth knowing:
+
+- `Select` typeahead matches a prefix, not a substring (antd's `showSearch` filtered on any
+  substring). One call site had it: the upscale model list.
+- `Form`'s validation is now written per form, so a *new* form means writing its own checks rather
+  than declaring `rules`. There are two forms left.
+- The image toolbar settings dialog renders a preview built from antd tokens; it now uses Tailwind
+  classes over `design-tokens`. Nothing reads antd's CSS variables any more, which is why removing
+  `ConfigProvider` changed no pixel.
+
+**What the browser caught that the compiler could not** In this pass: a duplicate chevron in
+`Select` (the kit drew one and the trigger drew its own), and — after `Form` stopped rendering a
+`<form>` element — a browser hint that the API key field was no longer inside a form, i.e. no
+password-manager prompt. Both were invisible to `tsc`, `--noUnusedLocals`, the tests and the
+reachability graph. The second is the same class of failure as #27's missing JSX brace: deleting a
+component deletes the semantics it silently provided.
+
+**Left alone deliberately** `known-issues.md` still describes the aria-hidden warning radix raises
+when a confirmation opens over a focused button. It predates this work, it is a browser hint rather
+than a fault, and fixing it means patching radix's `hideOthers`.
+
+**Where** `package.json`, `components/kit/*`, `components/kit/field.tsx`, `lib/canvas-overlay.ts`,
+`lib/design-tokens.ts`, `components/layout/app-providers.tsx`.

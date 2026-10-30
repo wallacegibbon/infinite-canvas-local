@@ -528,7 +528,14 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                     </>
                 }
             >
-                <div>
+                {/* A real <form>: the API key field is a password input, and browsers only
+                    offer to save one that sits inside a form. Enter also submits. */}
+                <form
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        saveCloudApi();
+                    }}
+                >
                     <Field label={t("config.cloudApi.name")} error={cloudApiErrors.name}>
                         <Input placeholder={t("config.cloudApi.namePlaceholder")} value={cloudApiDraft.name} onChange={(event) => setCloudApiField("name", event.target.value)} />
                     </Field>
@@ -541,7 +548,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                     <Field label={t("config.cloudApi.apiKey")} error={cloudApiErrors.apiKey}>
                         <Input.Password placeholder="sk-..." autoComplete="off" value={cloudApiDraft.apiKey} onChange={(event) => setCloudApiField("apiKey", event.target.value)} />
                     </Field>
-                </div>
+                </form>
                 <div className="text-xs text-stone-500">{t("config.cloudApi.hint")}</div>
             </Dialog>
         </>

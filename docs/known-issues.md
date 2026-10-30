@@ -222,24 +222,25 @@ leave the existing entries as written, write new ones in English.
 name filter in `workflows/registry.json` (`mj风格` and friends are patterns matched against real
 file names), `web/src/i18n/locales/zh-CN.ts` and everything under `internal/prompt`.
 
-## 11. The canvas subtree ships three lockfiles, one is maintained
+## 11. Radix hides the page from assistive tech while a focused button sits in it
 
-**Symptom** `npm`, `bun` and `pnpm` lockfiles all sit in `infinite-canvas/web`
-(`package-lock.json`, `bun.lock`, `pnpm-lock.yaml`), and `pnpm-workspace.yaml` is still the
-upstream stub (`allowBuilds:
-  esbuild: set this to true or false`). Only
-`package-lock.json` is maintained, because `make web` runs `npm ci`.
+**Symptom** Opening a confirmation (`kit/confirm`, which is radix's `AlertDialog`) over a button
+that currently has focus logs a browser warning:
 
-**Cause** The canvas was vendored with all three. Nothing in this repo selects pnpm, so
-`pnpm-lock.yaml` drifted first.
+```
+Blocked aria-hidden on an element because its descendant retained focus.
+Element with focus: <button ... border-red-300 ...>        (the danger button that was clicked)
+Ancestor with aria-hidden: <div class="flex h-dvh ...">
+```
 
-**Effect right now** `@ant-design/pro-components` was removed from `package.json` and
-`package-lock.json`, but `bun.lock` and `pnpm-lock.yaml` still pin it and its 130
-dependencies, so `bun install` / `pnpm install` would resolve a different (strictly larger)
-tree than `make web`.
+**Cause** Radix sets `aria-hidden` on the rest of the document when a modal layer opens, and it
+does so before focus has moved into the layer. Chrome therefore blocks the attribute (which is the
+outcome we want — the page stays readable) and warns. Reproduced from the config page's delete
+buttons; it is not specific to any one call site.
 
-**Fix** Pick one package manager. Given `"test": "bun test"` in `package.json`, either keep
-`bun.lock` and regenerate it with `bun install` (then add a `make` target that uses it), or
-drop `bun.lock`, `pnpm-lock.yaml` and `pnpm-workspace.yaml` and run the three `tests/` files
-under vite/vitest instead. Until then, delete the stale files once `bun install` has been run
-elsewhere, or regenerate them in the same commit that changes a dependency.
+**Effect right now** None that a user can see: the dialog is operable and focus lands in it. The
+warning is once per open and only in the console.
+
+**Fix** Either upgrade radix once it uses `inert` instead of `aria-hidden` for `hideOthers`, or move
+focus to the dialog's cancel button in `onPointerDown` of the trigger. Not done, because both are
+larger than the symptom.
