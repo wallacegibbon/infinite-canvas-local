@@ -71,9 +71,9 @@ Every variable is optional; the defaults match the previous implementation.
 | `HOST` | `127.0.0.1` | Listen address, bound as given. `0.0.0.0` accepts every interface. |
 | `PORT` | `8190` | Listen port. |
 | `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI base URL. |
-| `COMFYUI_DIR` | *(empty)* | ComfyUI install dir. Used to locate model roots. |
-| `COMFY_WORKFLOWS_DIR` | *(empty)* | ComfyUI `user/default/workflows`, imported automatically. |
+| `COMFYUI_DIR` | *(empty)* | ComfyUI install dir **on this host**. Locates model roots and `extra_model_paths.yaml`. Unset: ComfyUI's own `GET /internal/folder_paths` is used. |
 | `COMFY_PYTHON` | *(empty)* | Interpreter shown in the "runtime deps" hint. |
+| `COMFY_MODELS_SHARED` | *(empty)* | `1` = the gateway can write into ComfyUI's model folders (same machine, or a mount). Model installs stay off without it. |
 | `WORKFLOW_DIR` | `<root>/workflows` | Registry directory. |
 | `DATA_DIR` | `<root>/data` | Tasks, locks, preferences. |
 | `OUTPUT_DIR` | `<data>/outputs` | Generated files served under `/files/`. |
@@ -85,18 +85,78 @@ Every variable is optional; the defaults match the previous implementation.
 reachable from the network and no `GATEWAY_TOKEN` is set. Browser access is allowed when the
 canvas is served from the same host name as the gateway — the usual `:3000` canvas and `:8190`
 gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a *different* host does.
+
 | `GATEWAY_TOKEN` | *(empty)* | When set, `/api/*` requires the `X-Gateway-Token` header. `/v1/*` never does. |
 | `REQUEST_TIMEOUT_MS` | `600000` | Image generation timeout. |
 | `VIDEO_TIMEOUT_MS` | `0` | Video timeout; `0` means no limit. |
 | `POLL_INTERVAL_MS` | `750` | ComfyUI history poll interval. |
 | `SCAN_ON_START` | `1` | Scan ComfyUI for nodes and models at boot. |
-| `WATCH_WORKFLOWS` | `1` | Poll the workflow directories for changes (30 s). |
 | `TASK_RETENTION_DAYS` | `0` | Prune finished tasks older than this; `0` keeps everything. |
 | `MAX_STORED_TASKS` | `0` | Cap on stored tasks; `0` is unlimited. |
 | `MAX_UPLOAD_BYTES` | `52428800` | Per-file upload limit. |
 | `RESOURCE_CONCURRENCY` | `2` | Parallel downloads during a resource install. |
 | `PROMPT_MAX_TOKENS` | `8192` | Completion budget for `/v1/prompts/*`. Must cover reasoning plus the answer on a thinking model. |
 | `PROMPT_THINKING_PARAM` | `none` | `none` sends only standard OpenAI fields. `auto` learns per endpoint. Or pin `chat_template_kwargs` / `enable_thinking` / `reasoning_effort`. |
+
+### The gateway runs beside ComfyUI
+
+An install is a plain file write into ComfyUI's model folders, so the gateway belongs on the
+ComfyUI machine, or on a host where those folders are mounted. Whether that is true cannot be
+discovered from inside the process — a mount at another path looks exactly like a remote machine,
+and two machines that both install to `/opt/ComfyUI` look exactly like one — so it is configured,
+not detected:
+
+| `COMFY_MODELS_SHARED` | Behaviour |
+| --- | --- |
+| `1` | the gateway may write into ComfyUI's model folders: installs allowed, nothing is inspected |
+| unset / anything else | installs off: `GET /api/resources/status` reports `modelInstall { allowed: false, comfyHost }`, the canvas shows a banner and disables the download buttons, and `POST /api/resources/install` answers `400 model_install_disabled` naming `COMFY_URL`'s host |
+
+Fail-closed on purpose. The failure this prevents is not one the user can react to: writing into a
+path that happens to exist on this host succeeds, several gigabytes land on the wrong disk, and
+ComfyUI still reports the model as missing with nothing in the log. One line in `.env` — shipped
+filled in by `.env.example`, which is the single-machine template — is cheaper than that.
+
+### What works, and what does not, when the gateway is not on the ComfyUI machine
+
+Everything the gateway *reads over HTTP* works from anywhere; everything that touches ComfyUI's
+filesystem does not, and no environment variable can change that — `COMFYUI_DIR` is a path on the
+gateway's own host by definition.
+
+| Feature | Path |
+| --- | --- |
+| Generation, uploads, fetching images/videos, queue, system stats | HTTP (`/prompt`, `/upload/image`, `/view`, `/queue`, `/system_stats`) |
+| Which models are installed (panel "present/missing") | HTTP (`/object_info`) |
+| Installing models and custom nodes | **local write** — needs `COMFY_MODELS_SHARED=1` and the folders on this host |
+| `extra_model_paths.yaml` (mapped drives, NFS model dirs) | **local read** of `COMFYUI_DIR` and its parent |
+| "Runtime deps" interpreter hint | **local read** of `/proc` |
+| Replacing a model via the file picker | **local** GUI dialog |
+
+So a gateway on another machine still generates images; it just cannot install models, and it says
+so instead of filling the wrong disk. Run it beside ComfyUI when you want the whole panel.
+
+Workflows are the gateway's own: `workflows/registry.json` plus its graphs. There is no polling and
+no automatic import of ComfyUI's workflow folder. To add a graph made in ComfyUI, export it in
+**API format** (the UI format ComfyUI saves is rejected) and drop the file into `workflows/`, then
+scan with `POST /api/resources/refresh` — the refresh button in the canvas's *Add workflows* tab.
+One scan both registers the graph and clears its availability, which is why it is the only scan
+route: no "scan only the workflow folder" endpoint, no reload endpoint and no background poller.
+
+The file name *is* the workflow's identity, and it has to say what it is:
+
+```
+workflows/image-my-flow.json      id = name = image-my-flow, file = image-my-flow.json
+workflows/video-h3-t2v.json       id = name = video-h3-t2v, file = video-h3-t2v.json
+```
+
+`<type>-<slug>.json`, where `<type>` is `image`, `video`, `audio` or `text` and `<slug>` is
+lowercase letters, digits, `-` or `_`. Nothing is copied, renamed or re-slugged — the file you edit
+is the file that runs, and `workflows/` holds no duplicates. A file that breaks the rule (no
+prefix, wrong prefix for the graph it contains, or capitals and spaces in the name) is **not
+registered**; the scan reports it as `workflow files left unregistered` with the reason, and the
+fix is to rename the file.
+
+Anything a graph cannot describe — a prompt binding, presets — is left for you to add in
+`registry.json`; the scan warns when a registered graph has no prompt binding or no output node.
 
 ## Endpoints
 
@@ -126,6 +186,7 @@ Metadata and management:
 | `GET` | `/api/workflows` | Full workflow list with availability. |
 | `GET` | `/api/resources/status` | Model and node install status. |
 | `POST` | `/api/resources/install` | Start an install job. |
+| `POST` | `/api/resources/refresh` | The only rescan: reloads the resource index, re-scans ComfyUI (nodes, models, availability, new workflow graphs) and returns the resource status. This is the panel's refresh button. |
 | `GET` | `/api/setup/status` | Last scan result. |
 | `GET` | `/api/system/stats` | GPU and RAM, plus the last OOM. |
 

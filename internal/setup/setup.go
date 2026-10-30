@@ -56,10 +56,8 @@ type Counts struct {
 
 // Missing enumerates what the scan could not satisfy.
 type Missing struct {
-	Models      []string `json:"models"`
-	Nodes       []string `json:"nodes"`
-	UIWorkflows int      `json:"uiWorkflows"`
-	UISamples   []string `json:"uiSamples"`
+	Models []string `json:"models"`
+	Nodes  []string `json:"nodes"`
 }
 
 // Status is the payload of /api/setup/status and /health.setup.
@@ -98,20 +96,10 @@ type Manager struct {
 	loaderCatalog     map[string][]string
 	folderPathCatalog map[string]any
 	nodeClasses       map[string]bool
-	comfyFileCache    map[string]comfyFileEntry
-	importedComfy     map[string]bool
 
 	hasScanned bool
 	scanning   bool
 	scanMu     sync.Mutex
-
-	stopOnce sync.Once
-	stopCh   chan struct{}
-}
-
-type comfyFileEntry struct {
-	signature string
-	kind      string
 }
 
 // Options configures a Manager.
@@ -143,15 +131,12 @@ func New(opts Options) *Manager {
 		loaderCatalog:     map[string][]string{},
 		folderPathCatalog: map[string]any{},
 		nodeClasses:       map[string]bool{},
-		comfyFileCache:    map[string]comfyFileEntry{},
-		importedComfy:     map[string]bool{},
-		stopCh:            make(chan struct{}),
 		status: Status{
 			Phase:     "idle",
 			ComfyURL:  opts.Config.ComfyURL,
 			Workflows: []WorkflowState{},
 			Loras:     []string{},
-			Missing:   Missing{Models: []string{}, Nodes: []string{}, UISamples: []string{}},
+			Missing:   Missing{Models: []string{}, Nodes: []string{}},
 		},
 	}
 	manager.aliases = readAliasFile(manager.aliasFile)
@@ -513,71 +498,19 @@ func preferredRoot(roots []string) string {
 	return roots[0]
 }
 
-// Start kicks off the initial scan and the background refresh loop.
+// Start kicks off the initial scan.
+//
+// There is no background poller: the scan is expensive (it asks ComfyUI for its whole
+// object_info) and, because Registry.Scan registers the graphs it finds, it also rewrites
+// workflows/registry.json — which must not happen behind the back of whoever is editing
+// that file. A rescan happens at boot, on POST /api/resources/refresh, after a resource install or
+// a model switch, and when the panel's refresh button is used.
 func (m *Manager) Start() {
 	go func() {
 		if _, err := m.Scan(); err != nil {
 			m.logger.Warn("initial setup scan failed: %s", err)
 		}
 	}()
-	if !m.cfg.WatchWorkflows {
-		return
-	}
-	go m.watchLoop()
-}
-
-// watchLoop polls instead of using inotify.
-//
-// The stdlib has no portable file watcher, and adding a native dependency just to
-// notice a saved JSON file is not a trade worth making for a local tool: a 30 second
-// poll costs nothing and cannot miss events while a file is being written.
-func (m *Manager) watchLoop() {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	lastSignature := m.dirSignature()
-	for {
-		select {
-		case <-m.stopCh:
-			return
-		case <-ticker.C:
-			m.registry.ReloadIfChanged()
-			if signature := m.dirSignature(); signature != lastSignature {
-				lastSignature = signature
-				if _, err := m.Scan(); err != nil {
-					m.logger.Warn("background scan failed: %s", err)
-				}
-			}
-		}
-	}
-}
-
-// dirSignature fingerprints the watched directories.
-func (m *Manager) dirSignature() string {
-	var parts []string
-	for _, dir := range []string{m.cfg.WorkflowDir, m.cfg.ComfyWorkflowsDir} {
-		if dir == "" {
-			continue
-		}
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			parts = append(parts, dir+":missing")
-			continue
-		}
-		for _, entry := range entries {
-			info, statErr := entry.Info()
-			if statErr != nil {
-				continue
-			}
-			parts = append(parts, fmt.Sprintf("%s/%s:%d:%d", dir, entry.Name(), info.ModTime().UnixMilli(), info.Size()))
-		}
-	}
-	sort.Strings(parts)
-	return strings.Join(parts, "|")
-}
-
-// Stop halts the background loop.
-func (m *Manager) Stop() {
-	m.stopOnce.Do(func() { close(m.stopCh) })
 }
 
 func asExitError(err error, target **exec.ExitError) bool {

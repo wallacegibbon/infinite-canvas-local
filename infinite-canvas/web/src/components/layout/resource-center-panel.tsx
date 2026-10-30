@@ -99,6 +99,10 @@ const copyByLocale = {
         copyHint: "复制给 AI Agent",
         hintCopied: "已复制，直接发给你的 AI Agent",
         notReachable: "ComfyUI 当前未连接，资源状态可能不准确。",
+        installDisabled: "模型安装已关闭：还没有确认 Gateway 能写进 ComfyUI 的模型目录",
+        installDisabledBody: "模型是 Gateway 直接写进 ComfyUI 模型目录的。没有这条确认，下载只会落到当前机器的磁盘上，ComfyUI 那边仍然显示缺少——而且不会报错，只会白下载几个 GB。",
+        installDisabledHost: "ComfyUI 所在机器",
+        installDisabledFix: "如果 Gateway 就跑在 ComfyUI 这台机器上（或它的模型目录已经挂载到本机），在 .env 里设置 COMFY_MODELS_SHARED=1 并重启 gateway。如果 Gateway 在另一台机器上，请把它搬到 ComfyUI 所在机器上用同一份工作目录启动（画布可以留在浏览器这边，改一下网关地址即可）。",
         indexError: "资源索引读取失败：",
         indexWarning: "资源索引提示：",
         selectHint: "选择需要安装的功能包；已具备的资源会自动跳过。",
@@ -199,6 +203,10 @@ const copyByLocale = {
         copyHint: "Copy for your AI agent",
         hintCopied: "Copied — paste it to your AI agent",
         notReachable: "ComfyUI is not reachable; resource status may be stale.",
+        installDisabled: "Model installs are off: this gateway has not confirmed it can write into ComfyUI's model folders",
+        installDisabledBody: "The gateway installs models by writing straight into ComfyUI's model folders. Without that confirmation a download only reaches this host's disk while ComfyUI keeps reporting the model as missing — and nothing fails, so gigabytes are wasted quietly.",
+        installDisabledHost: "ComfyUI host",
+        installDisabledFix: "If the gateway runs on the ComfyUI machine (or its model folders are mounted here), set COMFY_MODELS_SHARED=1 in .env and restart the gateway. If it runs on another machine, move it there and start it from the same working directory (the canvas can stay in your browser — just point it at that gateway).",
         indexError: "Failed to load the resource index: ",
         indexWarning: "Resource index notice: ",
         selectHint: "Select the packs to install; existing resources are skipped.",
@@ -542,7 +550,20 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
         void tick();
     }, [copy.done, copy.failed, load, message, stopPolling]);
 
+    // Installs are local file writes, so a gateway on another machine can only download to
+    // the wrong disk. They stay off until the deployment states otherwise
+    // (COMFY_MODELS_SHARED=1); the server refuses too (code model_install_disabled), and this
+    // keeps the buttons from offering something that cannot work.
+    const modelInstall = status?.modelInstall;
+    const installDisabled = modelInstall?.allowed === false;
+
     const startInstall = async (input: { ids?: string[]; packs?: string[] }) => {
+        // The server refuses this too (model_install_disabled); catching it here keeps the
+        // reason readable instead of surfacing a raw API message.
+        if (installDisabled) {
+            message.warning(copy.installDisabled);
+            return;
+        }
         if (!input.ids?.length && !input.packs?.length) {
             message.info(copy.emptyMissing);
             return;
@@ -720,13 +741,24 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                         <Button size="small" icon={<RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />} loading={refreshing} onClick={() => void load(true)}>
                             {copy.refresh}
                         </Button>
-                        <WithHint hint={job?.status === "running" ? copy.jobRunningHint : !installIds.length ? copy.selectFirstHint : undefined}>
-                            <Button size="small" type="primary" icon={<Download className="size-3.5" />} disabled={!installIds.length || Boolean(job && ["running"].includes(job.status))} onClick={() => void startInstall({ ids: installIds })}>
+                        <WithHint hint={job?.status === "running" ? copy.jobRunningHint : installDisabled ? copy.installDisabled : !installIds.length ? copy.selectFirstHint : undefined}>
+                            <Button size="small" type="primary" icon={<Download className="size-3.5" />} disabled={!installIds.length || installDisabled || Boolean(job && ["running"].includes(job.status))} onClick={() => void startInstall({ ids: installIds })}>
                                 {copy.installSelected}
                             </Button>
                         </WithHint>
                     </div>
                 </div>
+                {installDisabled ? (
+                    <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50/70 px-2 py-1.5 text-[11px] leading-5 text-amber-700 dark:border-amber-900 dark:bg-amber-500/10 dark:text-amber-300">
+                        <div className="flex items-center gap-1.5 font-medium">
+                            <AlertTriangle className="size-3.5 shrink-0" />
+                            {copy.installDisabled}
+                        </div>
+                        <div className="mt-1">{copy.installDisabledBody}</div>
+                        {modelInstall?.comfyHost ? <div className="mt-1 break-all"><span className="opacity-70">{copy.installDisabledHost}: </span><span className="font-mono">{modelInstall.comfyHost}</span></div> : null}
+                        <div className="mt-1">{copy.installDisabledFix}</div>
+                    </div>
+                ) : null}
                 {status?.comfyRoot && !status.comfyReachable ? <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400"><AlertTriangle className="size-3.5" />{copy.notReachable}</div> : null}
                 {status?.indexError ? <div className="mt-2 break-all text-[11px] text-amber-600 dark:text-amber-400"><span className="inline-flex items-center gap-1.5"><AlertTriangle className="size-3.5 shrink-0" />{copy.indexError}</span>{status.indexError}</div> : null}
                 {!status?.indexError && status?.indexWarning ? <div className="mt-2 break-all text-[11px] text-stone-500 dark:text-stone-400"><span className="inline-flex items-center gap-1.5"><AlertTriangle className="size-3.5 shrink-0" />{copy.indexWarning}</span>{status.indexWarning}</div> : null}
@@ -1009,8 +1041,8 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                                     ) : null}
                                                                     {workflow.installIds.length ? (
                                                                         <div className="mt-2 flex justify-end">
-                                                                            <WithHint hint={job?.status === "running" ? copy.jobRunningHint : undefined}>
-                                                                                <Button size="small" icon={<Download className="size-3.5" />} onClick={() => void startInstall({ ids: workflow.installIds })} disabled={Boolean(job && job.status === "running")}>
+                                                                            <WithHint hint={job?.status === "running" ? copy.jobRunningHint : installDisabled ? copy.installDisabled : undefined}>
+                                                                                <Button size="small" icon={<Download className="size-3.5" />} onClick={() => void startInstall({ ids: workflow.installIds })} disabled={installDisabled || Boolean(job && job.status === "running")}>
                                                                                     {copy.installWorkflow}
                                                                                 </Button>
                                                                             </WithHint>
@@ -1103,8 +1135,8 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                             )}
                                             {!pack.planned && packInstallIds.length ? (
                                                 <div className="mt-2 flex justify-end">
-                                                    <WithHint hint={job?.status === "running" ? copy.jobRunningHint : undefined}>
-                                                        <Button size="small" icon={<Download className="size-3.5" />} onClick={() => void startInstall({ ids: packInstallIds })} disabled={Boolean(job && job.status === "running")}>
+                                                    <WithHint hint={job?.status === "running" ? copy.jobRunningHint : installDisabled ? copy.installDisabled : undefined}>
+                                                        <Button size="small" icon={<Download className="size-3.5" />} onClick={() => void startInstall({ ids: packInstallIds })} disabled={installDisabled || Boolean(job && job.status === "running")}>
                                                             {copy.installPack}
                                                         </Button>
                                                     </WithHint>

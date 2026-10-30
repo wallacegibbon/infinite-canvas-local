@@ -51,7 +51,6 @@ fi
 
 export COMFY_URL="${COMFY_URL:-http://127.0.0.1:8188}"
 export COMFYUI_DIR="${COMFYUI_DIR:-$HOME/comfy/ComfyUI}"
-export COMFY_WORKFLOWS_DIR="${COMFY_WORKFLOWS_DIR:-$COMFYUI_DIR/user/default/workflows}"
 export HOST="${HOST:-127.0.0.1}"
 export PORT="${PORT:-8190}"
 

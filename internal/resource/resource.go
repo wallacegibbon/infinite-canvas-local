@@ -33,19 +33,18 @@ type Source struct {
 
 // Resource is one entry of resources/index.json.
 type Resource struct {
-	ID        string         `json:"id"`
-	Type      string         `json:"type"`
-	Label     string         `json:"label"`
-	Target    string         `json:"target"`
-	Size      int64          `json:"size"`
-	Sha256    string         `json:"sha256"`
-	License   string         `json:"license"`
-	Note      string         `json:"note"`
-	Sources   []any          `json:"sources"`
-	Requires  []string       `json:"requires"`
-	Builder   map[string]any `json:"builder"`
-	BundleDir string         `json:"bundleDir"`
-	Files     []string       `json:"files"`
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Label    string         `json:"label"`
+	Target   string         `json:"target"`
+	Size     int64          `json:"size"`
+	Sha256   string         `json:"sha256"`
+	License  string         `json:"license"`
+	Note     string         `json:"note"`
+	Sources  []any          `json:"sources"`
+	Requires []string       `json:"requires"`
+	Builder  map[string]any `json:"builder"`
+	Files    []string       `json:"files"`
 }
 
 // Pack is one feature bundle: a set of resources plus the workflows they enable.
@@ -74,27 +73,27 @@ type Index struct {
 
 // Item is the wire projection of one resource's status.
 type Item struct {
-	ID              string           `json:"id"`
-	Type            string           `json:"type"`
-	Label           string           `json:"label"`
-	Target          string           `json:"target"`
-	Size            int64            `json:"size"`
-	Sha256          string           `json:"sha256"`
-	License         string           `json:"license"`
-	Note            string           `json:"note"`
-	Sources         []map[string]any `json:"sources"`
-	Requires        []string         `json:"requires"`
-	Builder         map[string]any   `json:"builder"`
-	Status          string           `json:"status"`
-	Present         bool             `json:"present"`
-	Registered      bool             `json:"registered"`
-	Exists          bool             `json:"exists"`
-	MatchedFile     string           `json:"matchedFile"`
-	MatchedBy       string           `json:"matchedBy"`
-	SizeMismatch    string           `json:"sizeMismatch"`
-	ActualSize      int64            `json:"actualSize"`
-	Installed       map[string]any   `json:"installed"`
-	MissingRequires []string         `json:"missingRequires"`
+	ID              string         `json:"id"`
+	Type            string         `json:"type"`
+	Label           string         `json:"label"`
+	Target          string         `json:"target"`
+	Size            int64          `json:"size"`
+	Sha256          string         `json:"sha256"`
+	License         string         `json:"license"`
+	Note            string         `json:"note"`
+	Sources         []string       `json:"sources"`
+	Requires        []string       `json:"requires"`
+	Builder         map[string]any `json:"builder"`
+	Status          string         `json:"status"`
+	Present         bool           `json:"present"`
+	Registered      bool           `json:"registered"`
+	Exists          bool           `json:"exists"`
+	MatchedFile     string         `json:"matchedFile"`
+	MatchedBy       string         `json:"matchedBy"`
+	SizeMismatch    string         `json:"sizeMismatch"`
+	ActualSize      int64          `json:"actualSize"`
+	Installed       map[string]any `json:"installed"`
+	MissingRequires []string       `json:"missingRequires"`
 	// ManualCommand is set for resources the gateway never installs itself (type
 	// "bake"): the exact command that produces the file.
 	ManualCommand string `json:"manualCommand,omitempty"`
@@ -217,6 +216,7 @@ type Status struct {
 	ComfyRoot      string              `json:"comfyRoot"`
 	ComfyPython    string              `json:"comfyPython"`
 	ComfyReachable bool                `json:"comfyReachable"`
+	ModelInstall   InstallPolicy       `json:"modelInstall"`
 	RuntimeDeps    []RuntimeDep        `json:"runtimeDeps"`
 	ModelRoots     map[string][]string `json:"modelRoots"`
 	Packs          []*PackStatus       `json:"packs"`
@@ -416,6 +416,17 @@ func validateIndex(index *Index) error {
 		}
 	}
 	return nil
+}
+
+// payloadPath is where a resource that ships with the gateway is staged.
+//
+// The layout mirrors the target, so "bundled" is a convention rather than a field in the
+// index: resources/payload/custom_nodes/<node> for a node, resources/payload/<type>/<file>
+// for a model. One rule, and the payload can be shipped or embedded without the installer
+// knowing which.
+func (m *Manager) payloadPath(target string) string {
+	normalized := util.NormalizeSlashes(target)
+	return filepath.Join(m.cfg.RootDir, "resources", "payload", filepath.FromSlash(normalized))
 }
 
 // targetParts splits a target into its directory and file components.

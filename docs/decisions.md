@@ -367,3 +367,68 @@ someone adds the zh entries — visible, not silent.
 **Not translated on purpose** `parameters[].label/description` for the API and plugin consumers
 stay English only (nothing in the canvas renders them yet), `bindings.prompt.default` is model
 input (#9), and `name` / `source.name` / `lora.filter` are identifiers and patterns.
+
+---
+
+## 21. Model installs are a configured fact, and they are off until stated
+
+**Decision** `COMFY_MODELS_SHARED=1` is required to install models. Without it
+`POST /api/resources/install` answers `400 model_install_disabled`, the panel shows a banner and
+disables the download buttons, and nothing is inspected to decide any of this. `.env.example` — the
+single-machine template the README tells you to copy — ships the line set.
+
+**Why not detection** The two ways to get it wrong are mirror images and both are cheap to hit. A
+bind mount or NFS share at a path different from what ComfyUI reports looks exactly like a remote
+machine, so a `stat` blocks a working install. Two hosts that both install to `/opt/ComfyUI` look
+exactly like one, so the same `stat` allows one that cannot work. A gate that is wrong in either
+direction is worse than no gate, and the operator settles it in one line.
+
+**Why fail-closed, and why that was not true before release** The dangerous failure is not an
+error: as root, writing into a path that happens to exist here succeeds, gigabytes land on the
+wrong disk, and ComfyUI keeps reporting the model as missing with nothing in the log. A default of
+"try anyway" would keep that hole open, and the only defence would be an operator who already knew
+the answer. While the project had no installed base the trade was different — refusing by default
+would have broken deployments that never set the variable — but before release there are none, so
+the safe default costs one line in `.env` and nothing else.
+
+**Cost** A first run that skips `.env` gets the panel with installs off; the banner names the
+variable, so it is a one-line fix rather than a mystery. Anyone whose mounts are real but
+unusual still has to say so, because the process cannot tell them apart from a remote machine —
+that is the point, not a limitation to work around.
+
+**Where** `internal/config/config.go` (`boolValue`), `internal/resource/install_policy.go`,
+`internal/resource/jobs.go` (`Install`, `installHint`), `internal/resource/status.go`,
+`resource-center-panel.tsx`, `web/src/services/api/resources.ts`, `docs/gateway.md`,
+`.env.example`, `README.md`.
+
+---
+
+## 22. ComfyUI is the only backend, and workflow JSON is the product model
+
+**Decision** The gateway speaks ComfyUI and nothing else. There is no backend abstraction, no
+per-backend resource directory, no adapter contract and no install script. A ComfyUI API-format
+graph *is* how a model is defined here: `workflows/<type>-<slug>.json` plus an entry in
+`workflows/registry.json` describing name, type, prompt binding and parameters.
+
+**Why** The graph is already self-describing — `BuildSchema` renders the parameter card,
+`InferBindings` finds the prompt and image slots, `InferType` decides image/video/audio,
+`ImageInputCapacity` counts reference images. A hand-written workflow DSL would have to
+reproduce all of that. Wrapping graphs as OpenAI models is the whole idea of the project, and
+one backend keeps it small enough to hold in your head.
+
+**Why not a backend abstraction, given a second backend is conceivable** The seam would have to
+cut through 26 Go files (`/prompt`, `/history`, `/view`, `/object_info`,
+`/internal/folder_paths`, `nvidia-smi`, `ModelLoaderSpecs`, the graph format itself), not just
+the resource installer. Abstracting only `resources/` would leave a per-backend resource system
+inside a ComfyUI-only gateway: two vocabularies, no payoff. The cheap path for a future backend
+is to make *it* speak ComfyUI's protocol — that costs a compatibility layer in the new thing
+instead of a permanent indirection in this one.
+
+**Cost** The graph format's sharp edges stay exposed: two encodings (API vs UI, the UI one is
+rejected with an explanation), and the heuristics listed above can be wrong (no prompt binding
+inferred, a node class renamed upstream). Those are handled where they occur — a registration
+warning, a naming rule, a `ModelLoaderSpecs` edit — rather than behind an abstraction that would
+only hide them.
+
+**Where** `internal/workflow` (registry, inference), `internal/comfy`, `internal/resource`,
+`workflows/*.json`.

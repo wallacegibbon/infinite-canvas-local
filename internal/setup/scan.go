@@ -4,11 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -77,11 +74,22 @@ func (m *Manager) Scan() (Status, error) {
 	m.status.ComfyReachable = true
 	m.mu.Unlock()
 
-	gatewayScan, err := m.registry.Scan()
-	if err != nil {
-		m.logger.Warn("failed to scan gateway workflows: %s", err)
+	// Register graph files that are sitting in workflows/ and note why any were left alone.
+	// This is the only place graphs are registered — a deferred registration would be the
+	// same call with less context, which is why there is no separate "scan the workflow
+	// folder" endpoint and no background poller.
+	if gatewayScan, scanErr := m.registry.Scan(); scanErr != nil {
+		m.logger.Warn("failed to scan gateway workflows: %s", scanErr)
+	} else {
+		if n := len(gatewayScan.Skipped) + len(gatewayScan.Failed); n > 0 {
+			m.logger.Warn("workflow files left unregistered: %s", summariseScanFailures(gatewayScan))
+		}
+		// Registered is not the same as usable: a graph with no output node or no prompt
+		// binding still runs, just not the way the user expects. Say so, once, per file.
+		for _, warning := range gatewayScan.Warnings {
+			m.logger.Warn("workflow registered with a caveat: %s", warning)
+		}
 	}
-	comfyScan := m.importComfyWorkflows()
 	m.registry.ReloadIfChanged()
 
 	entries := make([]*workflow.Entry, 0, m.registry.Len())
@@ -164,22 +172,30 @@ func (m *Manager) Scan() (Status, error) {
 	m.status.Counts = counts
 	m.status.Workflows = workflows
 	m.status.Missing = Missing{
-		Models:      sortedKeysOfSet(missingModels),
-		Nodes:       sortedKeysOfSet(missingNodes),
-		UIWorkflows: comfyScan.ui,
-		UISamples:   comfyScan.samples,
+		Models: sortedKeysOfSet(missingModels),
+		Nodes:  sortedKeysOfSet(missingNodes),
 	}
 	m.hasScanned = true
 	m.scanning = false
 	m.mu.Unlock()
 
 	m.persist()
-	m.logger.Info("setup scan ready: %d/%d workflows, %d UI workflow(s) skipped, %dms",
-		counts.Available, counts.Total, comfyScan.ui, time.Since(started).Milliseconds())
-	if len(gatewayScan.Added) > 0 || comfyScan.imported > 0 {
-		m.logger.Info("auto-imported workflows: gateway=%d, comfy=%d", len(gatewayScan.Added), comfyScan.imported)
-	}
+	m.logger.Info("setup scan ready: %d/%d workflows, %dms",
+		counts.Available, counts.Total, time.Since(started).Milliseconds())
 	return m.Status(), nil
+}
+
+// summariseScanFailures renders why graph files were not registered, so a UI-format file
+// dropped into workflows/ has an answer in the log.
+func summariseScanFailures(summary *workflow.ScanSummary) string {
+	parts := make([]string, 0, len(summary.Skipped)+len(summary.Failed))
+	for _, entry := range append(append([]workflow.ScanFailure{}, summary.Skipped...), summary.Failed...) {
+		parts = append(parts, entry.File+": "+entry.Reason)
+	}
+	if len(parts) > 3 {
+		parts = append(parts[:3:3], "...")
+	}
+	return strings.Join(parts, "; ")
 }
 
 // degrade records a failed scan without discarding the last good availability data.
@@ -415,125 +431,6 @@ func (m *Manager) modelAliasForLocked(classType, input, value string) string {
 	return ""
 }
 
-// comfyImportResult reports what importComfyWorkflows did.
-type comfyImportResult struct {
-	imported int
-	ui       int
-	samples  []string
-}
-
-// importComfyWorkflows pulls API-format graphs out of ComfyUI's own workflow folder.
-func (m *Manager) importComfyWorkflows() comfyImportResult {
-	result := comfyImportResult{samples: []string{}}
-	if m.cfg.ComfyWorkflowsDir == "" || !util.DirExists(m.cfg.ComfyWorkflowsDir) {
-		return result
-	}
-
-	importedNames := map[string]bool{}
-	for _, projected := range m.registry.List() {
-		entry := m.registry.Resolve(projected.ID)
-		if entry == nil {
-			continue
-		}
-		if entry.Source != nil && entry.Source.Path != "" {
-			path := entry.Source.Path
-			if !filepath.IsAbs(path) {
-				path = filepath.Join(m.cfg.ComfyWorkflowsDir, path)
-			}
-			m.importedComfy[path] = true
-		}
-		if entry.Source != nil && entry.Source.Kind == "comfyui" && entry.Source.Name != "" {
-			importedNames[filepath.Base(entry.Source.Name)] = true
-		}
-	}
-
-	entries, err := os.ReadDir(m.cfg.ComfyWorkflowsDir)
-	if err != nil {
-		return result
-	}
-
-	for _, dirEntry := range entries {
-		name := dirEntry.Name()
-		if dirEntry.IsDir() || !strings.HasSuffix(strings.ToLower(name), ".json") {
-			continue
-		}
-		if importedNames[filepath.Base(name)] {
-			continue
-		}
-		file := filepath.Join(m.cfg.ComfyWorkflowsDir, name)
-		info, statErr := dirEntry.Info()
-		if statErr != nil || !info.Mode().IsRegular() {
-			continue
-		}
-		signature := info.ModTime().String() + ":" + strconv.FormatInt(info.Size(), 10)
-
-		m.mu.Lock()
-		cached, hasCache := m.comfyFileCache[file]
-		m.mu.Unlock()
-		if hasCache && cached.signature == signature {
-			if cached.kind == "ui" {
-				result.ui++
-			}
-			continue
-		}
-
-		if info.Size() > m.cfg.MaxWorkflowBytes {
-			m.cacheComfyFile(file, signature, "too_large")
-			continue
-		}
-		data, readErr := os.ReadFile(file)
-		if readErr != nil {
-			m.cacheComfyFile(file, signature, "error")
-			m.logger.Warn("failed to read ComfyUI workflow %s: %s", name, readErr)
-			continue
-		}
-
-		var decoded any
-		if err := json.Unmarshal(stripBOMBytes(data), &decoded); err != nil {
-			m.cacheComfyFile(file, signature, "invalid")
-			continue
-		}
-		if workflow.IsUIWorkflow(decoded) {
-			m.cacheComfyFile(file, signature, "ui")
-			result.ui++
-			if len(result.samples) < 5 {
-				result.samples = append(result.samples, name)
-			}
-			continue
-		}
-		if !workflow.IsAPIWorkflow(decoded) {
-			m.cacheComfyFile(file, signature, "invalid")
-			continue
-		}
-		m.cacheComfyFile(file, signature, "api")
-
-		m.mu.Lock()
-		alreadyImported := m.importedComfy[file]
-		m.mu.Unlock()
-		if alreadyImported {
-			continue
-		}
-		if _, err := m.registry.ImportWorkflow(workflow.ImportWorkflowRequest{
-			Path: file,
-			Name: strings.TrimSuffix(name, ".json"),
-		}); err != nil {
-			m.logger.Warn("failed to auto-import ComfyUI workflow %s: %s", name, err)
-			continue
-		}
-		m.mu.Lock()
-		m.importedComfy[file] = true
-		m.mu.Unlock()
-		result.imported++
-	}
-	return result
-}
-
-func (m *Manager) cacheComfyFile(file, signature, kind string) {
-	m.mu.Lock()
-	m.comfyFileCache[file] = comfyFileEntry{signature: signature, kind: kind}
-	m.mu.Unlock()
-}
-
 func toStringSlice(items []any) []string {
 	out := make([]string, 0, len(items))
 	for _, item := range items {
@@ -564,11 +461,4 @@ func defaultIfEmpty(value, fallback string) string {
 		return fallback
 	}
 	return value
-}
-
-func stripBOMBytes(data []byte) []byte {
-	if len(data) >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF {
-		return data[3:]
-	}
-	return data
 }

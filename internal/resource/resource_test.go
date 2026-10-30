@@ -2,7 +2,10 @@ package resource
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"testing"
+
+	"comfyui-gateway/internal/config"
 )
 
 func TestTargetParts(t *testing.T) {
@@ -71,49 +74,37 @@ func TestValidateIndexRejects(t *testing.T) {
 	}
 }
 
-func TestNormalizeSourcesFoldsBothShapes(t *testing.T) {
-	raw := []any{
+// Sources are plain URLs; anything else in the field is ignored rather than half-honoured.
+func TestSourceURLsAcceptsOnlyRealDownloads(t *testing.T) {
+	resource := &Resource{Sources: []any{
 		"https://example.com/file.bin",
-		map[string]any{"url": "https://mirror.example.com/file.bin", "label": "mirror", "verify": "sha256"},
-		map[string]any{"kind": "bundled", "path": "resources/nodes/x"},
-		map[string]any{"kind": "bundled", "path": ""},
+		map[string]any{"url": "https://mirror.example.com/file.bin", "label": "mirror"},
+		map[string]any{"url": ""},
 		map[string]any{"label": "no destination"},
 		42,
-	}
+	}}
 
-	sources := normalizeSources(raw)
-
-	if len(sources) != 3 {
-		t.Fatalf("sources = %d, want 3 usable entries: %+v", len(sources), sources)
-	}
-	if sources[0]["url"] != "https://example.com/file.bin" {
-		t.Errorf("string source was not converted: %+v", sources[0])
-	}
-	if sources[1]["label"] != "mirror" || sources[1]["verify"] != "sha256" {
-		t.Errorf("extra fields were dropped: %+v", sources[1])
-	}
-	if sources[2]["kind"] != "bundled" || sources[2]["url"] != "" {
-		t.Errorf("bundled source = %+v", sources[2])
+	urls := sourceURLs(resource)
+	if len(urls) != 2 || urls[0] != "https://example.com/file.bin" || urls[1] != "https://mirror.example.com/file.bin" {
+		t.Fatalf("sourceURLs = %v, want the two usable URLs", urls)
 	}
 }
 
-func TestSourcesForPrependsBundledDir(t *testing.T) {
-	manager := &Manager{}
-	resource := &Resource{
-		ID:        "node",
-		BundleDir: "resources/nodes/unpacked/Node",
-		Sources:   []any{"https://example.com/node.zip"},
+// A resource staged under resources/payload/<target> is "bundled" by convention: no field,
+// and the panel shows no download source because there is nothing to download.
+func TestPayloadPathMirrorsTheTarget(t *testing.T) {
+	manager := &Manager{cfg: &config.Config{RootDir: "/gw"}}
+
+	if got := manager.payloadPath("custom_nodes/comfyui-kjnodes"); got != filepath.Join("/gw", "resources", "payload", "custom_nodes", "comfyui-kjnodes") {
+		t.Errorf("payloadPath = %q", got)
+	}
+	if got := manager.payloadPath("vae_approx/taeh3.safetensors"); got != filepath.Join("/gw", "resources", "payload", "vae_approx", "taeh3.safetensors") {
+		t.Errorf("payloadPath = %q", got)
 	}
 
-	sources := manager.sourcesFor(resource)
-	if len(sources) != 2 {
-		t.Fatalf("sources = %d, want the bundled dir plus the download", len(sources))
-	}
-	if sources[0]["kind"] != "bundled-dir" {
-		t.Errorf("first source = %+v, want the bundled directory", sources[0])
-	}
-	if sources[1]["url"] != "https://example.com/node.zip" {
-		t.Errorf("second source = %+v", sources[1])
+	resource := &Resource{Target: "custom_nodes/comfyui-kjnodes", Sources: []any{}}
+	if sources := manager.sourcesFor(resource); len(sources) != 0 {
+		t.Errorf("sourcesFor = %v, want none for a payload resource", sources)
 	}
 }
 

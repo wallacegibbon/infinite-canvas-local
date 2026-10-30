@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBakeResourceReportsTheRealCommand(t *testing.T) {
@@ -112,4 +113,16 @@ func TestInstallNeverStartsWithABakeItem(t *testing.T) {
 	} else if !strings.Contains(err.Error(), "local merge") {
 		t.Errorf("error should name the manual step, got: %v", err)
 	}
+
+	// The job runs in a goroutine that writes into the installation directory, so let it
+	// reach a terminal state before the test ends: t.TempDir cleanup otherwise races with
+	// it and fails with "directory not empty".
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if snapshot := manager.GetJob(job.ID); snapshot == nil || snapshot.Status != "running" {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Error("the install job did not finish within 5s")
 }

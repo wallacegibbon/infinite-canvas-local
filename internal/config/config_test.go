@@ -12,7 +12,8 @@ func isolateEnv(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{
 		"PORT", "HOST", "COMFY_URL", "COMFYUI_DIR", "COMFY_PYTHON", "COMFY_FRONTEND_DIR",
-		"COMFY_WORKFLOWS_DIR", "SCAN_ON_START", "WATCH_WORKFLOWS", "SCAN_DEBOUNCE_MS",
+		"COMFY_MODELS_SHARED",
+		"SCAN_ON_START",
 		"WORKFLOW_DIR", "DATA_DIR", "OUTPUT_DIR", "PUBLIC_BASE_URL", "CORS_ORIGINS",
 		"REQUEST_TIMEOUT_MS", "VIDEO_TIMEOUT_MS", "POLL_INTERVAL_MS",
 		"COMFY_RETRY_ATTEMPTS", "COMFY_RETRY_DELAY_MS", "TASK_RETENTION_DAYS",
@@ -117,6 +118,46 @@ func TestInvalidNumbersFallBack(t *testing.T) {
 	}
 	if cfg.MaxImageCount != 15 {
 		t.Errorf("MaxImageCount = %d, want the default", cfg.MaxImageCount)
+	}
+}
+
+// Installs are refused unless this is set, so a typo must read as "not set" rather than
+// silently enabling them.
+func TestComfyModelsSharedIsOptIn(t *testing.T) {
+	isolateEnv(t)
+	root := t.TempDir()
+	t.Setenv("GATEWAY_ROOT", root)
+	t.Setenv("DATA_DIR", filepath.Join(root, "data"))
+	t.Setenv("OUTPUT_DIR", filepath.Join(root, "out"))
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.ComfyModelsShared {
+		t.Error("ComfyModelsShared is on by default; installs must be refused until stated")
+	}
+
+	for _, value := range []string{"1", "true", "TRUE", " on "} {
+		t.Setenv("COMFY_MODELS_SHARED", value)
+		cfg, err = Load()
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		if !cfg.ComfyModelsShared {
+			t.Errorf("COMFY_MODELS_SHARED=%q was not read as true", value)
+		}
+	}
+
+	for _, value := range []string{"0", "false", "nope", "", "yes please"} {
+		t.Setenv("COMFY_MODELS_SHARED", value)
+		cfg, err = Load()
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		if cfg.ComfyModelsShared {
+			t.Errorf("COMFY_MODELS_SHARED=%q was read as true", value)
+		}
 	}
 }
 

@@ -27,7 +27,9 @@ func quietManager(t *testing.T) *Manager {
 	logger := logx.NewWithWriter("test", io.Discard)
 	// A scanned-on-demand setup manager over empty directories: the status paths call into
 	// it (folder paths, loader options, model aliases), and an unscanned one is harmless.
-	cfg := &config.Config{RootDir: t.TempDir(), DataDir: dataDir, ComfyDir: t.TempDir()}
+	// ComfyModelsShared mirrors what .env.example ships: installs are refused unless the
+	// deployment states that ComfyUI's model folders are reachable.
+	cfg := &config.Config{RootDir: t.TempDir(), DataDir: dataDir, ComfyDir: t.TempDir(), ComfyModelsShared: true}
 	return &Manager{
 		cfg:       cfg,
 		setup:     setup.New(setup.Options{Config: cfg, Logger: logger}),
@@ -279,7 +281,8 @@ func TestCancelJobUsesPanelVocabulary(t *testing.T) {
 
 func TestInstallJobFinishesWithDoneStatus(t *testing.T) {
 	root := t.TempDir()
-	bundle := filepath.Join(root, "bundles", "node-a")
+	// Payload layout: resources/payload/<target>, so the installer needs no bundleDir field.
+	bundle := filepath.Join(root, "resources", "payload", "custom_nodes", "node-a")
 	if err := os.MkdirAll(bundle, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -292,11 +295,10 @@ func TestInstallJobFinishesWithDoneStatus(t *testing.T) {
 	manager.cfg.ComfyDir = filepath.Join(root, "ComfyUI")
 	manager.cfg.ResourceConcurrency = 2
 	manager.index = &Index{Resources: []*Resource{{
-		ID:        "node-a",
-		Type:      "node",
-		Label:     "node a",
-		Target:    "custom_nodes/node-a",
-		BundleDir: "bundles/node-a",
+		ID:     "node-a",
+		Type:   "node",
+		Label:  "node a",
+		Target: "custom_nodes/node-a",
 	}}}
 
 	job, err := manager.Install([]string{"node-a"}, nil)

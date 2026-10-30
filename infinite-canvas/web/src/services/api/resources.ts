@@ -5,10 +5,8 @@ import { gatewayFetch } from "@/services/api/gateway-status";
 const gatewayRoot = LOCAL_GATEWAY_BASE_URL.replace(/\/v1\/?$/, "");
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
-export type ResourceSource = {
-    url: string;
-    label?: string;
-};
+/** A download URL. Resources staged under resources/payload have none. */
+export type ResourceSource = string;
 
 export type ResourceItem = {
     id: string;
@@ -128,6 +126,16 @@ export type PromptCapabilities = {
     engines: Record<string, PromptEngineCapability>;
 };
 
+/**
+ * Whether this gateway may install models at all. Configured, never inferred: installs are
+ * refused unless COMFY_MODELS_SHARED=1 states that ComfyUI's model folders are reachable.
+ */
+export type ResourceModelInstall = {
+    allowed: boolean;
+    /** COMFY_URL host:port — the machine the gateway has to run on. */
+    comfyHost?: string;
+};
+
 export type ResourceStatus = {
     ok: boolean;
     loadedAt?: string;
@@ -139,6 +147,7 @@ export type ResourceStatus = {
     comfyRoot?: string;
     comfyPython?: string;
     comfyReachable?: boolean;
+    modelInstall?: ResourceModelInstall;
     runtimeDeps?: Array<{ id: string; packages: string[] }>;
     promptCapabilities?: PromptCapabilities;
     modelRoots?: Record<string, string[]>;

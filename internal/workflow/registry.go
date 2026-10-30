@@ -3,7 +3,6 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -557,181 +556,108 @@ func (r *Registry) Schema(entry *Entry) Schema {
 	return BuildSchema(entry)
 }
 
-// ImportWorkflowRequest is the body of POST /api/workflows/import.
-type ImportWorkflowRequest struct {
-	URL         string
-	Path        string
-	JSON        json.RawMessage
-	Name        string
-	Type        string
-	Bindings    OrderedMap[OrderedMap[any]]
-	Defaults    map[string]any
-	Presets     map[string]any
-	Parameters  []any
-	Lora        *Lora
-	Description string
-	Overwrite   bool
-}
+// RegisterGraphFile registers a graph file that is already in the workflow directory.
+//
+// The file name is the workflow's identity. It must be "<type>-<slug>.json", where <type> is
+// one of image, video, audio or text: id, name and file are then the same string, nothing is
+// copied, renamed or re-slugged, and the file a user edits is the file that runs.
+//
+// A file that does not follow the rule is skipped rather than repaired — silently renaming
+// someone's file makes its name meaningless the next time they look at it — and the reason
+// travels back to the scan, which reports it. The workflow set is fixed and hand-managed, so
+// a rejected file is a naming mistake worth fixing, not a case to paper over.
+func (r *Registry) RegisterGraphFile(absolute string) (string, []string, error) {
+	base := filepath.Base(absolute)
+	stem := strings.TrimSuffix(base, ".json")
+	if err := validateGraphFileName(stem); err != nil {
+		return "", nil, err
+	}
 
-// ImportWorkflowResult is what the import endpoint returns.
-type ImportWorkflowResult struct {
-	Workflow PublicEntry `json:"workflow"`
-	Warnings []string    `json:"warnings"`
-}
-
-// ImportWorkflow registers a new workflow from a URL, a path, or inline JSON.
-func (r *Registry) ImportWorkflow(req ImportWorkflowRequest) (*ImportWorkflowResult, error) {
-	graph, derivedName, source, err := r.loadImportSource(req)
+	data, err := readFileLimited(absolute, r.maxWorkflowBytes)
 	if err != nil {
-		return nil, err
+		return "", nil, httpx.BadRequest("read_failed", "failed to read the workflow file: "+err.Error())
+	}
+	graph, err := decodeImportJSON(data)
+	if err != nil {
+		return "", nil, err
 	}
 
-	workflowType := InferType(graph, req.Type)
-	desiredName := EnsureTypePrefix(defaultString(req.Name, derivedName), workflowType)
-
-	r.mu.RLock()
-	existing, hasExisting := r.byName[desiredName]
-	r.mu.RUnlock()
-
-	finalName := desiredName
-	var id, fileName string
-	if hasExisting && req.Overwrite {
-		id = existing.ID
-		fileName = existing.File
-		finalName = existing.Name
-	} else {
-		finalName = r.uniqueName(desiredName)
-		id = util.Slugify(finalName, "workflow-"+fmt.Sprint(time.Now().UnixMilli()))
-		suffix := 1
-		for r.hasID(id) {
-			suffix++
-			id = util.Slugify(finalName, "workflow") + "-" + fmt.Sprint(suffix)
-		}
-		fileName = id + ".json"
+	workflowType := InferType(graph, "")
+	if declared, _ := typePrefixOf(stem); TypePrefixes[workflowType] != declared {
+		return "", nil, httpx.NewError(http.StatusUnprocessableEntity, "workflow_type_mismatch",
+			fmt.Sprintf("the file name starts with %s- but the graph looks like %s; rename the file to %s-…",
+				declared, workflowType, workflowType))
+	}
+	if r.hasID(stem) {
+		return "", nil, httpx.NewError(http.StatusUnprocessableEntity, "workflow_id_taken",
+			"another registry entry already uses this id and points at a different file")
 	}
 
-	inferred := InferBindings(graph)
-	merged := mergeBindings(inferred, req.Bindings)
-
+	merged := InferBindings(graph)
 	warnings := OutputWarnings(graph)
 	warnings = append(warnings, BindingWarnings(graph, merged)...)
 	if _, ok := merged.Get("prompt"); !ok {
 		warnings = append(warnings, "no prompt binding could be inferred; set one manually in registry.json.")
 	}
 
-	graphPayload, err := json.MarshalIndent(graph, "", "  ")
-	if err != nil {
-		return nil, httpx.NewError(http.StatusInternalServerError, "internal_error", "failed to serialise the workflow")
-	}
-	if err := util.WriteFileAtomic(filepath.Join(r.dir, fileName), append(graphPayload, '\n')); err != nil {
-		return nil, httpx.NewError(http.StatusInternalServerError, "internal_error", "failed to write the workflow file: "+err.Error())
-	}
-
 	entryPayload := map[string]any{
-		"id":          id,
-		"name":        finalName,
-		"type":        workflowType,
-		"description": req.Description,
-		"file":        fileName,
-		"bindings":    merged,
-		"defaults":    nonNilMap(req.Defaults),
-		"presets":     nonNilMap(req.Presets),
-		"parameters":  nonNilSlice(req.Parameters),
-		"lora":        req.Lora,
-		"importedAt":  util.NowIso(),
-		"source":      source,
+		"id":         stem,
+		"name":       stem,
+		"type":       workflowType,
+		"file":       base,
+		"bindings":   merged,
+		"defaults":   nonNilMap(nil),
+		"presets":    nonNilMap(nil),
+		"parameters": nonNilSlice(nil),
+		"importedAt": util.NowIso(),
+		"source":     &Source{Kind: "path", Path: absolute},
 	}
 	encodedEntry, err := json.Marshal(entryPayload)
 	if err != nil {
-		return nil, httpx.NewError(http.StatusInternalServerError, "internal_error", "failed to write registry.json")
+		return "", nil, httpx.NewError(http.StatusInternalServerError, "internal_error", "failed to write registry.json")
 	}
 
 	rawEntries, err := r.readRegistryRaw()
 	if err != nil {
-		return nil, httpx.NewError(http.StatusInternalServerError, "internal_error", "failed to read registry.json")
+		return "", nil, httpx.NewError(http.StatusInternalServerError, "internal_error", "failed to read registry.json")
 	}
 	next := make([]json.RawMessage, 0, len(rawEntries)+1)
-	for _, raw := range rawEntries {
-		var header struct {
-			ID string `json:"id"`
-		}
-		if err := json.Unmarshal(raw, &header); err == nil && header.ID == id {
-			continue
-		}
-		next = append(next, raw)
-	}
+	next = append(next, rawEntries...)
 	next = append(next, encodedEntry)
 	if err := r.writeRegistry(next); err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	if err := r.Load(); err != nil {
-		return nil, err
+		return "", nil, err
 	}
-
-	saved := r.Resolve(id)
-	if saved == nil {
-		return nil, httpx.NewError(http.StatusInternalServerError, "internal_error", "the imported workflow could not be read back")
-	}
-	return &ImportWorkflowResult{Workflow: PublicProjection(saved), Warnings: warnings}, nil
+	r.logger.Info("registered workflow %s from %s", stem, base)
+	return stem, warnings, nil
 }
 
-// loadImportSource resolves the three supported import sources into a graph.
-func (r *Registry) loadImportSource(req ImportWorkflowRequest) (Graph, string, *Source, error) {
-	switch {
-	case len(req.JSON) > 0 && string(req.JSON) != "null":
-		graph, err := decodeImportJSON(req.JSON)
-		if err != nil {
-			return nil, "", nil, err
+// typePrefixOf returns the capability a file name declares, by its leading "<type>-".
+func typePrefixOf(stem string) (string, bool) {
+	for _, candidate := range []string{"image", "video", "audio", "text"} {
+		if strings.HasPrefix(stem, candidate+"-") {
+			return candidate, true
 		}
-		return graph, defaultString(req.Name, "workflow"), &Source{Kind: "json"}, nil
-
-	case req.Path != "":
-		absolute := req.Path
-		if !filepath.IsAbs(absolute) {
-			absolute = filepath.Join(r.dir, absolute)
-		}
-		data, err := readFileLimited(absolute, r.maxWorkflowBytes)
-		if err != nil {
-			return nil, "", nil, httpx.BadRequest("read_failed", "failed to read the workflow file: "+err.Error())
-		}
-		graph, err := decodeImportJSON(data)
-		if err != nil {
-			return nil, "", nil, err
-		}
-		return graph, defaultString(req.Name, strings.TrimSuffix(filepath.Base(absolute), ".json")),
-			&Source{Kind: "path", Path: absolute}, nil
-
-	case req.URL != "":
-		if !strings.HasPrefix(req.URL, "http://") && !strings.HasPrefix(req.URL, "https://") {
-			return nil, "", nil, httpx.BadRequest("invalid_url", "only http/https URLs are supported")
-		}
-		client := &http.Client{Timeout: 15 * time.Second}
-		resp, err := client.Get(req.URL)
-		if err != nil {
-			return nil, "", nil, httpx.BadRequest("download_failed", "failed to download the workflow: "+err.Error())
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return nil, "", nil, httpx.BadRequest("download_failed", fmt.Sprintf("failed to download the workflow: HTTP %d", resp.StatusCode))
-		}
-		if resp.ContentLength > r.maxWorkflowBytes {
-			return nil, "", nil, httpx.NewError(http.StatusRequestEntityTooLarge, "workflow_too_large", "workflow file is too large")
-		}
-		data, err := io.ReadAll(io.LimitReader(resp.Body, r.maxWorkflowBytes+1))
-		if err != nil {
-			return nil, "", nil, httpx.BadRequest("download_failed", "failed to download the workflow: "+err.Error())
-		}
-		if int64(len(data)) > r.maxWorkflowBytes {
-			return nil, "", nil, httpx.NewError(http.StatusRequestEntityTooLarge, "workflow_too_large", "workflow file is too large")
-		}
-		graph, err := decodeImportJSON(data)
-		if err != nil {
-			return nil, "", nil, err
-		}
-		derived := defaultString(req.Name, strings.TrimSuffix(urlBaseName(req.URL), ".json"))
-		return graph, derived, &Source{Kind: "url", URL: req.URL}, nil
 	}
-	return nil, "", nil, httpx.BadRequest("missing_source", "provide one of url, path or json")
+	return "", false
+}
+
+// validateGraphFileName enforces "<type>-<slug>.json".
+//
+// The slug rule is util.Slugify's own: the id has to be usable as a URL path segment, and if
+// the file name were allowed to differ from the slug the two would drift apart again.
+func validateGraphFileName(stem string) error {
+	if stem == "" || util.Slugify(stem, "") != stem {
+		return httpx.NewError(http.StatusUnprocessableEntity, "workflow_name_invalid",
+			"the file name must be lowercase letters, digits, '-' or '_' (got "+stem+")")
+	}
+	if _, ok := typePrefixOf(stem); !ok {
+		return httpx.NewError(http.StatusUnprocessableEntity, "workflow_prefix_required",
+			"the file name must start with its type: image-, video-, audio- or text- (for example image-my-flow.json)")
+	}
+	return nil
 }
 
 // decodeImportJSON validates that the payload is a submittable API graph.
@@ -742,7 +668,7 @@ func decodeImportJSON(data []byte) (Graph, error) {
 	}
 	if IsUIWorkflow(decoded) {
 		return nil, httpx.NewError(http.StatusUnprocessableEntity, "ui_workflow_not_supported",
-			"this is a ComfyUI UI-format workflow and cannot be submitted; export it from ComfyUI in API format and import that file instead.")
+			"this is a ComfyUI UI-format workflow and cannot be submitted; export it from ComfyUI in API format and put that file in the workflows directory.")
 	}
 	if !IsAPIWorkflow(decoded) {
 		return nil, httpx.NewError(http.StatusUnprocessableEntity, "invalid_api_workflow",
@@ -757,6 +683,19 @@ type ScanSummary struct {
 	Added   []string      `json:"added"`
 	Skipped []ScanFailure `json:"skipped"`
 	Failed  []ScanFailure `json:"failed"`
+	// Warnings are per-file remarks that did not stop registration (no output node, no
+	// prompt binding). Registering is not the same as being usable, so they are reported.
+	Warnings []string `json:"warnings"`
+}
+
+// skipCodes are the reasons a scan leaves a graph file alone on purpose. They are reported
+// as "skipped" because the file needs a rename or an export, not an investigation.
+var skipCodes = map[string]bool{
+	"ui_workflow_not_supported": true,
+	"workflow_name_invalid":     true,
+	"workflow_prefix_required":  true,
+	"workflow_type_mismatch":    true,
+	"workflow_id_taken":         true,
 }
 
 // ScanFailure describes one file a scan could not import.
@@ -803,7 +742,7 @@ func (r *Registry) Scan() (*ScanSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	summary := &ScanSummary{Added: []string{}, Skipped: []ScanFailure{}, Failed: []ScanFailure{}}
+	summary := &ScanSummary{Added: []string{}, Skipped: []ScanFailure{}, Failed: []ScanFailure{}, Warnings: []string{}}
 	for _, dirEntry := range dirEntries {
 		name := dirEntry.Name()
 		if dirEntry.IsDir() || !strings.HasSuffix(strings.ToLower(name), ".json") || name == registryFileName {
@@ -816,17 +755,20 @@ func (r *Registry) Scan() (*ScanSummary, error) {
 		if usedSources[absolute] {
 			continue
 		}
-		result, err := r.ImportWorkflow(ImportWorkflowRequest{Path: absolute})
+		registered, warnings, err := r.RegisterGraphFile(absolute)
 		if err != nil {
 			var appErr *httpx.Error
-			if ok := asHTTPError(err, &appErr); ok && appErr.Code == "ui_workflow_not_supported" {
+			if ok := asHTTPError(err, &appErr); ok && skipCodes[appErr.Code] {
 				summary.Skipped = append(summary.Skipped, ScanFailure{File: name, Reason: appErr.Message})
 			} else {
 				summary.Failed = append(summary.Failed, ScanFailure{File: name, Reason: err.Error()})
 			}
 			continue
 		}
-		summary.Added = append(summary.Added, result.Workflow.Name)
+		summary.Added = append(summary.Added, registered)
+		for _, warning := range warnings {
+			summary.Warnings = append(summary.Warnings, name+": "+warning)
+		}
 	}
 	return summary, nil
 }
@@ -888,19 +830,6 @@ func (r *Registry) hasID(id string) bool {
 	defer r.mu.RUnlock()
 	_, exists := r.cache[id]
 	return exists
-}
-
-func (r *Registry) uniqueName(base string) string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	name := base
-	for index := 1; ; {
-		if _, exists := r.byName[name]; !exists {
-			return name
-		}
-		index++
-		name = fmt.Sprintf("%s-%d", base, index)
-	}
 }
 
 // mergeBindings overlays explicit bindings on top of inferred ones, keeping the

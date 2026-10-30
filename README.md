@@ -37,8 +37,8 @@ the canvas frontend is a self-contained third-party subtree beside it:
 .
 ├── main.go            # gateway entry point
 ├── internal/          # the whole gateway (config/comfy/workflow/generate/resource/prompt/…)
-├── workflows/         # workflow graphs + registry.json (runtime assets)
-├── resources/         # resource index (index.json) and bundled custom nodes
+├── workflows/         # what the product exposes: graphs + registry.json
+├── resources/         # what it needs installed: index.json + payload/
 ├── prompts/           # prompt skill files
 ├── data/              # runtime state: tasks.json, resource-lock.json, outputs/ (not tracked)
 ├── bin/               # build output (not tracked)
@@ -48,6 +48,17 @@ the canvas frontend is a self-contained third-party subtree beside it:
 ├── Makefile           # make build / check / check-full / verify-static / web / web-check
 └── start.sh           # starts the gateway and previews the canvas
 ```
+
+Two directories carry the runtime assets, and the split is deliberate:
+
+- **`workflows/`** is the outward face: one graph per model, plus `registry.json` describing
+  how it is presented (name, type, prompt binding, parameters). Adding a model means dropping
+  a `<type>-<slug>.json` here and scanning.
+- **`resources/`** is inward: `index.json` lists what has to be present on the machine (models
+  to download, custom nodes, runtime deps), and `payload/` holds the files that ship with the
+  gateway instead of being downloaded. The layout mirrors the install target, so a payload
+  resource needs no field of its own — `resources/payload/custom_nodes/<name>` is a node and
+  `resources/payload/<type>/<file>` is a model; anything without a payload comes from its URLs.
 
 ## Language
 
@@ -76,7 +87,8 @@ make web               # installs infinite-canvas/web deps if needed, then vite 
 make build             # Go gateway, static binary; start.sh builds it too if missing
 
 # Configure and start
-cp .env.example .env   # set COMFYUI_DIR / COMFY_WORKFLOWS_DIR / COMFY_PYTHON for this machine
+cp .env.example .env   # set COMFYUI_DIR / COMFY_PYTHON for this machine
+                        # (COMFY_MODELS_SHARED=1 there is what allows the panel to install models)
 ./start.sh
 ```
 

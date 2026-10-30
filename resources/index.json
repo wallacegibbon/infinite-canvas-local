@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "version": "2026.10.29-28",
+  "version": "2026.10.30-29",
   "channel": "stable",
-  "updatedAt": "2026-10-29",
+  "updatedAt": "2026-10-30",
   "packs": [
     {
       "id": "core",
@@ -411,7 +411,8 @@
         "preset": "Balanced",
         "strength": 1
       },
-      "license": "MOSS-Image"
+      "license": "MOSS-Image",
+      "sources": []
     },
     {
       "id": "qwen_image_2.1_turbo_int8_convrot",
@@ -460,7 +461,6 @@
       "label": "Qwen Multiangle Camera 节点",
       "target": "custom_nodes/ComfyUI-qwenmultiangle",
       "autoInstall": true,
-      "bundleDir": "resources/nodes/unpacked/ComfyUI-qwenmultiangle",
       "size": 4559537,
       "license": "MIT",
       "note": "安装后需重启 ComfyUI；主源内置 zip，备源公开 GitHub 归档。",
@@ -468,11 +468,7 @@
         "QwenMultiangleCameraNode"
       ],
       "sources": [
-        {
-          "url": "https://github.com/jtydhr88/ComfyUI-qwenmultiangle/archive/refs/heads/master.zip",
-          "label": "上游 GitHub",
-          "verify": false
-        }
+        "https://github.com/jtydhr88/ComfyUI-qwenmultiangle/archive/refs/heads/master.zip"
       ]
     },
     {
@@ -496,7 +492,6 @@
       "label": "Inpaint Crop & Stitch（局部重绘节点）",
       "target": "custom_nodes/ComfyUI-Inpaint-CropAndStitch",
       "autoInstall": true,
-      "bundleDir": "resources/nodes/unpacked/ComfyUI-Inpaint-CropAndStitch",
       "size": 161835,
       "license": "GPL-3.0",
       "note": "局部重绘所需；安装后需重启 ComfyUI。",
@@ -505,11 +500,7 @@
         "InpaintStitchImproved"
       ],
       "sources": [
-        {
-          "url": "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch/archive/refs/heads/main.zip",
-          "label": "上游 GitHub",
-          "verify": false
-        }
+        "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch/archive/refs/heads/main.zip"
       ]
     },
     {
@@ -518,7 +509,6 @@
       "label": "KJNodes（扩图蒙版节点）",
       "target": "custom_nodes/comfyui-kjnodes",
       "autoInstall": true,
-      "bundleDir": "resources/nodes/unpacked/comfyui-kjnodes",
       "size": 2634717,
       "license": "GPL-3.0",
       "note": "仅扩图的 DrawMaskOnImage 使用；无需额外 pip 依赖；安装后需重启 ComfyUI。",
@@ -526,11 +516,7 @@
         "DrawMaskOnImage"
       ],
       "sources": [
-        {
-          "url": "https://github.com/kijai/ComfyUI-KJNodes/archive/refs/heads/main.zip",
-          "label": "上游 GitHub",
-          "verify": false
-        }
+        "https://github.com/kijai/ComfyUI-KJNodes/archive/refs/heads/main.zip"
       ]
     },
     {
@@ -676,13 +662,8 @@
       "size": 145157232,
       "sha256": "52e41bc8ab3964b11104332bc7fc742571e5fd1eaf7bc046285a5b37c56d3020",
       "license": "未知（社区 LoRA）",
-      "note": "可选；随包分发（魔搭资源集为私有，匿名不可用）。",
+      "note": "可选；从 ModelScope 下载（资源集为私有，可能需要登录）。",
       "sources": [
-        {
-          "kind": "bundled",
-          "path": "resources/loras/KOOK-MOSS-SFT-观澜.safetensors",
-          "label": "随包"
-        },
         "https://www.modelscope.cn/datasets/shensanshu/ComfyUI-Local-Infinite-Canvas/resolve/master/comfyui-gateway/resources/loras/KOOK-MOSS-SFT-%E8%A7%82%E6%BE%9C.safetensors"
       ]
     },
@@ -874,7 +855,6 @@
       "type": "node",
       "label": "ComfyUI-VDN-H3",
       "target": "custom_nodes/ComfyUI-VDN-H3",
-      "bundleDir": "resources/nodes/unpacked/ComfyUI-VDN-H3",
       "size": 7313853,
       "license": "Apache-2.0",
       "autoInstall": true,
@@ -883,11 +863,7 @@
       ],
       "note": "预解压目录随包复制，不跑 pip；节点依赖按 README 处理。",
       "sources": [
-        {
-          "url": "https://github.com/Saganaki22/ComfyUI-VDN-H3/archive/refs/heads/main.zip",
-          "label": "GitHub 备源",
-          "verify": false
-        }
+        "https://github.com/Saganaki22/ComfyUI-VDN-H3/archive/refs/heads/main.zip"
       ]
     },
     {
@@ -895,7 +871,6 @@
       "type": "node",
       "label": "MiniMax H3 Audio T8",
       "target": "custom_nodes/minimax-h3-audio-t8",
-      "bundleDir": "resources/nodes/unpacked/minimax-h3-audio-t8",
       "size": 6464467,
       "license": "GPL-3.0-or-later",
       "autoInstall": true,
@@ -908,11 +883,7 @@
       ],
       "note": "预解压目录随包复制，不跑 pip；节点依赖按 README 处理。",
       "sources": [
-        {
-          "url": "https://github.com/T8mars/comfyui-minimax-h3-audio-T8/archive/refs/heads/main.zip",
-          "label": "GitHub 备源",
-          "verify": false
-        }
+        "https://github.com/T8mars/comfyui-minimax-h3-audio-T8/archive/refs/heads/main.zip"
       ]
     },
     {
@@ -920,7 +891,6 @@
       "type": "node",
       "label": "YC MiniMax H3 Nodes",
       "target": "custom_nodes/ComfyUI-YCNodes-MiniMax-H3",
-      "bundleDir": "resources/nodes/unpacked/ComfyUI-YCNodes-MiniMax-H3",
       "size": 94573,
       "license": "MIT",
       "autoInstall": true,
@@ -935,7 +905,6 @@
       "type": "node",
       "label": "SelfLift H3",
       "target": "custom_nodes/comfyui-SelfLift",
-      "bundleDir": "resources/nodes/unpacked/comfyui-SelfLift",
       "size": 330000,
       "license": "未声明 LICENSE",
       "autoInstall": true,
@@ -944,11 +913,7 @@
       ],
       "note": "预解压目录随包复制，不跑 pip；节点依赖按 README 处理。",
       "sources": [
-        {
-          "url": "https://github.com/facok/comfyui-SelfLift/archive/refs/heads/main.zip",
-          "label": "GitHub 备源",
-          "verify": false
-        }
+        "https://github.com/facok/comfyui-SelfLift/archive/refs/heads/main.zip"
       ]
     },
     {
@@ -956,7 +921,6 @@
       "type": "node",
       "label": "SolAttn H3（Triton）",
       "target": "custom_nodes/ComfyUI-SolAttn_triton",
-      "bundleDir": "resources/nodes/unpacked/ComfyUI-SolAttn_triton",
       "size": 104848,
       "license": "未声明 LICENSE",
       "autoInstall": true,
@@ -971,7 +935,6 @@
       "type": "node",
       "label": "VideoHelperSuite",
       "target": "custom_nodes/ComfyUI-VideoHelperSuite",
-      "bundleDir": "resources/nodes/unpacked/ComfyUI-VideoHelperSuite",
       "size": 414305,
       "license": "GPL-3.0",
       "autoInstall": true,
@@ -980,11 +943,7 @@
       ],
       "note": "预解压目录随包复制，不跑 pip；节点依赖按 README 处理。",
       "sources": [
-        {
-          "url": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite/archive/refs/heads/main.zip",
-          "label": "GitHub 备源",
-          "verify": false
-        }
+        "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite/archive/refs/heads/main.zip"
       ]
     },
     {
@@ -996,13 +955,7 @@
       "sha256": "f0f60fa072089997f817402098c2fd90777cb2660dd79cf5df42fc1e3e08e527",
       "license": "MiniMax H3 Community License",
       "note": "VDN/无VDN 工作流的预览解码用；随包分发（9.8MB）。",
-      "sources": [
-        {
-          "kind": "bundled",
-          "path": "resources/vae_approx/taeh3.safetensors",
-          "label": "随包"
-        }
-      ]
+      "sources": []
     },
     {
       "id": "seedvr2_node",
@@ -1010,7 +963,6 @@
       "label": "SeedVR2 超分节点",
       "target": "custom_nodes/ComfyUI-SeedVR2_VideoUpscaler",
       "autoInstall": true,
-      "bundleDir": "resources/nodes/unpacked/ComfyUI-SeedVR2_VideoUpscaler",
       "size": 2296099,
       "license": "Apache-2.0",
       "note": "随包节点，启动器自动复制；运行依赖（diffusers / rotary_embedding_torch / omegaconf / opencv-python / einops）由「运行库」安装项检测并补装，装完重启 ComfyUI。",
@@ -1018,7 +970,8 @@
         "SeedVR2LoadDiTModel",
         "SeedVR2LoadVAEModel",
         "SeedVR2VideoUpscaler"
-      ]
+      ],
+      "sources": []
     },
     {
       "id": "seedvr2_3b_dit",
@@ -1030,14 +983,8 @@
       "license": "Apache-2.0",
       "note": "SeedVR2 视频超分 DiT；约 3.4GB。",
       "sources": [
-        {
-          "url": "https://hf-mirror.com/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors",
-          "label": "HF 镜像"
-        },
-        {
-          "url": "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors",
-          "label": "Hugging Face"
-        }
+        "https://hf-mirror.com/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+        "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors"
       ]
     },
     {
@@ -1050,14 +997,8 @@
       "license": "Apache-2.0",
       "note": "SeedVR2 图片超分 7B DiT；约 8.5GB。",
       "sources": [
-        {
-          "url": "https://hf-mirror.com/AInVFX/SeedVR2_comfyUI/resolve/main/seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
-          "label": "HF 镜像"
-        },
-        {
-          "url": "https://huggingface.co/AInVFX/SeedVR2_comfyUI/resolve/main/seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
-          "label": "Hugging Face"
-        }
+        "https://hf-mirror.com/AInVFX/SeedVR2_comfyUI/resolve/main/seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+        "https://huggingface.co/AInVFX/SeedVR2_comfyUI/resolve/main/seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors"
       ]
     },
     {
@@ -1070,14 +1011,8 @@
       "license": "Apache-2.0",
       "note": "SeedVR2 图片/视频超分共用 VAE；节点只从 models/SEEDVR2 读取（不是 models/vae）。",
       "sources": [
-        {
-          "url": "https://hf-mirror.com/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors",
-          "label": "HF 镜像"
-        },
-        {
-          "url": "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors",
-          "label": "Hugging Face"
-        }
+        "https://hf-mirror.com/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors",
+        "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors"
       ]
     },
     {
@@ -1090,10 +1025,7 @@
       "license": "BSD-3-Clause",
       "note": "ESRGAN 快速放大默认模型。",
       "sources": [
-        {
-          "url": "https://modelscope.cn/datasets/shensanshu/ComfyUI-Local-Infinite-Canvas-Models/resolve/master/upscale_models/RealESRGAN_x2plus.pth",
-          "label": "魔搭镜像"
-        }
+        "https://modelscope.cn/datasets/shensanshu/ComfyUI-Local-Infinite-Canvas-Models/resolve/master/upscale_models/RealESRGAN_x2plus.pth"
       ]
     },
     {
@@ -1106,10 +1038,7 @@
       "license": "BSD-3-Clause",
       "note": "面向动漫/插画的 4x 放大模型；不是快速放大工作流的默认模型，可在 ComfyUI 中替换。",
       "sources": [
-        {
-          "url": "https://modelscope.cn/datasets/shensanshu/ComfyUI-Local-Infinite-Canvas-Models/resolve/master/upscale_models/RealESRGAN_x4plus_anime_6B.pth",
-          "label": "魔搭镜像"
-        }
+        "https://modelscope.cn/datasets/shensanshu/ComfyUI-Local-Infinite-Canvas-Models/resolve/master/upscale_models/RealESRGAN_x4plus_anime_6B.pth"
       ]
     },
     {
@@ -1122,10 +1051,7 @@
       "license": "BSD-3-Clause",
       "note": "4x 快速放大；输出尺寸较大。",
       "sources": [
-        {
-          "url": "https://modelscope.cn/datasets/shensanshu/ComfyUI-Local-Infinite-Canvas-Models/resolve/master/upscale_models/RealESRGAN_x4plus.pth",
-          "label": "魔搭镜像"
-        }
+        "https://modelscope.cn/datasets/shensanshu/ComfyUI-Local-Infinite-Canvas-Models/resolve/master/upscale_models/RealESRGAN_x4plus.pth"
       ]
     }
   ]

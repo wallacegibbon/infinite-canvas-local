@@ -5,7 +5,7 @@
       "id": "image-z-image-turbo",
       "name": "image-z-image-turbo",
       "type": "image",
-      "file": "z-image-turbo.json",
+      "file": "image-z-image-turbo.json",
       "description": "Z-Image Turbo text-to-image (4-8 step distill); bf16 base model by default with the Qwen3-4B text encoder and the ae VAE; no negative prompt (ConditioningZeroOut).",
       "lora": {
         "filter": "Z-Image|ZIT|Kook_Zimage"
@@ -150,7 +150,7 @@
       "id": "video-h3-ref2va",
       "name": "video-h3-ref2va",
       "type": "video",
-      "file": "h3-ref2va-drama-vdn.json",
+      "file": "video-h3-ref2va-drama-vdn.json",
       "description": "MiniMax-H3 multi-reference on the VDN 8-step backend (Singularity + VDN stage-dmd-step-250; turbo adapter + TESpeed + Sage + SelfLift + SigmaRefiner, 9 NFE). Supports 1–6 images, 0–2 audio clips and 0–1 video (at least one media). Requires models/vdn/stage-dmd-step-250.",
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
@@ -350,7 +350,7 @@
       "id": "video-h3-t2v",
       "name": "video-h3-t2v",
       "type": "video",
-      "file": "h3-ref2va-drama-vdn.json",
+      "file": "video-h3-ref2va-drama-vdn.json",
       "description": "MiniMax-H3 text-to-video on the VDN 8-step backend (Singularity + VDN stage-dmd-step-250; turbo adapter + TESpeed + Sage + SelfLift + SigmaRefiner, 9 NFE). No image/audio/video input. Requires models/vdn/stage-dmd-step-250.",
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
@@ -524,7 +524,7 @@
       "id": "video-h3-frames",
       "name": "video-h3-frames",
       "type": "video",
-      "file": "h3-ref2va-drama-vdn.json",
+      "file": "video-h3-ref2va-drama-vdn.json",
       "description": "MiniMax-H3 first/last-frame video on the VDN 8-step backend (VDN stage-dmd-step-250 + TESpeed + Sage + SelfLift + SigmaRefiner, 9 NFE). Requires 1–2 images: first, last, or both; task_type switches I2VA/L2VA/FL2VA.",
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
@@ -713,7 +713,7 @@
       "id": "video-h3-ref2va-novdn",
       "name": "video-h3-ref2va-novdn",
       "type": "video",
-      "file": "h3-ref2va-drama.json",
+      "file": "video-h3-ref2va-drama.json",
       "description": "MiniMax-H3 multi-reference on the original canvas chain (LightX2V 8-step LoRA + SolAttn/Sage + TESpeed + SelfLift + SigmaRefiner, 9 NFE; no VDN). Supports 1–6 images, 0–2 audio clips and 0–1 video (at least one media).",
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
@@ -913,7 +913,7 @@
       "id": "video-h3-t2v-novdn",
       "name": "video-h3-t2v-novdn",
       "type": "video",
-      "file": "h3-ref2va-drama.json",
+      "file": "video-h3-ref2va-drama.json",
       "description": "MiniMax-H3 text-to-video on the original canvas chain (LightX2V 8-step LoRA + SolAttn/Sage + TESpeed + SelfLift + SigmaRefiner, 9 NFE; no VDN). No image/audio/video input.",
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
@@ -1087,7 +1087,7 @@
       "id": "video-h3-frames-novdn",
       "name": "video-h3-frames-novdn",
       "type": "video",
-      "file": "h3-ref2va-drama.json",
+      "file": "video-h3-ref2va-drama.json",
       "description": "MiniMax-H3 first/last-frame video on the original canvas chain (LightX2V 8-step LoRA + SolAttn/Sage + TESpeed + SelfLift + SigmaRefiner, 9 NFE; no VDN). Requires 1–2 images: first, last, or both; task_type switches I2VA/L2VA/FL2VA.",
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
@@ -2113,7 +2113,7 @@
       "id": "video-h3-character-swap",
       "name": "video-h3-character-swap",
       "type": "video",
-      "file": "h3-character-swap-vdn.json",
+      "file": "video-h3-character-swap-vdn.json",
       "description": "MiniMax-H3 Ref2VA + Character Swap 1.5 LoRA on the local VDN 8-step backend. Source video length drives output duration; character image + prompt required. SAM 3.1 mask refinement follows separately.",
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",

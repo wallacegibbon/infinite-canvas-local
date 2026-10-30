@@ -40,7 +40,6 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer app.Setup().Stop()
 
 	if !config.IsLoopbackHost(cfg.Host) && cfg.GatewayToken == "" {
 		logger.Warn("listening on %s without GATEWAY_TOKEN: /api/* is unauthenticated for anyone who can reach this address", cfg.Host)
@@ -90,7 +89,6 @@ func run() error {
 		logger.Info("received %s, shutting down", received)
 	}
 
-	app.Setup().Stop()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {

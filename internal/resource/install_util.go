@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"comfyui-gateway/internal/logx"
@@ -32,17 +31,30 @@ func isFatal(err error) bool {
 	return errors.As(err, &target)
 }
 
-// isFatalWriteError reports filesystem failures that retrying cannot improve.
-func isFatalWriteError(err error) bool {
+// targetError reports a failure to write into the folders the install targets.
+//
+// It is fatal, and that is decided by *which side* failed rather than by inspecting errno:
+// the same disk fails the same way for the next item, so a run of identical errors helps
+// nobody. "No such file or directory" counts here — a target folder that vanished is a
+// deployment problem, and retrying cannot bring it back.
+func targetError(err error) error {
 	if err == nil {
-		return false
+		return nil
 	}
-	for _, code := range []error{syscall.ENOSPC, syscall.EDQUOT, syscall.EACCES, syscall.EPERM, syscall.EROFS} {
-		if errors.Is(err, code) {
-			return true
-		}
+	return fatal(fmt.Errorf("cannot write into ComfyUI's folders: %w", err))
+}
+
+// bundledError reports a failure to read something that ships with the gateway (a bundled
+// model file or node directory).
+//
+// It is deliberately not fatal: a release missing one bundled asset must not cancel the
+// rest of the install. Same errno as targetError, opposite conclusion — which is why the
+// decision lives at the call site instead of in an errno table.
+func bundledError(err error) error {
+	if err == nil {
+		return nil
 	}
-	return false
+	return fmt.Errorf("this release is missing a bundled file: %w", err)
 }
 
 // sourceErrors collects one failure per mirror so the user sees the real reason
@@ -73,19 +85,17 @@ func (s *sourceErrors) add(host string, err error) {
 	s.lines = append(s.lines, message)
 }
 
-// err renders the aggregate, escalating to fatal when the underlying cause is a
-// filesystem failure.
+// err renders the aggregate.
+//
+// Fatal write failures never reach here: installOne returns them immediately, so every
+// error collected below came from a mirror that may be replaced by another one.
 func (s *sourceErrors) err(fallback string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.lines) == 0 {
 		return errors.New(fallback)
 	}
-	joined := errors.New(strings.Join(s.lines, "；"))
-	if isFatalWriteError(s.first) {
-		return fatal(joined)
-	}
-	return joined
+	return errors.New(strings.Join(s.lines, "；"))
 }
 
 // progressPrinter throttles download progress lines.
@@ -171,18 +181,6 @@ func (m *Manager) markItemCanceled(item *JobItem) {
 	item.Status = "error"
 	item.Error = "cancelled"
 	m.mu.Unlock()
-}
-
-// wrapWriteError promotes a disk or permission failure to a fatal one, with wording
-// the user can act on.
-func (m *Manager) wrapWriteError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if isFatalWriteError(err) {
-		return fatal(fmt.Errorf("write failed (disk full or no permission): %w", err))
-	}
-	return err
 }
 
 // displayPath shortens a path relative to the ComfyUI root for log readability.

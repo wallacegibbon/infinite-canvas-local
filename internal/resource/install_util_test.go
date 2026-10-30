@@ -48,28 +48,42 @@ func TestHostOf(t *testing.T) {
 	}
 }
 
-// TestFatalWriteErrors documents which failures abort the job instead of walking the
-// rest of the mirror list.
-func TestFatalWriteErrors(t *testing.T) {
-	fatalCases := []error{syscall.ENOSPC, syscall.EACCES, syscall.EROFS, syscall.EDQUOT}
-	for _, cause := range fatalCases {
-		if !isFatalWriteError(cause) {
-			t.Errorf("%v should be treated as fatal", cause)
-		}
-		wrapped := &fatalInstallError{err: cause}
+// TestWriteErrorsAreClassifiedBySideNotByErrno documents the rule: the same errno means
+// "stop the job" when the target folder failed and "carry on" when a bundled asset failed.
+func TestWriteErrorsAreClassifiedBySideNotByErrno(t *testing.T) {
+	missing := syscall.ENOENT
+	readOnly := syscall.EROFS
+
+	// Destination side: retrying cannot help, and the next item will hit the same wall.
+	for _, cause := range []error{missing, readOnly, syscall.ENOSPC, syscall.EACCES, syscall.EDQUOT} {
+		wrapped := targetError(cause)
 		if !isFatal(wrapped) {
-			t.Errorf("isFatal did not recognize the wrapped %v", cause)
+			t.Errorf("targetError(%v) should be fatal", cause)
+		}
+		if !strings.Contains(wrapped.Error(), "cannot write into ComfyUI's folders") {
+			t.Errorf("targetError(%v) = %q, want it to name the folder", cause, wrapped)
+		}
+	}
+
+	// Source side: one missing bundled file must not cancel the rest of the install.
+	for _, cause := range []error{missing, readOnly} {
+		wrapped := bundledError(cause)
+		if isFatal(wrapped) {
+			t.Errorf("bundledError(%v) should not be fatal", cause)
+		}
+		if !strings.Contains(wrapped.Error(), "missing a bundled file") {
+			t.Errorf("bundledError(%v) = %q, want it to name the asset", cause, wrapped)
 		}
 	}
 
 	// Network and checksum failures are worth retrying against another mirror.
 	for _, cause := range []error{errors.New("HTTP 403"), errors.New("sha256 校验失败"), syscall.ECONNRESET} {
-		if isFatalWriteError(cause) {
+		if isFatal(cause) {
 			t.Errorf("%v should not be fatal", cause)
 		}
 	}
-	if isFatal(errors.New("plain")) {
-		t.Error("a plain error must not be fatal")
+	if targetError(nil) != nil || bundledError(nil) != nil {
+		t.Error("wrapping nil must stay nil")
 	}
 }
 
@@ -100,13 +114,19 @@ func TestSourceErrorsFallsBackWhenEmpty(t *testing.T) {
 	}
 }
 
-func TestSourceErrorsEscalatesDiskFailure(t *testing.T) {
+// A fatal write failure never reaches the aggregate: installOne returns it immediately
+// instead of trying the next mirror. The aggregate therefore stays non-fatal, and this
+// test pins that, because the escalation it used to do was decided by errno.
+func TestSourceErrorsNeverEscalates(t *testing.T) {
 	failures := &sourceErrors{}
 	failures.add("modelscope.cn", syscall.ENOSPC)
 
 	aggregated := failures.err("no usable source")
-	if !isFatal(aggregated) {
-		t.Error("a disk-full failure must escalate to fatal so the job stops")
+	if isFatal(aggregated) {
+		t.Error("the mirror aggregate must stay non-fatal; fatal write errors are returned early")
+	}
+	if !strings.Contains(aggregated.Error(), "modelscope.cn") {
+		t.Errorf("aggregate %q lost the mirror name", aggregated)
 	}
 }
 

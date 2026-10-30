@@ -2,8 +2,6 @@ package workflow
 
 import (
 	"errors"
-	"net/url"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -23,22 +21,6 @@ func containsString(items []string, target string) bool {
 // asHTTPError unwraps err into an *httpx.Error.
 func asHTTPError(err error, target **httpx.Error) bool {
 	return errors.As(err, target)
-}
-
-// urlBaseName extracts the last path segment of a URL.
-func urlBaseName(raw string) string {
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return "workflow"
-	}
-	base := path.Base(parsed.Path)
-	if base == "" || base == "/" || base == "." {
-		return "workflow"
-	}
-	if decoded, err := url.PathUnescape(base); err == nil {
-		return decoded
-	}
-	return base
 }
 
 // resolveOrJoin resolves a possibly relative path against a base directory.

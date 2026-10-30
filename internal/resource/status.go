@@ -419,41 +419,32 @@ func (m *Manager) itemStatus(resource *Resource, root string, byID map[string]*I
 	return item
 }
 
-// sourcesFor normalizes a resource's download sources.
+// sourcesFor lists the download URLs of a resource.
 //
-// index.json mixes two shapes: a bare URL string, and an object with url/kind/path.
-// Both are folded into objects, and entries that carry neither a URL nor a bundled
-// path are dropped so the UI never renders a dead download button.
-func (m *Manager) sourcesFor(resource *Resource) []map[string]any {
-	sources := normalizeSources(resource.Sources)
-	if resource.BundleDir != "" {
-		bundled := map[string]any{"kind": "bundled-dir", "path": resource.BundleDir, "label": "Bundled directory"}
-		sources = append([]map[string]any{bundled}, sources...)
-	}
-	return sources
+// Payload resources (those staged under resources/payload) have none: they are copied from
+// disk, so the panel shows no sources rather than a button that cannot work.
+func (m *Manager) sourcesFor(resource *Resource) []string {
+	return sourceURLs(resource)
 }
 
-// normalizeSources flattens the two accepted source shapes into objects.
-func normalizeSources(raw []any) []map[string]any {
-	out := make([]map[string]any, 0, len(raw))
-	for _, item := range raw {
-		var source map[string]any
+// sourceURLs reads the download URLs out of a resource's sources.
+//
+// index.json holds plain URL strings; an object with a url is still accepted so a hand-written
+// entry keeps working, but everything else is ignored. Entries that carry no URL are dropped
+// so the UI never renders a dead download button.
+func sourceURLs(resource *Resource) []string {
+	out := make([]string, 0, len(resource.Sources))
+	for _, item := range resource.Sources {
 		switch typed := item.(type) {
 		case string:
-			source = map[string]any{"url": typed}
-		case map[string]any:
-			source = make(map[string]any, len(typed)+1)
-			for key, value := range typed {
-				source[key] = value
+			if url := strings.TrimSpace(typed); strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+				out = append(out, url)
 			}
-		default:
-			continue
-		}
-		source["url"] = strings.TrimSpace(util.StringField(source, "url"))
-		kind := util.StringField(source, "kind")
-		hasBundledPath := (kind == "bundled" || kind == "bundled-dir") && util.StringField(source, "path") != ""
-		if source["url"] != "" || hasBundledPath {
-			out = append(out, source)
+		case map[string]any:
+			url := strings.TrimSpace(util.StringField(typed, "url"))
+			if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+				out = append(out, url)
+			}
 		}
 	}
 	return out
@@ -474,6 +465,7 @@ func (m *Manager) installedFor(id string) map[string]any {
 // Status builds the full resource panel payload.
 func (m *Manager) Status() *Status {
 	root := m.ComfyRoot()
+	modelInstall := m.InstallPolicy()
 
 	m.mu.Lock()
 	index := m.index
@@ -496,6 +488,7 @@ func (m *Manager) Status() *Status {
 			IndexSource:  source,
 			IndexError:   indexErr,
 			IndexWarning: indexWarning,
+			ModelInstall: modelInstall,
 			Resources:    []*Item{},
 			Packs:        []*PackStatus{},
 			RuntimeDeps:  runtimeDeps(),
@@ -614,6 +607,7 @@ func (m *Manager) Status() *Status {
 		ComfyRoot:      root,
 		ComfyPython:    m.ComfyPython(),
 		ComfyReachable: m.setup.Status().ComfyReachable,
+		ModelInstall:   modelInstall,
 		RuntimeDeps:    runtimeDeps(),
 		ModelRoots:     m.modelRootsView(root),
 		Packs:          packs,

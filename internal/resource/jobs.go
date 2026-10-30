@@ -126,6 +126,13 @@ func (m *Manager) Install(ids, packs []string) (*Job, error) {
 		return nil, httpxBadRequest("nothing_selected", "select at least one resource or pack to install")
 	}
 
+	// An install writes into ComfyUI's own model folders, so a gateway on another machine can
+	// only fill the wrong disk — and silently, since the write itself may well succeed. Installs
+	// stay off until the deployment states the folders are reachable.
+	if policy := m.InstallPolicy(); !policy.Allowed {
+		return nil, httpxBadRequest("model_install_disabled", installRefusedMessage(policy))
+	}
+
 	items := make([]*JobItem, 0, len(ordered))
 	for _, id := range ordered {
 		resource := findResource(index, id)
@@ -433,37 +440,29 @@ func (m *Manager) installOne(ctx context.Context, resource *Resource, item *JobI
 		// merged file is ~10 GB. Report the exact command instead of a vague instruction.
 		m.setItemStatus(item, "baking")
 		return m.bakeRequiredError(resource, root)
-	case "node", "dir":
+	case "node":
 		return m.installNodeLike(ctx, resource, item, root, file)
 	}
 
 	target := m.targetPath(resource, root)
 	m.logger.Info("%s install target: %s", item.Label, m.displayPath(target, root))
 
-	// A bundled file is copied in-process; nothing is downloaded and no command runs.
-	if resource.BundleDir != "" {
-		source := filepath.Join(m.cfg.RootDir, strings.TrimPrefix(util.NormalizeSlashes(resource.BundleDir), "/"))
-		if util.Exists(source) {
-			m.setItemStatus(item, "copying")
-			written, err := copyFile(ctx, source, target)
-			if err != nil {
-				return m.wrapWriteError(err)
-			}
-			m.setItemBytes(item, written, "bundled file")
-			m.logger.Info("%s copied the bundled file %s (in-process copy, no external command)", item.Label, humanBytes(written))
-			return nil
+	// A file staged under resources/payload/<target> ships with the gateway: it is copied
+	// in-process, nothing is downloaded and no command runs. This is a convention, not a
+	// field, so "bundled" can only ever mean one thing.
+	if payload := m.payloadPath(resource.Target); util.Exists(payload) {
+		m.setItemStatus(item, "copying")
+		written, err := copyFile(ctx, payload, target)
+		if err != nil {
+			return err
 		}
+		m.setItemBytes(item, written, "bundled file")
+		m.logger.Info("%s copied the bundled file %s (in-process copy, no external command)", item.Label, humanBytes(written))
+		return nil
 	}
 
 	failures := &sourceErrors{}
-	for _, source := range normalizeSources(resource.Sources) {
-		if kind := util.StringField(source, "kind"); kind != "" && kind != "url" {
-			continue
-		}
-		reference := defaultString(util.StringField(source, "url"), util.StringField(source, "path"))
-		if !strings.HasPrefix(reference, "http://") && !strings.HasPrefix(reference, "https://") {
-			continue
-		}
+	for _, reference := range sourceURLs(resource) {
 		err := m.downloadFile(ctx, reference, target, resource.Sha256, item)
 		if err == nil {
 			return nil
@@ -475,7 +474,7 @@ func (m *Manager) installOne(ctx context.Context, resource *Resource, item *JobI
 		}
 		failures.add(hostOf(reference), err)
 	}
-	return failures.err("no usable download source for this resource")
+	return failures.err("not shipped with this release (resources/payload/" + resource.Target + ") and no download URL works")
 }
 
 // installNodeLike installs a custom-node directory or an extracted archive.
@@ -487,19 +486,17 @@ func (m *Manager) installNodeLike(ctx context.Context, resource *Resource, item 
 	destination := filepath.Join(customNodes, file)
 	m.logger.Info("%s install target: %s", item.Label, m.displayPath(destination, root))
 
-	if resource.BundleDir != "" {
-		source := filepath.Join(m.cfg.RootDir, strings.TrimPrefix(util.NormalizeSlashes(resource.BundleDir), "/"))
-		if !util.DirExists(source) {
-			return errors.New("bundled node directory is missing: " + resource.BundleDir)
-		}
+	// Same convention as models: a node directory staged under resources/payload/<target>
+	// ships with the gateway and is copied as-is.
+	if payload := m.payloadPath(resource.Target); util.DirExists(payload) {
 		if util.DirExists(destination) {
 			m.logger.Info("%s directory already exists, skipping", item.Label)
 			return nil
 		}
 		m.setItemStatus(item, "copying")
-		written, err := copyDir(ctx, source, destination)
+		written, err := copyDir(ctx, payload, destination)
 		if err != nil {
-			return m.wrapWriteError(err)
+			return err
 		}
 		m.setItemBytes(item, written, "bundled directory")
 		m.logger.Info("%s copied the bundled directory %s (in-process copy, no external command)", item.Label, humanBytes(written))
@@ -507,13 +504,9 @@ func (m *Manager) installNodeLike(ctx context.Context, resource *Resource, item 
 	}
 
 	failures := &sourceErrors{}
-	for _, source := range normalizeSources(resource.Sources) {
-		reference := defaultString(util.StringField(source, "url"), util.StringField(source, "path"))
-		if !strings.HasPrefix(reference, "http://") && !strings.HasPrefix(reference, "https://") {
-			continue
-		}
+	for _, reference := range sourceURLs(resource) {
 		if err := os.MkdirAll(customNodes, 0o755); err != nil {
-			return m.wrapWriteError(err)
+			return targetError(err)
 		}
 		archive := filepath.Join(os.TempDir(), util.RandomID("node-")+filepath.Ext(reference))
 		if err := m.downloadFile(ctx, reference, archive, "", item); err != nil {
@@ -531,11 +524,11 @@ func (m *Manager) installNodeLike(ctx context.Context, resource *Resource, item 
 		extractErr := extractArchive(archive, customNodes)
 		_ = os.Remove(archive)
 		if extractErr != nil {
-			return m.wrapWriteError(fmt.Errorf("extraction failed: %w", extractErr))
+			return fmt.Errorf("extraction failed: %w", extractErr)
 		}
 		return nil
 	}
-	return failures.err("no usable install source for this node")
+	return failures.err("not shipped with this release (resources/payload/" + resource.Target + ") and no download URL works")
 }
 
 // targetPath picks the install destination for a resource.
@@ -573,7 +566,7 @@ func canWrite(dir string) bool {
 // matches, so a half-written model is never visible to ComfyUI.
 func (m *Manager) downloadFile(ctx context.Context, rawURL, target, expectedSha string, item *JobItem) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return m.wrapWriteError(err)
+		return targetError(err)
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -609,7 +602,7 @@ func (m *Manager) downloadFile(ctx context.Context, rawURL, target, expectedSha 
 	partial := target + ".part"
 	file, err := os.Create(partial)
 	if err != nil {
-		return m.wrapWriteError(err)
+		return targetError(err)
 	}
 	defer func() {
 		_ = file.Close()
@@ -630,7 +623,7 @@ func (m *Manager) downloadFile(ctx context.Context, rawURL, target, expectedSha 
 		read, readErr := response.Body.Read(buffer)
 		if read > 0 {
 			if _, writeErr := writer.Write(buffer[:read]); writeErr != nil {
-				return m.wrapWriteError(writeErr)
+				return targetError(writeErr)
 			}
 			written += int64(read)
 			m.setItemBytes(item, written, "")
@@ -659,10 +652,10 @@ func (m *Manager) downloadFile(ctx context.Context, rawURL, target, expectedSha 
 	}
 
 	if err := file.Close(); err != nil {
-		return m.wrapWriteError(err)
+		return targetError(err)
 	}
 	if err := os.Rename(partial, target); err != nil {
-		return m.wrapWriteError(err)
+		return targetError(err)
 	}
 	m.setItemBytes(item, written, host)
 	m.logger.Info("%s downloaded %s <- %s, %s", label, humanBytes(written), host, checksum)
@@ -672,22 +665,26 @@ func (m *Manager) downloadFile(ctx context.Context, rawURL, target, expectedSha 
 // copyFile copies a bundled file into place and returns the byte count.
 func copyFile(ctx context.Context, source, target string) (int64, error) {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return 0, err
+		return 0, targetError(err)
 	}
 	in, err := os.Open(source)
 	if err != nil {
-		return 0, err
+		return 0, bundledError(err)
 	}
 	defer in.Close()
 	out, err := os.Create(target)
 	if err != nil {
-		return 0, err
+		return 0, targetError(err)
 	}
 	defer out.Close()
 	if ctx.Err() != nil {
 		return 0, ctx.Err()
 	}
-	return io.Copy(out, in)
+	written, copyErr := io.Copy(out, in)
+	if copyErr != nil {
+		return 0, targetError(copyErr)
+	}
+	return written, nil
 }
 
 // copyDir recursively copies a bundled node directory and returns the total bytes.
@@ -695,39 +692,43 @@ func copyDir(ctx context.Context, source, target string) (int64, error) {
 	var total int64
 	err := filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return bundledError(err)
 		}
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		relative, err := filepath.Rel(source, path)
 		if err != nil {
-			return err
+			return bundledError(err)
 		}
 		destination := filepath.Join(target, relative)
 		if info.IsDir() {
-			return os.MkdirAll(destination, 0o755)
+			return targetError(os.MkdirAll(destination, 0o755))
 		}
 		if !info.Mode().IsRegular() {
 			return nil
 		}
 		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-			return err
+			return targetError(err)
 		}
 		// Copy in a closure so the descriptors close per file; a defer inside a Walk
 		// callback would hold one descriptor per entry until the whole tree finished.
 		written, copyErr := func() (int64, error) {
 			in, err := os.Open(path)
 			if err != nil {
-				return 0, err
+				return 0, bundledError(err)
 			}
 			defer in.Close()
 			out, err := os.Create(destination)
 			if err != nil {
-				return 0, err
+				return 0, targetError(err)
 			}
 			defer out.Close()
-			return io.Copy(out, in)
+			written, copyErr := io.Copy(out, in)
+			if copyErr != nil {
+				return 0, targetError(copyErr)
+			}
+			return written, nil
 		}()
 		if copyErr != nil {
 			return copyErr
@@ -877,6 +878,15 @@ func installHint(err error) string {
 		return "checksum failed: the download may be truncated, retry"
 	case strings.Contains(message, "no space"):
 		return "not enough disk space"
+	case strings.Contains(message, "quota"):
+		return "the disk quota for this volume is exhausted"
+	case strings.Contains(message, "cannot write into ComfyUI's folders"):
+		// The wrong-machine case is refused before a byte moves (COMFY_MODELS_SHARED), so
+		// this is a folder that is missing, read-only, or owned by another user — including
+		// a mount that went away, which is why "disk full" was the wrong thing to say.
+		return "check that this folder exists, is mounted writable, and belongs to this user (docs/gateway.md)"
+	case strings.Contains(message, "missing a bundled file"):
+		return "reinstall the gateway: this release is incomplete"
 	}
 	return ""
 }

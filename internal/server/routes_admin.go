@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"comfyui-gateway/internal/store"
 	"comfyui-gateway/internal/sysinfo"
 	"comfyui-gateway/internal/task"
-	"comfyui-gateway/internal/util"
 	"comfyui-gateway/internal/workflow"
 )
 
@@ -26,7 +24,6 @@ func (s *Server) routesAdmin(mux *http.ServeMux) {
 	s.route(mux, "GET /health", s.handleHealth)
 
 	s.route(mux, "GET /api/setup/status", s.handleSetupStatus)
-	s.route(mux, "POST /api/setup/scan", s.handleSetupScan)
 	s.route(mux, "POST /api/setup/model-alias", s.handleSetupModelAlias)
 
 	s.route(mux, "GET /api/resources/status", s.handleResourcesStatus)
@@ -42,9 +39,6 @@ func (s *Server) routesAdmin(mux *http.ServeMux) {
 	s.route(mux, "GET /api/workflows/{id}", s.handleWorkflowGet)
 	s.route(mux, "GET /api/workflows/{id}/schema", s.handleWorkflowSchema)
 	s.route(mux, "POST /api/workflows/{id}/visibility", s.handleWorkflowVisibility)
-	s.route(mux, "POST /api/workflows/import", s.handleWorkflowImport)
-	s.route(mux, "POST /api/workflows/scan", s.handleWorkflowScan)
-	s.route(mux, "POST /api/workflows/reload", s.handleWorkflowReload)
 	s.route(mux, "DELETE /api/workflows/{id}", s.handleWorkflowDelete)
 	s.route(mux, "GET /api/upscale/workflows", s.handleUpscaleWorkflows)
 
@@ -114,17 +108,6 @@ func (s *Server) handleSetupStatus(ctx *httpx.Ctx) error {
 	return nil
 }
 
-// handleSetupScan implements POST /api/setup/scan.
-func (s *Server) handleSetupScan(ctx *httpx.Ctx) error {
-	go func() {
-		if _, err := s.setup.Scan(); err != nil {
-			s.logger.Warn("manual setup scan failed: %s", err)
-		}
-	}()
-	okJSON(ctx.W, map[string]any{"status": s.setup.Status()})
-	return nil
-}
-
 // handleSetupModelAlias implements POST /api/setup/model-alias.
 func (s *Server) handleSetupModelAlias(ctx *httpx.Ctx) error {
 	body, err := bodyOrEmpty(ctx)
@@ -145,7 +128,13 @@ func (s *Server) handleResourcesStatus(ctx *httpx.Ctx) error {
 	return nil
 }
 
-// handleResourcesRefresh implements POST /api/resources/refresh.
+// handleResourcesRefresh implements POST /api/resources/refresh — the gateway's only rescan.
+//
+// One entry point on purpose. It reloads the resource index, re-scans ComfyUI (nodes, models,
+// availability, and the graphs sitting in workflows/) and answers with the resource status the
+// panel renders. A second "scan" route used to exist and behaved differently in two ways that
+// mattered: it ran asynchronously, so the caller got the pre-scan status, and it skipped the
+// resource index. Fewer paths, one behaviour.
 func (s *Server) handleResourcesRefresh(ctx *httpx.Ctx) error {
 	status, err := s.resources.Refresh()
 	if err != nil {
@@ -300,81 +289,6 @@ func (s *Server) handleWorkflowVisibility(ctx *httpx.Ctx) error {
 	}
 	s.logger.Info("workflow visibility %s -> %s", entry.ID, map[bool]string{true: "enabled", false: "hidden"}[enabled])
 	okJSON(ctx.W, map[string]any{"id": entry.ID, "enabled": enabled})
-	return nil
-}
-
-// handleWorkflowImport implements POST /api/workflows/import.
-func (s *Server) handleWorkflowImport(ctx *httpx.Ctx) error {
-	body, err := bodyOrEmpty(ctx)
-	if err != nil {
-		return err
-	}
-
-	request := workflow.ImportWorkflowRequest{
-		URL:         httpx.String(body, "url"),
-		Path:        httpx.String(body, "path"),
-		Name:        httpx.String(body, "name"),
-		Type:        httpx.String(body, "type"),
-		Description: httpx.String(body, "description"),
-		Overwrite:   httpx.Bool(body, "overwrite"),
-	}
-	if raw, ok := body["json"]; ok && raw != nil {
-		encoded, err := json.Marshal(raw)
-		if err != nil {
-			return httpx.BadRequest("invalid_json", "the json field could not be parsed")
-		}
-		request.JSON = encoded
-	}
-	if defaults := httpx.Object(body, "defaults"); defaults != nil {
-		request.Defaults = defaults
-	}
-	if presets := httpx.Object(body, "presets"); presets != nil {
-		request.Presets = presets
-	}
-	if parameters, ok := body["parameters"].([]any); ok {
-		request.Parameters = parameters
-	}
-	if lora := httpx.Object(body, "lora"); lora != nil {
-		request.Lora = &workflow.Lora{
-			Filter: util.StringField(lora, "filter"),
-			Source: util.StringField(lora, "source"),
-			Loader: util.StringField(lora, "loader"),
-		}
-	}
-
-	result, err := s.registry.ImportWorkflow(request)
-	if err != nil {
-		return err
-	}
-	s.logger.Info("imported workflow %s (%s)", result.Workflow.Name, result.Workflow.Type)
-	httpx.JSON(ctx.W, http.StatusCreated, map[string]any{
-		"ok":       true,
-		"workflow": result.Workflow,
-		"warnings": result.Warnings,
-	})
-	return nil
-}
-
-// handleWorkflowScan implements POST /api/workflows/scan.
-func (s *Server) handleWorkflowScan(ctx *httpx.Ctx) error {
-	summary, err := s.registry.Scan()
-	if err != nil {
-		return err
-	}
-	okJSON(ctx.W, map[string]any{
-		"added":   summary.Added,
-		"skipped": summary.Skipped,
-		"failed":  summary.Failed,
-	})
-	return nil
-}
-
-// handleWorkflowReload implements POST /api/workflows/reload.
-func (s *Server) handleWorkflowReload(ctx *httpx.Ctx) error {
-	if err := s.registry.Load(); err != nil {
-		return err
-	}
-	okJSON(ctx.W, map[string]any{"count": s.registry.Len()})
 	return nil
 }
 

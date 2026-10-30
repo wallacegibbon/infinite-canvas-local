@@ -26,14 +26,12 @@ type Config struct {
 	ComfyURL            string
 	ComfyDir            string
 	ComfyPython         string
+	ComfyModelsShared   bool // COMFY_MODELS_SHARED=1; installs are refused without it (internal/resource/install_policy.go)
 	PromptThinkingParam string
 	PromptMaxTokens     int
 	ComfyFrontendDir    string
-	ComfyWorkflowsDir   string
 
-	ScanOnStart    bool
-	WatchWorkflows bool
-	ScanDebounceMs int
+	ScanOnStart bool
 
 	WorkflowDir string
 	DataDir     string
@@ -88,15 +86,12 @@ func WithComfyPython(path string) Option { return func(c *Config) { c.ComfyPytho
 // WithComfyDir overrides the ComfyUI installation directory.
 func WithComfyDir(dir string) Option { return func(c *Config) { c.ComfyDir = dir } }
 
-// WithComfyWorkflowsDir overrides ComfyUI's user/default/workflows directory.
-func WithComfyWorkflowsDir(dir string) Option { return func(c *Config) { c.ComfyWorkflowsDir = dir } }
-
 // WithComfyFrontendDir overrides the ComfyUI frontend directory.
 func WithComfyFrontendDir(dir string) Option { return func(c *Config) { c.ComfyFrontendDir = dir } }
 
-// WithoutScanOnStart disables the startup scan and the file watchers (tests).
+// WithoutScanOnStart disables the startup scan (tests).
 func WithoutScanOnStart() Option {
-	return func(c *Config) { c.ScanOnStart = false; c.WatchWorkflows = false }
+	return func(c *Config) { c.ScanOnStart = false }
 }
 
 // WithRequestTimeout overrides the image generation timeout.
@@ -119,13 +114,11 @@ func Load(opts ...Option) (*Config, error) {
 		ComfyURL:            stringOr(os.Getenv("COMFY_URL"), "http://127.0.0.1:8188"),
 		ComfyDir:            strings.TrimSpace(os.Getenv("COMFYUI_DIR")),
 		ComfyPython:         strings.TrimSpace(os.Getenv("COMFY_PYTHON")),
+		ComfyModelsShared:   boolValue(os.Getenv("COMFY_MODELS_SHARED")),
 		PromptThinkingParam: stringOr(os.Getenv("PROMPT_THINKING_PARAM"), "none"),
 		PromptMaxTokens:     intValue(os.Getenv("PROMPT_MAX_TOKENS"), 8192),
 		ComfyFrontendDir:    strings.TrimSpace(os.Getenv("COMFY_FRONTEND_DIR")),
-		ComfyWorkflowsDir:   strings.TrimSpace(os.Getenv("COMFY_WORKFLOWS_DIR")),
 		ScanOnStart:         os.Getenv("SCAN_ON_START") != "0",
-		WatchWorkflows:      os.Getenv("WATCH_WORKFLOWS") != "0",
-		ScanDebounceMs:      intValue(os.Getenv("SCAN_DEBOUNCE_MS"), 800),
 		CorsOrigins: listValue(os.Getenv("CORS_ORIGINS"),
 			"http://localhost:3000,http://127.0.0.1:3000,http://localhost:8188,http://127.0.0.1:8188"),
 		RequestTimeoutMs:    intValue(os.Getenv("REQUEST_TIMEOUT_MS"), 10*60*1000),
@@ -158,7 +151,6 @@ func Load(opts ...Option) (*Config, error) {
 	cfg.OutputDir = absPath(cfg.OutputDir)
 	cfg.ComfyDir = absPath(cfg.ComfyDir)
 	cfg.ComfyFrontendDir = absPath(cfg.ComfyFrontendDir)
-	cfg.ComfyWorkflowsDir = absPath(cfg.ComfyWorkflowsDir)
 	cfg.ComfyURL = strings.TrimRight(cfg.ComfyURL, "/")
 
 	if cfg.PublicBaseURL == "" {
@@ -287,6 +279,17 @@ func countValue(value string) int {
 		return 0
 	}
 	return parsed
+}
+
+// boolValue reads an opt-in flag. Anything that is not an accepted spelling is false, which
+// is the safe direction here: COMFY_MODELS_SHARED gates a refusal, and a typo must not
+// silently enable installs on a host that cannot reach ComfyUI's model folders.
+func boolValue(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 func listValue(value, fallback string) []string {
