@@ -224,7 +224,7 @@ export function videoSelfLiftLabel(value: string | undefined) {
     return value === "quality" ? i18n.t("settingsPanels.video.selfLiftQuality") : "";
 }
 
-export function normalizeVideoModeValue(value: string | undefined) {
+function normalizeVideoModeValue(value: string | undefined) {
     if (value === "reference" || value === "text") return value;
     return "frames";
 }

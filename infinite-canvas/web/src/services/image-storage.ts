@@ -227,7 +227,7 @@ export async function imageToDataUrl(image: { url?: string; dataUrl?: string; st
     return blobToDataUrl(await fetchImageBlob(url, options));
 }
 
-export async function deleteStoredImages(keys: Iterable<string>) {
+async function deleteStoredImages(keys: Iterable<string>) {
     await Promise.all(
         Array.from(new Set(keys)).map(async (key) => {
             const url = objectUrls.get(key);
@@ -260,7 +260,7 @@ export async function cleanupUnusedImages(usedData: unknown) {
     await Promise.all([deleteStoredImages(unused), ...orphanPreviews.map(deleteImagePreview)]);
 }
 
-export function collectImageStorageKeys(value: unknown, keys = new Set<string>()) {
+function collectImageStorageKeys(value: unknown, keys = new Set<string>()) {
     if (!value || typeof value !== "object") return keys;
     if ("storageKey" in value && typeof value.storageKey === "string" && value.storageKey.startsWith("image:")) keys.add(value.storageKey);
     Object.values(value).forEach((item) => (Array.isArray(item) ? item.forEach((child) => collectImageStorageKeys(child, keys)) : collectImageStorageKeys(item, keys)));

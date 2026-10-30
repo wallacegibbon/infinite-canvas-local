@@ -1,5 +1,5 @@
-export type IndexedDbStoreUsage = { name: string; records: number; bytes: number };
-export type IndexedDbDatabaseUsage = { name: string; version: number; bytes: number; stores: IndexedDbStoreUsage[] };
+type IndexedDbStoreUsage = { name: string; records: number; bytes: number };
+type IndexedDbDatabaseUsage = { name: string; version: number; bytes: number; stores: IndexedDbStoreUsage[] };
 export type LocalStorageUsage = { usage: number; quota: number | null; contentBytes: number; databases: IndexedDbDatabaseUsage[] };
 
 export async function readLocalStorageUsage(): Promise<LocalStorageUsage> {

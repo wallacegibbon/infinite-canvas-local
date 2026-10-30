@@ -21,7 +21,7 @@ export enum CanvasNodeType {
 // Node types are open strings: built-ins use CanvasNodeType and plugins use "<pluginId>:<name>".
 export type CanvasNodeTypeId = CanvasNodeType | (string & {});
 
-export type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
+type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
 export type CanvasGenerationMode = "text" | "image" | "video" | "audio";
 export type CanvasImageGenerationType = "generation" | "edit";
 
@@ -146,7 +146,7 @@ export type CanvasConnection = {
     toNodeId: string;
 };
 
-export type CanvasAssistantReference = {
+type CanvasAssistantReference = {
     id: string;
     type: CanvasNodeTypeId;
     title: string;
@@ -162,7 +162,7 @@ export type CanvasAssistantImage = {
     prompt: string;
 };
 
-export type CanvasAssistantMessage = {
+type CanvasAssistantMessage = {
     id: string;
     role: "user" | "assistant" | "system" | "tool" | "error";
     title?: string;

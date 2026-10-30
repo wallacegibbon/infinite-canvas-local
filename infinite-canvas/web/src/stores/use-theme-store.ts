@@ -4,8 +4,8 @@ import { persist } from "zustand/middleware";
 import type { CardSkinId } from "@/lib/canvas-theme";
 import { isCardSkinLocked } from "@/lib/canvas/skin-unlocks";
 
-export type ThemeName = "light" | "dark";
-export type FishWhipSide = "left" | "right";
+type ThemeName = "light" | "dark";
+type FishWhipSide = "left" | "right";
 
 type ThemeStore = {
     theme: ThemeName;

@@ -7,7 +7,7 @@ export type ProgressRingPalette = {
     gradient: [string, string, string];
 };
 
-export type ProgressRingStyle = {
+type ProgressRingStyle = {
     coreWidth: number;
     auraWidth: number;
     auraOpacity: number;
@@ -26,7 +26,7 @@ export type ProgressRingStyle = {
     breatheSeconds: number;
 };
 
-export type ProgressRingSkin = {
+type ProgressRingSkin = {
     id: ProgressRingSkinId;
     mode?: "ring" | "tide";
     dark: ProgressRingPalette;

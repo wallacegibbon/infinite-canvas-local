@@ -28,7 +28,7 @@ function assertPlugin(plugin: unknown): asserts plugin is CanvasPlugin {
     if (!value.id || !Array.isArray(value.nodes) || !value.nodes.length) throw new Error(i18n.t("canvas.pluginErrors.missingFields"));
 }
 
-export function activatePlugin(plugin: CanvasPlugin) {
+function activatePlugin(plugin: CanvasPlugin) {
     registerNodeDefinitions(plugin.nodes, plugin.id);
     const runtime = getPluginRuntime();
     const disposers: Array<() => void> = [];
@@ -39,7 +39,7 @@ export function activatePlugin(plugin: CanvasPlugin) {
     if (disposers.length) cleanups.set(plugin.id, () => disposers.forEach((dispose) => dispose()));
 }
 
-export function deactivatePlugin(pluginId: string) {
+function deactivatePlugin(pluginId: string) {
     cleanups.get(pluginId)?.();
     cleanups.delete(pluginId);
     unregisterPluginNodes(pluginId);

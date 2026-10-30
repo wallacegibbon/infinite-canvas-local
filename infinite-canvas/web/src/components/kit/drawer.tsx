@@ -21,7 +21,7 @@ type Placement = "left" | "right";
 /** antd's `size` values, in pixels. */
 const SIZES = { default: 378, large: 736 } as const;
 
-export type DrawerProps = {
+type DrawerProps = {
     open: boolean;
     onClose: () => void;
     title?: ReactNode;

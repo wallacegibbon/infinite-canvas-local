@@ -101,7 +101,7 @@ export function localGatewayRoot(baseUrl: string) {
 }
 
 // Explicit cancellation against the local gateway: it does not rely on when the browser tears down the XHR.
-export function attachLocalCancel(config: AiConfig, requestId: string, signal?: AbortSignal) {
+function attachLocalCancel(config: AiConfig, requestId: string, signal?: AbortSignal) {
     const root = localGatewayRoot(config.baseUrl);
     if (!root || !signal) return null;
     const onAbort = () => {
@@ -116,7 +116,7 @@ export function attachLocalCancel(config: AiConfig, requestId: string, signal?: 
 }
 
 // The gateway only learns prompt_id once ComfyUI accepts the request, so progress is polled by requestId.
-export function attachLocalProgress(config: AiConfig, requestId: string, signal?: AbortSignal) {
+function attachLocalProgress(config: AiConfig, requestId: string, signal?: AbortSignal) {
     const root = localGatewayRoot(config.baseUrl);
     if (!root || !signal) return null;
     let stopped = false;
@@ -775,7 +775,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
 
 export type PromptOptimizeMode = "全参考模式(Reference to Video)" | "文生视频(T2VA)" | "首帧图生视频(I2VA)" | "首尾帧视频(FL2VA)" | "尾帧图生视频(L2VA)";
 
-export type ImageAngleParams = {
+type ImageAngleParams = {
     horizontalAngle: number;
     pitchAngle: number;
     cameraDistance: number;
@@ -821,7 +821,7 @@ export async function requestImageAngle(
     }
 }
 
-export type PromptOptimizeResult = { prompt: string; mode: string; duration: number };
+type PromptOptimizeResult = { prompt: string; mode: string; duration: number };
 
 export async function requestPromptOptimize(
     config: AiConfig,
@@ -859,7 +859,7 @@ export async function requestPromptOptimize(
     }
 }
 
-export type ImagePromptOptimizeResult = { prompt: string; mode: string };
+type ImagePromptOptimizeResult = { prompt: string; mode: string };
 
 export async function requestImagePromptOptimize(
     config: AiConfig,
@@ -899,7 +899,7 @@ export async function requestImagePromptOptimize(
 }
 
 export type ImageCaptionEngine = "qwen35" | "florence" | "cloud";
-export type ImageCaptionResult = { prompt: string; engine?: ImageCaptionEngine; promptId?: string; elapsedMs?: number };
+type ImageCaptionResult = { prompt: string; engine?: ImageCaptionEngine; promptId?: string; elapsedMs?: number };
 
 export async function requestImageCaption(config: AiConfig, params: { images: ReferenceImage[]; language?: "zh" | "en"; instruction?: string; engine?: ImageCaptionEngine; cloud?: { baseUrl: string; apiKey: string; model: string } }, options?: RequestOptions): Promise<ImageCaptionResult> {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
@@ -953,7 +953,7 @@ export type UpscaleWorkflow = {
     parameters: UpscaleParameter[];
 };
 
-export type UpscaleOptions = { workflowId: string; params?: Record<string, unknown>; signal?: AbortSignal };
+type UpscaleOptions = { workflowId: string; params?: Record<string, unknown>; signal?: AbortSignal };
 
 export async function requestUpscaleWorkflows(config: AiConfig): Promise<UpscaleWorkflow[]> {
     const root = localGatewayRoot(config.baseUrl);
@@ -1013,7 +1013,7 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
     }
 }
 
-export async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKey" | "apiFormat">) {
+async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKey" | "apiFormat">) {
     try {
         if (config.apiFormat === "gemini") {
             const payload = await httpJson<GeminiPayload>(geminiApiUrl({ ...defaultGeminiConfig, ...config }), { headers: geminiHeaders({ ...defaultGeminiConfig, ...config }) });

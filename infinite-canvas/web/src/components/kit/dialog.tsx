@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
  * menu correctly. Without them a dialog opened over the canvas would pan the canvas behind it.
  * Those attributes are the reason antd's `.ant-modal*` selectors could be dropped at all.
  */
-export type DialogProps = {
+type DialogProps = {
     open: boolean;
     onClose: () => void;
     /** Rendered in the header. Omit for panels that draw their own heading; see `label`. */

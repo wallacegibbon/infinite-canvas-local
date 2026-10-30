@@ -6,7 +6,7 @@ const gatewayRoot = LOCAL_GATEWAY_BASE_URL.replace(/\/v1\/?$/, "");
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
 /** A download URL. Resources staged under resources/payload have none. */
-export type ResourceSource = string;
+type ResourceSource = string;
 
 export type ResourceItem = {
     id: string;
@@ -48,7 +48,7 @@ export type ResourceItem = {
     restartAfterInstall?: boolean;
 };
 
-export type PackMainModelOption = {
+type PackMainModelOption = {
     file: string;
     label: string;
     installed: boolean;
@@ -57,7 +57,7 @@ export type PackMainModelOption = {
     resourceId?: string;
 };
 
-export type PackMainModel = {
+type PackMainModel = {
     workflowIds: string[];
     files: string[];
     defaultFile: string;
@@ -69,7 +69,7 @@ export type PackMainModel = {
     options: PackMainModelOption[];
 };
 
-export type WorkflowDependency = {
+type WorkflowDependency = {
     id: string;
     label: string;
     available: boolean;
@@ -111,7 +111,7 @@ export type ResourcePack = {
     optionalSize: number;
 };
 
-export type PromptEngineCapability = {
+type PromptEngineCapability = {
     id: string;
     label: string;
     available: boolean;
@@ -120,7 +120,7 @@ export type PromptEngineCapability = {
     reasons: string[];
 };
 
-export type PromptCapabilities = {
+type PromptCapabilities = {
     packId: string;
     comfyReachable: boolean;
     engines: Record<string, PromptEngineCapability>;
@@ -130,7 +130,7 @@ export type PromptCapabilities = {
  * Whether this gateway may install models at all. Configured, never inferred: installs are
  * refused unless INSTALL_INTO_COMFY=1 states that ComfyUI's model folders are reachable.
  */
-export type ResourceModelInstall = {
+type ResourceModelInstall = {
     allowed: boolean;
     /** COMFY_URL host:port — the machine the gateway has to run on. */
     comfyHost?: string;
@@ -167,7 +167,7 @@ export type ResourceStatus = {
     lock?: { installed?: Record<string, unknown>; updatedAt?: string };
 };
 
-export type ResourceJobItem = {
+type ResourceJobItem = {
     id: string;
     label: string;
     type: string;

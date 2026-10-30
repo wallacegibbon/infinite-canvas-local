@@ -44,7 +44,7 @@ export function isInheritableNodeField(key: string) {
     return INHERITABLE_FIELDS.has(key);
 }
 
-export function snapshotNodeSettings(metadata: CanvasNodeMetadata | undefined): CanvasNodeMetadata {
+function snapshotNodeSettings(metadata: CanvasNodeMetadata | undefined): CanvasNodeMetadata {
     const snapshot: CanvasNodeMetadata = {};
     const target = snapshot as unknown as Record<string, unknown>;
     for (const key of INHERITABLE_FIELDS) {

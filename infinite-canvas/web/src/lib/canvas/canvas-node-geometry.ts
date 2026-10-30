@@ -48,8 +48,8 @@ export function snapNodesIntoGroup(movedIds: Set<string>, nodes: CanvasNodeData[
     });
 }
 
-export const GROUP_WRAP_PADDING = 24;
-export const GROUP_WRAP_TOP_PADDING = 52;
+const GROUP_WRAP_PADDING = 24;
+const GROUP_WRAP_TOP_PADDING = 52;
 
 function selectedGroupIds(selectedIds: Set<string>, nodes: CanvasNodeData[]) {
     return new Set(nodes.filter((node) => selectedIds.has(node.id) && node.type === CanvasNodeType.Group).map((node) => node.id));
@@ -150,7 +150,7 @@ export function normalizeConnection(firstNodeId: string, secondNodeId: string, n
     return { fromNodeId: first.id, toNodeId: second.id };
 }
 
-export type FocusFrame = {
+type FocusFrame = {
     // Screen-space room taken above/below the node by open overlays (hover toolbar, prompt panel), gaps included.
     above?: number;
     below?: number;

@@ -21,7 +21,7 @@ export type CanvasProject = {
     viewport: ViewportTransform;
 };
 
-export type CanvasDeletedProject = {
+type CanvasDeletedProject = {
     id: string;
     deletedAt: string;
 };

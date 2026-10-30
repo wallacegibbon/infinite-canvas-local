@@ -48,7 +48,7 @@ export async function cleanupUnusedMedia(usedData: unknown) {
     await Promise.all(unused.map((key) => store.removeItem(key)));
 }
 
-export function collectMediaStorageKeys(value: unknown, keys = new Set<string>()) {
+function collectMediaStorageKeys(value: unknown, keys = new Set<string>()) {
     if (!value || typeof value !== "object") return keys;
     if ("storageKey" in value && typeof value.storageKey === "string" && value.storageKey.includes(":")) keys.add(value.storageKey);
     Object.values(value).forEach((item) => (Array.isArray(item) ? item.forEach((child) => collectMediaStorageKeys(child, keys)) : collectMediaStorageKeys(item, keys)));

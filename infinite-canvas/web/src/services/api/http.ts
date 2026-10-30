@@ -33,7 +33,7 @@ export class ApiError extends Error {
     }
 }
 
-export type HttpInit = Omit<RequestInit, "signal"> & {
+type HttpInit = Omit<RequestInit, "signal"> & {
     /** Milliseconds, as axios's `timeout`. Aborts with a `TimeoutError`. */
     timeout?: number;
     signal?: AbortSignal;

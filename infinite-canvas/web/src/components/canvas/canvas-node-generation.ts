@@ -8,9 +8,9 @@ import { CanvasNodeType, type CanvasConnection, type CanvasNodeData } from "@/ty
 import { getGenerationResourceNodes, getGroupResourceNodes } from "@/lib/canvas/canvas-resource-references";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
 
-export type NodeLora = { name: string; strength: number };
+type NodeLora = { name: string; strength: number };
 
-export type NodeGenerationContext = {
+type NodeGenerationContext = {
     prompt: string;
     referenceImages: ReferenceImage[];
     referenceVideos: ReferenceVideo[];

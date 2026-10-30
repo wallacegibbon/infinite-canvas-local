@@ -1,4 +1,4 @@
-export const CANVAS_IMAGE_PREVIEW_MAX_EDGE = 768;
+const CANVAS_IMAGE_PREVIEW_MAX_EDGE = 768;
 
 type ImageSourceChoice = {
     previewUrl?: string;
@@ -22,7 +22,7 @@ export function pickImageSource({ previewUrl, originalUrl, naturalWidth, natural
     return requiredLongEdge > previewLongEdge ? originalUrl : previewUrl;
 }
 
-export function getThumbnailDimensions(width: number, height: number, maxEdge = CANVAS_IMAGE_PREVIEW_MAX_EDGE) {
+function getThumbnailDimensions(width: number, height: number, maxEdge = CANVAS_IMAGE_PREVIEW_MAX_EDGE) {
     const scale = Math.min(1, maxEdge / Math.max(width, height));
     return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }

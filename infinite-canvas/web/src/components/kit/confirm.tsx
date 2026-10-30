@@ -20,7 +20,7 @@ import { Button } from "@/components/kit/button";
  * ours. Like `kit/dialog`, the portal carries `data-canvas-overlay` so a confirmation opened
  * from the canvas does not let clicks pan the canvas behind it.
  */
-export type ConfirmOptions = {
+type ConfirmOptions = {
     title: string;
     content?: string;
     okText?: string;

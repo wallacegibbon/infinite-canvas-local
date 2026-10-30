@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * the image settings popover rounds the control into a pill, and the canvas toolbar makes
  * the items fill the row. Those used to select antd's `.ant-segmented-*` internals.
  */
-export type SegmentedOption<T extends string | number> = { value: T; label?: ReactNode; disabled?: boolean };
+type SegmentedOption<T extends string | number> = { value: T; label?: ReactNode; disabled?: boolean };
 
 export function Segmented<T extends string | number>({
     value,

@@ -59,7 +59,7 @@ export function Popover({ content, placement = "top", mouseEnterDelay = 0.1, chi
     );
 }
 
-export type DropdownItem = { key?: string; icon?: ReactNode; label?: ReactNode; onClick?: () => void; disabled?: boolean; danger?: boolean; type?: never } | { type: "divider"; key?: string };
+type DropdownItem = { key?: string; icon?: ReactNode; label?: ReactNode; onClick?: () => void; disabled?: boolean; danger?: boolean; type?: never } | { type: "divider"; key?: string };
 
 export function Dropdown({ menu, className, children }: { menu?: { items?: DropdownItem[] }; className?: string; children?: ReactNode }): ReactNode {
     return (

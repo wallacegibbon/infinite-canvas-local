@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ Tabs */
 
-export type TabItem = { key: string; label?: ReactNode; children?: ReactNode; icon?: ReactNode };
+type TabItem = { key: string; label?: ReactNode; children?: ReactNode; icon?: ReactNode };
 
 export function Tabs({ items, activeKey, defaultActiveKey, onChange, className }: { items: readonly TabItem[]; activeKey?: string; defaultActiveKey?: string; onChange?: (key: string) => void; className?: string }): ReactNode {
     const [internal, setInternal] = useState(defaultActiveKey ?? items[0]?.key);
@@ -55,7 +55,7 @@ export function Tabs({ items, activeKey, defaultActiveKey, onChange, className }
 
 /* -------------------------------------------------------------- Collapse */
 
-export type CollapseItem = { key: string; label?: ReactNode; children?: ReactNode; extra?: ReactNode };
+type CollapseItem = { key: string; label?: ReactNode; children?: ReactNode; extra?: ReactNode };
 
 export function Collapse({ items, activeKey, defaultActiveKey = [], onChange, ghost = false, size = "middle", className }: { items: readonly CollapseItem[]; activeKey?: string | string[]; defaultActiveKey?: string | string[]; onChange?: (keys: string[]) => void; ghost?: boolean; size?: "small" | "middle"; className?: string }): ReactNode {
     const asArray = (value: string | string[] | undefined) => (value === undefined ? [] : Array.isArray(value) ? value : [value]);

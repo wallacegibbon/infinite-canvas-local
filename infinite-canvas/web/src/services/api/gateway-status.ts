@@ -58,7 +58,7 @@ function startPolling() {
     pollTimer = window.setTimeout(() => void tick(), HEALTH_INTERVAL_MS);
 }
 
-export function markGatewayDown() {
+function markGatewayDown() {
     if (down) return;
     down = true;
     emit();
@@ -79,7 +79,7 @@ export function markGatewayUp() {
     }
 }
 
-export function isGatewayRequest(url: string) {
+function isGatewayRequest(url: string) {
     if (!url) return false;
     try {
         const target = new URL(url, LOCAL_GATEWAY_ORIGIN || window.location.origin);

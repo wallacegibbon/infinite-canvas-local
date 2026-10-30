@@ -33,7 +33,7 @@ type MentionState = {
     query: string;
 };
 
-export const CONFIG_REFERENCE_PATTERN = /@\[node:([^\]]+)\]/g;
+const CONFIG_REFERENCE_PATTERN = /@\[node:([^\]]+)\]/g;
 
 export function CanvasConfigComposer({ nodeId, nodes, value, inputs, connectedNodes = [], onChange, onClose, onDisconnectReference, onStartReferenceSelection }: CanvasConfigComposerProps) {
     const { t } = useTranslation();

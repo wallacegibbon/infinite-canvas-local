@@ -7,7 +7,7 @@ import { gatewayModelLabel } from "@/lib/gateway-labels";
 import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_GATEWAY_CHANNEL_ID, LOCAL_GATEWAY_MODELS, LOCAL_GATEWAY_MODEL_VALUES } from "@/constant/app-mode";
 import { normalizeProgressRingSkin, type ProgressRingSkinId } from "@/lib/canvas/progress-ring-skins";
 
-export type ApiCallFormat = "openai" | "gemini";
+type ApiCallFormat = "openai" | "gemini";
 export type ModelCapability = "image" | "video" | "text" | "audio";
 export type ReasoningEffort = "auto" | "low" | "medium" | "high" | "xhigh";
 
@@ -89,12 +89,12 @@ export type AiConfig = {
 
 export type ConfigTabKey = "channels" | "preferences" | "cloud-api" | "prompt-sources" | "local-storage" | "resources";
 
-export type ChannelCredentialsImportResult = {
+type ChannelCredentialsImportResult = {
     status: "created" | "updated" | "missing-base-url" | "invalid-base-url";
     channelName?: string;
 };
 
-export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
+const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
 const CHANNEL_MODEL_SEPARATOR = "::";
 const localDefaultChannel: ModelChannel = {
     id: LOCAL_GATEWAY_CHANNEL_ID,
@@ -194,7 +194,7 @@ function findChannelModel(config: AiConfig, value: string): { channel: ModelChan
     return channel && model ? { channel, model } : null;
 }
 
-export function modelCapabilityOf(config: AiConfig, value: string): ModelCapability | undefined {
+function modelCapabilityOf(config: AiConfig, value: string): ModelCapability | undefined {
     return findChannelModel(config, value)?.model.capability;
 }
 
@@ -275,7 +275,7 @@ function isAiConfigReady(config: AiConfig, model: string) {
     return Boolean(match && match.channel.baseUrl.trim() && match.channel.apiKey.trim());
 }
 
-export function suggestPromptCloudApiName(baseUrl: string, model: string) {
+function suggestPromptCloudApiName(baseUrl: string, model: string) {
     const value = `${baseUrl || ""} ${model || ""}`.toLowerCase();
     if (value.includes("deepseek")) return "DeepSeek";
     if (value.includes("siliconflow")) return "SiliconFlow";
@@ -293,7 +293,7 @@ function normalizePromptCloudModel(baseUrl: string, model: string) {
     return /deepseek/i.test(baseUrl) && model === "deepseek-chat" ? "deepseek-flash" : model;
 }
 
-export function normalizePromptCloudApis(value: unknown): PromptCloudApi[] {
+function normalizePromptCloudApis(value: unknown): PromptCloudApi[] {
     if (!Array.isArray(value)) return [];
     const seen = new Set<string>();
     const apis: PromptCloudApi[] = [];
@@ -324,7 +324,7 @@ function promptCloudMirror(apis: PromptCloudApi[], activeId: string) {
     };
 }
 
-export function normalizePromptCloudConfig(config: AiConfig): AiConfig {
+function normalizePromptCloudConfig(config: AiConfig): AiConfig {
     const apis = normalizePromptCloudApis(config.promptCloudApis);
     if (!apis.length) {
         const baseUrl = String(config.promptCloudBaseUrl || "").trim();
@@ -525,7 +525,7 @@ export function normalizeChannelModels(models: Array<string | ChannelModel> | un
     return result;
 }
 
-export function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
+function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
     const apiFormat = normalizeApiFormat(channel?.apiFormat);
     return {
         id: channel?.id?.trim() || nanoid(),
@@ -537,7 +537,7 @@ export function createModelChannel(channel?: Partial<ModelChannel>): ModelChanne
     };
 }
 
-export function upsertChannelCredentials(
+function upsertChannelCredentials(
     config: AiConfig,
     input: { baseUrl?: string | null; apiKey?: string | null },
 ): ChannelCredentialsImportResult & { config: AiConfig } {
@@ -643,7 +643,7 @@ export function normalizeModelOptionValue(value: string | undefined, channels: M
     return channel && channel.models.some((item) => item.name === model) ? encodeChannelModel(channel.id, model) : model;
 }
 
-export function resolveModelChannel(config: AiConfig, value: string) {
+function resolveModelChannel(config: AiConfig, value: string) {
     const decoded = decodeChannelModel(value);
     const model = decoded?.model || value;
     const matched = decoded ? config.channels.find((channel) => channel.id === decoded.channelId) : config.channels.find((channel) => channel.models.some((item) => item.name === model));
@@ -687,7 +687,7 @@ function normalizeChannels(config: AiConfig) {
 }
 
 /** Every channel in this build points at the local gateway; there is no cloud default. */
-export function defaultBaseUrl() {
+function defaultBaseUrl() {
     return LOCAL_GATEWAY_BASE_URL;
 }
 

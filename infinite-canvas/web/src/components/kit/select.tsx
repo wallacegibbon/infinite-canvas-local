@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
  * canvas stops zoom and deselect. That attribute is what lets `lib/canvas-overlay` drop its
  * `.ant-select-dropdown` constant.
  */
-export type SelectOption<T extends string = string> = { value: T; label?: ReactNode; disabled?: boolean };
+type SelectOption<T extends string = string> = { value: T; label?: ReactNode; disabled?: boolean };
 
 type Size = "small" | "middle" | "large";
 

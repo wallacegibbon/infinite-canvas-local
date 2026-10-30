@@ -1,4 +1,4 @@
-export type ImageCropRect = {
+type ImageCropRect = {
     x: number;
     y: number;
     width: number;
@@ -12,7 +12,7 @@ export type ImageSplitParams = {
     verticalLines?: number[];
 };
 
-export type ImageSplitPiece = {
+type ImageSplitPiece = {
     row: number;
     column: number;
     dataUrl: string;

@@ -7,7 +7,7 @@ export type CanvasExportFile = {
     projects: CanvasProjectExportItem[];
 };
 
-export type CanvasProjectExportItem = {
+type CanvasProjectExportItem = {
     project: CanvasProject;
     files: CanvasExportAsset[];
 };

@@ -16,12 +16,12 @@ type RequestOptions = { signal?: AbortSignal; params?: Record<string, unknown> }
 type VideoMediaOptions = RequestOptions & { videos?: ReferenceVideo[]; audios?: ReferenceAudio[] };
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
-export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
-export type VideoGenerationTask = { id: string; provider: "openai" | "gemini"; model: string };
-export type VideoUpscaleSource = { name: string; type?: string; url?: string; storageKey?: string };
-export type VideoUpscaleParams = { scale: number; resolution: number; fps?: number; seed?: number; batchSize?: number; colorCorrection?: string };
-export type VideoInterpolateSource = VideoUpscaleSource;
-export type VideoInterpolateParams = { multiplier: 2 | 3 };
+type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
+type VideoGenerationTask = { id: string; provider: "openai" | "gemini"; model: string };
+type VideoUpscaleSource = { name: string; type?: string; url?: string; storageKey?: string };
+type VideoUpscaleParams = { scale: number; resolution: number; fps?: number; seed?: number; batchSize?: number; colorCorrection?: string };
+type VideoInterpolateSource = VideoUpscaleSource;
+type VideoInterpolateParams = { multiplier: 2 | 3 };
 export type VideoPreview = { url: string; mime?: string; step?: number; total?: number };
 type WaitOptions = RequestOptions & { onPreview?: (preview: VideoPreview | null) => void; onSteps?: (steps: { step: number; total: number }) => void };
 type GeminiInlineData = { bytesBase64Encoded: string; mimeType: string };
@@ -31,7 +31,7 @@ type GeminiVideoOperation = {
     error?: { message?: string };
     response?: { generateVideoResponse?: { generatedSamples?: Array<{ video?: { uri?: string } }> } };
 };
-export type VideoGenerationTaskState = { status: "pending"; preview?: VideoPreview; steps?: { step: number; total: number } } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
+type VideoGenerationTaskState = { status: "pending"; preview?: VideoPreview; steps?: { step: number; total: number } } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
 
 function aiApiUrl(config: AiConfig, path: string) {
@@ -76,7 +76,7 @@ export async function waitForVideoGenerationTask(config: AiConfig, task: VideoGe
 }
 
 /** Cancel a queued/running gateway video task; safe to call after completion. */
-export async function cancelVideoGenerationTask(config: AiConfig, task: Pick<VideoGenerationTask, "id" | "model">) {
+async function cancelVideoGenerationTask(config: AiConfig, task: Pick<VideoGenerationTask, "id" | "model">) {
     const requestConfig = resolveModelRequestConfig(config, task.model);
     await httpVoid(aiApiUrl(requestConfig, `/videos/${task.id}/cancel`), {
         method: "POST",
@@ -158,7 +158,7 @@ export async function createVideoInterpolateTask(config: AiConfig, source: Video
     }
 }
 
-export async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
+async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     const requestConfig = resolveModelRequestConfig(config, task.model);
     assertVideoConfig(requestConfig, requestConfig.model);
     if (task.provider === "gemini") return pollGeminiVideoTask(requestConfig, task, options);

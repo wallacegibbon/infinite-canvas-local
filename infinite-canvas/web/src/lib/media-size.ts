@@ -18,13 +18,13 @@ export const imageSizePresets: Record<string, Record<string, string>> = {
     "4k": { "1:1": "2880x2880", "2:3": "2336x3520", "3:2": "3520x2336", "4:3": "3312x2480", "3:4": "2480x3312", "16:9": "3840x2160", "9:16": "2160x3840", "21:9": "3840x1648", "9:21": "1648x3840" },
 };
 
-export function parsePixelSize(value: string) {
+function parsePixelSize(value: string) {
     const match = String(value || "").match(/^(\d+)x(\d+)$/i);
     if (!match) return null;
     return { width: Number(match[1]), height: Number(match[2]) };
 }
 
-export function parseAspectRatio(value: string) {
+function parseAspectRatio(value: string) {
     const match = String(value || "").match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
     if (!match) return null;
     const width = Number(match[1]);
@@ -46,7 +46,7 @@ export const videoRatioOptions = [
 export const VIDEO_SECONDS_MIN = 4;
 export const VIDEO_SECONDS_MAX = 30;
 
-export function normalizeMediaScale(value: string | undefined) {
+function normalizeMediaScale(value: string | undefined) {
     const scale = String(value || "").trim().toLowerCase();
     if (scale === "2k" || scale === "2048") return "2k";
     if (scale === "4k" || scale === "3840") return "4k";

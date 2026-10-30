@@ -4,10 +4,10 @@ import { Brush, Camera, Copy, FileText, Grid2x2, Lock, LockOpen, Maximize2, Scis
 import type { CanvasNodeData } from "@/types/canvas";
 import i18n from "@/i18n";
 
-export type ImageNodeActionToolId = "copyPrompt" | "reversePrompt" | "replace" | "resize" | "maskEdit" | "crop" | "split" | "upscale" | "superResolve" | "angle" | "view";
+type ImageNodeActionToolId = "copyPrompt" | "reversePrompt" | "replace" | "resize" | "maskEdit" | "crop" | "split" | "upscale" | "superResolve" | "angle" | "view";
 export type ImageQuickToolId = "info" | "delete" | "saveAsset" | "download" | ImageNodeActionToolId;
 
-export type ImageToolHandlers = {
+type ImageToolHandlers = {
     onUpload: (node: CanvasNodeData) => void;
     onToggleFreeResize: (node: CanvasNodeData) => void;
     onMaskEdit: (node: CanvasNodeData) => void;
@@ -21,7 +21,7 @@ export type ImageToolHandlers = {
     onReversePrompt: (node: CanvasNodeData) => void;
 };
 
-export type ImageToolDefinition = {
+type ImageToolDefinition = {
     id: ImageNodeActionToolId;
     defaultVisible: boolean;
     label: string | ((node: CanvasNodeData) => string);
@@ -31,7 +31,7 @@ export type ImageToolDefinition = {
     run: (node: CanvasNodeData, handlers: ImageToolHandlers) => void;
 };
 
-export type ImageQuickToolsConfig = {
+type ImageQuickToolsConfig = {
     ids: ImageQuickToolId[];
     showLabels: boolean;
 };
@@ -40,7 +40,7 @@ export const IMAGE_QUICK_TOOLS_STORAGE_KEY = "canvas-image-quick-tools-v8";
 
 const defaultBaseToolIds: ImageQuickToolId[] = ["info", "delete", "saveAsset", "download"];
 
-export const imageToolDefinitions: ImageToolDefinition[] = [
+const imageToolDefinitions: ImageToolDefinition[] = [
     {
         id: "copyPrompt",
         defaultVisible: true,
@@ -147,7 +147,7 @@ export function buildImageToolbarTools(node: CanvasNodeData, handlers: ImageTool
     }));
 }
 
-export function normalizeImageQuickToolIds(value: unknown[]) {
+function normalizeImageQuickToolIds(value: unknown[]) {
     const allIds: ImageQuickToolId[] = [...defaultBaseToolIds, ...imageToolDefinitions.map((tool) => tool.id)];
     const ids = new Set(allIds);
     return allIds.filter((id) => value.includes(id) && ids.has(id));
