@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Toaster } from "sonner";
 
@@ -10,24 +9,16 @@ import { GatewayReconnectBanner } from "@/components/layout/gateway-reconnect-ba
 import type { AppLocale } from "@/i18n";
 import { useThemeStore } from "@/stores/use-theme-store";
 
-const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            staleTime: 30_000,
-            retry: false,
-            refetchOnWindowFocus: false,
-        },
-    },
-});
-
 /**
  * App-level providers.
  *
- * This used to wrap the tree in antd's `ConfigProvider` (for the theme) and `App`
- * (for the static `message` / `modal` helpers). Both are gone: colours come from
- * Tailwind classes over `design-tokens`, toasts from `@/components/kit/toast` and
- * confirmations from `@/components/kit/confirm`. Nothing here is library-specific,
- * so the next replacement has nowhere to leak into (see docs/decisions.md #23/#24).
+ * This used to wrap the tree in three providers: antd's `ConfigProvider` (theme) and
+ * `App` (static `message` / `modal` helpers), and react-query's `QueryClientProvider`.
+ * All three are gone. Colours come from Tailwind classes over `design-tokens`, toasts
+ * from `@/components/kit/toast`, confirmations from `@/components/kit/confirm`, and
+ * every network call is a plain async function in `services/` — nothing ever called
+ * `useQuery`, so the client was a cache that only ever stayed empty. Nothing here is
+ * library-specific now, so the next replacement has nowhere to leak into (#23/#24).
  *
  * The two effects are the whole of the app's theme and locale plumbing: the `dark`
  * class on `<html>` is what every `dark:` utility keys off, and `colorScheme` is
@@ -52,10 +43,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
     return (
         <>
-            <QueryClientProvider client={queryClient}>
-                <ClientRootInit>{children}</ClientRootInit>
-                <GatewayReconnectBanner />
-            </QueryClientProvider>
+            <ClientRootInit>{children}</ClientRootInit>
+            <GatewayReconnectBanner />
             {/* Toasts are rendered by `@/components/kit/toast` over sonner. Sticky
                 loading toasts rely on `duration: Infinity`; 3000 matches antd's old
                 default for the auto-dismissing ones so the pacing of the UI did not
