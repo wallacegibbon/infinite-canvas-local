@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { saveAs } from "file-saver";
@@ -29,7 +29,14 @@ import { ActiveConnectionPath, ConnectionPath } from "@/components/canvas/canvas
 import { CanvasConfigComposer } from "@/components/canvas/canvas-config-composer";
 import { CanvasConfigNodePanel } from "@/components/canvas/canvas-config-node-panel";
 import { CanvasNodeContextMenu } from "@/components/canvas/canvas-context-menu";
-import { CanvasNodeAngleDialog, type CanvasImageAngleParams } from "@/components/canvas/canvas-node-angle-dialog";
+import type { CanvasImageAngleParams } from "@/components/canvas/canvas-node-angle-dialog";
+
+// The angle dialog drags in three.js (~136 kB gzip) for one control panel that most sessions
+// never open, so it is loaded on demand instead of on first paint. The dynamic import keeps
+// `three` out of the initial module graph; nothing else in the app imports it.
+const CanvasNodeAngleDialog = lazy(() =>
+    import("@/components/canvas/canvas-node-angle-dialog").then((module) => ({ default: module.CanvasNodeAngleDialog })),
+);
 import { CanvasNodeCropDialog, type CanvasImageCropRect } from "@/components/canvas/canvas-node-crop-dialog";
 import { CanvasNodeMaskEditDialog, type CanvasImageMaskEditPayload } from "@/components/canvas/canvas-node-mask-edit-dialog";
 import { CanvasNodeOutpaintDialog, type CanvasOutpaintPayload } from "@/components/canvas/canvas-node-outpaint-dialog";
@@ -3923,7 +3930,11 @@ function InfiniteCanvasPage() {
                     }}
                 />
 
-                {angleNode?.metadata?.content ? <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} open={Boolean(angleNode)} onClose={() => setAngleNodeId(null)} onConfirm={(params) => void generateAngleNode(angleNode!, params)} /> : null}
+                {angleNode?.metadata?.content ? (
+                    <Suspense fallback={null}>
+                        <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} open={Boolean(angleNode)} onClose={() => setAngleNodeId(null)} onConfirm={(params) => void generateAngleNode(angleNode!, params)} />
+                    </Suspense>
+                ) : null}
 
                 <Dialog
                     title={t("canvas.projectPage.imageDetails")}

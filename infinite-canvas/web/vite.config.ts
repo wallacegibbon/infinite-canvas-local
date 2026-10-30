@@ -38,13 +38,13 @@ function localPluginsManifest(): Plugin {
     };
 }
 
-// Vendor code is split by library family so the ~3.5 MB app entry does not have to be
-// re-downloaded when only app code changes, and no single chunk dwarfs the rest. The
-// entries are only a cache boundary: rollup keeps the execution order of side effects.
+// Vendor code is split by library family so the app entry does not have to be re-downloaded
+// when only app code changes, and no single chunk dwarfs the rest. The entries are only a
+// cache boundary: rollup keeps the execution order of side effects. The rule for antd (and
+// its @rc-component/rc-*/dayjs satellites) was deleted with the dependency itself.
 function vendorChunk(id: string): string | undefined {
     if (!id.includes("node_modules")) return undefined;
     if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react";
-    if (/[\\/]node_modules[\\/](antd|@ant-design|@rc-component|rc-.+|dayjs)[\\/]/.test(id)) return "antd";
     if (/[\\/]node_modules[\\/]three[\\/]/.test(id)) return "three";
     return "vendor";
 }
