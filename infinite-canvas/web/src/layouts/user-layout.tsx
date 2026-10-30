@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { StorageRecoveryBanner } from "@/components/layout/storage-recovery-banner";
 import { AppConfigModal } from "@/components/settings/app-config-modal";
 import { ResourceSetupGate } from "@/components/settings/resource-setup-gate";
 
@@ -15,6 +16,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
     return (
         <div className="flex h-dvh overflow-hidden bg-background text-foreground">
             <div className="min-w-0 flex-1 overflow-hidden">{children}</div>
+            <StorageRecoveryBanner />
             <AppConfigModal />
             <ResourceSetupGate />
         </div>

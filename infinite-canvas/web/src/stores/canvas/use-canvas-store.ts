@@ -4,6 +4,8 @@ import { persist, type PersistStorage, type StorageValue } from "zustand/middlew
 import { nanoid } from "nanoid";
 import i18n from "@/i18n";
 import { localForageStorage } from "@/lib/localforage-storage";
+import { preserveUnreadable } from "@/lib/persist-recovery";
+import { isStoreUnreadable } from "@/stores/use-storage-recovery-store";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import type { CanvasAssistantSession, CanvasConnection, CanvasNodeData, ViewportTransform } from "@/types/canvas";
 
@@ -54,11 +56,20 @@ const canvasStorage: PersistStorage<CanvasStore> = {
     getItem: async (name) => {
         const value = await localForageStorage.getItem(name);
         if (!value) return null;
-        const parsed = JSON.parse(value) as StorageValue<CanvasStore>;
-        queuedPersistState = parsed.state as PersistedCanvasState;
-        return parsed;
+        try {
+            const parsed = JSON.parse(value) as StorageValue<CanvasStore>;
+            queuedPersistState = parsed.state as PersistedCanvasState;
+            return parsed;
+        } catch (error) {
+            // Returning null instead of throwing: zustand turns a throw into an
+            // `onRehydrateStorage` error that nothing reads, and the app boots empty over data that
+            // is still in IndexedDB. Recorded, refused, and explained by the recovery banner.
+            preserveUnreadable("canvas", name, value, error);
+            return null;
+        }
     },
     setItem: (name, value) => {
+        if (isStoreUnreadable("canvas")) return;
         const nextState = value.state as PersistedCanvasState;
         if (queuedPersistState && queuedPersistState.projects === nextState.projects && queuedPersistState.deletedProjects === nextState.deletedProjects) return;
         queuedPersistState = nextState;

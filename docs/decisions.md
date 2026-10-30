@@ -1463,3 +1463,51 @@ one, and the local gateway reports neither.
 
 **Where** `stores/canvas/use-canvas-side-panel-store.ts`, `components/canvas/canvas-side-panel.tsx`,
 `components/settings/resource-center-panel.tsx`, `i18n/locales/`.
+
+## 49. An unreadable store is preserved, refused, and explained
+
+**Decision** Both `persist` storage adapters catch their own parse failure instead of letting it
+escape. On failure they copy the raw bytes to `<key>.corrupt-<timestamp>`, record the failure in
+`stores/use-storage-recovery-store.ts`, return `null` so hydration proceeds with defaults on
+purpose, and from then on refuse every `setItem`. A banner
+(`components/layout/storage-recovery-banner.tsx`) says what happened and offers three things.
+
+**Why catching is not enough on its own** Known issue #12 was reproduced before this was written. A
+2314-byte `canvas_store` holding one canvas with two nodes was replaced with the string
+`{oops truncated` and the page was hard-reloaded. The app came up on a brand-new project id with
+"No nodes on this canvas", the console was **empty**, and within seconds the stored blob was 378
+bytes — the empty project. The original was gone from the browser. So the failure mode was not
+"boots empty", it was "boots empty and then destroys what it could not read".
+
+That is the reason for the write refusal. Returning `null` alone would have left the second half
+intact: zustand's `persist` wraps `setState`, `hydrated: true` is a state change, and the canvas
+store's dedupe guard is skipped when `queuedPersistState` is `null` — which it is, precisely
+because the parse failed.
+
+**The three actions, in the order that protects the user** Export the raw bytes first: it is the
+only action that changes nothing and loses nothing, and it turns an opaque failure into a file the
+user can keep. Retry second: it re-reads, which genuinely helps the transient case (a write caught
+mid-flight, a quota hiccup) and is harmless in the permanent one. "Clear and start over" last and
+styled as a link, not a button, because it re-enables writing over the original key — though it
+cannot lose anything, since the copy is already on disk.
+
+**Two details that only showed up in the browser**
+
+- The banner was `top-4` and overlapped the canvas title and the top-bar controls. Moved to
+  `top-16`, which is where the reconnect banner already sits.
+- "Clear and start over" dismissed the banner but wrote nothing, because `setItem` only runs on a
+  state change and dismissing is not one. Reloading immediately after showed the banner again, which
+  reads as a broken button. The handler now nudges both stores with `setState({})` so the cleared
+  state actually replaces the blob.
+
+**Scope** The banner renders in `layouts/user-layout.tsx`, not in the canvas list, because `/`
+resolves straight to a canvas — most sessions never open the list, and a message that only appears
+there would be seen by almost nobody.
+
+**Verified** The reproduction was repeated against the fix: banner appears, main key still holds
+`{oops truncated`, a `.corrupt-2026-10-30T19-28-33-388Z` copy exists, "clear and start over" then
+rewrites the main key to a valid 378-byte blob. The origin's data was restored from a backup
+afterwards and checked: two nodes, correct title, no banner, console empty.
+
+**Where** `stores/use-storage-recovery-store.ts`, `lib/persist-recovery.ts`,
+`components/layout/storage-recovery-banner.tsx`, both persisted stores.
