@@ -8,7 +8,9 @@ import { cn } from "@/lib/utils";
  *
  * Both keep antd's prop names for the subset in use. `Progress` draws a single bar —
  * antd's circle and dashboard variants are not needed here — and `Alert` renders the
- * inline banner the storage panel uses when a read fails.
+ * inline banner the storage panel uses when a read fails. `Alert` always shows its icon;
+ * antd's `showIcon` was declared here and ignored, so it was deleted along with the one
+ * call site that still passed it.
  */
 type ProgressStatus = "normal" | "active" | "success" | "exception";
 
@@ -34,7 +36,7 @@ const ALERT_STYLES: Record<AlertType, { box: string; icon: typeof Info }> = {
     error: { box: "border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200", icon: XCircle },
 };
 
-export function Alert({ type = "info", message, description, className }: { type?: AlertType; message?: ReactNode; description?: ReactNode; showIcon?: boolean; className?: string }): ReactNode {
+export function Alert({ type = "info", message, description, className }: { type?: AlertType; message?: ReactNode; description?: ReactNode; className?: string }): ReactNode {
     const style = ALERT_STYLES[type] ?? ALERT_STYLES.info;
     const Icon = style.icon;
     return (

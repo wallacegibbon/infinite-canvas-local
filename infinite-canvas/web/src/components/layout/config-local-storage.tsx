@@ -60,7 +60,7 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
                         {t("config.localStorage.refresh")}
                     </Button>
                 </div>
-                {error ? <Alert className="mt-4" type="error" showIcon message={t("config.localStorage.readFailed")} description={error} /> : null}
+                {error ? <Alert className="mt-4" type="error" message={t("config.localStorage.readFailed")} description={error} /> : null}
                 {!usage && loading ? (
                     <div className="flex min-h-48 items-center justify-center"><Spin /></div>
                 ) : usage ? (

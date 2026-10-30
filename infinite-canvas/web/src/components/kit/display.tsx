@@ -6,11 +6,10 @@ import { cn } from "@/lib/utils";
 /**
  * The two states every list in this app needs, replacing antd's `Empty` and `Spin`.
  *
- * `Empty` accepts antd's `image` prop and ignores it: every call site passed
- * `Empty.PRESENTED_IMAGE_SIMPLE`, so there is one illustration, not a choice. Accepting the
- * prop keeps the call sites unchanged; there is a comment there rather than a lie here.
+ * `Empty` has one illustration and no `image` prop: antd's call sites all passed
+ * `Empty.PRESENTED_IMAGE_SIMPLE`, so the choice was already gone before the prop was.
  */
-export function Empty({ description, className }: { description?: ReactNode; image?: ReactNode; className?: string }): ReactNode {
+export function Empty({ description, className }: { description?: ReactNode; className?: string }): ReactNode {
     return (
         <div className={cn("flex flex-col items-center justify-center gap-2 text-center", className)}>
             <Inbox className="size-7 text-stone-300 dark:text-stone-600" aria-hidden="true" />
@@ -28,16 +27,19 @@ export function Spin({ size = "middle", className }: { size?: "small" | "middle"
     );
 }
 
-/** Horizontal or vertical stack with antd's `size` gap, replacing antd's `Space`. */
+/**
+ * Horizontal stack with antd's `size` gap, replacing antd's `Space`.
+ *
+ * antd's `direction="vertical"` branch was removed: no call site used it, and a vertical
+ * stack here is `className="flex-col"` on the one component that wants one.
+ */
 export function Space({
     size = "small",
-    direction = "horizontal",
     wrap = false,
     className,
     children,
 }: {
     size?: number | [number, number] | "small" | "middle" | "large";
-    direction?: "horizontal" | "vertical";
     wrap?: boolean;
     className?: string;
     children?: ReactNode;
@@ -46,7 +48,7 @@ export function Space({
     const gapClass = preset === "large" ? "gap-4" : preset === "middle" ? "gap-3" : preset === "small" ? "gap-2" : undefined;
     const gapStyle = typeof size === "number" ? { gap: size } : Array.isArray(size) ? { rowGap: size[0], columnGap: size[1] } : undefined;
     return (
-        <div className={cn("flex", direction === "vertical" ? "flex-col items-start" : "flex-row items-center", wrap && "flex-wrap", gapClass, className)} style={gapStyle}>
+        <div className={cn("flex items-center", wrap && "flex-wrap", gapClass, className)} style={gapStyle}>
             {children}
         </div>
     );

@@ -21,7 +21,6 @@ export function Field({
     label,
     extra,
     error,
-    htmlFor,
     className,
     children,
 }: {
@@ -30,8 +29,6 @@ export function Field({
     extra?: ReactNode;
     /** Validation message under the control. */
     error?: ReactNode;
-    /** Set to make the label a real `<label>`; omitted, it renders as a `<div>`. */
-    htmlFor?: string;
     /** antd's 24px gap; call sites that passed `mb-4` / `mb-0` still win. */
     className?: string;
     children?: ReactNode;
@@ -39,13 +36,7 @@ export function Field({
     const labelClass = "text-sm text-stone-600 dark:text-stone-400";
     return (
         <div className={cn("mb-6 flex flex-col gap-1.5", className)}>
-            {label === undefined ? null : htmlFor ? (
-                <label htmlFor={htmlFor} className={labelClass}>
-                    {label}
-                </label>
-            ) : (
-                <div className={labelClass}>{label}</div>
-            )}
+            {label === undefined ? null : <div className={labelClass}>{label}</div>}
             {children}
             {extra ? <div className="text-xs leading-5 text-stone-400 dark:text-stone-500">{extra}</div> : null}
             {error ? <div className="text-xs leading-5 text-red-500 dark:text-red-400">{error}</div> : null}

@@ -21,7 +21,6 @@ export function TagInput({
     onChange,
     placeholder,
     separators = [",", "，"],
-    disabled = false,
     className,
 }: {
     value?: string[];
@@ -29,7 +28,6 @@ export function TagInput({
     placeholder?: string;
     /** Characters that commit the pending text, as antd's `tokenSeparators`. */
     separators?: string[];
-    disabled?: boolean;
     className?: string;
 }): ReactNode {
     const [draft, setDraft] = useState("");
@@ -59,7 +57,7 @@ export function TagInput({
 
     return (
         <div
-            className={cn(FIELD, disabled && "cursor-not-allowed opacity-60", className)}
+            className={cn(FIELD, className)}
             onClick={(event) => (event.currentTarget.querySelector("input") as HTMLInputElement | null)?.focus()}
         >
             {value.map((tag) => (
@@ -68,24 +66,21 @@ export function TagInput({
                     className="inline-flex items-center gap-1 rounded border border-stone-200 bg-stone-100 px-1.5 py-0.5 text-xs text-stone-700 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300"
                 >
                     {tag}
-                    {disabled ? null : (
-                        <button
-                            type="button"
-                            aria-label={`Remove ${tag}`}
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                onChange?.(value.filter((item) => item !== tag));
-                            }}
-                            className="text-stone-400 transition-colors hover:text-stone-700 dark:hover:text-stone-200"
-                        >
-                            <X className="size-3" />
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        aria-label={`Remove ${tag}`}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            onChange?.(value.filter((item) => item !== tag));
+                        }}
+                        className="text-stone-400 transition-colors hover:text-stone-700 dark:hover:text-stone-200"
+                    >
+                        <X className="size-3" />
+                    </button>
                 </span>
             ))}
             <input
                 value={draft}
-                disabled={disabled}
                 placeholder={value.length ? undefined : placeholder}
                 onChange={(event) => {
                     const next = event.target.value;

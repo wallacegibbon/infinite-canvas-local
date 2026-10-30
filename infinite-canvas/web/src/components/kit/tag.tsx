@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * state is also written as an `is-active` class, because `globals.css` styles the prompt
  * filter chips through that class rather than through antd's generated one.
  */
-type TagColor = "default" | "blue" | "green" | "orange" | "gold" | "red" | "purple";
+type TagColor = "default" | "blue" | "green" | "orange" | "gold";
 
 const COLORS: Record<TagColor, string> = {
     default: "border-stone-200 bg-stone-100 text-stone-700 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300",
@@ -18,8 +18,6 @@ const COLORS: Record<TagColor, string> = {
     green: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300",
     orange: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/15 dark:text-orange-300",
     gold: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300",
-    red: "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300",
-    purple: "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/15 dark:text-purple-300",
 };
 
 const BASE = "inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs leading-tight whitespace-nowrap";

@@ -84,7 +84,6 @@ export function CanvasTopBar({
                         </button>
                     </Tooltip>
                     <Dropdown
-                        trigger={["click"]}
                         menu={{
                             items: [
                                 { key: "home", icon: <Home className="size-4" />, label: t("canvas.home"), onClick: onHome },

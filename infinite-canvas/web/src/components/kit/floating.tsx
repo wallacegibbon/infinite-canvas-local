@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
  * `Popover` opens on hover, because antd's did and the reference bar relies on it while
  * moving along a row of thumbnails. `Dropdown` keeps antd's `menu={{ items }}` shape,
  * including `divider` entries and per-item `danger`/`disabled`, so the canvas menu's item
- * list did not have to be rewritten.
+ * list did not have to be rewritten. antd's `trigger={["click"]}` is gone: it was declared,
+ * passed by one call site, and read by nobody — a click trigger is what the primitive does.
  *
  * Both portals carry `data-canvas-overlay`, so a panel opened over the canvas stops the
  * wheel and clicks from reaching the canvas underneath.
@@ -60,7 +61,7 @@ export function Popover({ content, placement = "top", mouseEnterDelay = 0.1, chi
 
 export type DropdownItem = { key?: string; icon?: ReactNode; label?: ReactNode; onClick?: () => void; disabled?: boolean; danger?: boolean; type?: never } | { type: "divider"; key?: string };
 
-export function Dropdown({ menu, className, children }: { menu?: { items?: DropdownItem[] }; trigger?: string[]; className?: string; children?: ReactNode }): ReactNode {
+export function Dropdown({ menu, className, children }: { menu?: { items?: DropdownItem[] }; className?: string; children?: ReactNode }): ReactNode {
     return (
         <RadixDropdownMenu.Root>
             <RadixDropdownMenu.Trigger asChild>{children}</RadixDropdownMenu.Trigger>
