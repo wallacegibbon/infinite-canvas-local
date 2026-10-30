@@ -10,8 +10,7 @@ import { fetchResourceStatus, type ResourceStatus } from "@/services/api/resourc
 const SKIP_KEY = "resource-setup-skipped";
 
 export function ResourceSetupGate() {
-    const { i18n } = useTranslation();
-    const zh = i18n.language.startsWith("zh");
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const [status, setStatus] = useState<ResourceStatus | null>(null);
     const [checked, setChecked] = useState(false);
@@ -52,9 +51,9 @@ export function ResourceSetupGate() {
                 <div className="flex items-center gap-2">
                     <Download className="size-5" />
                     <div>
-                        <div className="text-base font-semibold">{zh ? "准备资源" : "Prepare resources"}</div>
+                        <div className="text-base font-semibold">{t("resources.setup.title")}</div>
                         <div className="mt-0.5 text-xs font-normal text-stone-500 dark:text-stone-400">
-                            {zh ? "你的 ComfyUI 已连接；已按当前显卡和内存标出推荐版本，只下载缺少的模型/组件，已有同名文件会直接复用。" : "ComfyUI is connected. The recommended version is marked for this GPU; only missing files are downloaded."}
+                            {t("resources.setup.description")}
                         </div>
                     </div>
                 </div>
@@ -71,11 +70,11 @@ export function ResourceSetupGate() {
                 footer={
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-200 pt-3 dark:border-stone-800">
                         <span className="text-[11px] text-stone-400 dark:text-stone-500">
-                            {zh ? "跳过后可在 设置 → 添加工作流 随时补装。" : "You can install later from Settings → Add workflows."}
+                            {t("resources.setup.skipHint")}
                         </span>
                         <Button onClick={skip}>
                             <X className="size-4" />
-                            {zh ? "跳过，先进入画布" : "Skip for now"}
+                            {t("resources.setup.skipButton")}
                         </Button>
                     </div>
                 }

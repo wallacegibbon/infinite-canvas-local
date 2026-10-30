@@ -155,7 +155,7 @@ export function CanvasNodeHoverToolbar({
         ...(hasImage || hasVideo || hasAudio ? [{ id: "download", title: t(hasAudio ? "canvas.nodeToolbar.downloadAudio" : hasVideo ? "canvas.nodeToolbar.downloadVideo" : "canvas.nodeToolbar.downloadImage"), label: t("common.download"), icon: <Download className="size-4" />, onClick: () => onDownload(node) }] : []),
         ...(isVideo ? [{ id: "edit", title: t("common.edit"), label: t("common.edit"), icon: <MessageSquare className="size-4" />, onClick: () => onToggleDialog(node) }] : []),
         ...(hasVideo ? [{ id: "videoInterpolate", title: t("canvas.nodeToolbar.interpolateTitle"), label: t("canvas.nodeToolbar.interpolate"), icon: <Clapperboard className="size-4" />, onClick: () => onInterpolateVideo(node) }] : []),
-        ...(hasVideo ? [{ id: "videoUpscale", title: "SeedVR2 视频超分", label: "超分", icon: <Maximize2 className="size-4" />, onClick: () => onVideoUpscale(node) }] : []),
+        ...(hasVideo ? [{ id: "videoUpscale", title: t("canvas.videoUpscale.title"), label: t("canvas.videoUpscale.label"), icon: <Maximize2 className="size-4" />, onClick: () => onVideoUpscale(node) }] : []),
         ...(isText ? [{ id: "generateImage", title: t("canvas.node.generateImage"), label: t("canvas.node.generate"), icon: <ImageIcon className="size-4" />, onClick: () => onGenerateImage(node) }] : []),
         ...(isConfig ? [{ id: "config", title: t("canvas.configNode.title"), label: t("canvas.configNode.title"), icon: <Settings2 className="size-4" />, onClick: () => onToggleDialog(node) }] : []),
         ...(isText ? [{ id: "decreaseFont", title: t("canvas.nodeToolbar.decreaseFont"), label: t("canvas.nodeToolbar.zoomOut"), icon: <Minus className="size-4" />, onClick: () => onDecreaseFont(node) }] : []),

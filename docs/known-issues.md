@@ -107,37 +107,32 @@ i.e. exactly when the workflow is *hidden* from the model picker.
 
 ---
 
-## 6. 55 hardcoded Chinese strings outside the i18n dictionaries
+## 6. Thirteen lines of Chinese stay hardcoded, on purpose
 
-**Symptom** The English UI still shows Chinese in a few dialogs.
+**Was** 55 strings of UI copy written inline, showing Chinese in the English UI, plus
+`resource-center-panel.tsx` keeping its own `zh`/`en` copy object.
 
-**Cause** Those strings were never routed through `t()`. Remaining, per file:
+**Now** Every one of those strings goes through `t()`, and the panel's 102 strings moved to
+`resources.panel.*` (decisions #39). What is left is 13 lines, and each is data rather than copy:
 
 ```
-21  components/canvas/canvas-image-settings-popover.tsx
- 7  components/canvas/canvas-node-prompt-panel.tsx     (5 of these are protocol values — keep)
- 6  pages/canvas/project.tsx
- 4  stores/use-config-store.ts
- 4  components/layout/resource-setup-gate.tsx
- 2  components/layout/app-config-modal.tsx
- 2  components/layout/channel-editor-drawer.tsx
- 2  components/canvas/canvas-node.tsx
- 2  pages/config/index.tsx
- 2  components/canvas/canvas-node-moss-layout-dialog.tsx (data: region labels + regex)
- 1  components/canvas/canvas-node-hover-toolbar.tsx
- 1  services/api/image.ts
- 1  components/layout/user-status-actions.tsx           (the 「中」 language glyph — keep)
+ 6  components/canvas/canvas-node-prompt-panel.tsx   protocol: PromptOptimizeMode + referenceNote
+ 2  components/canvas/canvas-node.tsx                art: mascot slogans, paired with their English line
+ 2  components/canvas/canvas-node-moss-layout-dialog.tsx  data: caption regex + prefix the gateway parses
+ 1  services/api/image.ts                           protocol: PromptOptimizeMode union
+ 1  components/layout/user-status-actions.tsx       endonym: 「中」 on the language switcher
+ 1  components/layout/app-config-modal.tsx          endonym: 中文 in the language picker
 ```
 
-Two batches are done (47 + 10 strings); the rest is mechanical work.
+**Why these are not a violation** #17 asks for user-visible copy to live in the dictionaries. The
+protocol values are form fields the gateway matches or feeds to a workflow (#9); the MOSS regex and
+prefix are an agreement about the shape of the gateway's output; the mascot slogans are set in a CJK
+font stack and printed next to their own English line, so translating them would show the sentence
+twice; and a language name is written in the language it names.
 
-Not in the table, because the shape is different: `components/layout/resource-center-panel.tsx`
-(101 Chinese lines) keeps its own `copyByLocale` object with `zh` and `en` side by side instead
-of using the dictionaries. Same violation — one file, so it is the cheap place to start.
-
-**Careful** Some Chinese is *data*, not copy: the MOSS region labels and their regex, the H3
-mode strings (`文生视频(T2VA)` …) sent to the gateway, and the language glyph on the switcher.
-Those must not be translated.
+**Not verified** The remaining risk is a raw key or a `zh` fallback appearing in a surface nobody
+clicked through. The DOM scan covers every route in both locales, but dialogs, drawers and
+context menus are opened by hand and are not exhaustive.
 
 ---
 

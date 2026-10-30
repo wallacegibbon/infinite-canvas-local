@@ -98,7 +98,7 @@ const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
 const CHANNEL_MODEL_SEPARATOR = "::";
 const localDefaultChannel: ModelChannel = {
     id: LOCAL_GATEWAY_CHANNEL_ID,
-    name: "本地 ComfyUI",
+    name: i18n.t("config.channels.localName"),
     baseUrl: LOCAL_GATEWAY_BASE_URL,
     apiKey: "local",
     apiFormat: "openai",
@@ -284,9 +284,9 @@ function suggestPromptCloudApiName(baseUrl: string, model: string) {
     if (value.includes("openai")) return "OpenAI";
     // llama.cpp is the most common local/LAN endpoint, so give it a recognizable default name.
     if (/127\.0\.0\.1|localhost|\[::1\]|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\./.test(value)) {
-        return value.includes("llama") ? "本机 llama.cpp" : "本机接口";
+        return value.includes("llama") ? i18n.t("config.cloudApi.suggestedLocalLlama") : i18n.t("config.cloudApi.suggestedLocalEndpoint");
     }
-    return "提示词接口";
+    return i18n.t("config.cloudApi.suggestedGeneric");
 }
 
 function normalizePromptCloudModel(baseUrl: string, model: string) {
@@ -434,7 +434,7 @@ export const useConfigStore = create<ConfigStore>()(
                     config.channels = [
                         {
                             ...candidate,
-                            name: candidate.name || "本地 ComfyUI",
+                            name: candidate.name || i18n.t("config.channels.localName"),
                             baseUrl: candidate.baseUrl || LOCAL_GATEWAY_BASE_URL,
                             apiKey: candidate.apiKey || "local",
                             apiFormat: "openai",

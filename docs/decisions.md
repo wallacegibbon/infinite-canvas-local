@@ -849,7 +849,7 @@ than a fault, and fixing it means patching radix's `hideOthers`.
 
 ---
 
-## 34. Unused translations are pruned by namespace, never by key
+## 34. Unused translations are pruned by namespace, never by key *(superseded by #38)*
 
 **Decision** A locale namespace is deleted only when its feature was deleted outright *and* no
 template key can reach it. Everything else unreferenced stays.
@@ -904,10 +904,11 @@ by a call site, and never read by the implementation: `Alert.showIcon`, `Empty.i
 Five more were implemented but never exercised (`Space.direction`, `Field.htmlFor`,
 `TagInput.disabled`, `Tag`'s red and purple) and were deleted so the branches cannot rot.
 
-**One list left alone on purpose** ~120 exported symbols have no importer. Most are types in
-`types/canvas-plugin.ts`, which is the **published plugin contract** mirrored by
-`plugins/canvas/sdk/src/types.ts` — plugin authors import them, so "unused in this repo" means the
-opposite of dead. The rest are candidates for a later pass, one at a time, with a browser.
+**The list this audit left alone, and what became of it** ~120 exported symbols appeared to have
+no importer. Most are types in `types/canvas-plugin.ts`, which is the **published plugin contract**
+mirrored by `plugins/canvas/sdk/src/types.ts` — plugin authors import them, so "unused in this
+repo" means the opposite of dead, and they are still there. The rest were resolved in #37, which is
+why that entry insists on the reference graph: several of them were not dead, only unexported.
 
 ---
 
@@ -945,3 +946,116 @@ because a browser can demonstrate the result but cannot enumerate the branches.
 
 **Where** `services/api/http.ts`, `services/api/{image,video,audio,skin-unlocks}.ts`,
 `tests/api-http.test.ts`.
+
+---
+
+## 37. An export is a promise, and ninety-eight were not keeping one
+
+**Decision** A symbol is exported only when another module imports it. Where nothing outside the
+declaring file referred to a symbol that was exported anyway, the keyword was removed and the
+symbol left exactly where it was; where *nothing at all* referred to it, it was deleted. 583
+exports under `src/` became 464.
+
+**Why** An export is a contract with a caller who may not exist. It pins a name, a signature and
+a shape, and every later reader has to establish whether something out there depends on it before
+changing it. Most of these were leftovers rather than contracts: the canvas upscale and
+angle-transform routines lost their callers when the gateway took over those workflows, and
+`setPackMainModel` lost its when the resource panel stopped offering a main-model picker.
+
+**How the two cases were told apart** With the TypeScript language service, not with grep.
+`findReferences` follows barrel re-exports, resolves aliases, and reports whether each reference
+comes from the declaring file or from elsewhere — three things a text scan cannot do. `tsc
+--noUnusedLocals` then supplied the other half: a symbol used only inside its own file is not dead
+yet, but once it stops being exported it may be, and the compiler says so.
+
+**What grep would have got wrong** `fetchImageModels` has no caller by name outside `image.ts`.
+Its caller is `fetchChannelModels`, one file down. A name-only scan deletes a live function here.
+The reverse error is just as likely: `components/ui/select.tsx` lists every part in a trailing
+`export { … }` block, so each part looks referenced — the file appears to use itself. Removing
+those entries exposed the truth, and `SelectGroup`, `SelectLabel` and `SelectSeparator` had no
+caller inside the file either; they were deleted rather than narrowed, because a component nothing
+renders is not an API.
+
+**Cost** Anyone who wants one of these helpers from outside has to add `export` back — a one-word
+change made where its intent is obvious. The cost of the alternative is permanent: a reader cannot
+distinguish a narrower module from one that happens to have no callers today.
+
+**Where** `infinite-canvas/web/src/**`, and the commit that removed the sixteen dead symbols.
+
+---
+
+## 38. Unused translation keys are pruned by key, with reachability decided on the AST
+
+**Decision** A key is deleted when no call site can ask for it. This replaces #34, which pruned
+only by namespace because a script could not separate a dead string from one reached through a
+computed key.
+
+**Why the earlier reasoning could be finished rather than accepted** #34's warning was right about
+the *naive* script, which is why it stopped. The cases it named are all decidable if the analysis
+reads the syntax tree instead of the text: `t(\`settingsPanels.common.${labelKey}\`)` and
+`t(\`assets.kinds.${kind}\`)` mark a subtree reachable, and `t(cond ? "a.b" : "a.c")` — the shape
+this codebase uses for tooltips — contributes both literals, where a regex sees only the
+condition. Keys built by concatenation and by `getFixedT("zh-CN")(…)` are handled the same way.
+
+**The four call sites that stop an analysis dead** `t(item.labelKey)` appears four times. Each
+source is a local constant list in the same file, so the eight keys are read out by hand and listed
+in the analysis. They are the only place the tool is told the answer instead of deriving it, and
+that is the stated risk: a new `t(someVariable)` invalidates the pass.
+
+**Verification, because "nothing looks broken" is not one** The new key set must equal the old set
+minus the dead set, key for key, in both dictionaries — a set comparison rather than a diff that a
+human skims. It does: zh 1118 → 980, en 1099 → 961. Afterwards the analysis reports zero
+unreachable keys, and a DOM scan across every route in both languages returns no rendered key.
+
+**What it found** Two whole namespaces: `config.promptSources.*` (~50 keys for a prompt-library
+panel that no longer exists) and `canvas.agentOps.*` (labels for an agent feature that is gone).
+Two keys that this migration itself had orphaned — `common.durationMinutes` / `durationSeconds`,
+whose only caller was `formatDuration`, deleted two commits earlier — which is the analysis
+agreeing with the code rather than with its own assumptions.
+
+**Cost** ~200 lines out of the dictionaries, 18 kB of the index chunk. Deleting the wrong one
+shows a raw key to the user, so the two guards above are not optional: the set comparison catches
+an over-delete *before* the build, and the DOM scan catches whatever it cannot see.
+
+**Where** `src/i18n/locales/{zh-CN,en-US}.ts`.
+
+---
+
+## 39. All UI copy lives in the dictionaries — including the panel that kept its own
+
+**Decision** `resource-center-panel.tsx` no longer holds a `copyByLocale` object with `zh` and `en`
+side by side. Its 102 strings moved to `resources.panel.*` and are read with
+`t("resources.panel", { returnObjects: true })`.
+
+**Why, given the old shape was not wrong** It was correct, bilingual and type-checked, which is
+why it survived this long. But it was the only copy in the app that `grep resources.panel`-style
+maintenance could not find: someone translating a string had three places to look, and the whole
+point of #17 is that there is one. The values were extracted from the component's own object by
+script and re-emitted verbatim, so the migration could not retype or re-translate anything — the
+check was a value-by-value comparison against the originals, 102 of 102 identical in both
+languages.
+
+**What had to be preserved** The type. `type Copy = typeof copyByLocale.zh` made `copy.titlex` a
+compile error and, more importantly, checked the two `copy[\`runtimeDep_${id}\`]` lookups. That is
+now `type Copy = typeof import("@/i18n/locales/zh-CN").default.resources.panel`: the dictionary is
+the source of truth, and a `Record<string, string>` would have silently allowed a typo through as
+`undefined` at render time.
+
+**The Chinese that stays, and why each one does** Thirteen lines across six files, all deliberate:
+
+- **Protocol values** `PromptOptimizeMode` (`文生视频(T2VA)` …) and the `referenceNote` hint in
+  `canvas-node-prompt-panel.tsx` are form fields sent to the gateway; the backend matches the
+  former and feeds the latter to a workflow (#9).
+- **Parsed data** the `^(物体|人物|文字)` regex and the `人物：` caption prefix in the MOSS layout
+  dialog are an agreement with the gateway about the shape of its output, not copy.
+- **Decorative art** the mascot slogans in `canvas-node.tsx` are set in a CJK font stack and
+  paired with their own English line (`PROCESS GUARDIAN`, `LIGHT BE WITH YOU`). Translating them
+  would print the same sentence twice.
+- **Endonyms** `中文` in the language picker and `中` on the switcher name a language in that
+  language, which is what every language switcher does.
+
+**Cost** One `as unknown as Copy` cast at the boundary, and a component that now depends on the
+dictionary's shape for its types. Both are visible where they are written down.
+
+**Where** `components/layout/resource-center-panel.tsx`, `components/layout/resource-setup-gate.tsx`,
+`src/i18n/locales/{zh-CN,en-US}.ts` (`resources.*`).

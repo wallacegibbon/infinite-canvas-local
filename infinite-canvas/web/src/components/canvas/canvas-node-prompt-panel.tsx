@@ -489,7 +489,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                                 }}
                                 capability="text"
                                 extraOptions={[
-                                    { value: "caption:cloud", label: `反推 · ${t("canvas.promptPanel.optimizeEngineCloud")}${optimizeCloudReady ? `（${config.promptCloudModel}）` : `（${t("canvas.promptPanel.captionCloudNotConfigured")}）`}` },
+                                    { value: "caption:cloud", label: `${t("canvas.promptPanel.captionShort")} · ${t("canvas.promptPanel.optimizeEngineCloud")}${optimizeCloudReady ? `（${config.promptCloudModel}）` : `（${t("canvas.promptPanel.captionCloudNotConfigured")}）`}` },
                                 ]}
                                 onMissingConfig={() => openConfigDialog(true)}
                                 className="max-w-[190px]"

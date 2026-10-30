@@ -2162,7 +2162,7 @@ function InfiniteCanvasPage() {
                 {
                     id: childId,
                     type: CanvasNodeType.Image,
-                    title: payload.prompt.slice(0, 32) || "扩图结果",
+                    title: payload.prompt.slice(0, 32) || t("canvas.outpaint.resultTitle"),
                     position: { x: node.position.x + node.width + 96, y: node.position.y },
                     width: node.width,
                     height: node.height,
@@ -2182,7 +2182,7 @@ function InfiniteCanvasPage() {
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt: payload.prompt, ...generationMetadata } } : item)));
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : "扩图失败";
+                const errorDetails = error instanceof Error ? error.message : t("canvas.outpaint.failed");
                 toast.error(errorDetails);
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {
@@ -2215,7 +2215,7 @@ function InfiniteCanvasPage() {
                 {
                     id: childId,
                     type: CanvasNodeType.Image,
-                    title: payload.summary.slice(0, 32) || "MOSS 布局结果",
+                    title: payload.summary.slice(0, 32) || t("canvas.mossLayout.resultTitle"),
                     position: { x: node.position.x + node.width + 96, y: node.position.y },
                     width: node.width,
                     height: node.height,
@@ -2229,13 +2229,13 @@ function InfiniteCanvasPage() {
             const controller = startGenerationRequest(childId, node.id, childId);
             try {
                 const image = await requestGeneration(generationConfig, payload.summary, { signal: controller.signal }).then((items) => items[0]);
-                if (!image) throw new Error("MOSS 布局生成没有返回图片");
+                if (!image) throw new Error(t("canvas.mossLayout.noImage"));
                 const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
                 const size = fitNodeSize(uploaded.width, uploaded.height, node.width, node.height);
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt: payload.summary, layout: payload, ...generationMetadata } } : item)));
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : "MOSS 布局生成失败";
+                const errorDetails = error instanceof Error ? error.message : t("canvas.mossLayout.failed");
                 toast.error(errorDetails);
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {
@@ -2324,7 +2324,7 @@ function InfiniteCanvasPage() {
                 {
                     id: childId,
                     type: CanvasNodeType.Video,
-                    title: "SeedVR2 超分",
+                    title: t("canvas.videoUpscale.resultTitle"),
                     position: { x: node.position.x + node.width + 96, y: node.position.y },
                     width: size.width,
                     height: size.height,

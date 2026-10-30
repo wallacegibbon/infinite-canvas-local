@@ -7,8 +7,10 @@ import { useTranslation } from "react-i18next";
 import { ImageSettingsPanel, OptionPill, SettingTitle, imageSizeLabel } from "@/components/image-settings-panel";
 import { Button } from "@/components/kit/button";
 import { Switch } from "@/components/kit/choice";
+import i18n from "@/i18n";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
+import { gatewayVariantLabel } from "@/lib/gateway-labels";
 import { channelModelOf } from "@/stores/use-config-store";
 import type { AiConfig } from "@/stores/use-config-store";
 
@@ -27,13 +29,11 @@ type CanvasImageSettingsPopoverProps = {
     autoAdjustOverflow?: boolean;
 };
 
-const qwenModeLabels: Record<string, string> = { t2i: "文生图", edit: "多图编辑", inpaint: "局部重绘", outpaint: "扩图" };
-const qwenModeHints: Record<string, string> = {
-    t2i: "纯文生图：不需要参考图，按提示词生成完整画面",
-    edit: "接 1–4 张参考图，按提示词编辑或融合；可跟随首图或手动选画布比例",
-    inpaint: "选择后自动打开蒙版，只修改蒙版覆盖区域",
-    outpaint: "打开扩图画布，拖图 / 滚轮调整扩图范围",
-};
+// Variant labels arrive from the gateway in English, because registry.json is data
+// (docs/decisions.md #8). `gatewayVariantLabel` answers with the Chinese one from the
+// dictionary when the UI is Chinese and hands back the gateway text — or the bare mode id —
+// otherwise, which is why the four strings are not repeated here.
+const qwenVariantLabel = (mode: string, labels: Record<string, string> | undefined) => labels?.[mode] || gatewayVariantLabel(mode, mode);
 const editRatioOptions = ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"] as const;
 
 function qwenCanvasSize(resolution: string | number, ratio: string) {
@@ -47,14 +47,15 @@ function qwenCanvasSize(resolution: string | number, ratio: string) {
 
 function mossModelInfo(config: AiConfig) {
     const workflowId = channelModelOf(config, config.model)?.model.workflowId || "";
-    return workflowId.startsWith("image-moss-sft-") ? { label: workflowId.includes("50step") ? "MOSS-Image 50步" : "MOSS-Image 8步" } : null;
+    if (!workflowId.startsWith("image-moss-sft-")) return null;
+    return { label: i18n.t(workflowId.includes("50step") ? "canvas.imagePopover.moss50" : "canvas.imagePopover.moss8") };
 }
 
 function qwenModelInfo(config: AiConfig) {
     const model = channelModelOf(config, config.model)?.model;
     if (model?.workflowId !== "image-qwen21") return null;
     const modes = model.variantModes?.length ? model.variantModes : ["t2i", "edit", "inpaint", "outpaint"];
-    return { modes, labels: { ...qwenModeLabels, ...(model.variantLabels || {}) } };
+    return { modes, labels: model.variantLabels };
 }
 
 export function CanvasImageSettingsPopover({ config, onConfigChange, onParamsChange, onOpenChange, onOpenMaskEditor, onOpenOutpaintEditor, onOpenMossLayoutEditor, buttonClassName, placement = "topLeft" }: CanvasImageSettingsPopoverProps) {
@@ -68,6 +69,13 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, onParamsCha
     const activeSize = config.size || "auto";
     const qwen = qwenModelInfo(config);
     const editCanvasRatio = String((config.params as Record<string, unknown> | undefined)?.editCanvasRatio || "auto");
+    // A stored imageMode can outlive the model it was chosen for (switching to Qwen while the
+    // config still says "layout"), so an unknown mode reads as plain text-to-image.
+    const imageMode = qwen && qwen.modes.includes(String(config.imageMode)) ? String(config.imageMode) : "t2i";
+    // The trigger reads `mode · scope`: the mode name, then what the canvas will follow.
+    const qwenTriggerLabel = !qwen
+        ? ""
+        : `${qwenVariantLabel(imageMode, qwen.labels)}${imageMode === "t2i" ? "" : imageMode === "edit" ? ` · ${editCanvasRatio === "auto" ? t("canvas.imagePopover.followFirst") : editCanvasRatio}` : ` · ${t("canvas.imagePopover.followSource")}`}`;
     const updateOpen = (nextOpen: boolean) => {
         setOpen(nextOpen);
         onOpenChange?.(nextOpen);
@@ -103,7 +111,7 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, onParamsCha
             <span ref={buttonRef} className="inline-flex min-w-0">
                 <Button size="small" type="text" className={buttonClassName || "!h-8 !max-w-[180px] !justify-start !rounded-full !px-2.5"} style={{ background: theme.node.fill, color: theme.node.text }} icon={<Settings2 className="size-3.5" />} onClick={() => updateOpen(!open)}>
                     <span className="truncate">
-                        {qwen ? `${qwen.labels[String(config.imageMode || "t2i")] || qwen.labels.t2i || qwen.labels.edit}${String(config.imageMode || "t2i") === "t2i" ? "" : String(config.imageMode || "t2i") === "edit" ? ` · ${editCanvasRatio === "auto" ? "跟随首图" : editCanvasRatio}` : " · 跟随原图"}` : `${imageSizeLabel(activeSize)} · ${t("canvas.controls.images", { count })}`}
+                        {qwen ? qwenTriggerLabel : `${imageSizeLabel(activeSize)} · ${t("canvas.controls.images", { count })}`}
                     </span>
                 </Button>
             </span>
@@ -137,9 +145,16 @@ function ImageSettingsPortal({
     onOpenMossLayoutEditor?: () => void;
     onClose: () => void;
 }) {
+    const { t } = useTranslation();
     const qwen = qwenModelInfo(config);
     const moss = mossModelInfo(config);
     const qwenMode = String(config.imageMode || "t2i");
+    const modeHints: Record<string, string> = {
+        t2i: t("canvas.imagePopover.hints.t2i"),
+        edit: t("canvas.imagePopover.hints.edit"),
+        inpaint: t("canvas.imagePopover.hints.inpaint"),
+        outpaint: t("canvas.imagePopover.hints.outpaint"),
+    };
     const refResolution = String((config.params as Record<string, unknown> | undefined)?.resolution ?? 1024);
     const editCanvasRatio = String((config.params as Record<string, unknown> | undefined)?.editCanvasRatio || "auto");
     const width = 356;
@@ -176,7 +191,7 @@ function ImageSettingsPortal({
                 <div className="space-y-4">
                     <div className="text-lg font-semibold">Qwen Image 2.1</div>
                     <div className="space-y-2.5">
-                        <SettingTitle color={theme.node.muted}>功能</SettingTitle>
+                        <SettingTitle color={theme.node.muted}>{t("canvas.imagePopover.mode")}</SettingTitle>
                         <div className="grid grid-cols-2 gap-2.5">
                             {["t2i", "edit", "inpaint", "outpaint"].filter((mode) => qwen.modes.includes(mode)).map((mode) => (
                                 <OptionPill
@@ -190,22 +205,22 @@ function ImageSettingsPortal({
                                         if (mode === "outpaint") onOpenOutpaintEditor?.();
                                     }}
                                 >
-                                    {qwen.labels[mode] || mode}
+                                    {qwenVariantLabel(mode, qwen.labels)}
                                 </OptionPill>
                             ))}
                         </div>
                         <div className="text-xs leading-4" style={{ color: theme.node.muted }}>
-                            {qwenModeHints[qwenMode] || qwenModeHints.t2i}
+                            {modeHints[qwenMode] || modeHints.t2i}
                         </div>
                         {qwenMode === "t2i" ? (
                             <ImageSettingsPanel config={config} onConfigChange={(key, value) => onConfigChange(key, value)} theme={theme} className="space-y-4" maxCount={10} />
                         ) : qwenMode === "edit" ? (
                             <div className="space-y-3">
                                 <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: theme.node.stroke }}>
-                                    <SettingTitle color={theme.node.muted}>画布比例</SettingTitle>
+                                    <SettingTitle color={theme.node.muted}>{t("canvas.imagePopover.canvasRatio")}</SettingTitle>
                                     <div className="grid grid-cols-3 gap-2">
                                         <OptionPill selected={editCanvasRatio === "auto"} theme={theme} onClick={() => onParamsChange?.({ editCanvasRatio: "auto", editCanvasSize: "" })}>
-                                            跟随首图
+                                            {t("canvas.imagePopover.followFirst")}
                                         </OptionPill>
                                         {editRatioOptions.map((ratio) => (
                                             <OptionPill
@@ -219,17 +234,17 @@ function ImageSettingsPortal({
                                         ))}
                                     </div>
                                     <div className="text-xs leading-4" style={{ color: theme.node.muted }}>
-                                        跟随首图保持原输出尺寸；手动比例按当前参考分辨率生成画布（原始按 1k）。
+                                        {t("canvas.imagePopover.editRatioHint")}
                                     </div>
                                 </div>
                                 <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: theme.node.stroke }}>
-                                    <SettingTitle color={theme.node.muted}>参考分辨率</SettingTitle>
+                                    <SettingTitle color={theme.node.muted}>{t("canvas.imagePopover.referenceResolution")}</SettingTitle>
                                     <div className="grid grid-cols-4 gap-2">
                                         {[
                                             ["1024", "1k"],
                                             ["1536", "1.5k"],
                                             ["2048", "2k"],
-                                            ["0", "原始"],
+                                            ["0", t("canvas.imagePopover.resolutionOriginal")],
                                         ].map(([value, label]) => (
                                             <OptionPill key={value} selected={refResolution === value} theme={theme} onClick={() => onParamsChange?.({ resolution: Number(value), ...(editCanvasRatio !== "auto" ? { editCanvasSize: qwenCanvasSize(value, editCanvasRatio) } : {}) })}>
                                                 {label}
@@ -237,7 +252,7 @@ function ImageSettingsPortal({
                                         ))}
                                     </div>
                                     <div className="text-xs leading-4" style={{ color: theme.node.muted }}>
-                                        多图尺寸不同时各自按比例缩放；输出尺寸默认跟随第一张参考图，原始表示不缩放。
+                                        {t("canvas.imagePopover.resolutionHint")}
                                     </div>
                                 </div>
                                 <ImageSettingsPanel config={config} onConfigChange={(key, value) => onConfigChange(key, value)} theme={theme} className="space-y-4" maxCount={10} showSize={false} />
@@ -245,11 +260,11 @@ function ImageSettingsPortal({
                         ) : (
                             <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: theme.node.stroke }}>
                                 <div className="flex items-center justify-between gap-3">
-                                    <SettingTitle color={theme.node.muted}>透明背景</SettingTitle>
+                                    <SettingTitle color={theme.node.muted}>{t("canvas.imagePopover.transparent")}</SettingTitle>
                                     <Switch size="small" checked={config.background === "transparent"} onChange={(checked) => onConfigChange("background", checked ? "transparent" : "")} />
                                 </div>
                                 <div className="text-xs leading-4" style={{ color: theme.node.muted }}>
-                                    仅 Qwen Image 2.1 支持；透明输出保存为 PNG，保留 alpha。
+                                    {t("canvas.imagePopover.transparentHint")}
                                 </div>
                             </div>
                         )}
@@ -259,7 +274,7 @@ function ImageSettingsPortal({
                 <div className="space-y-4">
                     {moss && onOpenMossLayoutEditor ? (
                         <div className="space-y-2.5 rounded-xl border p-3" style={{ borderColor: theme.node.stroke }}>
-                            <SettingTitle color={theme.node.muted}>区域布局</SettingTitle>
+                            <SettingTitle color={theme.node.muted}>{t("canvas.imagePopover.layout")}</SettingTitle>
                             {config.imageMode === "layout" && config.layout ? (
                                 <>
                                     <button
@@ -271,7 +286,7 @@ function ImageSettingsPortal({
                                             onOpenMossLayoutEditor();
                                         }}
                                     >
-                                        编辑区域布局（{config.layout.regions.length} 个区域）
+                                        {t("canvas.imagePopover.editLayout", { count: config.layout.regions.length })}
                                     </button>
                                     <button
                                         type="button"
@@ -279,7 +294,7 @@ function ImageSettingsPortal({
                                         style={{ background: "transparent", borderColor: theme.node.stroke, color: theme.node.muted }}
                                         onClick={() => onConfigChange("imageMode", "edit")}
                                     >
-                                        切换普通文生图
+                                        {t("canvas.imagePopover.usePlainMode")}
                                     </button>
                                 </>
                             ) : (
@@ -293,11 +308,11 @@ function ImageSettingsPortal({
                                         onOpenMossLayoutEditor();
                                     }}
                                 >
-                                    打开区域布局编辑器
+                                    {t("canvas.imagePopover.openLayoutEditor")}
                                 </button>
                             )}
                             <div className="text-xs leading-4" style={{ color: theme.node.muted }}>
-                                {moss.label} · 画框并为每个区域单独填写提示词；背景框先画，主体/文字后画。普通文生图不会使用旧布局。
+                                {moss.label} · {t("canvas.imagePopover.layoutHint")}
                             </div>
                         </div>
                     ) : null}
