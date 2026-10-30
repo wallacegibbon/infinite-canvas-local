@@ -257,15 +257,32 @@ makes `parsed.state.assets.map` throw, a manual edit — the parse throws inside
 catches it, calls `onRehydrateStorage` with the error, and the listener ignores the error and sets
 `hydrated: true`. The app then comes up with **empty defaults**.
 
+**Reproduced** On the `127.0.0.1:3000` origin, with a live canvas holding two nodes:
+
+1. back up `infinite-canvas:canvas_store` (2314 bytes, one project), then overwrite it with the
+   invalid string `{oops truncated`;
+2. hard reload.
+
+Result: the app came up on `/canvas/QA-dFYz82fJmscKgcA7_2` — a **new project id** — titled
+"Infinite Canvas 1", "No nodes on this canvas". The original canvas was gone from the list. The
+console was **empty**: not the persist middleware's error, not a warning, nothing. Within seconds
+the stored blob was 378 bytes containing a valid blob for the new empty project, so the 2314-byte
+original had already been overwritten.
+
 **Why that is worse than it sounds** The user sees an empty canvas list over data that is still in
-IndexedDB, with no message. The only trace is a console error from the persist middleware. There is
-no "your saved state could not be read" anywhere in the UI, so the natural conclusion is that the
-canvases were deleted.
+IndexedDB, with no message anywhere. There is no "your saved state could not be read" in the UI and
+none in the console, so the only available conclusion is that the canvases were deleted — and they
+very nearly are, because the empty state is persisted over the unreadable one as soon as anything
+sets store state.
 
-**Fix** Wrap both parses in `try`/`catch`, return `null` on failure so hydration proceeds with
-defaults deliberately, and surface the failure once (a toast, or a banner on the canvas list) so the
-state is not silently swapped for an empty one. Not done yet: the user-visible half is a product
-decision, and the parse half alone changes nothing a user can see.
+**There is no `version` and no `migrate`** in either `persist` configuration, so this is not only a
+corruption path. Any change to the persisted shape — `lastProjectId` was added earlier in this work
+— hydrates a partially-defined state instead of being migrated or rejected.
 
-**Not verified** Whether a real-world corruption has ever happened. This was found by reading the
-code, not by reproducing.
+**Fix** Guard both parses, and make the storage adapter refuse to write over a blob it failed to
+read, so the unreadable state survives until someone can look at it. Then say so once, in the UI.
+Not done yet: the "refuse to write" half means the session stops persisting, which is only coherent
+together with the message, and the message is a product decision.
+
+**Restored** The origin's data was put back from the backup afterwards and verified: 2314 bytes, one
+project named 无限画布 1, two nodes.
