@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Button, Input, Popconfirm, Switch, Tabs } from "antd";
+import { Input, Popconfirm, Switch, Tabs } from "antd";
 import { AlertTriangle, Puzzle, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { canvasThemes } from "@/lib/canvas-theme";

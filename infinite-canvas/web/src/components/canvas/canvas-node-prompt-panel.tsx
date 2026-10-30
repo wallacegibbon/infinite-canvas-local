@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ChevronRight, LoaderCircle, Maximize2, ScanText, Sparkles, Square, X } from "lucide-react";
-import { Button, Tooltip } from "antd";
+import { Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { BaseModelPicker, ModelPicker, WorkflowModelPicker } from "@/components/model-picker";

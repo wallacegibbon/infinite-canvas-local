@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, Segmented, Tooltip } from "antd";
+import { Segmented, Tooltip } from "antd";
 import { Check, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useImageEditorViewport } from "@/components/canvas/use-image-editor-viewport";
+import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { readImageMeta } from "@/lib/image-utils";
 

@@ -1,9 +1,10 @@
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "antd";
+
 import { Download, FileUp, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/kit/button";
 import { toast } from "@/components/kit/toast";
 import { readZip } from "@/lib/zip";
 import { setMediaBlob } from "@/services/file-storage";

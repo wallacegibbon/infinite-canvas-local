@@ -1,9 +1,10 @@
 import { Copy, Download, PencilLine, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Button, Card, Drawer, Empty, Form, Image, Input, Pagination, Select, Space, Tag, Typography } from "antd";
+import { Card, Drawer, Empty, Form, Image, Input, Pagination, Select, Space, Tag, Typography } from "antd";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { useCopyText } from "@/hooks/use-copy-text";

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Settings2 } from "lucide-react";
-import { Button, Switch } from "antd";
+import { Switch } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsPanel, OptionPill, SettingTitle, imageSizeLabel } from "@/components/image-settings-panel";
+import { Button } from "@/components/kit/button";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { channelModelOf } from "@/stores/use-config-store";

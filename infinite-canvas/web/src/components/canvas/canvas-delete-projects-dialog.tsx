@@ -28,7 +28,7 @@ export function CanvasDeleteProjectsDialog() {
             footer={
                 <>
                     <Button onClick={() => setDeleteIds([])}>{t("common.cancel")}</Button>
-                    <Button variant="danger" onClick={confirm}>
+                    <Button type="primary" danger onClick={confirm}>
                         {t("common.delete")}
                     </Button>
                 </>

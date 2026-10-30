@@ -701,3 +701,41 @@ closing contains no `ant-modal` at all. The antd chunk went 739 kB → 714 kB (2
 
 **Where** `components/kit/dialog.tsx`, `components/kit/button.tsx`,
 `components/kit/confirm.tsx`, and the 23 files that used to render `<Modal>`.
+
+---
+
+## 30. Buttons keep antd's prop names, and antd's reset stylesheet is gone
+
+**Decision** `kit/button.tsx` takes `type` / `size` / `icon` / `iconPlacement` / `danger` /
+`loading` / `shape` — antd's names — so moving 116 `<Button>` call sites off antd was 30 import
+swaps and zero call-site edits. Sizes keep antd's metrics exactly (24 / 32 / 40 px) because these
+buttons sit in toolbars measured against those heights. Children render inside
+`<span data-slot="text">` and the icon inside `<span data-slot="icon">`, because `globals.css`
+collapses the canvas composer's label at narrow widths and needs to select one without the other;
+the four `.canvas-composer-icon.ant-btn` rules became `.canvas-composer-icon` plus
+`> span:not([data-slot="icon"])`.
+
+**Why keep antd's names** They were never antd's invention: `type`, `size`, `icon` and `danger`
+are the words these call sites already think in, and a rename pass would have touched 116 lines to
+make them say `variant` instead. The shim is documented at the top of the file so nobody mistakes
+it for antd.
+
+**The bug this uncovered** With the kit button in place, the home page's primary button rendered as
+an empty white pill. The cause had nothing to do with the button: `antd/dist/reset.css` was
+imported from `main.tsx`, so it loaded as an **unlayered stylesheet**, and it contains
+`input, button, select… { color: inherit }`. Unlayered CSS outranks *every* cascade layer, so that
+one declaration silently beat every Tailwind text colour on every `<button>` in the app —
+including the ones that had been antd's until now, where it made no difference because antd styled
+its own internals. `text-white` simply never applied to a button. Tailwind's preflight already
+normalises the same elements, so the import is deleted rather than layered; verified afterwards
+that antd's Select, Input, Tabs and Switch still render correctly without it.
+
+That failure mode is worth remembering: type checks, unused-symbol checks and the reachability
+graph all passed while a primary button was invisible.
+
+**Result** antd component instances 238 → 122; files importing antd 42 → 36. The antd JS chunk did
+not shrink (714 kB) because Button is imported internally by the components that remain, so this
+step buys removability rather than bytes.
+
+**Where** `components/kit/button.tsx`, `styles/globals.css`, `main.tsx`, and the 30 files whose
+antd import lost `Button`.

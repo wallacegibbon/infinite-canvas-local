@@ -1,8 +1,9 @@
 import type { CSSProperties } from "react";
 import { Image as ImageIcon, LoaderCircle, MessageSquare, Play, Settings2, Square, Video } from "lucide-react";
-import { Button, Segmented } from "antd";
+import { Segmented } from "antd";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/kit/button";
 import { BaseModelPicker, WorkflowModelPicker } from "@/components/model-picker";
 import { defaultConfig, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 

@@ -1,6 +1,7 @@
+import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { useEffect, useState } from "react";
-import { Button, Segmented, Slider } from "antd";
+import { Segmented, Slider } from "antd";
 import { RotateCcw, WandSparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 

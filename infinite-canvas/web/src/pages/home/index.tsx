@@ -1,5 +1,6 @@
+import { Button } from "@/components/kit/button";
 import { ArrowRight } from "lucide-react";
-import { Button } from "antd";
+
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 

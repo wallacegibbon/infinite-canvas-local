@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button, Spin } from "antd";
+import { Spin } from "antd";
 import { Gauge } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { LOCAL_GATEWAY_BASE_URL } from "@/constant/app-mode";
 import { canvasThemes } from "@/lib/canvas-theme";

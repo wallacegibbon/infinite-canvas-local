@@ -93,7 +93,7 @@ export function ConfirmHost() {
                         <Button disabled={pending} onClick={dismiss}>
                             {request?.cancelText}
                         </Button>
-                        <Button variant={request?.danger ? "danger" : "primary"} disabled={pending} onClick={handleOk}>
+                        <Button type="primary" danger={Boolean(request?.danger)} disabled={pending} onClick={handleOk}>
                             {pending ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
                             {request?.okText}
                         </Button>

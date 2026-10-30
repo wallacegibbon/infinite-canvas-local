@@ -334,7 +334,7 @@
         line-height: 1 !important;
     }
 
-    .canvas-composer-icon.ant-btn {
+    .canvas-composer-icon {
         flex: 0 0 32px;
         width: 32px;
     }
@@ -350,7 +350,7 @@
     .canvas-composer-tools .canvas-composer-mode-button span,
     .canvas-composer-tools .canvas-model-picker-text,
     .canvas-composer-tools .canvas-select-chevron,
-    .canvas-composer-tools .canvas-composer-icon.ant-btn > span:not(.ant-btn-icon) {
+    .canvas-composer-tools .canvas-composer-icon > span:not([data-slot="icon"]) {
         display: none;
     }
 
@@ -374,13 +374,13 @@
             line-height: 1;
         }
 
-        .canvas-composer-icon.ant-btn {
+        .canvas-composer-icon {
             flex: 0 1 auto;
             max-width: 170px;
             width: auto !important;
         }
 
-        .canvas-composer-tools .canvas-composer-icon.ant-btn > span:not(.ant-btn-icon) {
+        .canvas-composer-tools .canvas-composer-icon > span:not([data-slot="icon"]) {
             display: inline-flex;
             min-width: 0;
         }
@@ -610,8 +610,7 @@
     font-size: 0.75rem;
 }
 
-[data-card-skin="cream"] .ant-btn:disabled,
-[data-card-skin="cream"] .ant-btn.ant-btn-disabled {
+[data-card-skin="cream"] button:disabled {
     color: #7a7a7a !important;
     background: rgba(120, 96, 60, 0.06) !important;
     border-color: #ddcfb9 !important;

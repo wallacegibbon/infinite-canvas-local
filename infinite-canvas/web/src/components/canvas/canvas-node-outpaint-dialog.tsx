@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, Input } from "antd";
+import { Input } from "antd";
 import { Minimize2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 
+import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 
