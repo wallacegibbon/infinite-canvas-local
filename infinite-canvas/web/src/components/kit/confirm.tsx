@@ -78,11 +78,11 @@ export function ConfirmHost() {
             }}
         >
             <AlertDialog.Portal>
-                <AlertDialog.Overlay data-canvas-overlay className="fixed inset-0 z-[1400] bg-black/45" />
+                <AlertDialog.Overlay data-canvas-overlay className="fixed inset-0 z-[1400] bg-black/45 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
                 <AlertDialog.Content
                     data-canvas-overlay
                     data-canvas-dialog-content
-                    className="fixed left-1/2 top-1/2 z-[1401] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-stone-200 bg-white p-5 shadow-2xl dark:border-stone-800 dark:bg-stone-900"
+                    className="fixed left-1/2 top-1/2 z-[1401] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-stone-200 bg-white p-5 shadow-2xl data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-stone-800 dark:bg-stone-900"
                 >
                     <AlertDialog.Title className="text-base font-semibold text-stone-900 dark:text-stone-100">{request?.title}</AlertDialog.Title>
                     {/* radix requires a description on an alert dialog and wires `aria-describedby`

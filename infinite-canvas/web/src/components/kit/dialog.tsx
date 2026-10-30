@@ -18,6 +18,10 @@ import { cn } from "@/lib/utils";
  *   - Closing unmounts the children. That is antd's `destroyOnHidden`, which 13 of the call
  *     sites asked for explicitly; the ones that did not were keeping transient form state
  *     alive across opens, which is not behaviour worth preserving.
+ *   - It fades and scales in, which is what antd's Modal did and what this lost when antd was
+ *     removed. The animation is **enter-only on purpose**: an exit animation would make radix
+ *     hold the subtree mounted for its duration, and instant unmount on close is the contract
+ *     the call sites rely on.
  *   - `title` may be omitted for content panels that draw their own heading; `label` then
  *     supplies the accessible name, because an unlabelled dialog is unusable with a screen
  *     reader.
@@ -56,7 +60,7 @@ export function Dialog({ open, onClose, title, label, children, footer, width = 
             }}
         >
             <RadixDialog.Portal>
-                <RadixDialog.Overlay data-canvas-overlay className="fixed inset-0 z-[1300] bg-black/45" />
+                <RadixDialog.Overlay data-canvas-overlay className="fixed inset-0 z-[1300] bg-black/45 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
                 <RadixDialog.Content
                     data-canvas-overlay
                     data-canvas-dialog-content
@@ -69,7 +73,7 @@ export function Dialog({ open, onClose, title, label, children, footer, width = 
                     }}
                     style={{ width }}
                     className={cn(
-                        "fixed left-1/2 top-1/2 z-[1301] flex max-h-[90dvh] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl outline-none dark:border-stone-800 dark:bg-stone-900",
+                        "fixed left-1/2 top-1/2 z-[1301] flex max-h-[90dvh] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl outline-none dark:border-stone-800 dark:bg-stone-900 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
                         className,
                     )}
                 >
