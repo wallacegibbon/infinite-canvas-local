@@ -1,11 +1,13 @@
 import { Copy, Download, PencilLine, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Card, Drawer, Empty, Form, Image, Input, Pagination, Select, Space, Tag, Typography } from "antd";
+import { Card, Drawer, Form, Image, Input, Pagination, Select, Typography } from "antd";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
+import { Empty, Space } from "@/components/kit/display";
+import { CheckableTag, Tag } from "@/components/kit/tag";
 import { toast } from "@/components/kit/toast";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { formatBytes, readFileAsDataUrl } from "@/lib/image-utils";
@@ -229,7 +231,7 @@ export default function AssetsPage() {
                                 <div className="text-xs font-medium text-stone-500 dark:text-stone-400">{t("assets.type")}</div>
                                 <div className="flex flex-wrap gap-2">
                                     {kindOptions.map((option) => (
-                                        <Tag.CheckableTag
+                                        <CheckableTag
                                             key={option}
                                             checked={kindFilter === option}
                                             className={cn("prompt-filter-tag", kindFilter === option && "is-active")}
@@ -239,7 +241,7 @@ export default function AssetsPage() {
                                             }}
                                         >
                                             {option === "all" ? t("common.all") : t(`assets.kinds.${option}`)}
-                                        </Tag.CheckableTag>
+                                        </CheckableTag>
                                     ))}
                                 </div>
                             </div>
@@ -277,7 +279,7 @@ export default function AssetsPage() {
                         ))}
                     </div>
 
-                    {!visibleAssets.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("assets.empty")} className="py-20" /> : null}
+                    {!visibleAssets.length ? <Empty description={t("assets.empty")} className="py-20" /> : null}
 
                     <div className="flex justify-center">
                         <Pagination

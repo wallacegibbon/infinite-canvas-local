@@ -1,9 +1,11 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
-import { Empty, Input, Popconfirm, Select, Tag } from "antd";
+import { Input, Popconfirm, Select } from "antd";
 import { Check, ChevronRight, Download, Eye, FileText, Image as ImageIcon, LayoutGrid, ListChecks, Music2, Plus, Rows3, Search, Settings2, Square, Trash2, Type, Video } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 
+import { Empty } from "@/components/kit/display";
+import { CheckableTag } from "@/components/kit/tag";
 import { toast } from "@/components/kit/toast";
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { exportCanvasNodes } from "@/lib/canvas/canvas-export";
@@ -506,13 +508,13 @@ const CanvasAssetsTab = memo(function CanvasAssetsTab({ onInsert, theme }: { onI
             </div>
             {allTags.length ? (
                 <div className="flex flex-wrap gap-1.5 px-3 pb-2">
-                    <Tag.CheckableTag checked={tagFilter === "all"} className={cn("prompt-filter-tag", tagFilter === "all" && "is-active")} onChange={() => setTagFilter("all")}>
+                    <CheckableTag checked={tagFilter === "all"} className={cn("prompt-filter-tag", tagFilter === "all" && "is-active")} onChange={() => setTagFilter("all")}>
                         {t("common.all")}
-                    </Tag.CheckableTag>
+                    </CheckableTag>
                     {allTags.map((tag) => (
-                        <Tag.CheckableTag key={tag} checked={tagFilter === tag} className={cn("prompt-filter-tag", tagFilter === tag && "is-active")} onChange={() => setTagFilter((prev) => (prev === tag ? "all" : tag))}>
+                        <CheckableTag key={tag} checked={tagFilter === tag} className={cn("prompt-filter-tag", tagFilter === tag && "is-active")} onChange={() => setTagFilter((prev) => (prev === tag ? "all" : tag))}>
                             {tag}
-                        </Tag.CheckableTag>
+                        </CheckableTag>
                     ))}
                 </div>
             ) : null}
@@ -545,7 +547,7 @@ const CanvasAssetsTab = memo(function CanvasAssetsTab({ onInsert, theme }: { onI
                         })}
                     </div>
                 ) : (
-                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("canvas.sidePanel.noAssets")} className="pt-16" />
+                    <Empty description={t("canvas.sidePanel.noAssets")} className="pt-16" />
                 )}
             </div>
         </div>

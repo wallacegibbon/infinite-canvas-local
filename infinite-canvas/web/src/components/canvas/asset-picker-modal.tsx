@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { Empty, Input, Pagination, Tag } from "antd";
+import { Input, Pagination } from "antd";
 import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Dialog } from "@/components/kit/dialog";
+import { Empty } from "@/components/kit/display";
+import { CheckableTag, Tag } from "@/components/kit/tag";
 import { cn } from "@/lib/utils";
 import { getImagePreviewRevision, subscribeImagePreviews } from "@/services/image-storage";
 import { assetCoverUrl, useAssetStore, type Asset } from "@/stores/use-asset-store";
@@ -102,7 +104,7 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                 />
                 <div className="flex gap-1.5">
                     {kindOptions.map((option) => (
-                        <Tag.CheckableTag
+                        <CheckableTag
                             key={option}
                             checked={kindFilter === option}
                             className={cn("prompt-filter-tag", kindFilter === option && "is-active")}
@@ -112,7 +114,7 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                             }}
                         >
                             {option === "all" ? t("common.all") : t(`assets.kinds.${option}`)}
-                        </Tag.CheckableTag>
+                        </CheckableTag>
                     ))}
                 </div>
             </div>
@@ -124,7 +126,7 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                     ))}
                 </div>
             ) : (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("canvas.assetPicker.empty")} className="py-12" />
+                <Empty description={t("canvas.assetPicker.empty")} className="py-12" />
             )}
 
             {filtered.length > PAGE_SIZE && (

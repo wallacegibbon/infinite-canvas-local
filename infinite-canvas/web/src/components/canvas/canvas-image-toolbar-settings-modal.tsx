@@ -1,7 +1,9 @@
 import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
+import { Space } from "@/components/kit/display";
+import { Tag } from "@/components/kit/tag";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Card, Checkbox, Form, Space, Switch, Tag, Tooltip, Typography, theme as antdTheme } from "antd";
+import { Card, Checkbox, Form, Switch, Tooltip, Typography, theme as antdTheme } from "antd";
 import { Ellipsis, Image as ImageIcon, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
