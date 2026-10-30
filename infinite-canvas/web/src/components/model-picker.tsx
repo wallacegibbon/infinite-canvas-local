@@ -3,7 +3,7 @@ import { Cpu, Layers, ScanText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/kit/select-primitive";
 import { cn } from "@/lib/utils";
 import {
     baseModelOptions,

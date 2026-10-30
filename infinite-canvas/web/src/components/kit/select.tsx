@@ -1,7 +1,7 @@
 import { ChevronDown, LoaderCircle } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { SelectContent, SelectItem, SelectTrigger, SelectValue, Select as SelectRoot } from "@/components/ui/select";
+import { SelectContent, SelectItem, SelectTrigger, SelectValue, Select as SelectRoot } from "@/components/kit/select-primitive";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * The prop shape is antd's (`value` / `onChange` / `options` / `placeholder` / `size` /
  * `loading` / `notFoundContent`), so call sites keep reading `onChange={(value) => …}` and
  * `options={[{ value, label }]}`. The implementation is the radix primitive already in
- * `components/ui/select`, which is what `model-picker` uses.
+ * `kit/select-primitive`, which is what `model-picker` uses.
  *
  * Two antd features are not carried over, because radix covers them natively:
  *   - `showSearch` / `optionFilterProp` — the listbox has built-in typeahead, driven by

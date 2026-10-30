@@ -1112,3 +1112,45 @@ still resolves — to a redirect, so old bookmarks land on a canvas instead of a
 **Where** `src/pages/canvas/entry.tsx`, `src/router.tsx`, `stores/canvas/use-canvas-store.ts`
 (`lastProjectId`), `components/canvas/canvas-top-bar.tsx` (the switcher this made obvious:
 switching used to mean leaving the canvas for the list page), `components/canvas/canvas-manager-dialog.tsx`.
+
+---
+
+## 41. `npm run check` is the third gate, because the compiler cannot see these two bugs
+
+**Decision** Two scripts in `infinite-canvas/web/scripts/` run as `npm run check:i18n` and
+`npm run check:exports`, together with `tsc --noEmit` under `npm run check`.
+
+**Why they exist** Both catch a class of bug that type-checks, builds, and passes tests while
+being visibly broken:
+
+- **A missing translation key.** `fallbackLng` is `zh-CN`, so an absent English key renders
+  Chinese — no error, no warning, just a sentence in the wrong language. The inverse is worse:
+  deleting a key that is still asked for prints the key itself on screen. This has happened
+  three times in this repository — `assets.kinds.audio` (the built-in Audio node's title, wrong
+  since audio nodes existed), `agent.composer.mentions.*` (two error paths), and
+  `navigation.config` (the settings button's aria-label, deleted as a dead key by the very commit
+  that made it dead).
+- **An export nothing imports.** An export is a promise to a caller who may not exist, and a
+  `tsc` pass cannot tell an unused export from a used one. See #37 for why grep is not enough.
+
+**What makes them checks and not trivia** They are not advice in a document; they exit non-zero.
+`check:i18n` compares every literal `t("…")` against the flattened dictionaries in both
+directions, compares the two dictionaries to each other, and treats a `t("…", { returnObjects })`
+object path as a branch rather than a missing leaf. `check:exports` uses the language service.
+
+**The two exceptions, written down where the script can see them** `chinese()` in
+`lib/gateway-labels.ts` asks only the zh dictionary, so `gateway.models.*` and
+`gateway.variants.*` are zh-only on purpose — enumerating them in `check-i18n.cjs` stops the
+"only in zh-CN" check from failing every run. And four `t(variable)` call sites read their key
+from a local constant list; the eight resulting keys are listed by hand in `HAND_RESOLVED`,
+which is the one place the tool is told the answer instead of deriving it. The script prints any
+`t(variable)` it meets so that list stays honest.
+
+**Renamed while passing through** `canvas.projectPage.*` (37 keys) became `canvas.runtime.*`.
+`projectPage` named a page that no longer exists — the list is a panel now — and these keys were
+never page furniture: they are stop-generation, export, clipboard and failure messages emitted
+*by* the canvas. `canvas.project.*` keeps the list-management keys, which is what "project"
+actually means here.
+
+**Where** `infinite-canvas/web/scripts/check-i18n.cjs`, `scripts/check-exports.cjs`,
+`package.json`.

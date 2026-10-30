@@ -430,7 +430,7 @@ function InfiniteCanvasPage() {
                 );
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
                 toast.error(errorDetails);
                 setNodes((prev) =>
                     prev.map((item) =>
@@ -502,10 +502,10 @@ function InfiniteCanvasPage() {
     const confirmStopGeneration = useCallback(
         (nodeId: string) => {
             confirm({
-                title: t("canvas.projectPage.stopTitle"),
-                content: t("canvas.projectPage.stopDescription"),
-                okText: t("canvas.projectPage.stop"),
-                cancelText: t("canvas.projectPage.continue"),
+                title: t("canvas.runtime.stopTitle"),
+                content: t("canvas.runtime.stopDescription"),
+                okText: t("canvas.runtime.stop"),
+                cancelText: t("canvas.runtime.continue"),
                 danger: true,
                 onOk: () => stopGenerationByRunningId(nodeId),
             });
@@ -687,7 +687,7 @@ function InfiniteCanvasPage() {
 
             const connection = normalizeConnection(current.nodeId, targetNodeId, nodesRef.current, current.handleType);
             if (!connection) {
-                toast.warning(t("canvas.projectPage.configConnection"));
+                toast.warning(t("canvas.runtime.configConnection"));
                 return;
             }
             const { fromNodeId, toNodeId } = connection;
@@ -710,7 +710,7 @@ function InfiniteCanvasPage() {
                 ? normalizeConnection(newNode.id, pending.connection.nodeId, [...nodesRef.current, newNode], "source")
                 : normalizeConnection(pending.connection.nodeId, newNode.id, [...nodesRef.current, newNode], pending.connection.handleType);
             if (!connection) {
-                toast.warning(t("canvas.projectPage.configConnection"));
+                toast.warning(t("canvas.runtime.configConnection"));
                 return;
             }
             setNodes((prev) => [...prev, newNode]);
@@ -1275,11 +1275,11 @@ function InfiniteCanvasPage() {
 
     const exportCurrentProject = useCallback(async () => {
         const project = useCanvasStore.getState().projects.find((item) => item.id === projectId);
-        if (!project) return toast.error(t("canvas.projectPage.notFound"));
-        const hide = toast.loading(t("canvas.projectPage.exporting"));
+        if (!project) return toast.error(t("canvas.runtime.notFound"));
+        const hide = toast.loading(t("canvas.runtime.exporting"));
         try {
             await exportCanvasProjects([project], project.title || t("canvas.title"));
-            toast.success(t("canvas.projectPage.exported"));
+            toast.success(t("canvas.runtime.exported"));
         } catch (error) {
             console.error(error);
             toast.error(t("canvas.sidePanel.exportFailed"));
@@ -1624,7 +1624,7 @@ function InfiniteCanvasPage() {
 
             const node = {
                 ...createCanvasNode(CanvasNodeType.Text, getCanvasCenter(), { content: trimmed, status: NODE_STATUS_SUCCESS }),
-                title: trimmed.slice(0, 32) || t("canvas.projectPage.clipboardText"),
+                title: trimmed.slice(0, 32) || t("canvas.runtime.clipboardText"),
             };
 
             setNodes((prev) => [...prev, node]);
@@ -1648,12 +1648,12 @@ function InfiniteCanvasPage() {
             const blob = await imageItem.getType(imageType);
             const file = new File([blob], "clipboard-image.png", { type: imageType });
             void createImageFileNode(file, getCanvasCenter());
-            toast.success(t("canvas.projectPage.clipboardImageAdded"));
+            toast.success(t("canvas.runtime.clipboardImageAdded"));
             return;
         }
 
         const text = await navigator.clipboard.readText();
-        if (createTextNodeFromClipboard(text)) toast.success(t("canvas.projectPage.clipboardTextAdded"));
+        if (createTextNodeFromClipboard(text)) toast.success(t("canvas.runtime.clipboardTextAdded"));
     }, [createImageFileNode, createTextNodeFromClipboard, getCanvasCenter, t]);
 
     useEffect(() => {
@@ -1930,16 +1930,16 @@ function InfiniteCanvasPage() {
         async (node: CanvasNodeData) => {
             if (node.type === CanvasNodeType.Text) {
                 const content = node.metadata?.content?.trim();
-                if (!content) return toast.error(t("canvas.projectPage.noTextToSave"));
-                addAsset({ kind: "text", title: node.metadata?.prompt?.slice(0, 24) || t("canvas.projectPage.canvasText"), coverUrl: "", tags: [], source: "Canvas", data: { content }, metadata: { source: "canvas", nodeId: node.id } });
+                if (!content) return toast.error(t("canvas.runtime.noTextToSave"));
+                addAsset({ kind: "text", title: node.metadata?.prompt?.slice(0, 24) || t("canvas.runtime.canvasText"), coverUrl: "", tags: [], source: "Canvas", data: { content }, metadata: { source: "canvas", nodeId: node.id } });
                 toast.success(t("common.addedToAssets"));
                 return;
             }
             if (node.type === CanvasNodeType.Video) {
-                if (!node.metadata?.content) return toast.error(t("canvas.projectPage.noVideoToSave"));
+                if (!node.metadata?.content) return toast.error(t("canvas.runtime.noVideoToSave"));
                 addAsset({
                     kind: "video",
-                    title: node.metadata?.prompt?.slice(0, 24) || t("canvas.projectPage.canvasVideo"),
+                    title: node.metadata?.prompt?.slice(0, 24) || t("canvas.runtime.canvasVideo"),
                     coverUrl: "",
                     tags: [],
                     source: "Canvas",
@@ -1952,11 +1952,11 @@ function InfiniteCanvasPage() {
             const primaryImage = node.metadata?.images?.find((image) => image.id === node.metadata?.primaryImageId) || node.metadata?.images?.[0];
             const imageContent = primaryImage?.content || node.metadata?.content || "";
             const imageStorageKey = primaryImage?.storageKey || node.metadata?.storageKey;
-            if (!imageContent) return toast.error(t("canvas.projectPage.noImageToSave"));
+            if (!imageContent) return toast.error(t("canvas.runtime.noImageToSave"));
             const dataUrl = imageStorageKey ? "" : imageContent;
             addAsset({
                 kind: "image",
-                title: node.metadata?.prompt?.slice(0, 24) || t("canvas.projectPage.canvasImage"),
+                title: node.metadata?.prompt?.slice(0, 24) || t("canvas.runtime.canvasImage"),
                 coverUrl: imageContent,
                 tags: [],
                 source: "Canvas",
@@ -1978,7 +1978,7 @@ function InfiniteCanvasPage() {
     const createImageReversePromptNodes = useCallback(
         (node: CanvasNodeData) => {
             if (node.type !== CanvasNodeType.Image || !node.metadata?.content) {
-                toast.warning(t("canvas.projectPage.emptyReverse"));
+                toast.warning(t("canvas.runtime.emptyReverse"));
                 return;
             }
 
@@ -1990,7 +1990,7 @@ function InfiniteCanvasPage() {
                     { x: node.position.x + node.width + gap + textSpec.width / 2, y: node.position.y + node.height / 2 },
                     { content: "", status: NODE_STATUS_SUCCESS, fontSize: 14 },
                 ),
-                title: t("canvas.projectPage.reverseTitle"),
+                title: t("canvas.runtime.reverseTitle"),
             };
 
             setNodes((prev) => [...prev, textNode]);
@@ -2046,7 +2046,7 @@ function InfiniteCanvasPage() {
                     return {
                         id,
                         type: CanvasNodeType.Image,
-                        title: t("canvas.projectPage.splitTitle", { name: node.title || t("assets.kinds.image"), row: piece.row + 1, column: piece.column + 1 }),
+                        title: t("canvas.runtime.splitTitle", { name: node.title || t("assets.kinds.image"), row: piece.row + 1, column: piece.column + 1 }),
                         position: { x: startX + piece.column * (cellWidth + gap), y: startY + piece.row * (cellHeight + gap) },
                         width: cellWidth,
                         height: cellHeight,
@@ -2062,7 +2062,7 @@ function InfiniteCanvasPage() {
             setSelectedNodeIds(new Set(childNodes.map((child) => child.id)));
             setSelectedConnectionId(null);
             setDialogNodeId(null);
-            toast.success(t("canvas.projectPage.splitSuccess", { count: childNodes.length }));
+            toast.success(t("canvas.runtime.splitSuccess", { count: childNodes.length }));
         },
         [t],
     );
@@ -2082,7 +2082,7 @@ function InfiniteCanvasPage() {
                 return;
             }
             const userPrompt = payload.prompt.trim();
-            const prompt = isQwenImage ? userPrompt : t("canvas.projectPage.maskPrompt", { source: imageReferenceLabel(0), mask: imageReferenceLabel(1), prompt: userPrompt });
+            const prompt = isQwenImage ? userPrompt : t("canvas.runtime.maskPrompt", { source: imageReferenceLabel(0), mask: imageReferenceLabel(1), prompt: userPrompt });
             setMaskEditNodeId(null);
             const maskImage = await uploadImage(payload.maskDataUrl);
             const generationMask = isQwenImage ? await uploadImage(payload.binaryMaskDataUrl) : null;
@@ -2098,7 +2098,7 @@ function InfiniteCanvasPage() {
                 {
                     id: maskNodeId,
                     type: CanvasNodeType.Image,
-                    title: t("canvas.projectPage.maskNodeTitle"),
+                    title: t("canvas.runtime.maskNodeTitle"),
                     position: { x: node.position.x, y: node.position.y + node.height + 96 },
                     width: node.width,
                     height: node.height,
@@ -2107,7 +2107,7 @@ function InfiniteCanvasPage() {
                 {
                     id: childId,
                     type: CanvasNodeType.Image,
-                    title: userPrompt.slice(0, 32) || t("canvas.projectPage.maskResult"),
+                    title: userPrompt.slice(0, 32) || t("canvas.runtime.maskResult"),
                     position: { x: node.position.x + node.width + 96, y: node.position.y },
                     width: node.width,
                     height: node.height,
@@ -2132,7 +2132,7 @@ function InfiniteCanvasPage() {
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt, ...generationMetadata } } : item)));
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.maskFailed");
+                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.maskFailed");
                 toast.error(errorDetails);
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {
@@ -2297,7 +2297,7 @@ function InfiniteCanvasPage() {
             );
         } catch (error) {
             if (isGenerationCanceled(error)) return;
-            const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+            const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
             setNodes((prev) =>
                 prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)),
             );
@@ -2378,7 +2378,7 @@ function InfiniteCanvasPage() {
                 );
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
                 toast.error(errorDetails);
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {
@@ -2451,7 +2451,7 @@ function InfiniteCanvasPage() {
                 );
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
                 toast.error(errorDetails);
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {
@@ -2507,7 +2507,7 @@ function InfiniteCanvasPage() {
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt, ...generationMetadata } } : item)));
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {
                 finishGenerationRequest(childId, controller);
@@ -2694,7 +2694,7 @@ function InfiniteCanvasPage() {
     }, [currentProject?.title, t]);
 
     const startTitleEditing = useCallback(() => {
-        setTitleDraft(currentProject?.title || t("canvas.projectPage.untitledCanvas"));
+        setTitleDraft(currentProject?.title || t("canvas.runtime.untitledCanvas"));
         setTitleEditing(true);
     }, [currentProject?.title, t]);
 
@@ -2743,7 +2743,7 @@ function InfiniteCanvasPage() {
                     setDialogNodeId(null);
                 } catch (error) {
                     if (!isGenerationCanceled(error)) {
-                        const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                        const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
                         toast.error(errorDetails);
                         setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_ERROR, errorDetails } } : node)));
                     }
@@ -2759,7 +2759,7 @@ function InfiniteCanvasPage() {
             const sourceTextContent = sourceNode?.type === CanvasNodeType.Text ? sourceNode.metadata?.content?.trim() || "" : "";
             const editingTextNode = mode === "text" && Boolean(sourceTextContent);
             const generationContext = await hydrateNodeGenerationContext(
-                buildNodeGenerationContext(nodeId, nodesRef.current, connectionsRef.current, editingTextNode ? t("canvas.projectPage.editTextPrompt", { source: sourceTextContent, prompt }) : prompt),
+                buildNodeGenerationContext(nodeId, nodesRef.current, connectionsRef.current, editingTextNode ? t("canvas.runtime.editTextPrompt", { source: sourceTextContent, prompt }) : prompt),
             );
             if (generationContext.loras.length) generationConfig.params = { ...(generationConfig.params || {}), loras: generationContext.loras };
             const effectivePrompt = generationContext.prompt.trim();
@@ -2897,7 +2897,7 @@ function InfiniteCanvasPage() {
                                 return true;
                             } catch (error) {
                                 if (isGenerationCanceled(error)) return false;
-                                const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
                                 if (!firstError) firstError = errorDetails;
                                 hasFailure = true;
                                 setNodes((prev) => prev.map((node) => (node.id === rootId ? { ...node, metadata: { ...node.metadata, images: node.metadata?.images?.map((image) => (image.id === imageId ? { ...image, status: NODE_STATUS_ERROR, errorDetails } : image)) } } : node)));
@@ -2911,14 +2911,14 @@ function InfiniteCanvasPage() {
                         return;
                     }
                     if (hasFailure) {
-                        toast.error(hasSuccess ? t("canvas.projectPage.partialFailed") : firstError || t("canvas.projectPage.generationFailed"));
+                        toast.error(hasSuccess ? t("canvas.runtime.partialFailed") : firstError || t("canvas.runtime.generationFailed"));
                     }
                     setNodes((prev) =>
                         prev.map((node) =>
                             node.id === nodeId && isConfigNode
-                                ? { ...node, metadata: { ...node.metadata, status: hasSuccess ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR, errorDetails: hasSuccess ? undefined : t("canvas.projectPage.generationFailed") } }
+                                ? { ...node, metadata: { ...node.metadata, status: hasSuccess ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR, errorDetails: hasSuccess ? undefined : t("canvas.runtime.generationFailed") } }
                                 : node.id === rootId
-                                  ? { ...node, metadata: { ...node.metadata, status: hasSuccess ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR, errorDetails: hasSuccess ? undefined : t("canvas.projectPage.allFailed") } }
+                                  ? { ...node, metadata: { ...node.metadata, status: hasSuccess ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR, errorDetails: hasSuccess ? undefined : t("canvas.runtime.allFailed") } }
                                     : node,
                         ),
                     );
@@ -3090,7 +3090,7 @@ function InfiniteCanvasPage() {
                             return { id: textId, status: NODE_STATUS_SUCCESS, content } satisfies CanvasNodeText;
                         } catch (error) {
                             if (isGenerationCanceled(error)) return null;
-                            const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                            const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
                             setNodes((prev) => prev.map((node) => (node.id === rootId ? { ...node, metadata: { ...node.metadata, texts: node.metadata?.texts?.map((item) => (item.id === textId ? { ...item, status: NODE_STATUS_ERROR, errorDetails } : item)) } } : node)));
                             return { id: textId, status: NODE_STATUS_ERROR, content: "", errorDetails } satisfies CanvasNodeText;
                         }
@@ -3102,7 +3102,7 @@ function InfiniteCanvasPage() {
                 const failedTexts = results.filter((item) => item?.status === NODE_STATUS_ERROR);
                 const firstText = completedTexts[0];
                 if (completedTexts.length <= 1) setExpandedBatchNodeIds((current) => new Set([...current].filter((id) => id !== rootId)));
-                if (failedTexts.length) toast.error(firstText ? t("canvas.projectPage.partialTextFailed") : failedTexts[0]?.errorDetails || t("canvas.projectPage.generationFailed"));
+                if (failedTexts.length) toast.error(firstText ? t("canvas.runtime.partialTextFailed") : failedTexts[0]?.errorDetails || t("canvas.runtime.generationFailed"));
                 setNodes((prev) =>
                     prev.map((node) => {
                         if (node.id === rootId) {
@@ -3115,16 +3115,16 @@ function InfiniteCanvasPage() {
                                     texts: completedTexts,
                                     primaryTextId: primaryText?.id,
                                     status: primaryText ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR,
-                                    errorDetails: primaryText ? undefined : t("canvas.projectPage.generationFailed"),
+                                    errorDetails: primaryText ? undefined : t("canvas.runtime.generationFailed"),
                                 },
                             };
                         }
-                        return node.id === nodeId && isConfigNode ? { ...node, metadata: { ...node.metadata, status: firstText ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR, errorDetails: firstText ? undefined : t("canvas.projectPage.generationFailed") } } : node;
+                        return node.id === nodeId && isConfigNode ? { ...node, metadata: { ...node.metadata, status: firstText ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR, errorDetails: firstText ? undefined : t("canvas.runtime.generationFailed") } } : node;
                     }),
                 );
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
                 toast.error(errorDetails);
                 setNodes((prev) =>
                     prev.map((node) =>
@@ -3184,7 +3184,7 @@ function InfiniteCanvasPage() {
             if (context?.loras.length) generationConfig.params = { ...(generationConfig.params || {}), loras: context.loras };
             const prompt = (savedImageMetadata?.prompt || context?.prompt || "").trim();
             if (!prompt) {
-                toast.warning(t("canvas.projectPage.retryPromptMissing"));
+                toast.warning(t("canvas.runtime.retryPromptMissing"));
                 return;
             }
             const generationType = savedImageMetadata?.generationType;
@@ -3192,8 +3192,8 @@ function InfiniteCanvasPage() {
             const retryReferenceImages =
                 hasSavedImageMetadata && savedImageMetadata ? await resolveMetadataReferences(savedImageMetadata) : useReferenceImages ? (context?.referenceImages.length ? context.referenceImages : sourceNodeReferenceImages(sourceNode)) : [];
             if (useReferenceImages && !retryReferenceImages) {
-                toast.error(t("canvas.projectPage.referenceMissing"));
-                setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: item.metadata?.content ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR, errorDetails: item.metadata?.content ? undefined : t("canvas.projectPage.referenceMissing"), images: item.metadata?.images?.map((image) => (image.id === imageId ? { ...image, status: NODE_STATUS_ERROR, errorDetails: t("canvas.projectPage.referenceMissing") } : image)) } } : item)));
+                toast.error(t("canvas.runtime.referenceMissing"));
+                setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: item.metadata?.content ? NODE_STATUS_SUCCESS : NODE_STATUS_ERROR, errorDetails: item.metadata?.content ? undefined : t("canvas.runtime.referenceMissing"), images: item.metadata?.images?.map((image) => (image.id === imageId ? { ...image, status: NODE_STATUS_ERROR, errorDetails: t("canvas.runtime.referenceMissing") } : image)) } } : item)));
                 return;
             }
             const retryImages = retryReferenceImages || [];
@@ -3284,7 +3284,7 @@ function InfiniteCanvasPage() {
                 );
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
                 toast.error(errorDetails);
                 setNodes((prev) =>
                     prev.map((item) =>
@@ -3328,7 +3328,7 @@ function InfiniteCanvasPage() {
         (node: CanvasNodeData) => {
             const prompt = (node.metadata?.content || node.metadata?.prompt || "").trim();
             if (!prompt) {
-                toast.warning(t("canvas.projectPage.emptyTextImage"));
+                toast.warning(t("canvas.runtime.emptyTextImage"));
                 return;
             }
             const sourceNode = nodesRef.current.find((item) => item.id === node.id);
@@ -3613,7 +3613,7 @@ function InfiniteCanvasPage() {
                 <CanvasManagerDialog />
                 <AssetsManagerDialog />
                 <CanvasTopBar
-                    title={currentProject?.title || t("canvas.projectPage.untitledCanvas")}
+                    title={currentProject?.title || t("canvas.runtime.untitledCanvas")}
                     titleDraft={titleDraft}
                     isTitleEditing={titleEditing}
                     onTitleDraftChange={setTitleDraft}
@@ -3953,7 +3953,7 @@ function InfiniteCanvasPage() {
                 ) : null}
 
                 <Dialog
-                    title={t("canvas.projectPage.imageDetails")}
+                    title={t("canvas.runtime.imageDetails")}
                     open={Boolean(previewContent)}
                     onClose={() => setPreviewNodeId(null)}
                     width="auto"
@@ -3964,19 +3964,19 @@ function InfiniteCanvasPage() {
                 </Dialog>
 
                 <Dialog
-                    title={t("canvas.projectPage.clearTitle")}
+                    title={t("canvas.runtime.clearTitle")}
                     open={clearConfirmOpen}
                     onClose={() => setClearConfirmOpen(false)}
                     footer={
                         <>
                             <Button onClick={() => setClearConfirmOpen(false)}>{t("common.cancel")}</Button>
                             <Button danger type="primary" onClick={clearCanvas}>
-                                {t("canvas.projectPage.clear")}
+                                {t("canvas.runtime.clear")}
                             </Button>
                         </>
                     }
                 >
-                    <p className="text-sm opacity-60">{t("canvas.projectPage.clearDescription")}</p>
+                    <p className="text-sm opacity-60">{t("canvas.runtime.clearDescription")}</p>
                 </Dialog>
 
                 <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={() => setAssetPickerOpen(false)} />

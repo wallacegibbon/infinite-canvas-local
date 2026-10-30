@@ -1,4 +1,4 @@
-import { Home } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -13,7 +13,7 @@ export default function NotFound() {
                     <p className="mt-3 text-sm leading-6 text-stone-500 dark:text-stone-400">{t("notFound.description")}</p>
                     <div className="mt-8 flex flex-wrap justify-center gap-3">
                         <Link to="/" className="inline-flex h-10 items-center gap-2 rounded-lg bg-stone-950 px-4 text-sm font-medium text-white transition hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200">
-                            <Home className="size-4" />
+                            <Maximize2 className="size-4" />
                             {t("notFound.home")}
                         </Link>
                     </div>
