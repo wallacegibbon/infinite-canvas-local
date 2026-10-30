@@ -116,7 +116,9 @@ export const imageToolDefinitions: ImageToolDefinition[] = [
     },
     {
         id: "angle",
-        defaultVisible: false,
+        // Shown by default since it is the only entry point to the multi-angle dialog; it used to
+        // be opt-in. Kept as a stored preference, so anyone who already saved a toolbar keeps it.
+        defaultVisible: true,
         label: () => i18n.t("canvas.imageTools.angle"),
         title: () => i18n.t("canvas.imageTools.angleTitle"),
         icon: () => <Camera className="size-4" />,
