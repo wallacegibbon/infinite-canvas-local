@@ -15,6 +15,9 @@ export const APP_DATABASE = "infinite-canvas";
 /** One object store per plugin id, created on demand by the plugin event bus. */
 export const PLUGIN_DATABASE = "infinite-canvas-plugins";
 
-/** Every object store in {@link APP_DATABASE}, in rough order of size. */
-const APP_STORES = ["app_state", "media_files", "image_files", "image_previews", "image_generation_logs", "video_generation_logs"] as const;
+/**
+ * The object stores in {@link APP_DATABASE}, for anyone who needs the list rather than a single
+ * name: `app_state` (canvas and asset state), `media_files`, `image_files`, `image_previews`, and
+ * the `image_generation_logs` / `video_generation_logs` history.
+ */
 
