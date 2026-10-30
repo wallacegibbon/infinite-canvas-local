@@ -36,7 +36,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
     const pickerId = useId();
     const [open, setOpen] = useState(false);
     const options = useMemo(
-        () => Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability), ...extraOptions.map((option) => option.value)].filter((model): model is string => Boolean(model)))),
+        () => Array.from(new Set([...(!capability ? [value] : []), ...selectableModelsByCapability(config, capability), ...extraOptions.map((option) => option.value)].filter((model): model is string => Boolean(model)))),
         [capability, config, extraOptions, value],
     );
     const current = value || "";
@@ -57,7 +57,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
             open={open}
             value={current}
             onOpenChange={(nextOpen) => {
-                if (nextOpen && !options.length && config.channelMode === "local") onMissingConfig?.();
+                if (nextOpen && !options.length) onMissingConfig?.();
                 if (nextOpen) window.dispatchEvent(new CustomEvent("model-picker-open", { detail: pickerId }));
                 setOpen(nextOpen);
             }}

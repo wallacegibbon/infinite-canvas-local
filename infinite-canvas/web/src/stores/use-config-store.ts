@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
@@ -42,7 +41,6 @@ export type PromptCloudApi = {
 };
 
 export type AiConfig = {
-    channelMode: "remote" | "local";
     baseUrl: string;
     apiKey: string;
     apiFormat: ApiCallFormat;
@@ -114,7 +112,6 @@ const localVideoModel = `${LOCAL_GATEWAY_CHANNEL_ID}::video-h3-t2v`;
 // local gateway, so a second default config would be dead weight that has to be kept
 // in sync field by field.
 export const defaultConfig: AiConfig = {
-    channelMode: "local",
     baseUrl: LOCAL_GATEWAY_BASE_URL,
     apiKey: "local",
     apiFormat: "openai",
@@ -470,7 +467,6 @@ export const useConfigStore = create<ConfigStore>()(
                     ...current,
                     config: {
                         ...config,
-                        channelMode: "local",
                         model: pickModel(config.model || config.imageModel, imageOptions),
                         apiFormat: "openai",
                         channels,
@@ -507,9 +503,15 @@ export const useConfigStore = create<ConfigStore>()(
     ),
 );
 
+/**
+ * The config every caller should read.
+ *
+ * It used to be a copy with `channelMode` forced to "local", because a cloud mode
+ * still existed and could have set it. With cloud mode deleted the field was always
+ * "local", so there is nothing left to force and this is the stored config itself.
+ */
 export function useEffectiveConfig() {
-    const config = useConfigStore((state) => state.config);
-    return useMemo(() => ({ ...config, channelMode: "local" as const }), [config]);
+    return useConfigStore((state) => state.config);
 }
 
 /** Normalize a mixed list of raw model names or model objects into deduped ChannelModel entries. */
