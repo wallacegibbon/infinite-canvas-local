@@ -1,9 +1,10 @@
 import { Copy, Download, PencilLine, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Button, Card, Drawer, Empty, Form, Image, Input, Modal, Pagination, Select, Space, Tag, Typography } from "antd";
+import { Button, Card, Drawer, Empty, Form, Image, Input, Pagination, Select, Space, Tag, Typography } from "antd";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { formatBytes, readFileAsDataUrl } from "@/lib/image-utils";
@@ -293,7 +294,20 @@ export default function AssetsPage() {
                 </div>
             </main>
 
-            <Modal title={editingAsset ? t("assets.edit") : t("assets.add")} open={isAssetOpen} width={980} onCancel={() => setIsAssetOpen(false)} onOk={() => void saveAsset()} okText={t("common.save")} cancelText={t("common.cancel")} destroyOnHidden>
+            <Dialog
+                title={editingAsset ? t("assets.edit") : t("assets.add")}
+                open={isAssetOpen}
+                width={980}
+                onClose={() => setIsAssetOpen(false)}
+                footer={
+                    <>
+                        <Button onClick={() => setIsAssetOpen(false)}>{t("common.cancel")}</Button>
+                        <Button type="primary" onClick={() => void saveAsset()}>
+                            {t("common.save")}
+                        </Button>
+                    </>
+                }
+            >
                 <div className="grid gap-6 pt-1 lg:grid-cols-[minmax(0,1fr)_320px]">
                     <Form form={form} layout="vertical" requiredMark={false} initialValues={{ kind: "text", tags: [] }}>
                         <Form.Item name="kind" label={t("assets.type")}>
@@ -397,15 +411,27 @@ export default function AssetsPage() {
                         event.target.value = "";
                     }}
                 />
-            </Modal>
+            </Dialog>
 
             <AssetDrawer asset={previewAsset} onClose={() => setPreviewAsset(null)} onCopy={copyAssetText} onDownload={downloadImage} />
 
             <input ref={assetInputRef} type="file" accept="application/zip,.zip" className="hidden" onChange={(event) => void importAssetZip(event.target.files?.[0])} />
 
-            <Modal title={t("assets.deleteTitle")} open={Boolean(deletingAsset)} onCancel={() => setDeletingAsset(null)} onOk={confirmDelete} okText={t("common.delete")} okButtonProps={{ danger: true }} cancelText={t("common.cancel")}>
+            <Dialog
+                title={t("assets.deleteTitle")}
+                open={Boolean(deletingAsset)}
+                onClose={() => setDeletingAsset(null)}
+                footer={
+                    <>
+                        <Button onClick={() => setDeletingAsset(null)}>{t("common.cancel")}</Button>
+                        <Button danger type="primary" onClick={confirmDelete}>
+                            {t("common.delete")}
+                        </Button>
+                    </>
+                }
+            >
                 {t("assets.deleteConfirm", { name: deletingAsset?.title })}
-            </Modal>
+            </Dialog>
         </div>
     );
 }

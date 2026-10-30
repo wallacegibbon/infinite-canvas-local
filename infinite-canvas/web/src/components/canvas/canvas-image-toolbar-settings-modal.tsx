@@ -1,5 +1,6 @@
+import { Dialog } from "@/components/kit/dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Button, Card, Checkbox, Form, Modal, Space, Switch, Tag, Tooltip, Typography, theme as antdTheme } from "antd";
+import { Button, Card, Checkbox, Form, Space, Switch, Tag, Tooltip, Typography, theme as antdTheme } from "antd";
 import { Ellipsis, Image as ImageIcon, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -122,15 +123,13 @@ export function ImageToolSettingsModal({
     const scrollbarThumbWidth = previewScroll.max > 0 ? Math.min(scrollbarWidth, Math.max(64, (previewScroll.viewport / previewScroll.content) * scrollbarWidth)) : scrollbarWidth;
 
     return (
-        <Modal
+        <Dialog
             title={t("canvas.imageTools.customize")}
             open={open}
-            centered
             width={760}
-            onCancel={onCancel}
-            destroyOnHidden
+            onClose={onCancel}
             footer={
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex w-full items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                         <span>{t("canvas.imageTools.showLabels")}</span>
                         <Switch checked={showLabels} onChange={onShowLabelsChange} />
@@ -215,7 +214,7 @@ export function ImageToolSettingsModal({
                     </Checkbox.Group>
                 </Form.Item>
             </Form>
-        </Modal>
+        </Dialog>
     );
 }
 

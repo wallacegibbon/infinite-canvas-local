@@ -661,3 +661,43 @@ out of reachable paths already; the win is comprehensibility, not bytes.
 **Where** `services/api/model-plugin.ts`, `services/api/image.ts`, `video.ts`, `audio.ts`,
 `stores/use-config-store.ts`, `components/layout/channel-editor-drawer.tsx`,
 `i18n/locales/{zh-CN,en-US}.ts`.
+
+---
+
+## 29. Dialogs are a kit primitive too; no antd `Modal` is left
+
+**Decision** All 27 `<Modal>` call sites now render `@/components/kit/dialog`. Its props are the
+subset antd's call sites actually used — `open`, `onClose`, `title`, `label`, `footer`, `width`,
+`bodyStyle`, `bodyClassName`, `closable`, `maskClosable` — so a call site cannot depend on a
+feature that does not exist. `kit/button.tsx` was extracted at the same time, because the confirm
+dialog and the two antd-free dialogs needed the same three button looks.
+
+Three behaviours are decided deliberately rather than inherited:
+
+- **Always centred.** 23 of the 27 asked for `centered`; the remainder are content panels where
+  centring is not a regression.
+- **Closing unmounts the children.** That is antd's `destroyOnHidden`, which 13 sites requested
+  explicitly. The others were keeping transient form state alive across opens, which is not worth
+  preserving.
+- **Footers are explicit.** antd's `okText`/`onOk`/`confirmLoading` are gone; the six sites that
+  used them build their own row. More lines, but the loading and disabled states are now visible
+  where they are decided instead of inferred from antd props.
+
+**Why this had to carry attributes** This is the part that would have broken silently. The canvas
+overlay guards used to match `.ant-modal-root` and `.ant-modal-content`; those class names are
+gone, and `lib/canvas-overlay.ts` resolves overlays through `data-canvas-overlay` and
+`data-canvas-dialog-content`. The kit dialog emits both, so a dialog opened over the canvas still
+swallows clicks and wheel, and the prompt mention menu still measures its boundary. Remove those
+attributes and the canvas pans behind its own dialogs — a bug with no compile error anywhere.
+
+**Cost** antd's dialog animated in and out; this one appears instantly. Six call sites had already
+opted out of that animation with `transitionName=""`, so for them nothing changed, and the rest
+lose a 200 ms transition. There is also no `width` default beyond 520 for panels that omit it.
+
+**Verified** `tsc`, `tsc --noUnusedLocals`, 11 tests and `vite build` clean; in the browser the
+resource gate, the asset editor, the system panel, the 980 px settings dialog and the destructive
+"clear canvas" dialog all open, close via the X / Escape / their buttons, and the DOM after
+closing contains no `ant-modal` at all. The antd chunk went 739 kB → 714 kB (240 → 232 kB gzip).
+
+**Where** `components/kit/dialog.tsx`, `components/kit/button.tsx`,
+`components/kit/confirm.tsx`, and the 23 files that used to render `<Modal>`.

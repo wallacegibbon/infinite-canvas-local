@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Home, Images, Menu, PanelLeftClose, PanelLeftOpen, Plus, Redo2, Trash2, Undo2, Upload } from "lucide-react";
-import { Dropdown, Modal, Tooltip } from "antd";
+import { Dropdown, Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { CanvasSystemStatus } from "@/components/canvas/canvas-system-status";
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -135,7 +136,7 @@ export function CanvasTopBar({
                     <UserStatusActions variant="canvas" onOpenShortcuts={() => setShortcutsOpen(true)} onOpenPlugins={onOpenPlugins} />
                 </div>
             </div>
-            <Modal title={t("canvas.shortcuts")} open={shortcutsOpen} onCancel={() => setShortcutsOpen(false)} footer={null} centered>
+            <Dialog title={t("canvas.shortcuts")} open={shortcutsOpen} onClose={() => setShortcutsOpen(false)}>
                 <div className="space-y-2 border-t pt-4 text-sm" style={{ borderColor: theme.node.stroke }}>
                     <Shortcut keys={["Ctrl / Space", t("canvas.shortcut.drag")]} value={t("canvas.shortcut.toggleTool")} />
                     <Shortcut keys={[t("canvas.shortcut.wheel")]} value={t("canvas.shortcut.zoom")} />
@@ -153,7 +154,7 @@ export function CanvasTopBar({
                     <Shortcut keys={["Esc"]} value={t("canvas.shortcut.escape")} />
                     <Shortcut keys={[t("canvas.shortcut.dropMedia")]} value={t("canvas.shortcut.upload")} />
                 </div>
-            </Modal>
+            </Dialog>
         </>
     );
 }

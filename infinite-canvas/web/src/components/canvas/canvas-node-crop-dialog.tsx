@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, Modal, Segmented, Tooltip } from "antd";
+import { Button, Segmented, Tooltip } from "antd";
 import { Check, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useImageEditorViewport } from "@/components/canvas/use-image-editor-viewport";
+import { Dialog } from "@/components/kit/dialog";
 import { readImageMeta } from "@/lib/image-utils";
 
 export type CanvasImageCropRect = {
@@ -69,7 +70,7 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
     };
 
     return (
-        <Modal title={t("canvas.editors.cropTitle")} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={780} centered destroyOnHidden transitionName="" maskTransitionName="">
+        <Dialog title={t("canvas.editors.cropTitle")} open={open && Boolean(dataUrl)} onClose={onClose} width={780}>
             <div className="space-y-4">
                 <div
                     ref={viewport.viewportRef}
@@ -154,7 +155,7 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
                     </Button>
                 </div>
             </div>
-        </Modal>
+        </Dialog>
     );
 }
 

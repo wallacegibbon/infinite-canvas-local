@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, Input, Modal } from "antd";
+import { Button, Input } from "antd";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 
+import { Dialog } from "@/components/kit/dialog";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import type { CanvasMossLayout, CanvasMossLayoutRegion } from "@/types/canvas";
 
@@ -183,7 +184,7 @@ export function CanvasNodeMossLayoutDialog({ open, dataUrl, promptDefault = "", 
     };
 
     return (
-        <Modal open={open} onCancel={onClose} footer={null} width={1040} centered destroyOnHidden transitionName="" maskTransitionName="">
+        <Dialog label={t("canvas.mossLayout.title")} open={open} onClose={onClose} width={1040}>
             <div className="grid gap-5 lg:grid-cols-[minmax(460px,1fr)_360px]" data-canvas-no-zoom>
                 <div className="space-y-2">
                     <div
@@ -296,6 +297,6 @@ export function CanvasNodeMossLayoutDialog({ open, dataUrl, promptDefault = "", 
                     </div>
                 </div>
             </div>
-        </Modal>
+        </Dialog>
     );
 }

@@ -1,8 +1,9 @@
-import { Button, Checkbox, Modal, Progress, Tag, Tooltip } from "antd";
+import { Button, Checkbox, Progress, Tag, Tooltip } from "antd";
 import { AlertTriangle, ChevronDown, Download, HardDriveDownload, RefreshCw, Server, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { cancelResourceJob, fetchResourceJob, fetchResourceStatus, formatBytes, installResources, pickResourceReplacement, refreshResourceStatus, setResourceReplacement, setWorkflowVisibility, type ResourceItem, type ResourceJob, type ResourcePack, type ResourceStatus } from "@/services/api/resources";
 import { gatewayVariantLabel } from "@/lib/gateway-labels";
@@ -729,7 +730,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                 {!status?.indexError && status?.indexWarning ? <div className="mt-2 break-all text-[11px] text-stone-500 dark:text-stone-400"><span className="inline-flex items-center gap-1.5"><AlertTriangle className="size-3.5 shrink-0" />{copy.indexWarning}</span>{status.indexWarning}</div> : null}
             </div>
 
-            <Modal open={runtimeHelpOpen} onCancel={() => setRuntimeHelpOpen(false)} footer={null} width={620} title={copy.runtimeHelp}>
+            <Dialog open={runtimeHelpOpen} onClose={() => setRuntimeHelpOpen(false)} width={620} title={copy.runtimeHelp}>
                 <div className="space-y-3 text-sm">
                     <div className="text-xs leading-5 text-stone-500 dark:text-stone-400">{copy.runtimeHelpIntro}</div>
                     <div className="rounded-md border border-stone-200 p-2 dark:border-stone-800">
@@ -753,7 +754,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                     })}
                     <div className="text-xs leading-5 text-stone-500 dark:text-stone-400">{copy.runtimeHelpNote}</div>
                 </div>
-            </Modal>
+            </Dialog>
             {error ? <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"><XCircle className="size-3.5 shrink-0" />{error}</div> : null}
 
             {job ? (

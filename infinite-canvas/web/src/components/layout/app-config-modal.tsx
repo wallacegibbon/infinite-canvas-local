@@ -1,8 +1,9 @@
-import { Button, Form, Input, Modal, Radio, Select, Switch, Tabs } from "antd";
+import { Button, Form, Input, Radio, Select, Switch, Tabs } from "antd";
 import { ArrowLeft, ArrowRight, ChevronDown, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { confirm } from "@/components/kit/confirm";
 import { ModelPicker, WorkflowModelPicker } from "@/components/model-picker";
@@ -461,19 +462,22 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                 </div>
             ) : null}
             <ChannelEditorDrawer open={Boolean(editingChannel)} channel={editingChannel} onSave={saveChannel} onClose={() => setEditingChannelId("")} />
-            <Modal
+            <Dialog
                 open={Boolean(passwordSkinId)}
-                centered
                 width={420}
                 maskClosable={false}
                 title={passwordSkinId ? t("config.preferences.cardSkinUnlockTitle", { name: t(`config.preferences.cardSkins.${passwordSkinId}.label`) }) : ""}
-                okText={t("config.preferences.cardSkinUnlockAction")}
-                cancelText={t("common.cancel")}
-                confirmLoading={verifyingSkinPassword}
-                okButtonProps={{ disabled: !skinPassword.trim() || verifyingSkinPassword }}
-                cancelButtonProps={{ disabled: verifyingSkinPassword }}
-                onOk={() => void unlockSelectedSkin()}
-                onCancel={closeSkinPasswordModal}
+                onClose={closeSkinPasswordModal}
+                footer={
+                    <>
+                        <Button disabled={verifyingSkinPassword} onClick={closeSkinPasswordModal}>
+                            {t("common.cancel")}
+                        </Button>
+                        <Button type="primary" loading={verifyingSkinPassword} disabled={!skinPassword.trim()} onClick={() => void unlockSelectedSkin()}>
+                            {t("config.preferences.cardSkinUnlockAction")}
+                        </Button>
+                    </>
+                }
             >
                 <p className="mb-3 text-sm text-stone-500">{t("config.preferences.cardSkinUnlockHint")}</p>
                 <Input.Password
@@ -490,16 +494,20 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                     }}
                 />
                 {skinPasswordError ? <p className="mt-2 text-xs text-red-500">{skinPasswordError}</p> : null}
-            </Modal>
-            <Modal
+            </Dialog>
+            <Dialog
                 open={cloudApiEditorOpen}
-                centered
                 width={520}
                 title={editingCloudApiId ? t("config.cloudApi.editTitle") : t("config.cloudApi.addTitle")}
-                okText={t("common.save")}
-                cancelText={t("common.cancel")}
-                onOk={() => void saveCloudApi()}
-                onCancel={() => setCloudApiEditorOpen(false)}
+                onClose={() => setCloudApiEditorOpen(false)}
+                footer={
+                    <>
+                        <Button onClick={() => setCloudApiEditorOpen(false)}>{t("common.cancel")}</Button>
+                        <Button type="primary" onClick={() => void saveCloudApi()}>
+                            {t("common.save")}
+                        </Button>
+                    </>
+                }
             >
                 <Form form={cloudApiForm} layout="vertical" requiredMark={false}>
                     <Form.Item label={t("config.cloudApi.name")} name="name" rules={[{ required: true, whitespace: true, message: t("config.cloudApi.nameRequired") }]}>
@@ -516,7 +524,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                     </Form.Item>
                 </Form>
                 <div className="text-xs text-stone-500">{t("config.cloudApi.hint")}</div>
-            </Modal>
+            </Dialog>
         </>
     );
 }
@@ -527,7 +535,7 @@ export function AppConfigModal() {
     const configTab = useConfigStore((state) => state.configTab);
     const setConfigDialogOpen = useConfigStore((state) => state.setConfigDialogOpen);
     return (
-        <Modal
+        <Dialog
             title={
                 <div>
                     <div className="text-lg font-semibold">{t("config.title")}</div>
@@ -536,13 +544,12 @@ export function AppConfigModal() {
             }
             open={isConfigOpen}
             width={980}
-            centered
-            onCancel={() => setConfigDialogOpen(false)}
-            styles={{ body: { maxHeight: "72vh", overflowY: "auto", paddingRight: 12 } }}
-            footer={null}
+            onClose={() => setConfigDialogOpen(false)}
+            bodyStyle={{ maxHeight: "72vh" }}
+            bodyClassName="pr-3"
         >
             <AppConfigPanel showDoneButton initialTab={configTab} />
-        </Modal>
+        </Dialog>
     );
 }
 

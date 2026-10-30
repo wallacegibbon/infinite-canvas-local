@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Button, Modal } from "antd";
+import { Button } from "antd";
 import { Maximize2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 
+import { Dialog } from "@/components/kit/dialog";
 import type { CanvasNodeData } from "@/types/canvas";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 
@@ -42,15 +43,10 @@ export function CanvasNodeVideoUpscaleDialog({ open, node, onClose, onConfirm }:
     const outputHeight = sourceHeight ? Math.round(sourceHeight * scale) : 0;
 
     return (
-        <Modal
+        <Dialog
             open={open}
-            onCancel={onClose}
-            footer={null}
+            onClose={onClose}
             width={560}
-            centered
-            destroyOnHidden
-            transitionName=""
-            maskTransitionName=""
             title={
                 <span className="flex items-center gap-2">
                     <Maximize2 className="size-4" />
@@ -128,6 +124,6 @@ export function CanvasNodeVideoUpscaleDialog({ open, node, onClose, onConfirm }:
                     </Button>
                 </div>
             </div>
-        </Modal>
+        </Dialog>
     );
 }

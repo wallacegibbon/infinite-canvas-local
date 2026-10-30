@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button, Modal, Spin } from "antd";
+import { Button, Spin } from "antd";
 import { Gauge } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { LOCAL_GATEWAY_BASE_URL } from "@/constant/app-mode";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -123,7 +124,7 @@ export function CanvasSystemStatus() {
                 </span>
                 {oom ? <span className="size-1.5 rounded-full" style={{ background: "#dc2626" }} title={t("canvas.systemStatus.oomBadge")} /> : null}
             </button>
-            <Modal title={t("canvas.systemStatus.title")} open={open} onCancel={() => setOpen(false)} footer={null} centered width={440} destroyOnHidden>
+            <Dialog title={t("canvas.systemStatus.title")} open={open} onClose={() => setOpen(false)} width={440}>
                 <div className="space-y-4 pt-1 text-sm" style={{ color: theme.node.text }}>
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-xs" style={{ color: theme.node.muted }}>
@@ -205,7 +206,7 @@ export function CanvasSystemStatus() {
                         </div>
                     </div>
                 </div>
-            </Modal>
+            </Dialog>
         </>
     );
 }

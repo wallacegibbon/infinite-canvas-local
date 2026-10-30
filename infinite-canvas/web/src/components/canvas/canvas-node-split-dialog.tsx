@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, InputNumber, Modal, Tooltip } from "antd";
+import { Button, InputNumber, Tooltip } from "antd";
 import { Grid2x2, ListRestart, PanelTop, Redo2, Rows3, Trash2, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { readImageMeta } from "@/lib/image-utils";
 import type { ImageSplitParams } from "@/lib/canvas/canvas-image-data";
 import { useImageEditorViewport } from "@/components/canvas/use-image-editor-viewport";
@@ -148,7 +149,7 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
     const confirmParams = { ...params, horizontalLines, verticalLines, rows, columns };
 
     return (
-        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={780} centered destroyOnHidden transitionName="" maskTransitionName="">
+        <Dialog label={t("canvas.editors.splitTitle")} open={open && Boolean(dataUrl)} onClose={onClose} width={780}>
             <div className="space-y-5" data-canvas-no-zoom>
                 <div>
                     <h2 className="text-xl font-semibold">{t("canvas.editors.splitTitle")}</h2>
@@ -225,7 +226,7 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
                     </div>
                 </div>
             </div>
-        </Modal>
+        </Dialog>
     );
 }
 

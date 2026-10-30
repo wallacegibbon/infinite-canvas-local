@@ -438,18 +438,6 @@
         box-shadow: 0 18px 54px rgba(0, 0, 0, 0.45);
     }
 
-    .canvas-node-info-modal .ant-modal-header {
-        padding-right: 0;
-    }
-
-    .canvas-node-info-modal .ant-modal-title {
-        line-height: 1;
-    }
-
-    .canvas-node-info-modal .ant-modal-close {
-        top: 21px;
-    }
-
     @keyframes canvas-batch-child-in {
         from {
             opacity: 0;

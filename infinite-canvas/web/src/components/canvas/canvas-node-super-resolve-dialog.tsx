@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Collapse, InputNumber, Modal, Segmented, Select } from "antd";
+import { Button, Collapse, InputNumber, Segmented, Select } from "antd";
 import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { readImageMeta } from "@/lib/image-utils";
 import { requestUpscaleWorkflows, type UpscaleParameter, type UpscaleWorkflow } from "@/services/api/image";
 import type { AiConfig } from "@/stores/use-config-store";
@@ -169,7 +170,7 @@ export function CanvasNodeSuperResolveDialog({
     };
 
     return (
-        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={820} centered destroyOnHidden>
+        <Dialog label={t("canvas.superResolve.title")} open={open && Boolean(dataUrl)} onClose={onClose} width={820}>
             <div className="space-y-5">
                 <h2 className="text-xl font-semibold">{title || t("canvas.superResolve.title")}</h2>
                 <div className="grid gap-6 md:grid-cols-[minmax(260px,1fr)_360px]">
@@ -274,7 +275,7 @@ export function CanvasNodeSuperResolveDialog({
                     </Button>
                 </div>
             </div>
-        </Modal>
+        </Dialog>
     );
 }
 

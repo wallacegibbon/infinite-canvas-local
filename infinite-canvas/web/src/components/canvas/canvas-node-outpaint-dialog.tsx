@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, Input, Modal } from "antd";
+import { Button, Input } from "antd";
 import { Minimize2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 
+import { Dialog } from "@/components/kit/dialog";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 
 export type CanvasOutpaintPayload = {
@@ -185,7 +186,7 @@ export function CanvasNodeOutpaintDialog({ dataUrl, open, promptDefault = "", on
     };
 
     return (
-        <Modal open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={980} centered destroyOnHidden transitionName="" maskTransitionName="">
+        <Dialog label={t("canvas.outpaint.title")} open={open && Boolean(dataUrl)} onClose={onClose} width={980}>
             <div className="grid gap-5 lg:grid-cols-[minmax(420px,1fr)_300px]" data-canvas-no-zoom>
                 <div
                     ref={boardRef}
@@ -275,6 +276,6 @@ export function CanvasNodeOutpaintDialog({ dataUrl, open, promptDefault = "", on
                     </div>
                 </div>
             </div>
-        </Modal>
+        </Dialog>
     );
 }

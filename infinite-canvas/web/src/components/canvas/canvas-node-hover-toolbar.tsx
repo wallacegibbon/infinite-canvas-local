@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Modal, Segmented, Tooltip } from "antd";
+import { Segmented, Tooltip } from "antd";
 import { Clapperboard, Download, Ellipsis, FolderPlus, Image as ImageIcon, Info, Maximize2, MessageSquare, Minus, Music2, Plus, RefreshCw, Settings2, Trash2, Ungroup, Upload, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
@@ -261,7 +262,7 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
     );
 
     return (
-        <Modal className="canvas-node-info-modal" title={title} open={open && Boolean(node)} centered footer={null} onCancel={onClose}>
+        <Dialog title={title} open={open && Boolean(node)} onClose={onClose}>
             {node ? (
                 <div className="h-[56vh] min-h-[360px] select-text text-sm" data-canvas-shortcuts-ignore>
                     {view === "info" ? (
@@ -289,7 +290,7 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
                     )}
                 </div>
             ) : null}
-        </Modal>
+        </Dialog>
     );
 }
 

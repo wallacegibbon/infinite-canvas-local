@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Button, Input, Modal, Popconfirm, Switch, Tabs } from "antd";
+import { Button, Input, Popconfirm, Switch, Tabs } from "antd";
 import { AlertTriangle, Puzzle, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { installPluginFromUrl, setPluginEnabled, uninstallPlugin, updatePlugin } from "@/lib/canvas/plugin-loader";
@@ -122,7 +123,7 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
     ];
 
     return (
-        <Modal title={t("canvas.plugins.title")} open={open} onCancel={onClose} footer={null} centered width={640}>
+        <Dialog title={t("canvas.plugins.title")} open={open} onClose={onClose} width={640}>
             <div className="space-y-3">
                 <div className="flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-5" style={{ borderColor: "#f59e0b55", background: "#f59e0b14", color: theme.node.text }}>
                     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
@@ -130,6 +131,6 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
                 </div>
                 <Tabs defaultActiveKey="local" items={tabs} />
             </div>
-        </Modal>
+        </Dialog>
     );
 }

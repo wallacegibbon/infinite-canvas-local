@@ -1,5 +1,6 @@
+import { Dialog } from "@/components/kit/dialog";
 import { useEffect, useState } from "react";
-import { Button, Modal, Segmented, Slider } from "antd";
+import { Button, Segmented, Slider } from "antd";
 import { RotateCcw, WandSparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -30,7 +31,7 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
     const update = <Key extends keyof CanvasImageAngleParams>(key: Key, value: CanvasImageAngleParams[Key]) => setParams((current) => ({ ...current, [key]: value }));
 
     return (
-        <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={1000} centered destroyOnHidden>
+        <Dialog label={t("canvas.editors.angleTitle")} open={open && Boolean(dataUrl)} onClose={onClose} width={1000}>
             <div className="space-y-5">
                 <div>
                     <h2 className="text-xl font-semibold">{t("canvas.editors.angleTitle")}</h2>
@@ -70,7 +71,7 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
                     </Button>
                 </div>
             </div>
-        </Modal>
+        </Dialog>
     );
 }
 

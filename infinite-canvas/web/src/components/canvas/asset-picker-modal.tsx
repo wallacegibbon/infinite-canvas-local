@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { Empty, Input, Modal, Pagination, Tag } from "antd";
+import { Empty, Input, Pagination, Tag } from "antd";
 import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { cn } from "@/lib/utils";
 import { getImagePreviewRevision, subscribeImagePreviews } from "@/services/image-storage";
 import { assetCoverUrl, useAssetStore, type Asset } from "@/stores/use-asset-store";
@@ -19,9 +20,9 @@ type Props = {
 export function AssetPickerModal({ open, onInsert, onClose }: Props) {
     const { t } = useTranslation();
     return (
-        <Modal title={t("canvas.assetPicker.title")} open={open} onCancel={onClose} footer={null} width={860} destroyOnHidden styles={{ body: { padding: "0 24px 24px", minHeight: 480 } }}>
+        <Dialog title={t("canvas.assetPicker.title")} open={open} onClose={onClose} width={860} bodyClassName="min-h-[480px] pt-0">
             <MyAssetsTab onInsert={onInsert} />
-        </Modal>
+        </Dialog>
     );
 }
 

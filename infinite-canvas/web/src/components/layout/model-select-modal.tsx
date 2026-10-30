@@ -1,8 +1,9 @@
-import { Button, Checkbox, Input, Modal, Tabs } from "antd";
+import { Button, Checkbox, Input, Tabs } from "antd";
 import { RefreshCw, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { fetchChannelModels } from "@/services/api/image";
 import type { ModelChannel } from "@/stores/use-config-store";
@@ -85,25 +86,24 @@ export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onCl
     };
 
     return (
-        <Modal
+        <Dialog
             open={open}
             width={880}
-            centered
-            onCancel={onClose}
+            onClose={onClose}
             title={
                 <span>
                     {t("config.modelSelect.title")} <span className="ml-2 text-xs font-normal text-stone-500">{t("config.modelSelect.selected", { selected: selected.size, total: new Set([...existing, ...fetched]).size })}</span>
                 </span>
             }
-            styles={{ body: { maxHeight: "62vh", overflowY: "auto" } }}
-            footer={[
-                <Button key="cancel" onClick={onClose}>
-                    {t("common.cancel")}
-                </Button>,
-                <Button key="confirm" type="primary" onClick={confirm}>
-                    {t("config.modelSelect.confirm")}
-                </Button>,
-            ]}
+            bodyStyle={{ maxHeight: "62vh" }}
+            footer={
+                <>
+                    <Button onClick={onClose}>{t("common.cancel")}</Button>
+                    <Button type="primary" onClick={confirm}>
+                        {t("config.modelSelect.confirm")}
+                    </Button>
+                </>
+            }
         >
             <div className="flex flex-wrap items-center gap-3">
                 <Input className="min-w-[200px] flex-1" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("config.modelSelect.search")} prefix={<Search className="size-4 text-stone-400" />} allowClear />
@@ -150,6 +150,6 @@ export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onCl
             ) : (
                 <div className="py-8 text-center text-sm text-stone-500">{t(activeTab === "new" ? "config.modelSelect.fetchedEmpty" : "config.modelSelect.existingEmpty")}</div>
             )}
-        </Modal>
+        </Dialog>
     );
 }

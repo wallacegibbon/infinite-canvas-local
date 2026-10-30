@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { requestEdit, requestGeneration, requestImageAngle, requestImageQuestion, requestUpscale } from "@/services/api/image";
 import { bindStepProgress, unbindStepProgress } from "@/services/api/step-progress";
@@ -21,7 +22,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { cropDataUrl, splitDataUrl } from "@/lib/canvas/canvas-image-data";
 import { fitNodeSize, nodeSizeFromRatio } from "@/lib/canvas/canvas-node-size";
 import { captureVideoFrame, type VideoFramePosition } from "@/lib/canvas/canvas-video-frame";
-import { Button, Modal } from "antd";
+import { Button } from "antd";
 import { NODE_DEFAULT_SIZE, getNodeSpec } from "@/constant/canvas";
 import { ActiveConnectionPath, ConnectionPath } from "@/components/canvas/canvas-connections";
 import { CanvasConfigComposer } from "@/components/canvas/canvas-config-composer";
@@ -3923,23 +3924,21 @@ function InfiniteCanvasPage() {
 
                 {angleNode?.metadata?.content ? <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} open={Boolean(angleNode)} onClose={() => setAngleNodeId(null)} onConfirm={(params) => void generateAngleNode(angleNode!, params)} /> : null}
 
-                <Modal
+                <Dialog
                     title={t("canvas.projectPage.imageDetails")}
                     open={Boolean(previewContent)}
-                    centered
-                    onCancel={() => setPreviewNodeId(null)}
-                    footer={null}
+                    onClose={() => setPreviewNodeId(null)}
                     width="auto"
-                    styles={{ body: { padding: 0, display: "flex", justifyContent: "center", alignItems: "center", maxHeight: "80vh" } }}
+                    bodyClassName="p-0"
+                    bodyStyle={{ display: "flex", justifyContent: "center", alignItems: "center", maxHeight: "80vh" }}
                 >
                     {previewContent ? <img src={previewContent} alt={previewNode?.title || t("assets.kinds.image")} style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain" }} /> : null}
-                </Modal>
+                </Dialog>
 
-                <Modal
+                <Dialog
                     title={t("canvas.projectPage.clearTitle")}
                     open={clearConfirmOpen}
-                    centered
-                    onCancel={() => setClearConfirmOpen(false)}
+                    onClose={() => setClearConfirmOpen(false)}
                     footer={
                         <>
                             <Button onClick={() => setClearConfirmOpen(false)}>{t("common.cancel")}</Button>
@@ -3950,7 +3949,7 @@ function InfiniteCanvasPage() {
                     }
                 >
                     <p className="text-sm opacity-60">{t("canvas.projectPage.clearDescription")}</p>
-                </Modal>
+                </Dialog>
 
                 <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={() => setAssetPickerOpen(false)} />
             </section>

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ChevronRight, LoaderCircle, Maximize2, ScanText, Sparkles, Square, X } from "lucide-react";
-import { Button, Modal, Tooltip } from "antd";
+import { Button, Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 
+import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { BaseModelPicker, ModelPicker, WorkflowModelPicker } from "@/components/model-picker";
 import { channelModelOf, defaultConfig, modelImageInputs, modelOptionName, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
@@ -619,7 +620,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
             {mode !== "text" && originalPrompt && !optimizeRunning && !optimizeResult && !optimizeError ? (
                 <OriginalPromptDisclosure key={`${node.id}:${originalPrompt}`} text={originalPrompt} label={t("canvas.promptPanel.originalPrompt")} hint={t("canvas.promptPanel.originalPromptHint")} theme={theme} />
             ) : null}
-            <Modal title={t("canvas.promptPanel.editorTitle")} open={expanded} centered width={760} footer={null} onCancel={() => { commitPrompt(); setExpanded(false); }} destroyOnHidden>
+            <Dialog title={t("canvas.promptPanel.editorTitle")} open={expanded} width={760} onClose={() => { commitPrompt(); setExpanded(false); }}>
                 <div data-canvas-no-zoom className="pt-2" onWheelCapture={(event) => event.stopPropagation()}>
                     <CanvasNodeReferenceBar nodeId={node.id} nodes={nodes} connectedNodes={connectedNodes} leadingNode={sourceImageReference ? node : undefined} onDisconnect={onDisconnectReference} onStartSelection={(nodeId) => { setExpanded(false); onStartReferenceSelection?.(nodeId); }} addDisabled={isH3T2V} addDisabledHint={t("canvas.promptPanel.videoTextAddDisabled")} />
                     {textVideoHasReferences ? <div className="mb-2 text-xs leading-4 text-[#ef4444]">{t("canvas.promptPanel.videoTextRefsWarning")}</div> : null}
@@ -639,7 +640,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
                         placeholder={t(`canvas.promptPanel.${mode === "image" && hasImageContent ? "editImage" : mode === "text" && hasTextContent ? "editText" : mode}`)}
                     />
                 </div>
-            </Modal>
+            </Dialog>
         </div>
     );
 }

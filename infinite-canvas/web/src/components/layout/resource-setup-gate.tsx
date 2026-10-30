@@ -1,4 +1,5 @@
-import { Button, Modal } from "antd";
+import { Button } from "@/components/kit/button";
+import { Dialog } from "@/components/kit/dialog";
 import { Download, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -46,7 +47,7 @@ export function ResourceSetupGate() {
     };
 
     return (
-        <Modal
+        <Dialog
             title={
                 <div className="flex items-center gap-2">
                     <Download className="size-5" />
@@ -60,11 +61,10 @@ export function ResourceSetupGate() {
             }
             open={open}
             width={860}
-            centered
             closable={false}
-            footer={null}
-            onCancel={skip}
-            styles={{ body: { maxHeight: "72vh", overflowY: "auto", paddingRight: 12 } }}
+            onClose={skip}
+            bodyStyle={{ maxHeight: "72vh" }}
+            bodyClassName="pr-3"
         >
             <ResourceCenterPanel
                 compact
@@ -73,12 +73,13 @@ export function ResourceSetupGate() {
                         <span className="text-[11px] text-stone-400 dark:text-stone-500">
                             {zh ? "跳过后可在 设置 → 添加工作流 随时补装。" : "You can install later from Settings → Add workflows."}
                         </span>
-                        <Button icon={<X className="size-4" />} onClick={skip}>
+                        <Button onClick={skip}>
+                            <X className="size-4" />
                             {zh ? "跳过，先进入画布" : "Skip for now"}
                         </Button>
                     </div>
                 }
             />
-        </Modal>
+        </Dialog>
     );
 }
