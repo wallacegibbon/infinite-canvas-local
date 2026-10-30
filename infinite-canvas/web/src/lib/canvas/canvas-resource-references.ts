@@ -23,10 +23,6 @@ export function buildNodeMentionReferences(node: CanvasNodeData, nodes: CanvasNo
     return labelResourceNodes(getMentionResourceNodes(node.id, nodes, connections), true);
 }
 
-export function buildCanvasResourceReferences(nodes: CanvasNodeData[]) {
-    return labelResourceNodes(nodes, true);
-}
-
 export async function resolveCanvasReferenceImages(references: CanvasResourceReference[], nodes: CanvasNodeData[]) {
     const nodesById = new Map(nodes.map((node) => [node.id, node]));
     return Promise.all(references.filter((reference) => reference.kind === "image").map(async (reference) => {

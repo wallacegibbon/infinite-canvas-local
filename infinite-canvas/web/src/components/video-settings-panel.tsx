@@ -229,17 +229,6 @@ export function normalizeVideoModeValue(value: string | undefined) {
     return "frames";
 }
 
-export function normalizeVideoSizeValue(value: string, resolution = "720") {
-    if (value === "auto") return "auto";
-    if (/^\d+x\d+$/.test(value || "")) return value;
-    const ratio = inferVideoRatio(value);
-    return ratio === "auto" ? "auto" : computeVideoSize(resolution, ratio);
-}
-
-export function normalizeVideoResolutionValue(value: string) {
-    return parseVideoResolution(value);
-}
-
 function updateDimension(key: "width" | "height", value: number | null, dimensions: { width: number; height: number }, onConfigChange: VideoSettingsPanelProps["onConfigChange"]) {
     const next = Math.max(1, Math.floor(value || dimensions[key] || 720));
     onConfigChange("size", `${key === "width" ? next : dimensions.width}x${key === "height" ? next : dimensions.height}`);

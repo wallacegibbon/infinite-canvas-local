@@ -215,17 +215,6 @@ export async function refreshResourceStatus(): Promise<ResourceStatus> {
     return data as ResourceStatus;
 }
 
-export async function setPackMainModel(packId: string, file: string): Promise<ResourceStatus> {
-    const response = await gatewayFetch(`${gatewayRoot}/api/resources/packs/${encodeURIComponent(packId)}/main-model`, {
-        method: "POST",
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ file }),
-    });
-    const data = await readJson(response);
-    if (!response.ok || data.ok === false) throw new Error(errorMessage(data, apiText("resourceMainModelFailed", { status: response.status })));
-    return data.status as ResourceStatus;
-}
-
 export async function installResources(input: { ids?: string[]; packs?: string[] }): Promise<ResourceJob> {
     const response = await gatewayFetch(`${gatewayRoot}/api/resources/install`, {
         method: "POST",

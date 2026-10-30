@@ -65,7 +65,3 @@ export function recallNodeSettings(type: CanvasNodeTypeId, metadata?: CanvasNode
     if (!settings) return undefined;
     return cloneValue(settings);
 }
-
-export function clearNodeSettingsMemory() {
-    memory.clear();
-}

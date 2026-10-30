@@ -18,10 +18,6 @@ export function gatewayModelLabel(id: string, fallback?: string) {
     return chinese(`gateway.models.${id}.label`) || fallback || id;
 }
 
-export function gatewayModelDescription(id: string, fallback?: string) {
-    return chinese(`gateway.models.${id}.description`) || fallback || "";
-}
-
 export function gatewayVariantLabel(mode: string, fallback?: string) {
     return chinese(`gateway.variants.${mode}`) || fallback || mode;
 }

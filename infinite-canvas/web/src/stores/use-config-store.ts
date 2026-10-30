@@ -198,11 +198,6 @@ export function modelCapabilityOf(config: AiConfig, value: string): ModelCapabil
     return findChannelModel(config, value)?.model.capability;
 }
 
-export function modelMatchesCapability(config: AiConfig, value: string, capability?: ModelCapability) {
-    if (!capability) return true;
-    return modelCapabilityOf(config, value) === capability;
-}
-
 export function resolveModelForCapability(config: AiConfig, currentModel: string | undefined, capability: ModelCapability) {
     const defaultModel = capability === "image" ? config.imageModel : capability === "video" ? config.videoModel : capability === "audio" ? config.audioModel : config.textModel;
     const fallbackModel = capability === "image" ? defaultConfig.imageModel : capability === "video" ? defaultConfig.videoModel : capability === "audio" ? defaultConfig.audioModel : defaultConfig.textModel;
@@ -341,11 +336,6 @@ export function normalizePromptCloudConfig(config: AiConfig): AiConfig {
     }
     const activeId = apis.some((api) => api.id === config.promptCloudApiId) ? String(config.promptCloudApiId) : apis[0]?.id || "";
     return { ...config, ...promptCloudMirror(apis, activeId) };
-}
-
-export function activePromptCloudApi(config: AiConfig): PromptCloudApi | null {
-    const apis = config.promptCloudApis || [];
-    return apis.find((api) => api.id === config.promptCloudApiId) || apis[0] || null;
 }
 
 export const useConfigStore = create<ConfigStore>()(
@@ -613,10 +603,6 @@ function importedChannelName(baseUrl: string) {
 
 export function encodeChannelModel(channelId: string, model: string) {
     return `${channelId}${CHANNEL_MODEL_SEPARATOR}${model.trim()}`;
-}
-
-export function isChannelModelValue(value: string) {
-    return value.includes(CHANNEL_MODEL_SEPARATOR);
 }
 
 export function decodeChannelModel(value: string) {

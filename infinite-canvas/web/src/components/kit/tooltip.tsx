@@ -21,8 +21,6 @@ import { cn } from "@/lib/utils";
  * The portal carries `data-canvas-overlay`; without it a tooltip opened over the canvas
  * would let the wheel and clicks through to the canvas underneath.
  */
-export const TooltipProvider = RadixTooltip.Provider;
-
 type Placement = "top" | "bottom" | "left" | "right";
 
 export function Tooltip({

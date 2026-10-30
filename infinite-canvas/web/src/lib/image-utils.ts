@@ -15,13 +15,6 @@ export function formatBytes(bytes: number) {
     return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
 }
 
-export function formatDuration(ms: number) {
-    const value = Math.max(0, Math.floor(ms / 1000));
-    const minutes = Math.floor(value / 60);
-    const seconds = value % 60;
-    return minutes ? i18n.t("common.durationMinutes", { minutes, seconds: String(seconds).padStart(2, "0") }) : i18n.t("common.durationSeconds", { seconds });
-}
-
 export function getDataUrlByteSize(dataUrl: string) {
     const base64 = dataUrl.split(",", 2)[1];
     if (!base64) {
