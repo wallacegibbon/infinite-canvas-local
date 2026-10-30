@@ -846,3 +846,23 @@ than a fault, and fixing it means patching radix's `hideOthers`.
 
 **Where** `package.json`, `components/kit/*`, `components/kit/field.tsx`, `lib/canvas-overlay.ts`,
 `lib/design-tokens.ts`, `components/layout/app-providers.tsx`.
+
+---
+
+## 34. Unused translations are pruned by namespace, never by key
+
+**Decision** A locale namespace is deleted only when its feature was deleted outright *and* no
+template key can reach it. Everything else unreferenced stays.
+
+**Why** After the deletions there are ~150 translation keys no literal `t("…")` refers to. A script
+can find them, but it cannot tell a dead string from one reached through a computed key —
+`t(\`settingsPanels.common.${labelKey}\`)`, `t(\`canvas.sidePanel.filter.${value}\`)` and
+`t(\`assets.kinds.${kind}\`)` all resolve keys that look unreferenced. Deleting one of those shows the
+user a raw key like `assets.kinds.image`, which is the same class of bug as decision #27's missing
+JSX brace: invisible to the compiler and obvious only in the browser.
+
+So the pruning pass took `prompts`, `imageWorkbench`, `videoWorkbench` and the dead half of
+`workbench`, and stopped. The verification is a DOM scan for text matching a key shape, run on every
+route.
+
+**Where** `src/i18n/locales/{zh-CN,en-US}.ts`.
