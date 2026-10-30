@@ -2,6 +2,9 @@
 node_modules
 dist
 build
+# Served to the browser as plugin code, byte for byte. Nothing in this repo generates
+# them and they are not part of the app build, so they are assets rather than source.
+public/plugins
 coverage
 bun.lock
 *.log

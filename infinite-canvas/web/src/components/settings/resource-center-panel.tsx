@@ -1,4 +1,3 @@
-
 import { AlertTriangle, ChevronDown, Download, HardDriveDownload, RefreshCw, Server, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,7 +9,21 @@ import { Progress } from "@/components/kit/feedback";
 import { Tag } from "@/components/kit/tag";
 import { toast } from "@/components/kit/toast";
 import { Tooltip } from "@/components/kit/tooltip";
-import { cancelResourceJob, fetchResourceJob, fetchResourceStatus, formatBytes, installResources, pickResourceReplacement, refreshResourceStatus, setResourceReplacement, setWorkflowVisibility, type ResourceItem, type ResourceJob, type ResourcePack, type ResourceStatus } from "@/services/api/resources";
+import {
+    cancelResourceJob,
+    fetchResourceJob,
+    fetchResourceStatus,
+    formatBytes,
+    installResources,
+    pickResourceReplacement,
+    refreshResourceStatus,
+    setResourceReplacement,
+    setWorkflowVisibility,
+    type ResourceItem,
+    type ResourceJob,
+    type ResourcePack,
+    type ResourceStatus,
+} from "@/services/api/resources";
 import { gatewayVariantLabel } from "@/lib/gateway-labels";
 import { isGatewayDown } from "@/services/api/gateway-status";
 
@@ -55,7 +68,11 @@ function WithHint({ hint, children }: { hint?: string; children: React.ReactNode
 function packState(pack: ResourcePack, copy: Copy) {
     if (pack.planned) return <Tag>{copy.planned}</Tag>;
     if (!pack.missing) return <Tag color="green">{copy.ready}</Tag>;
-    return <Tag color="orange">{copy.missing} {pack.missing}</Tag>;
+    return (
+        <Tag color="orange">
+            {copy.missing} {pack.missing}
+        </Tag>
+    );
 }
 
 function formatSpeed(bytesPerSecond: number) {
@@ -67,7 +84,9 @@ const REPLACEABLE_MODEL_DIRS = new Set(["diffusion_models", "text_encoders", "va
 
 function isReplaceableResource(item: ResourceItem) {
     if (item.type !== "model" && item.type !== "bake") return false;
-    const dir = String(item.target || "").replace(/\\/g, "/").split("/")[0];
+    const dir = String(item.target || "")
+        .replace(/\\/g, "/")
+        .split("/")[0];
     return REPLACEABLE_MODEL_DIRS.has(dir);
 }
 
@@ -100,11 +119,7 @@ function ResourceCard({
             <div className="flex items-start gap-2">
                 {optional ? (
                     <WithHint hint={item.type === "bake" ? copy.manualOnlyHint : item.status === "present" ? copy.presentHint : undefined}>
-                        <Checkbox
-                            checked={selected}
-                            disabled={item.status === "present" || item.type === "bake"}
-                            onChange={(event) => onToggle?.(event.target.checked)}
-                        />
+                        <Checkbox checked={selected} disabled={item.status === "present" || item.type === "bake"} onChange={(event) => onToggle?.(event.target.checked)} />
                     </WithHint>
                 ) : (
                     <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-stone-300 dark:bg-stone-600" />
@@ -119,12 +134,28 @@ function ResourceCard({
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-stone-400 dark:text-stone-500">
                         <span>{sourceSummary(item, copy)}</span>
                         <span>{formatBytes(item.size)}</span>
-                        {!compact && item.license ? <span>{copy.license}: {item.license}</span> : null}
+                        {!compact && item.license ? (
+                            <span>
+                                {copy.license}: {item.license}
+                            </span>
+                        ) : null}
                     </div>
-                    {item.matchedBy === "size" && item.matchedFile ? <div className="mt-0.5 text-[10px] leading-4 text-stone-400 dark:text-stone-500">{copy.matchedBySize}: {item.matchedFile}</div> : null}
+                    {item.matchedBy === "size" && item.matchedFile ? (
+                        <div className="mt-0.5 text-[10px] leading-4 text-stone-400 dark:text-stone-500">
+                            {copy.matchedBySize}: {item.matchedFile}
+                        </div>
+                    ) : null}
                     {item.sizeMismatch ? <div className="mt-0.5 text-[10px] leading-4 text-amber-600 dark:text-amber-400">{item.sizeMismatch}</div> : null}
-                    {item.overridden && item.overriddenBy ? <div className="mt-0.5 text-[10px] leading-4 text-blue-600 dark:text-blue-300">{copy.replacedBy}: {item.overriddenBy}</div> : null}
-                    {!compact && item.note ? <div className="mt-0.5 text-[10px] leading-4 text-stone-400 dark:text-stone-500">{copy.note}: {item.note}</div> : null}
+                    {item.overridden && item.overriddenBy ? (
+                        <div className="mt-0.5 text-[10px] leading-4 text-blue-600 dark:text-blue-300">
+                            {copy.replacedBy}: {item.overriddenBy}
+                        </div>
+                    ) : null}
+                    {!compact && item.note ? (
+                        <div className="mt-0.5 text-[10px] leading-4 text-stone-400 dark:text-stone-500">
+                            {copy.note}: {item.note}
+                        </div>
+                    ) : null}
                     {item.manualCommand ? (
                         <div className="mt-1 rounded-md border border-stone-200 bg-stone-50/80 px-2 py-1 dark:border-stone-800 dark:bg-white/[.03]">
                             <div className="flex items-center justify-between gap-2">
@@ -138,7 +169,11 @@ function ResourceCard({
                     ) : null}
                     {canReplace ? (
                         <div className="mt-1 flex flex-wrap items-center justify-end gap-1">
-                            {item.overridden ? <Button size="small" type="text" disabled={replacing} onClick={() => onRestore?.(item)}>{copy.restoreDefault}</Button> : null}
+                            {item.overridden ? (
+                                <Button size="small" type="text" disabled={replacing} onClick={() => onRestore?.(item)}>
+                                    {copy.restoreDefault}
+                                </Button>
+                            ) : null}
                             <Button size="small" type="text" loading={replacing} onClick={() => onReplace?.(item)}>
                                 {item.overridden ? copy.replaceAgain : copy.replaceModel}
                             </Button>
@@ -183,11 +218,21 @@ function WorkflowResourceRow({
                     <span>{sourceSummary(item, copy)}</span>
                     <span>{formatBytes(item.size)}</span>
                 </div>
-                {item.matchedBy === "size" && item.matchedFile ? <div className="mt-0.5 text-[10px] text-stone-400 dark:text-stone-500">{copy.matchedBySize}: {item.matchedFile}</div> : null}
+                {item.matchedBy === "size" && item.matchedFile ? (
+                    <div className="mt-0.5 text-[10px] text-stone-400 dark:text-stone-500">
+                        {copy.matchedBySize}: {item.matchedFile}
+                    </div>
+                ) : null}
                 {item.sizeMismatch ? <div className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">{item.sizeMismatch}</div> : null}
-                {item.overridden && item.overriddenBy ? <div className="mt-0.5 text-[10px] text-blue-600 dark:text-blue-300">{copy.replacedBy}: {item.overriddenBy}</div> : null}
+                {item.overridden && item.overriddenBy ? (
+                    <div className="mt-0.5 text-[10px] text-blue-600 dark:text-blue-300">
+                        {copy.replacedBy}: {item.overriddenBy}
+                    </div>
+                ) : null}
                 {item.type === "bake" && requires.length ? (
-                    <div className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">{copy.bakeRequires}: {requires.map((entry) => entry.label).join(" + ")}</div>
+                    <div className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                        {copy.bakeRequires}: {requires.map((entry) => entry.label).join(" + ")}
+                    </div>
                 ) : null}
                 {item.manualCommand ? (
                     <div className="mt-1 rounded-md border border-stone-200 bg-stone-50/80 px-2 py-1 dark:border-stone-800 dark:bg-white/[.03]">
@@ -203,7 +248,11 @@ function WorkflowResourceRow({
             </div>
             {canReplace ? (
                 <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
-                    {item.overridden ? <Button size="small" type="text" disabled={replacing} onClick={() => onRestore?.(item)}>{copy.restoreDefault}</Button> : null}
+                    {item.overridden ? (
+                        <Button size="small" type="text" disabled={replacing} onClick={() => onRestore?.(item)}>
+                            {copy.restoreDefault}
+                        </Button>
+                    ) : null}
                     <Button size="small" type="text" loading={replacing} onClick={() => onReplace?.(item)}>
                         {item.overridden ? copy.replaceAgain : copy.replaceModel}
                     </Button>
@@ -214,7 +263,6 @@ function WorkflowResourceRow({
 }
 
 export function ResourceCenterPanel({ compact = false, footer }: { compact?: boolean; footer?: React.ReactNode }) {
-
     // A dropped gateway is reported by the shared banner; do not raise one error per request.
     const showError = (error: unknown) => {
         if (isGatewayDown()) return;
@@ -255,20 +303,23 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
         }
     }, []);
 
-    const load = useCallback(async (refresh = false) => {
-        setError("");
-        if (refresh) setRefreshing(true);
-        else setLoading(true);
-        try {
-            const next = refresh ? await refreshResourceStatus() : await fetchResourceStatus();
-            applyStatus(next);
-        } catch (loadError) {
-            setError(loadError instanceof Error ? loadError.message : String(loadError));
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    }, [applyStatus]);
+    const load = useCallback(
+        async (refresh = false) => {
+            setError("");
+            if (refresh) setRefreshing(true);
+            else setLoading(true);
+            try {
+                const next = refresh ? await refreshResourceStatus() : await fetchResourceStatus();
+                applyStatus(next);
+            } catch (loadError) {
+                setError(loadError instanceof Error ? loadError.message : String(loadError));
+            } finally {
+                setLoading(false);
+                setRefreshing(false);
+            }
+        },
+        [applyStatus],
+    );
 
     useEffect(() => {
         void load();
@@ -284,51 +335,54 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
         });
     }, [status]);
 
-    const watchJob = useCallback((initial: ResourceJob) => {
-        stopPolling();
-        setJob(initial);
-        speedSamples.current.clear();
-        setSpeeds({});
-        window.requestAnimationFrame(() => jobPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-        const tick = async () => {
-            try {
-                const next = await fetchResourceJob(initial.id);
-                const now = Date.now();
-                const nextSpeeds: Record<string, number> = {};
-                for (const item of next.items) {
-                    if (item.status !== "downloading") {
-                        speedSamples.current.delete(item.id);
-                        continue;
+    const watchJob = useCallback(
+        (initial: ResourceJob) => {
+            stopPolling();
+            setJob(initial);
+            speedSamples.current.clear();
+            setSpeeds({});
+            window.requestAnimationFrame(() => jobPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+            const tick = async () => {
+                try {
+                    const next = await fetchResourceJob(initial.id);
+                    const now = Date.now();
+                    const nextSpeeds: Record<string, number> = {};
+                    for (const item of next.items) {
+                        if (item.status !== "downloading") {
+                            speedSamples.current.delete(item.id);
+                            continue;
+                        }
+                        const previous = speedSamples.current.get(item.id);
+                        if (previous && now > previous.time && item.bytes >= previous.bytes) {
+                            const sample = (item.bytes - previous.bytes) / ((now - previous.time) / 1000);
+                            const speed = previous.speed > 0 ? previous.speed * 0.5 + sample * 0.5 : sample;
+                            nextSpeeds[item.id] = speed;
+                            speedSamples.current.set(item.id, { bytes: item.bytes, time: now, speed });
+                        } else {
+                            speedSamples.current.set(item.id, { bytes: item.bytes, time: now, speed: 0 });
+                        }
                     }
-                    const previous = speedSamples.current.get(item.id);
-                    if (previous && now > previous.time && item.bytes >= previous.bytes) {
-                        const sample = (item.bytes - previous.bytes) / ((now - previous.time) / 1000);
-                        const speed = previous.speed > 0 ? previous.speed * 0.5 + sample * 0.5 : sample;
-                        nextSpeeds[item.id] = speed;
-                        speedSamples.current.set(item.id, { bytes: item.bytes, time: now, speed });
-                    } else {
-                        speedSamples.current.set(item.id, { bytes: item.bytes, time: now, speed: 0 });
+                    setSpeeds(nextSpeeds);
+                    setJob(next);
+                    if (["done", "error", "canceled"].includes(next.status)) {
+                        stopPolling();
+                        speedSamples.current.clear();
+                        setSpeeds({});
+                        if (next.status === "done") toast.success(copy.done);
+                        else if (next.status === "error") toast.error(next.message || copy.failed);
+                        await load(true);
+                        window.dispatchEvent(new Event("local-gateway-refresh-models"));
                     }
-                }
-                setSpeeds(nextSpeeds);
-                setJob(next);
-                if (["done", "error", "canceled"].includes(next.status)) {
+                } catch (pollError) {
                     stopPolling();
-                    speedSamples.current.clear();
-                    setSpeeds({});
-                    if (next.status === "done") toast.success(copy.done);
-                    else if (next.status === "error") toast.error(next.message || copy.failed);
-                    await load(true);
-                    window.dispatchEvent(new Event("local-gateway-refresh-models"));
+                    setError(pollError instanceof Error ? pollError.message : String(pollError));
                 }
-            } catch (pollError) {
-                stopPolling();
-                setError(pollError instanceof Error ? pollError.message : String(pollError));
-            }
-        };
-        pollRef.current = window.setInterval(() => void tick(), 900);
-        void tick();
-    }, [copy.done, copy.failed, load, stopPolling]);
+            };
+            pollRef.current = window.setInterval(() => void tick(), 900);
+            void tick();
+        },
+        [copy.done, copy.failed, load, stopPolling],
+    );
 
     // Installs are local file writes, so a gateway on another machine can only download to
     // the wrong disk. They stay off until the deployment states otherwise
@@ -387,9 +441,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
 
     const installIds = useMemo(() => {
         if (!status) return [];
-        const required = status.packs
-            .filter((pack) => selectedPacks.has(pack.id) && !pack.planned)
-            .flatMap((pack) => pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake").map((item) => item.id));
+        const required = status.packs.filter((pack) => selectedPacks.has(pack.id) && !pack.planned).flatMap((pack) => pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake").map((item) => item.id));
         const optional = status.resources.filter((item) => selectedOptional.has(item.id) && item.status !== "present" && item.type !== "bake").map((item) => item.id);
         return [...new Set([...required, ...optional])];
     }, [selectedOptional, selectedPacks, status]);
@@ -418,13 +470,17 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
     const toggleWorkflowEnabled = async (id: string, enabled: boolean) => {
         try {
             await setWorkflowVisibility(id, enabled);
-            setStatus((current) => current ? {
-                ...current,
-                packs: current.packs.map((pack) => ({
-                    ...pack,
-                    workflowDependencies: pack.workflowDependencies?.map((workflow) => (workflow.id === id ? { ...workflow, enabled } : workflow)),
-                })),
-            } : current);
+            setStatus((current) =>
+                current
+                    ? {
+                          ...current,
+                          packs: current.packs.map((pack) => ({
+                              ...pack,
+                              workflowDependencies: pack.workflowDependencies?.map((workflow) => (workflow.id === id ? { ...workflow, enabled } : workflow)),
+                          })),
+                      }
+                    : current,
+            );
             window.dispatchEvent(new Event("local-gateway-refresh-models"));
         } catch (toggleError) {
             showError(toggleError);
@@ -479,7 +535,12 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
     };
 
     if (loading && !status) {
-        return <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-stone-200 p-8 text-sm text-stone-500 dark:border-stone-800 dark:text-stone-400"><RefreshCw className="size-4 animate-spin" />{copy.scanFirst}</div>;
+        return (
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-stone-200 p-8 text-sm text-stone-500 dark:border-stone-800 dark:text-stone-400">
+                <RefreshCw className="size-4 animate-spin" />
+                {copy.scanFirst}
+            </div>
+        );
     }
 
     return (
@@ -493,11 +554,24 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                         </div>
                         <div className="text-xs leading-5 text-stone-500 dark:text-stone-400">{copy.subtitle}</div>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-500 dark:text-stone-400">
-                            <span className="inline-flex items-center gap-1"><Server className="size-3" />{copy.comfyRoot}: {status?.comfyRoot || "—"}</span>
-                            <span>{copy.indexVersion}: {status?.indexVersion || "—"}</span>
-                            <span>{copy.present}: {recommendedPresent}/{recommendedTotal}</span>
-                            <span>{copy.missing}: {recommendedMissing}</span>
-                            {recommendedMissingSize ? <span>{copy.size}: {formatBytes(recommendedMissingSize)}</span> : null}
+                            <span className="inline-flex items-center gap-1">
+                                <Server className="size-3" />
+                                {copy.comfyRoot}: {status?.comfyRoot || "—"}
+                            </span>
+                            <span>
+                                {copy.indexVersion}: {status?.indexVersion || "—"}
+                            </span>
+                            <span>
+                                {copy.present}: {recommendedPresent}/{recommendedTotal}
+                            </span>
+                            <span>
+                                {copy.missing}: {recommendedMissing}
+                            </span>
+                            {recommendedMissingSize ? (
+                                <span>
+                                    {copy.size}: {formatBytes(recommendedMissingSize)}
+                                </span>
+                            ) : null}
                         </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -508,7 +582,13 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                             {copy.refresh}
                         </Button>
                         <WithHint hint={job?.status === "running" ? copy.jobRunningHint : installDisabled ? copy.installDisabled : !installIds.length ? copy.selectFirstHint : undefined}>
-                            <Button size="small" type="primary" icon={<Download className="size-3.5" />} disabled={!installIds.length || installDisabled || Boolean(job && ["running"].includes(job.status))} onClick={() => void startInstall({ ids: installIds })}>
+                            <Button
+                                size="small"
+                                type="primary"
+                                icon={<Download className="size-3.5" />}
+                                disabled={!installIds.length || installDisabled || Boolean(job && ["running"].includes(job.status))}
+                                onClick={() => void startInstall({ ids: installIds })}
+                            >
                                 {copy.installSelected}
                             </Button>
                         </WithHint>
@@ -521,13 +601,39 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                             {copy.installDisabled}
                         </div>
                         <div className="mt-1">{copy.installDisabledBody}</div>
-                        {modelInstall?.comfyHost ? <div className="mt-1 break-all"><span className="opacity-70">{copy.installDisabledHost}: </span><span className="font-mono">{modelInstall.comfyHost}</span></div> : null}
+                        {modelInstall?.comfyHost ? (
+                            <div className="mt-1 break-all">
+                                <span className="opacity-70">{copy.installDisabledHost}: </span>
+                                <span className="font-mono">{modelInstall.comfyHost}</span>
+                            </div>
+                        ) : null}
                         <div className="mt-1">{copy.installDisabledFix}</div>
                     </div>
                 ) : null}
-                {status?.comfyRoot && !status.comfyReachable ? <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400"><AlertTriangle className="size-3.5" />{copy.notReachable}</div> : null}
-                {status?.indexError ? <div className="mt-2 break-all text-[11px] text-amber-600 dark:text-amber-400"><span className="inline-flex items-center gap-1.5"><AlertTriangle className="size-3.5 shrink-0" />{copy.indexError}</span>{status.indexError}</div> : null}
-                {!status?.indexError && status?.indexWarning ? <div className="mt-2 break-all text-[11px] text-stone-500 dark:text-stone-400"><span className="inline-flex items-center gap-1.5"><AlertTriangle className="size-3.5 shrink-0" />{copy.indexWarning}</span>{status.indexWarning}</div> : null}
+                {status?.comfyRoot && !status.comfyReachable ? (
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                        <AlertTriangle className="size-3.5" />
+                        {copy.notReachable}
+                    </div>
+                ) : null}
+                {status?.indexError ? (
+                    <div className="mt-2 break-all text-[11px] text-amber-600 dark:text-amber-400">
+                        <span className="inline-flex items-center gap-1.5">
+                            <AlertTriangle className="size-3.5 shrink-0" />
+                            {copy.indexError}
+                        </span>
+                        {status.indexError}
+                    </div>
+                ) : null}
+                {!status?.indexError && status?.indexWarning ? (
+                    <div className="mt-2 break-all text-[11px] text-stone-500 dark:text-stone-400">
+                        <span className="inline-flex items-center gap-1.5">
+                            <AlertTriangle className="size-3.5 shrink-0" />
+                            {copy.indexWarning}
+                        </span>
+                        {status.indexWarning}
+                    </div>
+                ) : null}
             </div>
 
             <Dialog open={runtimeHelpOpen} onClose={() => setRuntimeHelpOpen(false)} size="form" title={copy.runtimeHelp}>
@@ -545,7 +651,9 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                             <div key={entry.id} className="rounded-md border border-stone-200 p-2 dark:border-stone-800">
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="font-medium">{copy[`runtimeDep_${entry.id}` as keyof Copy] || entry.id}</span>
-                                    <Button size="small" onClick={() => void copyHintText(command)}>{copy.copyHint}</Button>
+                                    <Button size="small" onClick={() => void copyHintText(command)}>
+                                        {copy.copyHint}
+                                    </Button>
                                 </div>
                                 <div className="mt-0.5 text-[11px] text-stone-500 dark:text-stone-400">{copy[`runtimeDepNote_${entry.id}` as keyof Copy] || ""}</div>
                                 <code className="mt-1 block break-all rounded bg-stone-100 px-2 py-1 text-[11px] dark:bg-white/5">{command}</code>
@@ -555,7 +663,12 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                     <div className="text-xs leading-5 text-stone-500 dark:text-stone-400">{copy.runtimeHelpNote}</div>
                 </div>
             </Dialog>
-            {error ? <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"><XCircle className="size-3.5 shrink-0" />{error}</div> : null}
+            {error ? (
+                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                    <XCircle className="size-3.5 shrink-0" />
+                    {error}
+                </div>
+            ) : null}
 
             {job ? (
                 <div ref={jobPanelRef} aria-live="polite" className="sticky top-0 z-30 rounded-xl border border-stone-200 bg-white/95 p-3 shadow-sm backdrop-blur dark:border-stone-800 dark:bg-stone-950/95">
@@ -567,7 +680,9 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                         <div className="flex min-w-0 items-center gap-2">
                             <span className="min-w-0 truncate text-stone-500 dark:text-stone-400">{job.message || job.status}</span>
                             {job.status === "running" ? (
-                                <Button size="small" danger loading={stopping} onClick={() => void stopInstall()}>{copy.cancel}</Button>
+                                <Button size="small" danger loading={stopping} onClick={() => void stopInstall()}>
+                                    {copy.cancel}
+                                </Button>
                             ) : null}
                         </div>
                     </div>
@@ -580,32 +695,49 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                     <span className={item.status === "error" ? "shrink-0 text-red-500" : "shrink-0 text-stone-400 dark:text-stone-500"}>
                                         {item.status === "downloading"
                                             ? `${formatBytes(item.bytes)} / ${formatBytes(item.size)}${speeds[item.id] ? ` · ${formatSpeed(speeds[item.id])}` : ""}`
-                                            : item.status === "copying" ? copy.copying : item.status === "verifying" ? copy.verifying : item.status === "installing" ? copy.installing : item.status === "extracting" ? copy.extracting : item.status === "baking" ? copy.localBake : item.status === "error" ? copy.itemFailed : item.status}
+                                            : item.status === "copying"
+                                              ? copy.copying
+                                              : item.status === "verifying"
+                                                ? copy.verifying
+                                                : item.status === "installing"
+                                                  ? copy.installing
+                                                  : item.status === "extracting"
+                                                    ? copy.extracting
+                                                    : item.status === "baking"
+                                                      ? copy.localBake
+                                                      : item.status === "error"
+                                                        ? copy.itemFailed
+                                                        : item.status}
                                     </span>
                                 </div>
                                 {item.status === "error" && item.error ? (
-                                    <div className="line-clamp-2 break-words pl-1 text-[10px] text-red-500" title={item.error}>{item.error}</div>
+                                    <div className="line-clamp-2 break-words pl-1 text-[10px] text-red-500" title={item.error}>
+                                        {item.error}
+                                    </div>
                                 ) : null}
                             </div>
                         ))}
                     </div>
                     {job.items.some((item) => item.hint) ? (
                         <div className="mt-2 space-y-2">
-                            {job.items.filter((item) => item.hint).map((item) => (
-                                <div
-                                    key={`${item.id}-hint`}
-                                    className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
-                                >
-                                    <div className="mb-1 flex items-center justify-between gap-2">
-                                        <span className="flex min-w-0 items-center gap-1 font-medium">
-                                            <AlertTriangle className="size-3.5 shrink-0" />
-                                            <span className="truncate">{copy.hintTitle} · {item.label}</span>
-                                        </span>
-                                        <Button size="small" onClick={() => void copyHintText(item.hint || "")}>{copy.copyHint}</Button>
+                            {job.items
+                                .filter((item) => item.hint)
+                                .map((item) => (
+                                    <div key={`${item.id}-hint`} className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                                        <div className="mb-1 flex items-center justify-between gap-2">
+                                            <span className="flex min-w-0 items-center gap-1 font-medium">
+                                                <AlertTriangle className="size-3.5 shrink-0" />
+                                                <span className="truncate">
+                                                    {copy.hintTitle} · {item.label}
+                                                </span>
+                                            </span>
+                                            <Button size="small" onClick={() => void copyHintText(item.hint || "")}>
+                                                {copy.copyHint}
+                                            </Button>
+                                        </div>
+                                        <div className="whitespace-pre-wrap break-all text-[10px] leading-4">{item.hint}</div>
                                     </div>
-                                    <div className="whitespace-pre-wrap break-all text-[10px] leading-4">{item.hint}</div>
-                                </div>
-                            ))}
+                                ))}
                         </div>
                     ) : null}
                 </div>
@@ -626,10 +758,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                     const extraOptionalMissing = extraOptionalItems.filter((item) => item.status !== "present");
                     const extraOptionalSize = extraOptionalMissing.reduce((sum, item) => sum + (item.size || 0), 0);
                     const selectedOptionalInPack = extraOptionalItems.filter((item) => selectedOptional.has(item.id) && item.status !== "present");
-                    const packInstallIds = [
-                        ...pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake").map((item) => item.id),
-                        ...selectedOptionalInPack.map((item) => item.id),
-                    ];
+                    const packInstallIds = [...pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake").map((item) => item.id), ...selectedOptionalInPack.map((item) => item.id)];
                     const expandable = pack.total > 0 || pack.optionalTotal > 0 || workflowDependencies.length > 0;
                     const optionalLabel = pack.optionalLabel?.trim() || copy.optionalSection;
                     const headerBody = (
@@ -639,9 +768,21 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                 {pack.recommended ? <Tag color="blue">{copy.recommended}</Tag> : null}
                                 {pack.optional && !pack.recommended ? <Tag>{copy.optional}</Tag> : null}
                                 {packState(pack, copy)}
-                                {workflowDependencies.length ? <Tag>{copy.workflowSection} {workflowDependencies.length}</Tag> : null}
-                                {extraOptionalItems.length ? <Tag>{optionalLabel} {extraOptionalItems.length}</Tag> : null}
-                                {pack.missingSize ? <span className="text-[11px] text-stone-500 dark:text-stone-400">{copy.size} {formatBytes(pack.missingSize)}</span> : null}
+                                {workflowDependencies.length ? (
+                                    <Tag>
+                                        {copy.workflowSection} {workflowDependencies.length}
+                                    </Tag>
+                                ) : null}
+                                {extraOptionalItems.length ? (
+                                    <Tag>
+                                        {optionalLabel} {extraOptionalItems.length}
+                                    </Tag>
+                                ) : null}
+                                {pack.missingSize ? (
+                                    <span className="text-[11px] text-stone-500 dark:text-stone-400">
+                                        {copy.size} {formatBytes(pack.missingSize)}
+                                    </span>
+                                ) : null}
                             </div>
                         </>
                     );
@@ -669,7 +810,12 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                     <div className="min-w-0 flex-1">{headerBody}</div>
                                 )}
                                 {expandable ? (
-                                    <button type="button" className="mt-0.5 rounded-md p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:text-stone-500 dark:hover:bg-white/5 dark:hover:text-stone-300" onClick={() => toggleExpanded(pack.id)} aria-label={expanded ? copy.collapse : copy.expand}>
+                                    <button
+                                        type="button"
+                                        className="mt-0.5 rounded-md p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:text-stone-500 dark:hover:bg-white/5 dark:hover:text-stone-300"
+                                        onClick={() => toggleExpanded(pack.id)}
+                                        aria-label={expanded ? copy.collapse : copy.expand}
+                                    >
                                         <ChevronDown className={`size-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
                                     </button>
                                 ) : null}
@@ -688,14 +834,21 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                     // "Restart needed" used to be the fallback for every unavailable workflow,
                                                     // so one blocked by an uninstalled custom node promised a restart that would
                                                     // not help. A workflow carrying problems reports those instead.
-                                                    const workflowTag = workflow.missing
-                                                        ? <Tag color="orange">{copy.missing} {workflow.missing}</Tag>
-                                                        : workflow.available
-                                                            ? <Tag color="green">{copy.workflowReady}</Tag>
-                                                            : workflow.problems.length
-                                                              ? <Tag color="orange">{copy.workflowBlocked}</Tag>
-                                                              : <Tag color="gold">{copy.workflowRestart}</Tag>;
-                                                    const problemText = workflow.problems.map((problem) => problem.message).filter(Boolean).join("；");
+                                                    const workflowTag = workflow.missing ? (
+                                                        <Tag color="orange">
+                                                            {copy.missing} {workflow.missing}
+                                                        </Tag>
+                                                    ) : workflow.available ? (
+                                                        <Tag color="green">{copy.workflowReady}</Tag>
+                                                    ) : workflow.problems.length ? (
+                                                        <Tag color="orange">{copy.workflowBlocked}</Tag>
+                                                    ) : (
+                                                        <Tag color="gold">{copy.workflowRestart}</Tag>
+                                                    );
+                                                    const problemText = workflow.problems
+                                                        .map((problem) => problem.message)
+                                                        .filter(Boolean)
+                                                        .join("；");
                                                     return (
                                                         <div
                                                             key={workflow.id}
@@ -710,7 +863,11 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                                 <button type="button" className="min-w-0 flex-1 text-left" onClick={() => toggleWorkflow(workflow.id)} aria-expanded={workflowExpanded}>
                                                                     <div className="flex flex-wrap items-center gap-2">
                                                                         <span className={`text-xs font-medium ${workflow.enabled === false ? "text-stone-400 dark:text-stone-500" : "text-stone-800 dark:text-stone-100"}`}>{workflow.label}</span>
-                                                                        {workflow.recommended ? <Tag color="blue" className="m-0">{copy.recommended}</Tag> : null}
+                                                                        {workflow.recommended ? (
+                                                                            <Tag color="blue" className="m-0">
+                                                                                {copy.recommended}
+                                                                            </Tag>
+                                                                        ) : null}
                                                                         {workflow.missingSize ? <span className="text-[10px] text-stone-400 dark:text-stone-500">{formatBytes(workflow.missingSize)}</span> : null}
                                                                         {workflowTag}
                                                                     </div>
@@ -734,18 +891,19 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                                                 void toggleWorkflowEnabled(workflow.id, workflow.enabled === false);
                                                                             }}
                                                                         >
-                                                                            <Checkbox
-                                                                                checked={workflow.enabled !== false}
-                                                                                onClick={(event) => event.stopPropagation()}
-                                                                                onChange={(event) => void toggleWorkflowEnabled(workflow.id, event.target.checked)}
-                                                                            />
+                                                                            <Checkbox checked={workflow.enabled !== false} onClick={(event) => event.stopPropagation()} onChange={(event) => void toggleWorkflowEnabled(workflow.id, event.target.checked)} />
                                                                             <span className={`min-w-8 text-[10px] ${workflow.enabled === false ? "text-stone-400 dark:text-stone-500" : "text-emerald-600 dark:text-emerald-400"}`}>
                                                                                 {workflow.enabled === false ? copy.workflowDisabled : copy.workflowEnabled}
                                                                             </span>
                                                                         </span>
                                                                     </Tooltip>
                                                                 )}
-                                                                <button type="button" className="mt-1 rounded-lg p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:text-stone-500 dark:hover:bg-white/5 dark:hover:text-stone-300" onClick={() => toggleWorkflow(workflow.id)} aria-label={workflowExpanded ? copy.collapse : copy.expand}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="mt-1 rounded-lg p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:text-stone-500 dark:hover:bg-white/5 dark:hover:text-stone-300"
+                                                                    onClick={() => toggleWorkflow(workflow.id)}
+                                                                    aria-label={workflowExpanded ? copy.collapse : copy.expand}
+                                                                >
                                                                     <ChevronDown className={`size-4 transition-transform ${workflowExpanded ? "rotate-180" : ""}`} />
                                                                 </button>
                                                             </div>
@@ -765,13 +923,16 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                                             />
                                                                         ))}
                                                                     </div>
-                                                                    {!workflow.available && problemText ? (
-                                                                        <div className="mt-1 text-[10px] leading-4 text-amber-600 dark:text-amber-400">{problemText}</div>
-                                                                    ) : null}
+                                                                    {!workflow.available && problemText ? <div className="mt-1 text-[10px] leading-4 text-amber-600 dark:text-amber-400">{problemText}</div> : null}
                                                                     {workflow.installIds.length ? (
                                                                         <div className="mt-2 flex justify-end">
                                                                             <WithHint hint={job?.status === "running" ? copy.jobRunningHint : installDisabled ? copy.installDisabled : undefined}>
-                                                                                <Button size="small" icon={<Download className="size-3.5" />} onClick={() => void startInstall({ ids: workflow.installIds })} disabled={installDisabled || Boolean(job && job.status === "running")}>
+                                                                                <Button
+                                                                                    size="small"
+                                                                                    icon={<Download className="size-3.5" />}
+                                                                                    onClick={() => void startInstall({ ids: workflow.installIds })}
+                                                                                    disabled={installDisabled || Boolean(job && job.status === "running")}
+                                                                                >
                                                                                     {copy.installWorkflow}
                                                                                 </Button>
                                                                             </WithHint>
@@ -787,9 +948,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                 <>
                                                     <div className="mt-3 mb-1.5 flex items-center justify-between gap-2 text-[11px]">
                                                         <span className="font-medium text-stone-600 dark:text-stone-300">{optionalLabel}</span>
-                                                        <span className="text-stone-400 dark:text-stone-500">
-                                                            {`${copy.optionalMissingLabel} ${extraOptionalMissing.length}${extraOptionalSize ? ` · ${formatBytes(extraOptionalSize)}` : ""}`}
-                                                        </span>
+                                                        <span className="text-stone-400 dark:text-stone-500">{`${copy.optionalMissingLabel} ${extraOptionalMissing.length}${extraOptionalSize ? ` · ${formatBytes(extraOptionalSize)}` : ""}`}</span>
                                                     </div>
                                                     <div className="space-y-1.5">
                                                         {extraOptionalItems.map((item) => (
@@ -817,7 +976,10 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                 <>
                                                     <div className="mb-1.5 flex items-center justify-between text-[11px]">
                                                         <span className="font-medium text-stone-600 dark:text-stone-300">{copy.requiredSection}</span>
-                                                        <span className="text-stone-400 dark:text-stone-500">{pack.present}/{pack.total}{pack.missingSize ? ` · ${copy.size} ${formatBytes(pack.missingSize)}` : ""}</span>
+                                                        <span className="text-stone-400 dark:text-stone-500">
+                                                            {pack.present}/{pack.total}
+                                                            {pack.missingSize ? ` · ${copy.size} ${formatBytes(pack.missingSize)}` : ""}
+                                                        </span>
                                                     </div>
                                                     <div className="space-y-1.5">
                                                         {pack.requiredItems.map((item) => (

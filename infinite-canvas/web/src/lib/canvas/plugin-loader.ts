@@ -153,7 +153,10 @@ async function loadLocalPlugins() {
 async function loadDevPlugins() {
     const raw = import.meta.env.VITE_DEV_PLUGINS;
     if (!raw) return;
-    const urls = raw.split(",").map((item) => item.trim()).filter(Boolean);
+    const urls = raw
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
     await Promise.all(
         urls.map(async (url) => {
             try {

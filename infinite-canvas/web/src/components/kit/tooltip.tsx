@@ -61,11 +61,7 @@ export function Tooltip({
                         side={placement}
                         sideOffset={6}
                         style={{ background: color, ...styles?.root }}
-                        className={cn(
-                            "z-[1500] max-w-[250px] rounded-md px-2 py-1.5 text-xs leading-snug font-normal",
-                            color ? "text-stone-900" : "bg-stone-900/95 text-stone-50 dark:bg-stone-700",
-                            className,
-                        )}
+                        className={cn("z-[1500] max-w-[250px] rounded-md px-2 py-1.5 text-xs leading-snug font-normal", color ? "text-stone-900" : "bg-stone-900/95 text-stone-50 dark:bg-stone-700", className)}
                     >
                         {title}
                     </RadixTooltip.Content>

@@ -35,7 +35,7 @@ type PluginHostParams = {
  */
 export function usePluginHost(params: PluginHostParams) {
     const { t } = useTranslation();
-    const { effectiveConfig, isAiConfigReady, openConfigDialog, theme, nodesRef, connectionsRef, viewportRef, setNodes, setDialogNodeId, } = params;
+    const { effectiveConfig, isAiConfigReady, openConfigDialog, theme, nodesRef, connectionsRef, viewportRef, setNodes, setDialogNodeId } = params;
 
     // Host capabilities available to plugin nodes; methods receive nodeId and are not bound to a specific node.
     const pluginAi = useMemo<CanvasPluginAi>(() => {
@@ -53,17 +53,17 @@ export function usePluginHost(params: PluginHostParams) {
                 const config = { ...buildGenerationConfig(effectiveConfig, undefined, "image"), count: String(options?.count || 1), ...(options?.model ? { model: options.model } : {}), ...(options?.size ? { size: options.size } : {}) };
                 ensureReady(config);
                 const references = toReferences(options?.references);
-                const items = references.length
-                    ? await requestEdit(config, prompt, references, { signal: options?.signal, params: options?.params })
-                    : await requestGeneration(config, prompt, { signal: options?.signal, params: options?.params });
-                const images = await Promise.all(items.map(async (item) => {
-                    try {
-                        return await imageToDataUrl({ dataUrl: item.dataUrl }, { signal: options?.signal });
-                    } catch (error) {
-                        if (options?.signal?.aborted) throw error;
-                        return item.dataUrl;
-                    }
-                }));
+                const items = references.length ? await requestEdit(config, prompt, references, { signal: options?.signal, params: options?.params }) : await requestGeneration(config, prompt, { signal: options?.signal, params: options?.params });
+                const images = await Promise.all(
+                    items.map(async (item) => {
+                        try {
+                            return await imageToDataUrl({ dataUrl: item.dataUrl }, { signal: options?.signal });
+                        } catch (error) {
+                            if (options?.signal?.aborted) throw error;
+                            return item.dataUrl;
+                        }
+                    }),
+                );
                 return { images };
             },
             generateVideo: async (prompt, options) => {
@@ -91,7 +91,9 @@ export function usePluginHost(params: PluginHostParams) {
             getModelSchema: async (model) => {
                 const decoded = decodeChannelModel(model);
                 const channel = decoded ? effectiveConfig.channels.find((item) => item.id === decoded.channelId) : undefined;
-                const baseUrl = String(channel?.baseUrl || effectiveConfig.baseUrl || "").trim().replace(/\/+$/, "");
+                const baseUrl = String(channel?.baseUrl || effectiveConfig.baseUrl || "")
+                    .trim()
+                    .replace(/\/+$/, "");
                 if (!baseUrl) return null;
                 const workflow = decoded?.model || model;
                 try {
@@ -106,7 +108,9 @@ export function usePluginHost(params: PluginHostParams) {
             },
             resolveMedia: (storageKey) => resolveMediaUrl(storageKey, ""),
             listLoras: async () => {
-                const baseUrl = String(effectiveConfig.baseUrl || effectiveConfig.channels[0]?.baseUrl || "").trim().replace(/\/+$/, "");
+                const baseUrl = String(effectiveConfig.baseUrl || effectiveConfig.channels[0]?.baseUrl || "")
+                    .trim()
+                    .replace(/\/+$/, "");
                 if (!baseUrl) return [];
                 try {
                     const response = await fetch(`${baseUrl.replace(/\/v1$/i, "")}/api/loras`);

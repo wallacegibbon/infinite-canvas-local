@@ -1,4 +1,3 @@
-
 import type { TFunction } from "i18next";
 import { Database, HardDrive, Layers3, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -61,13 +60,20 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
                 </div>
                 {error ? <Alert className="mt-4" type="error" message={t("config.localStorage.readFailed")} description={error} /> : null}
                 {!usage && loading ? (
-                    <div className="flex min-h-48 items-center justify-center"><Spin /></div>
+                    <div className="flex min-h-48 items-center justify-center">
+                        <Spin />
+                    </div>
                 ) : usage ? (
                     <>
                         <div className="mt-4 grid gap-3 sm:grid-cols-3">
                             <StorageMetric icon={<Database className="size-4" />} label={t("config.localStorage.indexedDbUsage")} value={formatStorageBytes(indexedDbBytes)} hint={t("config.localStorage.contentEstimate")} />
                             <StorageMetric icon={<HardDrive className="size-4" />} label={t("config.localStorage.siteUsage")} value={formatStorageBytes(usage.usage)} hint={t("config.localStorage.siteUsageHint")} />
-                            <StorageMetric icon={<Layers3 className="size-4" />} label={t("config.localStorage.quota")} value={formatStorageBytes(usage.quota)} hint={usage.quota ? t("config.localStorage.quotaHint") : t("config.localStorage.quotaUnavailable")} />
+                            <StorageMetric
+                                icon={<Layers3 className="size-4" />}
+                                label={t("config.localStorage.quota")}
+                                value={formatStorageBytes(usage.quota)}
+                                hint={usage.quota ? t("config.localStorage.quotaHint") : t("config.localStorage.quotaUnavailable")}
+                            />
                         </div>
                         {usage.quota ? (
                             <div className="mt-4">
@@ -86,7 +92,9 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
                     <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-4 py-3 dark:border-stone-800">
                         <div className="min-w-0">
                             <div className="truncate text-sm font-semibold">{database.name === PLUGIN_DATABASE ? t("config.localStorage.pluginDatabase") : t("config.localStorage.mainDatabase")}</div>
-                            <div className="mt-0.5 truncate font-mono text-[11px] text-stone-500">{database.name} · v{database.version}</div>
+                            <div className="mt-0.5 truncate font-mono text-[11px] text-stone-500">
+                                {database.name} · v{database.version}
+                            </div>
                         </div>
                         <div className="shrink-0 text-sm font-medium tabular-nums">{formatStorageBytes(database.bytes)}</div>
                     </div>
@@ -111,7 +119,10 @@ export function ConfigLocalStorage({ active }: { active: boolean }) {
 function StorageMetric({ icon, label, value, hint }: { icon: ReactNode; label: string; value: string; hint: string }) {
     return (
         <div className="rounded-lg bg-stone-100/70 p-3 dark:bg-stone-900/70">
-            <div className="flex items-center gap-2 text-xs text-stone-500">{icon}{label}</div>
+            <div className="flex items-center gap-2 text-xs text-stone-500">
+                {icon}
+                {label}
+            </div>
             <div className="mt-2 text-xl font-semibold tabular-nums">{value}</div>
             <div className="mt-1 text-[11px] text-stone-500">{hint}</div>
         </div>

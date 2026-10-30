@@ -37,12 +37,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
     const mode = node.metadata?.generationMode || "image";
     const config = buildNodeConfig(globalConfig, node, mode);
     const chipStyle = { background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text };
-    const frameMode: "first" | "last" | "both" =
-        node.metadata?.frameMode === "last" || node.metadata?.frameMode === "both" || node.metadata?.frameMode === "first"
-            ? node.metadata.frameMode
-            : inputSummary.imageCount >= 2
-              ? "both"
-              : "first";
+    const frameMode: "first" | "last" | "both" = node.metadata?.frameMode === "last" || node.metadata?.frameMode === "both" || node.metadata?.frameMode === "first" ? node.metadata.frameMode : inputSummary.imageCount >= 2 ? "both" : "first";
     const changeVideoMode = (value: "text" | "frames" | "reference") => {
         const baseId = value === "reference" ? "video-h3-ref2va" : value === "frames" ? "video-h3-frames" : "video-h3-t2v";
         const nextModel = videoModelForWorkflow(config, baseId, { noVdn: isNoVdnWorkflowId(videoWorkflowId(config, config.model)) });
@@ -90,7 +85,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
                                     </span>
                                 ),
                             },
-]}
+                        ]}
                     />
                 </div>
             </div>
@@ -107,7 +102,15 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
 
             <div className="mb-2 grid min-w-0 cursor-default grid-cols-[minmax(0,1fr)_148px] items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
                 <div className="flex min-w-0 flex-col gap-1">
-                    <WorkflowModelPicker className="canvas-compact-control h-10" config={config} value={config.model} onChange={(model) => onConfigChange(node.id, mode === "video" ? videoModelModePatch(config, model) : { model })} capability={mode} onMissingConfig={() => openConfigDialog(true)} fullWidth />
+                    <WorkflowModelPicker
+                        className="canvas-compact-control h-10"
+                        config={config}
+                        value={config.model}
+                        onChange={(model) => onConfigChange(node.id, mode === "video" ? videoModelModePatch(config, model) : { model })}
+                        capability={mode}
+                        onMissingConfig={() => openConfigDialog(true)}
+                        fullWidth
+                    />
                     <BaseModelPicker className="canvas-compact-control h-10" config={config} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} fullWidth />
                 </div>
                 {mode === "video" ? (
@@ -121,11 +124,33 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
                         onModeChange={changeVideoMode}
                     />
                 ) : mode === "image" ? (
-                    <CanvasImageSettingsPopover config={config} placement="topRight" autoAdjustOverflow={false} buttonClassName="canvas-compact-control !h-10 !w-full !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })} onParamsChange={(params) => onConfigChange(node.id, { params: { ...node.metadata?.params, ...params } })} onOpenMaskEditor={() => onOpenMaskEditor?.(node.id)} onOpenOutpaintEditor={() => onOpenOutpaintEditor?.(node.id)} onOpenMossLayoutEditor={() => onOpenMossLayoutEditor?.(node.id)} />
+                    <CanvasImageSettingsPopover
+                        config={config}
+                        placement="topRight"
+                        autoAdjustOverflow={false}
+                        buttonClassName="canvas-compact-control !h-10 !w-full !justify-start !rounded-lg !px-2"
+                        onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })}
+                        onParamsChange={(params) => onConfigChange(node.id, { params: { ...node.metadata?.params, ...params } })}
+                        onOpenMaskEditor={() => onOpenMaskEditor?.(node.id)}
+                        onOpenOutpaintEditor={() => onOpenOutpaintEditor?.(node.id)}
+                        onOpenMossLayoutEditor={() => onOpenMossLayoutEditor?.(node.id)}
+                    />
                 ) : mode === "audio" ? (
-                    <CanvasAudioSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !h-10 !w-full !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, audioConfigPatch(key, value))} />
+                    <CanvasAudioSettingsPopover
+                        config={config}
+                        placement="topRight"
+                        buttonClassName="canvas-compact-control !h-10 !w-full !justify-start !rounded-lg !px-2"
+                        onConfigChange={(key, value) => onConfigChange(node.id, audioConfigPatch(key, value))}
+                    />
                 ) : (
-                    <CanvasTextSettingsPopover config={config} count={node.metadata?.textCount || 1} placement="topRight" buttonClassName="canvas-compact-control !h-10 !w-full !justify-start !rounded-lg !px-2" onConfigChange={(_, value) => onConfigChange(node.id, { reasoningEffort: value })} onCountChange={(textCount) => onConfigChange(node.id, { textCount })} />
+                    <CanvasTextSettingsPopover
+                        config={config}
+                        count={node.metadata?.textCount || 1}
+                        placement="topRight"
+                        buttonClassName="canvas-compact-control !h-10 !w-full !justify-start !rounded-lg !px-2"
+                        onConfigChange={(_, value) => onConfigChange(node.id, { reasoningEffort: value })}
+                        onCountChange={(textCount) => onConfigChange(node.id, { textCount })}
+                    />
                 )}
             </div>
 

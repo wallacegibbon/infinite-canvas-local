@@ -39,11 +39,7 @@ export function CameraOrbitPreview({ dataUrl, params, onChange }: CameraOrbitPre
                     cameraDistance: clampDistance(Math.round((10 - state.distance) * 10) / 10),
                     wideAngle: current.wideAngle,
                 };
-                if (
-                    Math.abs(next.horizontalAngle - current.horizontalAngle) < 0.01 &&
-                    Math.abs(next.pitchAngle - current.pitchAngle) < 0.01 &&
-                    Math.abs(next.cameraDistance - current.cameraDistance) < 0.01
-                ) {
+                if (Math.abs(next.horizontalAngle - current.horizontalAngle) < 0.01 && Math.abs(next.pitchAngle - current.pitchAngle) < 0.01 && Math.abs(next.cameraDistance - current.cameraDistance) < 0.01) {
                     return;
                 }
                 onChangeRef.current(next);
@@ -65,16 +61,14 @@ export function CameraOrbitPreview({ dataUrl, params, onChange }: CameraOrbitPre
         const azimuth = params.horizontalAngle;
         const elevation = params.pitchAngle;
         const distance = 10 - params.cameraDistance;
-        if (
-            Math.abs(state.azimuth - azimuth) > 0.01 ||
-            Math.abs(state.elevation - elevation) > 0.01 ||
-            Math.abs(state.distance - distance) > 0.01
-        ) {
+        if (Math.abs(state.azimuth - azimuth) > 0.01 || Math.abs(state.elevation - elevation) > 0.01 || Math.abs(state.distance - distance) > 0.01) {
             widget.setState({ azimuth, elevation, distance });
         }
     }, [params.horizontalAngle, params.pitchAngle, params.cameraDistance]);
 
-    return <div className="relative min-h-[340px] w-full flex-1 overflow-hidden">
-        <div ref={containerRef} className="absolute inset-0" />
-    </div>;
+    return (
+        <div className="relative min-h-[340px] w-full flex-1 overflow-hidden">
+            <div ref={containerRef} className="absolute inset-0" />
+        </div>
+    );
 }

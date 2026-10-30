@@ -50,7 +50,14 @@ export async function splitDataUrl(dataUrl: string, params: ImageSplitParams): P
 
 function buildSplitCuts(lines: number[] | undefined, size: number, count: number) {
     if (!lines?.length) return Array.from({ length: count + 1 }, (_, index) => Math.floor((index * size) / count));
-    return [0, ...lines.map((line) => Math.round(line * size)).filter((line) => line > 0 && line < size).sort((a, b) => a - b), size];
+    return [
+        0,
+        ...lines
+            .map((line) => Math.round(line * size))
+            .filter((line) => line > 0 && line < size)
+            .sort((a, b) => a - b),
+        size,
+    ];
 }
 
 function drawCrop(image: HTMLImageElement, sx: number, sy: number, sw: number, sh: number) {

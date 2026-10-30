@@ -20,4 +20,3 @@ export const PLUGIN_DATABASE = "infinite-canvas-plugins";
  * name: `app_state` (canvas and asset state), `media_files`, `image_files`, `image_previews`, and
  * the `image_generation_logs` / `video_generation_logs` history.
  */
-

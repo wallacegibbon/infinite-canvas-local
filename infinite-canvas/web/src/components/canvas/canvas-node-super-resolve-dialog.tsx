@@ -159,11 +159,7 @@ export function CanvasNodeSuperResolveDialog({
         setResolution(clampResolution(shortEdge * scale, minResolution, maxResolution));
     }, [open, shortEdge, scale, resolutionParameter, minResolution, maxResolution]);
 
-    const canRun = Boolean(
-        workflow?.available &&
-            image &&
-            (resolutionParameter ? resolution > shortEdge && resolution >= minResolution && resolution <= maxResolution : Boolean(selectedModel)),
-    );
+    const canRun = Boolean(workflow?.available && image && (resolutionParameter ? resolution > shortEdge && resolution >= minResolution && resolution <= maxResolution : Boolean(selectedModel)));
     const workflowOptions = workflows.map((item) => ({ value: item.id, label: `${item.label}${item.available ? "" : ` (${t("canvas.superResolve.unavailable")})`}` }));
 
     const confirm = () => {
@@ -200,9 +196,7 @@ export function CanvasNodeSuperResolveDialog({
                                     onChange={(value) => setWorkflowId(value)}
                                     notFoundContent={t("canvas.superResolve.noWorkflow")}
                                 />
-                                {workflow && !workflow.available ? (
-                                    <div className="text-xs text-[#ef4444]">{workflow.problems?.[0]?.message || t("canvas.superResolve.unavailable")}</div>
-                                ) : null}
+                                {workflow && !workflow.available ? <div className="text-xs text-[#ef4444]">{workflow.problems?.[0]?.message || t("canvas.superResolve.unavailable")}</div> : null}
                             </div>
                         ) : null}
 
@@ -226,12 +220,7 @@ export function CanvasNodeSuperResolveDialog({
                                         {t("canvas.superResolve.targetShortEdge")} {resolution || "—"}px
                                     </span>
                                 </div>
-                                <Segmented
-                                    block
-                                    value={scale}
-                                    options={SCALES.map((value) => ({ label: `${value}×`, value }))}
-                                    onChange={(value) => setScale(Number(value))}
-                                />
+                                <Segmented block value={scale} options={SCALES.map((value) => ({ label: `${value}×`, value }))} onChange={(value) => setScale(Number(value))} />
                             </div>
                         ) : null}
 
@@ -246,12 +235,7 @@ export function CanvasNodeSuperResolveDialog({
                                         children: (
                                             <div className="grid grid-cols-2 gap-2">
                                                 {advancedParameters.map((parameter) => (
-                                                    <ParameterField
-                                                        key={parameter.key}
-                                                        parameter={parameter}
-                                                        value={values[parameter.key]}
-                                                        onChange={(value) => setValues((current) => ({ ...current, [parameter.key]: value }))}
-                                                    />
+                                                    <ParameterField key={parameter.key} parameter={parameter} value={values[parameter.key]} onChange={(value) => setValues((current) => ({ ...current, [parameter.key]: value }))} />
                                                 ))}
                                             </div>
                                         ),
@@ -287,12 +271,7 @@ function ParameterField({ parameter, value, onChange }: { parameter: UpscalePara
         return (
             <label className="flex flex-col gap-1 text-xs opacity-75">
                 <span>{parameter.label}</span>
-                <Select
-                    size="small"
-                    value={String(value ?? "")}
-                    options={(parameter.options || []).map((option) => ({ value: optionValue(option), label: optionLabel(option) }))}
-                    onChange={onChange}
-                />
+                <Select size="small" value={String(value ?? "")} options={(parameter.options || []).map((option) => ({ value: optionValue(option), label: optionLabel(option) }))} onChange={onChange} />
             </label>
         );
     }

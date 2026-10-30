@@ -240,7 +240,9 @@ export function CanvasNodeMossLayoutDialog({ open, dataUrl, promptDefault = "", 
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <div className="text-xs font-medium" style={{ color: theme.node.muted }}>{t("canvas.mossLayout.summaryLabel")}</div>
+                        <div className="text-xs font-medium" style={{ color: theme.node.muted }}>
+                            {t("canvas.mossLayout.summaryLabel")}
+                        </div>
                         <Input.TextArea value={summary} onChange={(event) => setSummary(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} placeholder={t("canvas.mossLayout.summaryPlaceholder")} />
                         <div className="rounded-lg border px-2 py-1.5 text-xs leading-relaxed" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>
                             {t("canvas.mossLayout.effectivePrompt", { value: effectiveSummary || t("canvas.mossLayout.effectivePromptEmpty") })}
@@ -264,7 +266,11 @@ export function CanvasNodeMossLayoutDialog({ open, dataUrl, promptDefault = "", 
                                     <span className="truncate">{region.caption || region.text || t("canvas.mossLayout.emptyCaption")}</span>
                                 </button>
                             ))}
-                            {!regions.length ? <div className="rounded-lg border border-dashed p-3 text-center text-xs" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>{t("canvas.mossLayout.drawHint")}</div> : null}
+                            {!regions.length ? (
+                                <div className="rounded-lg border border-dashed p-3 text-center text-xs" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>
+                                    {t("canvas.mossLayout.drawHint")}
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                     {selected ? (
@@ -294,7 +300,9 @@ export function CanvasNodeMossLayoutDialog({ open, dataUrl, promptDefault = "", 
                     {error ? <div className="text-xs text-red-500">{error}</div> : null}
                     <div className="flex justify-end gap-2">
                         <Button onClick={onClose}>{t("common.cancel")}</Button>
-                        <Button type="primary" onClick={submit}>{t("canvas.mossLayout.generate")}</Button>
+                        <Button type="primary" onClick={submit}>
+                            {t("canvas.mossLayout.generate")}
+                        </Button>
                     </div>
                 </div>
             </div>

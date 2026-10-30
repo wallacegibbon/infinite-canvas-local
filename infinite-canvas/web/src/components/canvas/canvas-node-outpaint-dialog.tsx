@@ -94,7 +94,7 @@ export function CanvasNodeOutpaintDialog({ dataUrl, open, promptDefault = "", on
         next.src = dataUrl;
     }, [dataUrl, open, promptDefault]);
 
-    const ratio = ratioKey === "original" ? (image ? image.naturalWidth / image.naturalHeight : 1) : (RATIOS.find((item) => item.key === ratioKey)?.value || 1);
+    const ratio = ratioKey === "original" ? (image ? image.naturalWidth / image.naturalHeight : 1) : RATIOS.find((item) => item.key === ratioKey)?.value || 1;
     const boardWidth = ratio >= 1 ? 560 : Math.round(460 * ratio);
     const boardHeight = ratio >= 1 ? Math.round(560 / ratio) : 460;
     const scale = image ? Math.min(boardWidth / canvas.width, boardHeight / canvas.height) : 1;
@@ -111,7 +111,7 @@ export function CanvasNodeOutpaintDialog({ dataUrl, open, promptDefault = "", on
 
     const applyRatio = (key: string) => {
         if (!image) return;
-        const nextRatio = key === "original" ? imageWidth / imageHeight : (RATIOS.find((item) => item.key === key)?.value || 1);
+        const nextRatio = key === "original" ? imageWidth / imageHeight : RATIOS.find((item) => item.key === key)?.value || 1;
         const area = key === "original" ? Math.max(imageWidth * imageHeight * 2.25, 1) : Math.max(canvas.width * canvas.height, imageWidth * imageHeight * 1.5);
         let width = Math.sqrt(area * nextRatio);
         let height = width / nextRatio;
@@ -208,9 +208,7 @@ export function CanvasNodeOutpaintDialog({ dataUrl, open, promptDefault = "", on
                             backgroundColor: theme.node.fill,
                         }}
                     >
-                        <div className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-black/55 px-2 py-0.5 text-[10px] text-white">
-                            {t("canvas.outpaint.checkerHint", { width: canvas.width, height: canvas.height })}
-                        </div>
+                        <div className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-black/55 px-2 py-0.5 text-[10px] text-white">{t("canvas.outpaint.checkerHint", { width: canvas.width, height: canvas.height })}</div>
                         {image ? (
                             <div
                                 className="absolute cursor-move overflow-hidden rounded-md border-2 shadow-lg"
@@ -234,7 +232,9 @@ export function CanvasNodeOutpaintDialog({ dataUrl, open, promptDefault = "", on
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <div className="text-xs font-medium" style={{ color: theme.node.muted }}>{t("canvas.outpaint.ratio")}</div>
+                        <div className="text-xs font-medium" style={{ color: theme.node.muted }}>
+                            {t("canvas.outpaint.ratio")}
+                        </div>
                         <div className="grid grid-cols-3 gap-2">
                             {RATIOS.map((item) => (
                                 <button
@@ -250,30 +250,48 @@ export function CanvasNodeOutpaintDialog({ dataUrl, open, promptDefault = "", on
                         </div>
                     </div>
                     <div className="space-y-1 rounded-xl border p-3 text-xs" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>
-                        <div className="flex justify-between"><span>{t("canvas.outpaint.outputCanvas")}</span><span style={{ color: theme.node.text }}>{canvas.width} × {canvas.height}</span></div>
-                        <div className="flex justify-between"><span>{t("canvas.outpaint.topBottom")}</span><span>{topPad} / {bottomPad} px</span></div>
-                        <div className="flex justify-between"><span>{t("canvas.outpaint.leftRight")}</span><span>{leftPad} / {rightPad} px</span></div>
+                        <div className="flex justify-between">
+                            <span>{t("canvas.outpaint.outputCanvas")}</span>
+                            <span style={{ color: theme.node.text }}>
+                                {canvas.width} × {canvas.height}
+                            </span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>{t("canvas.outpaint.topBottom")}</span>
+                            <span>
+                                {topPad} / {bottomPad} px
+                            </span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>{t("canvas.outpaint.leftRight")}</span>
+                            <span>
+                                {leftPad} / {rightPad} px
+                            </span>
+                        </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Button size="small" onClick={() => zoom(1.12)}>{t("canvas.outpaint.grow")}</Button>
-                        <Button size="small" onClick={() => zoom(1 / 1.12)}>{t("canvas.outpaint.shrink")}</Button>
+                        <Button size="small" onClick={() => zoom(1.12)}>
+                            {t("canvas.outpaint.grow")}
+                        </Button>
+                        <Button size="small" onClick={() => zoom(1 / 1.12)}>
+                            {t("canvas.outpaint.shrink")}
+                        </Button>
                         <Button size="small" icon={<Minimize2 className="size-3.5" />} onClick={() => setCanvas((previous) => ({ ...previous, x: (previous.width - imageWidth) / 2, y: (previous.height - imageHeight) / 2 }))}>
                             {t("canvas.outpaint.center")}
                         </Button>
                     </div>
                     <div className="space-y-2">
-                        <div className="text-xs font-medium" style={{ color: theme.node.muted }}>{t("canvas.outpaint.prompt")}</div>
-                        <Input.TextArea
-                            value={prompt}
-                            onChange={(event) => setPrompt(event.target.value)}
-                            autoSize={{ minRows: 3, maxRows: 5 }}
-                            placeholder={t("canvas.outpaint.promptPlaceholder")}
-                        />
+                        <div className="text-xs font-medium" style={{ color: theme.node.muted }}>
+                            {t("canvas.outpaint.prompt")}
+                        </div>
+                        <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} autoSize={{ minRows: 3, maxRows: 5 }} placeholder={t("canvas.outpaint.promptPlaceholder")} />
                         {error ? <div className="text-xs text-red-500">{error}</div> : null}
                     </div>
                     <div className="flex justify-end gap-2">
                         <Button onClick={onClose}>{t("common.cancel")}</Button>
-                        <Button type="primary" onClick={submit}>{t("canvas.outpaint.generate")}</Button>
+                        <Button type="primary" onClick={submit}>
+                            {t("canvas.outpaint.generate")}
+                        </Button>
                     </div>
                 </div>
             </div>

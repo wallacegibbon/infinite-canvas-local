@@ -5,17 +5,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/kit/select-primitive";
 import { cn } from "@/lib/utils";
-import {
-    baseModelOptions,
-    channelModelOf,
-    modelOptionLabel,
-    modelOptionName,
-    selectableModelsByCapability,
-    workflowModelOptions,
-    workflowModelValue,
-    type AiConfig,
-    type ModelCapability,
-} from "@/stores/use-config-store";
+import { baseModelOptions, channelModelOf, modelOptionLabel, modelOptionName, selectableModelsByCapability, workflowModelOptions, workflowModelValue, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 
 type ModelPickerExtraOption = { value: string; label: string; disabled?: boolean };
 
@@ -166,7 +156,9 @@ export function WorkflowModelPicker({ config, value, onChange, capability, class
         [config, capability],
     );
     const selected = useMemo(() => workflowModelValue(config, value) || value, [config, value]);
-    return <LevelSelect value={selected} options={options} onChange={onChange} className={className} fullWidth={fullWidth} placeholder={placeholder || i18n.t("settingsPanels.model.select")} onMissingConfig={onMissingConfig} icon="workflow" width="w-72" />;
+    return (
+        <LevelSelect value={selected} options={options} onChange={onChange} className={className} fullWidth={fullWidth} placeholder={placeholder || i18n.t("settingsPanels.model.select")} onMissingConfig={onMissingConfig} icon="workflow" width="w-72" />
+    );
 }
 
 /** Second-level dropdown: switch between the default base model and its variants within one workflow. */

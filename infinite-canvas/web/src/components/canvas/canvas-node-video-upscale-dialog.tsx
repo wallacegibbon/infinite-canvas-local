@@ -108,7 +108,10 @@ export function CanvasNodeVideoUpscaleDialog({ open, node, onClose, onConfirm }:
                         {t("canvas.videoUpscale.targetShortEdge")} <span style={{ color: theme.node.text }}>{resolution}px</span>
                     </div>
                     <div>
-                        {t("canvas.videoUpscale.expectedOutput")} <span style={{ color: theme.node.text }}>{outputWidth || "?"} × {outputHeight || "?"}</span>
+                        {t("canvas.videoUpscale.expectedOutput")}{" "}
+                        <span style={{ color: theme.node.text }}>
+                            {outputWidth || "?"} × {outputHeight || "?"}
+                        </span>
                     </div>
                     <div>{t("canvas.videoUpscale.engineInfo")}</div>
                 </div>

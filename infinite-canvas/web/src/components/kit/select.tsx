@@ -65,11 +65,7 @@ export function Select<T extends string = string>({
 }): ReactNode {
     const empty = !value || value === NONE;
     return (
-        <SelectRoot
-            value={empty ? NONE : value}
-            disabled={disabled}
-            onValueChange={(next) => onChange?.((next === NONE ? "" : next) as T)}
-        >
+        <SelectRoot value={empty ? NONE : value} disabled={disabled} onValueChange={(next) => onChange?.((next === NONE ? "" : next) as T)}>
             <SelectTrigger
                 size={size === "small" ? "sm" : "default"}
                 hideChevron
@@ -83,11 +79,7 @@ export function Select<T extends string = string>({
                 )}
             >
                 <SelectValue className="min-w-0 flex-1 truncate text-left" placeholder={<span className="text-stone-400 dark:text-stone-500">{placeholder}</span>} />
-                {loading ? (
-                    <LoaderCircle className="size-3.5 shrink-0 animate-spin text-stone-400" />
-                ) : (
-                    <ChevronDown className="size-3.5 shrink-0 text-stone-400" />
-                )}
+                {loading ? <LoaderCircle className="size-3.5 shrink-0 animate-spin text-stone-400" /> : <ChevronDown className="size-3.5 shrink-0 text-stone-400" />}
             </SelectTrigger>
             <SelectContent
                 data-canvas-overlay

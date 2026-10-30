@@ -1,4 +1,3 @@
-
 import i18n from "@/i18n";
 import { apiErrorMessage, httpBlob, httpJson, httpVoid, isCancelled, readApiErrorMessage } from "@/services/api/http";
 import { dataUrlToFile, readFileAsDataUrl } from "@/lib/image-utils";
@@ -9,7 +8,17 @@ import { boolConfig, buildApiUrl, modelOptionName, resolveModelRequestConfig, ty
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
-type VideoResponse = { id: string; status?: string; error?: { message?: string }; url?: string; result_url?: string; video_url?: string; content?: { video_url?: string; url?: string } | null; preview?: { url?: string; mime?: string; step?: number; total?: number }; steps?: { step?: number; total?: number } };
+type VideoResponse = {
+    id: string;
+    status?: string;
+    error?: { message?: string };
+    url?: string;
+    result_url?: string;
+    video_url?: string;
+    content?: { video_url?: string; url?: string } | null;
+    preview?: { url?: string; mime?: string; step?: number; total?: number };
+    steps?: { step?: number; total?: number };
+};
 type ApiVideoResponse = VideoResponse | { code?: number | string; data?: VideoResponse | null; msg?: string; message?: string; error?: { message?: string } };
 type ApiEnvelope<T> = T | { code?: number | string; data?: T | null; msg?: string; message?: string; error?: { message?: string } };
 type RequestOptions = { signal?: AbortSignal; params?: Record<string, unknown> };
@@ -32,7 +41,6 @@ type GeminiVideoOperation = {
     response?: { generateVideoResponse?: { generatedSamples?: Array<{ video?: { uri?: string } }> } };
 };
 type VideoGenerationTaskState = { status: "pending"; preview?: VideoPreview; steps?: { step: number; total: number } } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
-
 
 function aiApiUrl(config: AiConfig, path: string) {
     return buildApiUrl(config.baseUrl, path);
@@ -229,9 +237,7 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
     videos.forEach((file) => body.append("video[]", file));
     audios.forEach((file) => body.append("audio[]", file));
     try {
-        const created = unwrapVideoResponse(
-            await httpJson<ApiVideoResponse>(aiApiUrl(config, "/videos"), { method: "POST", headers: aiHeaders(config), body, signal: options?.signal }),
-        );
+        const created = unwrapVideoResponse(await httpJson<ApiVideoResponse>(aiApiUrl(config, "/videos"), { method: "POST", headers: aiHeaders(config), body, signal: options?.signal }));
         if (!created.id) throw new Error(apiText("noVideoTaskId"));
         return { id: created.id, provider: "openai", model };
     } catch (error) {
@@ -259,9 +265,7 @@ async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, 
               }
             : undefined;
         const totalSteps = Number(video.steps?.total) || 0;
-        const steps = totalSteps > 0
-            ? { step: Math.min(totalSteps, Math.max(0, Number(video.steps?.step) || 0)), total: totalSteps }
-            : undefined;
+        const steps = totalSteps > 0 ? { step: Math.min(totalSteps, Math.max(0, Number(video.steps?.step) || 0)), total: totalSteps } : undefined;
         return { status: "pending", preview, steps };
     } catch (error) {
         throw new Error(apiErrorMessage(error, apiText("videoTaskQueryFailed")));
@@ -302,21 +306,24 @@ async function createGeminiVideoTask(config: AiConfig, model: string, prompt: st
     if (videos[0]) instance.video = await fileToGeminiInline(videos[0]);
     if (audios[0]) instance.audio = await fileToGeminiInline(audios[0]);
     try {
-        const created = unwrapEnvelope(await httpJson<ApiEnvelope<GeminiVideoOperation>>(geminiVideoUrl(config, model, "predictLongRunning"), {
-            method: "POST",
-            body: JSON.stringify({
-                instances: [instance],
-                parameters: {
-                    aspectRatio: videoAspectRatio(config.size),
-                    durationSeconds: Number(normalizeVideoSeconds(config.videoSeconds)) || 8,
-                    resolution: normalizeVideoResolution(config.vquality),
-                    generateAudio: boolConfig(config.videoGenerateAudio, true),
-                    addWatermark: boolConfig(config.videoWatermark, false),
-                },
+        const created = unwrapEnvelope(
+            await httpJson<ApiEnvelope<GeminiVideoOperation>>(geminiVideoUrl(config, model, "predictLongRunning"), {
+                method: "POST",
+                body: JSON.stringify({
+                    instances: [instance],
+                    parameters: {
+                        aspectRatio: videoAspectRatio(config.size),
+                        durationSeconds: Number(normalizeVideoSeconds(config.videoSeconds)) || 8,
+                        resolution: normalizeVideoResolution(config.vquality),
+                        generateAudio: boolConfig(config.videoGenerateAudio, true),
+                        addWatermark: boolConfig(config.videoWatermark, false),
+                    },
+                }),
+                headers: geminiVideoHeaders(config),
+                signal: options?.signal,
             }),
-            headers: geminiVideoHeaders(config),
-            signal: options?.signal,
-        }), apiText("noVideoTask"));
+            apiText("noVideoTask"),
+        );
         if (!created.name) throw new Error(apiText("noVideoTaskId"));
         return { id: created.name, provider: "gemini", model };
     } catch (error) {
@@ -433,7 +440,6 @@ function unwrapEnvelope<T>(payload: ApiEnvelope<T>, emptyMessage: string): T {
 function videoResultUrl(payload: VideoResponse) {
     return [payload.video_url, payload.result_url, payload.url, payload.content?.video_url, payload.content?.url].find((url) => typeof url === "string" && (isPublicMediaUrl(url) || /\.mp4(\?|#|$)/i.test(url)));
 }
-
 
 async function assertVideoBlob(blob: Blob) {
     if (!blob.type.includes("json")) return;

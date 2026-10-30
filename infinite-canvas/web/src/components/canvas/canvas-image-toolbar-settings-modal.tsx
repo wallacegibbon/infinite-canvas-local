@@ -22,14 +22,16 @@ export type ImageToolbarSettingsTool = {
     danger?: boolean;
 };
 
-type PreviewTool = ImageToolbarSettingsTool | {
-    id: "more";
-    title: string;
-    label: string;
-    icon: ReactNode;
-    active?: boolean;
-    danger?: boolean;
-};
+type PreviewTool =
+    | ImageToolbarSettingsTool
+    | {
+          id: "more";
+          title: string;
+          label: string;
+          icon: ReactNode;
+          active?: boolean;
+          danger?: boolean;
+      };
 
 type PreviewScroll = {
     left: number;
@@ -63,10 +65,7 @@ export function ImageToolSettingsModal({
     const [previewScroll, setPreviewScroll] = useState<PreviewScroll>({ left: 0, max: 0, viewport: 1, content: 1 });
     const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
     const selectedTools = tools.filter((tool) => selected.has(tool.id));
-    const previewTools: PreviewTool[] = [
-        ...selectedTools,
-        { id: "more", title: t("canvas.imageTools.configure"), label: t("canvas.imageTools.more"), icon: <Ellipsis className="size-4" />, active: true },
-    ];
+    const previewTools: PreviewTool[] = [...selectedTools, { id: "more", title: t("canvas.imageTools.configure"), label: t("canvas.imageTools.more"), icon: <Ellipsis className="size-4" />, active: true }];
 
     const syncPreviewScroll = useCallback(() => {
         const toolbar = previewToolbarRef.current;
@@ -173,9 +172,7 @@ export function ImageToolSettingsModal({
                             <PreviewToolbarItem key={tool.id} tool={tool} showLabels={showLabels} />
                         ))}
                     </div>
-                    <div
-                        className="flex h-48 w-full max-w-[360px] flex-col items-center justify-center rounded-xl border border-stone-200 bg-stone-100 text-stone-500 dark:border-stone-800 dark:bg-stone-800 dark:text-stone-400"
-                    >
+                    <div className="flex h-48 w-full max-w-[360px] flex-col items-center justify-center rounded-xl border border-stone-200 bg-stone-100 text-stone-500 dark:border-stone-800 dark:bg-stone-800 dark:text-stone-400">
                         <ImageIcon className="mb-2 size-8" />
                         <Typography.Text type="secondary">{t("canvas.imageTools.imageNode")}</Typography.Text>
                     </div>

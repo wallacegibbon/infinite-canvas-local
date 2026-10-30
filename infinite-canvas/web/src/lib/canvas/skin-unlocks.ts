@@ -51,10 +51,6 @@ export async function verifySkinPassword(skinId: CardSkinId, password: string): 
         throw new Error("crypto-unavailable");
     }
     const key = await globalThis.crypto.subtle.importKey("raw", new TextEncoder().encode(normalized), "PBKDF2", false, ["deriveBits"]);
-    const bits = await globalThis.crypto.subtle.deriveBits(
-        { name: "PBKDF2", salt: hexToBytes(record.salt), iterations: record.iterations, hash: "SHA-256" },
-        key,
-        256,
-    );
+    const bits = await globalThis.crypto.subtle.deriveBits({ name: "PBKDF2", salt: hexToBytes(record.salt), iterations: record.iterations, hash: "SHA-256" }, key, 256);
     return timingSafeEqualHex(bytesToHex(bits), record.hash);
 }

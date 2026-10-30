@@ -47,7 +47,9 @@ export const VIDEO_SECONDS_MIN = 4;
 export const VIDEO_SECONDS_MAX = 30;
 
 function normalizeMediaScale(value: string | undefined) {
-    const scale = String(value || "").trim().toLowerCase();
+    const scale = String(value || "")
+        .trim()
+        .toLowerCase();
     if (scale === "2k" || scale === "2048") return "2k";
     if (scale === "4k" || scale === "3840") return "4k";
     if (scale === "auto") return "auto";
@@ -105,7 +107,9 @@ export function clampVideoSeconds(value: string) {
 }
 
 export function parseVideoResolution(value: string | undefined) {
-    const raw = String(value || "").trim().toLowerCase();
+    const raw = String(value || "")
+        .trim()
+        .toLowerCase();
     if (raw === "low") return "480";
     if (raw === "auto" || raw === "high" || raw === "medium") return "720";
     const number = raw.replace(/p$/i, "");

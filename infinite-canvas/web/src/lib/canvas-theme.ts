@@ -123,11 +123,11 @@ export function getCanvasTheme(theme: CanvasColorTheme, cardSkin: CardSkinId = "
     const base = canvasThemes[theme];
     const override = cardSkinNodeOverrides[cardSkin]?.[theme] || {};
     const toolbarOverride = cardSkinToolbarOverrides[cardSkin]?.[theme] || {};
-    const result = ({
+    const result = {
         ...base,
         ...(Object.keys(override).length ? { node: { ...base.node, ...override } } : {}),
         ...(Object.keys(toolbarOverride).length ? { toolbar: { ...base.toolbar, ...toolbarOverride } } : {}),
-    }) as CanvasTheme;
+    } as CanvasTheme;
     themeCache.set(key, result);
     return result;
 }

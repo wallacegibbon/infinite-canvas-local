@@ -142,10 +142,7 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
         clearPromptContinue();
     };
 
-
     const updateChannels = (channels: ModelChannel[]) => saveConfig(withChannels(config, channels));
-
-
 
     const saveChannel = (channel: ModelChannel) => {
         updateChannels(config.channels.map((item) => (item.id === channel.id ? channel : item)));
@@ -243,22 +240,13 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
                                         {cloudApis.map((api) => {
                                             const active = api.id === activeCloudApiId;
                                             return (
-                                                <div
-                                                    key={api.id}
-                                                    className={`flex items-center justify-between gap-3 rounded-lg border px-4 py-3 ${
-                                                        active ? "border-stone-400 dark:border-stone-500" : "border-stone-200 dark:border-stone-800"
-                                                    }`}
-                                                >
+                                                <div key={api.id} className={`flex items-center justify-between gap-3 rounded-lg border px-4 py-3 ${active ? "border-stone-400 dark:border-stone-500" : "border-stone-200 dark:border-stone-800"}`}>
                                                     <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
                                                         <Radio checked={active} onChange={() => selectPromptCloudApi(api.id)} aria-label={t("config.cloudApi.use")} />
                                                         <div className="min-w-0">
                                                             <div className="flex min-w-0 items-center gap-2">
                                                                 <span className="truncate text-sm font-semibold">{api.name || t("config.cloudApi.unnamed")}</span>
-                                                                {active ? (
-                                                                    <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-600 dark:bg-stone-800 dark:text-stone-300">
-                                                                        {t("config.cloudApi.active")}
-                                                                    </span>
-                                                                ) : null}
+                                                                {active ? <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-600 dark:bg-stone-800 dark:text-stone-300">{t("config.cloudApi.active")}</span> : null}
                                                             </div>
                                                             <div className="mt-1 truncate text-xs text-stone-500">
                                                                 {api.baseUrl || t("config.channels.missingUrl")} · {api.model || "—"}
@@ -282,11 +270,7 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
                                 <div className="mt-5 border-t border-stone-200 pt-4 dark:border-stone-800">
                                     <div className="mb-1 text-sm font-semibold">{t("config.cloudApi.outputLanguage")}</div>
                                     <div className="mb-2 text-xs text-stone-500">{t("config.cloudApi.outputLanguageDescription")}</div>
-                                    <Radio.Group
-                                        value={config.promptOptimizeLanguage === "en" ? "en" : "zh"}
-                                        onChange={(event) => updateConfig("promptOptimizeLanguage", event.target.value as "zh" | "en")}
-                                        optionType="button"
-                                    >
+                                    <Radio.Group value={config.promptOptimizeLanguage === "en" ? "en" : "zh"} onChange={(event) => updateConfig("promptOptimizeLanguage", event.target.value as "zh" | "en")} optionType="button">
                                         <Radio.Button value="zh">中文</Radio.Button>
                                         <Radio.Button value="en">English</Radio.Button>
                                     </Radio.Group>
@@ -371,9 +355,7 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
                                                         <span className="flex items-center gap-1.5 text-sm font-medium">
                                                             <span className="truncate">{t(`config.preferences.cardSkins.${id}.label`)}</span>
                                                             {locked ? <span className="shrink-0 rounded-full border border-current px-1.5 py-0.5 text-[9px] font-medium opacity-70">{t("config.preferences.cardSkinLocked")}</span> : null}
-                                                            {(id === "fish" || id === "angel") && !locked ? (
-                                                                <ChevronDown className={`ml-auto size-3.5 shrink-0 opacity-45 transition-transform ${selected && fishOptionsOpen ? "rotate-180" : ""}`} />
-                                                            ) : null}
+                                                            {(id === "fish" || id === "angel") && !locked ? <ChevronDown className={`ml-auto size-3.5 shrink-0 opacity-45 transition-transform ${selected && fishOptionsOpen ? "rotate-180" : ""}`} /> : null}
                                                         </span>
                                                         <span className="mt-0.5 block truncate text-[11px] opacity-60">{locked ? t("config.preferences.cardSkinLockedHint") : t(`config.preferences.cardSkins.${id}.description`)}</span>
                                                     </span>
@@ -392,11 +374,7 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
                                             </div>
                                             <div className="mt-3 flex items-center justify-between gap-3 border-t border-stone-200/70 pt-3 dark:border-stone-800/70">
                                                 <div className="text-xs opacity-60">{t("config.preferences.fishWhipSide")}</div>
-                                                <Button
-                                                    size="small"
-                                                    icon={fishWhipSide === "right" ? <ArrowLeft className="size-3.5" /> : <ArrowRight className="size-3.5" />}
-                                                    onClick={() => setFishWhipSide(fishWhipSide === "right" ? "left" : "right")}
-                                                >
+                                                <Button size="small" icon={fishWhipSide === "right" ? <ArrowLeft className="size-3.5" /> : <ArrowRight className="size-3.5" />} onClick={() => setFishWhipSide(fishWhipSide === "right" ? "left" : "right")}>
                                                     {fishWhipSide === "right" ? t("config.preferences.fishWhipMoveLeft") : t("config.preferences.fishWhipMoveRight")}
                                                 </Button>
                                             </div>
@@ -606,5 +584,3 @@ function pickDefaultModel(config: AiConfig, capability: ModelCapability, current
 function normalizeImageCount(value: string) {
     return String(Math.max(1, Math.min(15, Math.floor(Math.abs(Number(value)) || 3))));
 }
-
-

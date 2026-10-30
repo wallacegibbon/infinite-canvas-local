@@ -75,11 +75,7 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
     return (
         <Dialog title={t("canvas.editors.cropTitle")} open={open && Boolean(dataUrl)} onClose={onClose} size="panel" bodyClassName="flex flex-col">
             <div className="flex min-h-0 flex-1 flex-col gap-4">
-                <div
-                    ref={viewport.viewportRef}
-                    {...viewport.panHandlers}
-                    className={`relative min-h-[260px] flex-1 rounded-lg bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
-                >
+                <div ref={viewport.viewportRef} {...viewport.panHandlers} className={`relative min-h-[260px] flex-1 rounded-lg bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}>
                     <div className="relative" style={viewport.contentStyle}>
                         <div ref={boxRef} className="absolute isolate overflow-hidden rounded-lg bg-black select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
                             <div className="absolute left-0 top-0 [backface-visibility:hidden]" style={viewport.mediaStyle}>
@@ -123,18 +119,11 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
                     <div className="flex flex-wrap items-center gap-3 text-sm opacity-80">
                         <span>{t("canvas.editors.cropSize", { size: cropSize ? `${cropSize.width} x ${cropSize.height}` : t("canvas.editors.unknown") })}</span>
                         <span>{t("canvas.editors.ratio", { ratio: cropSize ? formatRatio(cropSize.width, cropSize.height) : t("canvas.editors.unknown") })}</span>
-                        {image ? (
-                            <span>{t("canvas.editors.original", { width: image.width, height: image.height })}</span>
-                        ) : null}
+                        {image ? <span>{t("canvas.editors.original", { width: image.width, height: image.height })}</span> : null}
                     </div>
                     <Segmented
                         size="small"
-                        options={[
-                            { label: t("canvas.editors.free"), value: "free" },
-                            { label: t("canvas.editors.fixed"), value: "fixed" },
-                            { label: t("canvas.editors.originalMode"), value: "original" },
-                            ...["1:1", "4:3", "16:9", "9:16"],
-                        ]}
+                        options={[{ label: t("canvas.editors.free"), value: "free" }, { label: t("canvas.editors.fixed"), value: "fixed" }, { label: t("canvas.editors.originalMode"), value: "original" }, ...["1:1", "4:3", "16:9", "9:16"]]}
                         value={ratioPreset}
                         onChange={(value) => {
                             const preset = String(value);

@@ -49,15 +49,39 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
         };
     }, [open]);
 
-    const panel = open && buttonRect ? <VideoSettingsPortal buttonRect={buttonRect} panelRef={panelRef} placement={placement} theme={theme} config={config} onConfigChange={onConfigChange} frameMode={frameMode} onFrameModeChange={onFrameModeChange} onModeChange={onModeChange} durationLocked={durationLocked} sourceDurationSeconds={sourceDurationSeconds} /> : null;
+    const panel =
+        open && buttonRect ? (
+            <VideoSettingsPortal
+                buttonRect={buttonRect}
+                panelRef={panelRef}
+                placement={placement}
+                theme={theme}
+                config={config}
+                onConfigChange={onConfigChange}
+                frameMode={frameMode}
+                onFrameModeChange={onFrameModeChange}
+                onModeChange={onModeChange}
+                durationLocked={durationLocked}
+                sourceDurationSeconds={sourceDurationSeconds}
+            />
+        ) : null;
     const durationSummary = durationLocked ? `${i18n.t("settingsPanels.video.followSource")}${sourceDurationSeconds != null ? ` · ${sourceDurationSeconds.toFixed(1)}s` : ""}` : videoSecondsLabel(config.videoSeconds);
 
     return (
         <>
             <span ref={buttonRef} className="inline-flex min-w-0">
-                <Button size="small" type="text" className={buttonClassName || "!h-8 !max-w-[220px] !justify-start !rounded-full !px-2.5"} style={{ background: theme.node.fill, color: theme.node.text }} icon={<Settings2 className="size-3.5" />} onClick={() => setOpen((current) => !current)}>
+                <Button
+                    size="small"
+                    type="text"
+                    className={buttonClassName || "!h-8 !max-w-[220px] !justify-start !rounded-full !px-2.5"}
+                    style={{ background: theme.node.fill, color: theme.node.text }}
+                    icon={<Settings2 className="size-3.5" />}
+                    onClick={() => setOpen((current) => !current)}
+                >
                     <span className="truncate">
-                        {videoResolutionLabel(config.vquality)} · {videoSizeLabel(config.size)} · {durationSummary} · {videoModeLabel(config.videoMode)}{videoInterpolationLabel(config.videoInterpolation) ? ` · ${videoInterpolationLabel(config.videoInterpolation)}` : ""}{videoSelfLiftLabel(config.videoSelfLiftMode) ? ` · ${videoSelfLiftLabel(config.videoSelfLiftMode)}` : ""}
+                        {videoResolutionLabel(config.vquality)} · {videoSizeLabel(config.size)} · {durationSummary} · {videoModeLabel(config.videoMode)}
+                        {videoInterpolationLabel(config.videoInterpolation) ? ` · ${videoInterpolationLabel(config.videoInterpolation)}` : ""}
+                        {videoSelfLiftLabel(config.videoSelfLiftMode) ? ` · ${videoSelfLiftLabel(config.videoSelfLiftMode)}` : ""}
                     </span>
                 </Button>
             </span>
@@ -113,15 +137,18 @@ function VideoSettingsPortal({
     } as const;
 
     return createPortal(
-        <div
-            ref={panelRef}
-            className="canvas-image-settings-popover"
-            style={style}
-            onPointerDown={(event) => event.stopPropagation()}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-        >
-            <VideoSettingsPanel config={config} onConfigChange={(key, value) => onConfigChange(key, value)} theme={theme} className="space-y-4" frameMode={frameMode} onFrameModeChange={onFrameModeChange} onModeChange={onModeChange} durationLocked={durationLocked} sourceDurationSeconds={sourceDurationSeconds} />
+        <div ref={panelRef} className="canvas-image-settings-popover" style={style} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+            <VideoSettingsPanel
+                config={config}
+                onConfigChange={(key, value) => onConfigChange(key, value)}
+                theme={theme}
+                className="space-y-4"
+                frameMode={frameMode}
+                onFrameModeChange={onFrameModeChange}
+                onModeChange={onModeChange}
+                durationLocked={durationLocked}
+                sourceDurationSeconds={sourceDurationSeconds}
+            />
         </div>,
         document.body,
     );

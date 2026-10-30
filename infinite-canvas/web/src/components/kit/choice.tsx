@@ -15,7 +15,21 @@ import { cn } from "@/lib/utils";
 
 /* ---------------------------------------------------------------- Switch */
 
-export function Switch({ checked = false, onChange, size = "middle", loading = false, disabled, className }: { checked?: boolean; onChange?: (checked: boolean) => void; size?: "small" | "middle"; loading?: boolean; disabled?: boolean; className?: string }): ReactNode {
+export function Switch({
+    checked = false,
+    onChange,
+    size = "middle",
+    loading = false,
+    disabled,
+    className,
+}: {
+    checked?: boolean;
+    onChange?: (checked: boolean) => void;
+    size?: "small" | "middle";
+    loading?: boolean;
+    disabled?: boolean;
+    className?: string;
+}): ReactNode {
     const small = size === "small";
     return (
         <button
@@ -44,7 +58,15 @@ type CheckboxGroupContext = { values: readonly string[]; toggle: (value: string,
 
 const CheckboxContext = createContext<CheckboxGroupContext | null>(null);
 
-export function Checkbox({ checked, onChange, disabled, className, children, value, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "size"> & { checked?: boolean; onChange?: (event: ChangeEvent<HTMLInputElement>) => void; value?: string; children?: ReactNode }): ReactNode {
+export function Checkbox({
+    checked,
+    onChange,
+    disabled,
+    className,
+    children,
+    value,
+    ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "size"> & { checked?: boolean; onChange?: (event: ChangeEvent<HTMLInputElement>) => void; value?: string; children?: ReactNode }): ReactNode {
     const group = useContext(CheckboxContext);
     const inGroup = Boolean(group && value !== undefined);
     const isChecked = inGroup ? group!.values.includes(value!) : Boolean(checked);
@@ -89,7 +111,15 @@ const RadioContext = createContext<RadioGroupContext | null>(null);
 /** antd gave handlers an event; the call sites read `event.target.value`. */
 const asValueEvent = (value: string) => ({ target: { value } }) as unknown as ChangeEvent<HTMLInputElement>;
 
-export function Radio({ checked, onChange, disabled, className, children, value, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "size"> & { checked?: boolean; onChange?: (event: ChangeEvent<HTMLInputElement>) => void; value?: string; children?: ReactNode }): ReactNode {
+export function Radio({
+    checked,
+    onChange,
+    disabled,
+    className,
+    children,
+    value,
+    ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "size"> & { checked?: boolean; onChange?: (event: ChangeEvent<HTMLInputElement>) => void; value?: string; children?: ReactNode }): ReactNode {
     const group = useContext(RadioContext);
     const inGroup = Boolean(group && value !== undefined);
     const isChecked = inGroup ? group!.value === value : Boolean(checked);

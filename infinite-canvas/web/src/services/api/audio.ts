@@ -69,4 +69,3 @@ async function assertAudioBlob(blob: Blob) {
     if (typeof payload.code === "number" && payload.code !== 0) throw new Error(payload.msg || apiText("audioGenerationFailed"));
     if (payload.error?.message) throw new Error(payload.error.message);
 }
-

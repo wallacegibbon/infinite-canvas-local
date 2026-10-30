@@ -31,11 +31,7 @@ export function Segmented<T extends string | number>({
 }): ReactNode {
     const height = size === "small" ? "h-6 text-[13px]" : size === "large" ? "h-9 text-base" : "h-7 text-sm";
     return (
-        <div
-            role="tablist"
-            data-slot="segmented"
-            className={cn("inline-flex items-center gap-0.5 rounded-md bg-stone-100 p-0.5 dark:bg-stone-800", block && "flex w-full", className)}
-        >
+        <div role="tablist" data-slot="segmented" className={cn("inline-flex items-center gap-0.5 rounded-md bg-stone-100 p-0.5 dark:bg-stone-800", block && "flex w-full", className)}>
             {options.map((raw) => {
                 const option: SegmentedOption<T> = typeof raw === "object" && raw !== null ? raw : { value: raw };
                 const active = option.value === value;

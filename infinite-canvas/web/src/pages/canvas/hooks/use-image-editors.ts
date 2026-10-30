@@ -145,11 +145,7 @@ export function useImageEditors(deps: NodeEditorDeps) {
                     metadata: childMetadata,
                 },
             ]);
-            setConnections((prev) => [
-                ...prev,
-                { id: nanoid(), fromNodeId: node.id, toNodeId: childId },
-                { id: nanoid(), fromNodeId: maskNodeId, toNodeId: childId },
-            ]);
+            setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }, { id: nanoid(), fromNodeId: maskNodeId, toNodeId: childId }]);
             setSelectedNodeIds(new Set([childId]));
             setSelectedConnectionId(null);
             setDialogNodeId(childId);
@@ -268,7 +264,9 @@ export function useImageEditors(deps: NodeEditorDeps) {
                 if (!image) throw new Error(t("canvas.mossLayout.noImage"));
                 const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
                 const size = fitNodeSize(uploaded.width, uploaded.height, node.width, node.height);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt: payload.summary, layout: payload, ...generationMetadata } } : item)));
+                setNodes((prev) =>
+                    prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt: payload.summary, layout: payload, ...generationMetadata } } : item)),
+                );
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
                 const errorDetails = error instanceof Error ? error.message : t("canvas.mossLayout.failed");
@@ -282,70 +280,57 @@ export function useImageEditors(deps: NodeEditorDeps) {
         [effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, startGenerationRequest],
     );
 
-    const superResolveImageNode = useCallback(async (node: CanvasNodeData, params: CanvasSuperResolveParams,
-        title: string,
-    ) => {
-        if (!node.metadata?.content) return;
-        const childId = nanoid();
-        const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
-        setRunningNodeId(childId);
-        setNodes((prev) => [
-            ...prev,
-            {
-                id: childId,
-                type: CanvasNodeType.Image,
-                title,
-                position: { x: node.position.x + node.width + 96, y: node.position.y },
-                width: imageConfig.width,
-                height: imageConfig.height,
-                metadata: { prompt: node.metadata?.prompt, status: NODE_STATUS_LOADING },
-            },
-        ]);
-        setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
-        setSelectedNodeIds(new Set([childId]));
-        setDialogNodeId(childId);
-        const controller = startGenerationRequest(childId, node.id, childId);
-        try {
-            const image = await requestUpscale(
-                effectiveConfig,
+    const superResolveImageNode = useCallback(
+        async (node: CanvasNodeData, params: CanvasSuperResolveParams, title: string) => {
+            if (!node.metadata?.content) return;
+            const childId = nanoid();
+            const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
+            setRunningNodeId(childId);
+            setNodes((prev) => [
+                ...prev,
                 {
-                    id: node.id,
-                    name: `${node.title || node.id}.png`,
-                    type: node.metadata.mimeType || "image/png",
-                    dataUrl: node.metadata.content,
-                    storageKey: node.metadata.storageKey,
+                    id: childId,
+                    type: CanvasNodeType.Image,
+                    title,
+                    position: { x: node.position.x + node.width + 96, y: node.position.y },
+                    width: imageConfig.width,
+                    height: imageConfig.height,
+                    metadata: { prompt: node.metadata?.prompt, status: NODE_STATUS_LOADING },
                 },
-                { workflowId: params.workflowId, params: params.params, signal: controller.signal },
-            ).then((items) => items[0]);
-            const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
-            const size = fitNodeSize(uploaded.width, uploaded.height, imageConfig.width, imageConfig.height);
-            setNodes((prev) =>
-                prev.map((item) =>
-                    item.id === childId
-                        ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), status: NODE_STATUS_SUCCESS } }
-                        : item,
-                ),
-            );
-        } catch (error) {
-            if (isGenerationCanceled(error)) return;
-            const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
-            setNodes((prev) =>
-                prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)),
-            );
-        } finally {
-            finishGenerationRequest(childId, controller);
-            setRunningNodeId(null);
-        }
-    }, [effectiveConfig, finishGenerationRequest, startGenerationRequest, t]);
+            ]);
+            setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
+            setSelectedNodeIds(new Set([childId]));
+            setDialogNodeId(childId);
+            const controller = startGenerationRequest(childId, node.id, childId);
+            try {
+                const image = await requestUpscale(
+                    effectiveConfig,
+                    {
+                        id: node.id,
+                        name: `${node.title || node.id}.png`,
+                        type: node.metadata.mimeType || "image/png",
+                        dataUrl: node.metadata.content,
+                        storageKey: node.metadata.storageKey,
+                    },
+                    { workflowId: params.workflowId, params: params.params, signal: controller.signal },
+                ).then((items) => items[0]);
+                const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
+                const size = fitNodeSize(uploaded.width, uploaded.height, imageConfig.width, imageConfig.height);
+                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), status: NODE_STATUS_SUCCESS } } : item)));
+            } catch (error) {
+                if (isGenerationCanceled(error)) return;
+                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
+                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
+            } finally {
+                finishGenerationRequest(childId, controller);
+                setRunningNodeId(null);
+            }
+        },
+        [effectiveConfig, finishGenerationRequest, startGenerationRequest, t],
+    );
 
-    const runSuperResolve = useCallback(
-        (node: CanvasNodeData, params: CanvasSuperResolveParams) => superResolveImageNode(node, params, t("canvas.superResolve.title")),
-        [superResolveImageNode, t],
-    );
-    const runFastUpscale = useCallback(
-        (node: CanvasNodeData, params: CanvasSuperResolveParams) => superResolveImageNode(node, params, t("canvas.superResolve.fastTitle")),
-        [superResolveImageNode, t],
-    );
+    const runSuperResolve = useCallback((node: CanvasNodeData, params: CanvasSuperResolveParams) => superResolveImageNode(node, params, t("canvas.superResolve.title")), [superResolveImageNode, t]);
+    const runFastUpscale = useCallback((node: CanvasNodeData, params: CanvasSuperResolveParams) => superResolveImageNode(node, params, t("canvas.superResolve.fastTitle")), [superResolveImageNode, t]);
     const generateAngleNode = useCallback(
         async (node: CanvasNodeData, params: CanvasImageAngleParams) => {
             if (!node.metadata?.content) return;

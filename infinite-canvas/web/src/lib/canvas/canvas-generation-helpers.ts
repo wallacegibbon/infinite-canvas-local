@@ -161,11 +161,7 @@ export function resetInterruptedGeneration(nodes: CanvasNodeData[]) {
 }
 
 export function clearStaleNodeErrors(nodes: CanvasNodeData[]) {
-    return nodes.map((node) =>
-        node.metadata?.status === "error"
-            ? { ...node, metadata: { ...node.metadata, status: "idle" as const, errorDetails: undefined } }
-            : node,
-    );
+    return nodes.map((node) => (node.metadata?.status === "error" ? { ...node, metadata: { ...node.metadata, status: "idle" as const, errorDetails: undefined } } : node));
 }
 
 export function isGenerationCanceled(error: unknown) {

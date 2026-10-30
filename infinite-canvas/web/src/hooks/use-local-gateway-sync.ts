@@ -68,18 +68,25 @@ export function useLocalGatewaySync() {
                         });
                         const signature = (
                             models: Array<{ name: string; capability: string; label?: string; workflowId?: string; baseModel?: string; baseModelLabel?: string; imageInputs?: number; variantModes?: string[]; variantLabels?: Record<string, string> }>,
-                        ) => JSON.stringify(models.map((model) => [model.name, model.capability, model.label || "", model.workflowId || "", model.baseModel || "", model.baseModelLabel || "", model.imageInputs ?? -1, model.variantModes || [], model.variantLabels || {}]));
+                        ) =>
+                            JSON.stringify(
+                                models.map((model) => [
+                                    model.name,
+                                    model.capability,
+                                    model.label || "",
+                                    model.workflowId || "",
+                                    model.baseModel || "",
+                                    model.baseModelLabel || "",
+                                    model.imageInputs ?? -1,
+                                    model.variantModes || [],
+                                    model.variantLabels || {},
+                                ]),
+                            );
                         if (signature(channel.models) !== signature(nextModels)) {
                             // After a gateway port change the stale baseUrl saved in the browser must follow the runtime address, or every request fails with "Failed to fetch".
-                            const channels = config.channels.map((item) =>
-                                item.id === channel.id ? { ...item, apiKey: item.apiKey || "local", baseUrl: LOCAL_GATEWAY_BASE_URL, models: nextModels } : item,
-                            );
-                            const imageOptions = channels.flatMap((item) =>
-                                item.models.filter((model) => model.capability === "image").map((model) => encodeChannelModel(item.id, model.name)),
-                            );
-                            const videoOptions = channels.flatMap((item) =>
-                                item.models.filter((model) => model.capability === "video").map((model) => encodeChannelModel(item.id, model.name)),
-                            );
+                            const channels = config.channels.map((item) => (item.id === channel.id ? { ...item, apiKey: item.apiKey || "local", baseUrl: LOCAL_GATEWAY_BASE_URL, models: nextModels } : item));
+                            const imageOptions = channels.flatMap((item) => item.models.filter((model) => model.capability === "image").map((model) => encodeChannelModel(item.id, model.name)));
+                            const videoOptions = channels.flatMap((item) => item.models.filter((model) => model.capability === "video").map((model) => encodeChannelModel(item.id, model.name)));
                             const pick = (current: string, options: string[]) => (options.includes(current) ? current : options[0] || "");
                             const pickImage = (current: string) => {
                                 if (imageOptions.includes(current)) return current;
@@ -108,9 +115,7 @@ export function useLocalGatewaySync() {
                     const config = state.config;
                     const channel = config.channels.find((item) => isLocalGatewayUrl(item.baseUrl)) || config.channels[0];
                     if (channel && channel.models.length) {
-                        const channels = config.channels.map((item) =>
-                            item.id === channel.id ? { ...item, apiKey: item.apiKey || "local", baseUrl: LOCAL_GATEWAY_BASE_URL, models: [] } : item,
-                        );
+                        const channels = config.channels.map((item) => (item.id === channel.id ? { ...item, apiKey: item.apiKey || "local", baseUrl: LOCAL_GATEWAY_BASE_URL, models: [] } : item));
                         useConfigStore.setState({
                             config: {
                                 ...config,

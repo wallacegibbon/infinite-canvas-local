@@ -52,9 +52,7 @@ export function ResourceSetupGate() {
                     <Download className="size-5" />
                     <div>
                         <div className="text-base font-semibold">{t("resources.setup.title")}</div>
-                        <div className="mt-0.5 text-xs font-normal text-stone-500 dark:text-stone-400">
-                            {t("resources.setup.description")}
-                        </div>
+                        <div className="mt-0.5 text-xs font-normal text-stone-500 dark:text-stone-400">{t("resources.setup.description")}</div>
                     </div>
                 </div>
             }
@@ -69,9 +67,7 @@ export function ResourceSetupGate() {
                 compact
                 footer={
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-200 pt-3 dark:border-stone-800">
-                        <span className="text-[11px] text-stone-400 dark:text-stone-500">
-                            {t("resources.setup.skipHint")}
-                        </span>
+                        <span className="text-[11px] text-stone-400 dark:text-stone-500">{t("resources.setup.skipHint")}</span>
                         <Button onClick={skip}>
                             <X className="size-4" />
                             {t("resources.setup.skipButton")}

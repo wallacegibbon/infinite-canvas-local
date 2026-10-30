@@ -57,7 +57,23 @@ export function Tabs({ items, activeKey, defaultActiveKey, onChange, className }
 
 type CollapseItem = { key: string; label?: ReactNode; children?: ReactNode; extra?: ReactNode };
 
-export function Collapse({ items, activeKey, defaultActiveKey = [], onChange, ghost = false, size = "middle", className }: { items: readonly CollapseItem[]; activeKey?: string | string[]; defaultActiveKey?: string | string[]; onChange?: (keys: string[]) => void; ghost?: boolean; size?: "small" | "middle"; className?: string }): ReactNode {
+export function Collapse({
+    items,
+    activeKey,
+    defaultActiveKey = [],
+    onChange,
+    ghost = false,
+    size = "middle",
+    className,
+}: {
+    items: readonly CollapseItem[];
+    activeKey?: string | string[];
+    defaultActiveKey?: string | string[];
+    onChange?: (keys: string[]) => void;
+    ghost?: boolean;
+    size?: "small" | "middle";
+    className?: string;
+}): ReactNode {
     const asArray = (value: string | string[] | undefined) => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
     const [internal, setInternal] = useState<string[]>(asArray(defaultActiveKey));
     const openKeys = activeKey === undefined ? internal : asArray(activeKey);
@@ -72,7 +88,15 @@ export function Collapse({ items, activeKey, defaultActiveKey = [], onChange, gh
                 const open = openKeys.includes(item.key);
                 return (
                     <div key={item.key} className={cn(!ghost && "border-b border-stone-200 last:border-b-0 dark:border-stone-800")}>
-                        <button type="button" aria-expanded={open} onClick={() => toggle(item.key)} className={cn("flex w-full items-center justify-between gap-2 text-left text-stone-700 transition-colors hover:bg-stone-50 dark:text-stone-200 dark:hover:bg-stone-800", size === "small" ? "px-2 py-1.5 text-[13px]" : "px-3 py-2 text-sm")}>
+                        <button
+                            type="button"
+                            aria-expanded={open}
+                            onClick={() => toggle(item.key)}
+                            className={cn(
+                                "flex w-full items-center justify-between gap-2 text-left text-stone-700 transition-colors hover:bg-stone-50 dark:text-stone-200 dark:hover:bg-stone-800",
+                                size === "small" ? "px-2 py-1.5 text-[13px]" : "px-3 py-2 text-sm",
+                            )}
+                        >
                             <span className="min-w-0">{item.label}</span>
                             <span className="flex shrink-0 items-center gap-2">
                                 {item.extra}
@@ -116,7 +140,8 @@ export function Pagination({
         const next = Math.min(Math.max(1, page), pages);
         if (next !== current) onChange?.(next, pageSize);
     };
-    const button = "inline-flex items-center justify-center rounded-md border border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:bg-stone-100 enabled:dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300";
+    const button =
+        "inline-flex items-center justify-center rounded-md border border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:bg-stone-100 enabled:dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300";
     const dimension = size === "small" ? "size-6 text-[13px]" : "size-8 text-sm";
     return (
         <div className={cn("flex flex-wrap items-center gap-1", className)}>

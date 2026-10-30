@@ -13,17 +13,7 @@ export type PendingConnectionCreate = {
     position: Position;
 };
 
-export function ConnectionCreateMenu({
-    pending,
-    scale = 1,
-    onCreate,
-    onClose,
-}: {
-    pending: PendingConnectionCreate;
-    scale?: number;
-    onCreate: (type: string) => void;
-    onClose: () => void;
-}) {
+export function ConnectionCreateMenu({ pending, scale = 1, onCreate, onClose }: { pending: PendingConnectionCreate; scale?: number; onCreate: (type: string) => void; onClose: () => void }) {
     const theme = useCanvasTheme();
     const { t } = useTranslation();
     useNodeRegistryVersion();

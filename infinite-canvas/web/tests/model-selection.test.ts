@@ -74,4 +74,3 @@ test("changing only the key on the same provider preserves the saved model and t
     expect(node.metadata?.videoTaskId).toBe("original-task");
     expect(ready({ ...selected, channels: [{ ...config.channels[0], apiKey: "" }] }, selected.model)).toBe(false);
 });
-

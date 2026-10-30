@@ -76,7 +76,9 @@ export function Dropdown({ menu, className, children }: { menu?: { items?: Dropd
                                 onSelect={() => item.onClick?.()}
                                 className={cn(
                                     "flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm outline-none select-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40",
-                                    item.danger ? "text-red-600 data-[highlighted]:bg-red-50 dark:text-red-400 dark:data-[highlighted]:bg-red-950/40" : "text-stone-700 data-[highlighted]:bg-stone-100 dark:text-stone-200 dark:data-[highlighted]:bg-stone-800",
+                                    item.danger
+                                        ? "text-red-600 data-[highlighted]:bg-red-50 dark:text-red-400 dark:data-[highlighted]:bg-red-950/40"
+                                        : "text-stone-700 data-[highlighted]:bg-stone-100 dark:text-stone-200 dark:data-[highlighted]:bg-stone-800",
                                 )}
                             >
                                 {item.icon ? <span className="flex shrink-0 items-center text-stone-400">{item.icon}</span> : null}

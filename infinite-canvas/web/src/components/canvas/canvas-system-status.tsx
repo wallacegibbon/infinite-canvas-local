@@ -112,11 +112,7 @@ export function CanvasSystemStatus() {
                 onClick={() => setOpen(true)}
             >
                 <Gauge className="size-3.5" />
-                <span>
-                    {gpu
-                        ? t("canvas.systemStatus.vramShort", { used: vramGb(gpu.memoryUsedMb), total: vramGb(gpu.memoryTotalMb) })
-                        : t("canvas.systemStatus.vramShortEmpty")}
-                </span>
+                <span>{gpu ? t("canvas.systemStatus.vramShort", { used: vramGb(gpu.memoryUsedMb), total: vramGb(gpu.memoryTotalMb) }) : t("canvas.systemStatus.vramShortEmpty")}</span>
                 <span className="hidden opacity-40 lg:inline">·</span>
                 <span className="hidden lg:inline">
                     {t("canvas.systemStatus.ramShort", {
@@ -158,9 +154,7 @@ export function CanvasSystemStatus() {
                     </div>
                     <div className="flex items-center justify-between text-xs" style={{ color: theme.node.muted }}>
                         <span>ComfyUI</span>
-                        <span style={{ color: stats?.comfy.reachable ? theme.node.text : "#dc2626" }}>
-                            {stats?.comfy.reachable ? t("canvas.systemStatus.online") : t("canvas.systemStatus.offline")}
-                        </span>
+                        <span style={{ color: stats?.comfy.reachable ? theme.node.text : "#dc2626" }}>{stats?.comfy.reachable ? t("canvas.systemStatus.online") : t("canvas.systemStatus.offline")}</span>
                     </div>
                     {oom ? (
                         <div className="rounded-lg border px-3 py-2 text-[11px]" style={{ borderColor: "#fca5a5", color: "#b91c1c" }}>
@@ -174,13 +168,7 @@ export function CanvasSystemStatus() {
                                     {t("canvas.systemStatus.freeHint")}
                                 </span>
                                 <div className="flex shrink-0 items-center gap-2">
-                                    <Button
-                                        size="small"
-                                        loading={freeing}
-                                        disabled={!stats?.comfy.reachable || freeing}
-                                        onClick={() => void freeMemory()}
-                                        style={{ background: "#16a34a", borderColor: "#16a34a", color: "#fff" }}
-                                    >
+                                    <Button size="small" loading={freeing} disabled={!stats?.comfy.reachable || freeing} onClick={() => void freeMemory()} style={{ background: "#16a34a", borderColor: "#16a34a", color: "#fff" }}>
                                         {t("canvas.systemStatus.freeAction")}
                                     </Button>
                                 </div>

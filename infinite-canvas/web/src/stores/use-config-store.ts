@@ -237,9 +237,7 @@ export function channelModelOf(config: AiConfig, value: string) {
 export function workflowModelOptions(config: AiConfig, capability?: ModelCapability) {
     const entries = channelModelEntries(config);
     if (!entries.some((entry) => entry.model.workflowId)) return selectableModelsByCapability(config, capability);
-    return entries
-        .filter((entry) => entry.model.workflowId && !entry.model.baseModel && (!capability || entry.model.capability === capability))
-        .map((entry) => entry.value);
+    return entries.filter((entry) => entry.model.workflowId && !entry.model.baseModel && (!capability || entry.model.capability === capability)).map((entry) => entry.value);
 }
 
 /** The base-model entry of the workflow the current model belongs to, used to echo the top-level dropdown. */
@@ -537,10 +535,7 @@ function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
     };
 }
 
-function upsertChannelCredentials(
-    config: AiConfig,
-    input: { baseUrl?: string | null; apiKey?: string | null },
-): ChannelCredentialsImportResult & { config: AiConfig } {
+function upsertChannelCredentials(config: AiConfig, input: { baseUrl?: string | null; apiKey?: string | null }): ChannelCredentialsImportResult & { config: AiConfig } {
     const rawBaseUrl = input.baseUrl?.trim() || "";
     if (!rawBaseUrl) return { status: "missing-base-url", config };
     if (!isHttpBaseUrl(rawBaseUrl)) return { status: "invalid-base-url", config };
@@ -647,7 +642,18 @@ function resolveModelChannel(config: AiConfig, value: string) {
     const decoded = decodeChannelModel(value);
     const model = decoded?.model || value;
     const matched = decoded ? config.channels.find((channel) => channel.id === decoded.channelId) : config.channels.find((channel) => channel.models.some((item) => item.name === model));
-    return matched || config.channels[0] || createModelChannel({ id: "default", name: i18n.t("config.channels.defaultName"), baseUrl: config.baseUrl, apiKey: config.apiKey, apiFormat: config.apiFormat, models: config.models.map(modelOptionName).map((name) => ({ name, capability: guessCapability(name) })) });
+    return (
+        matched ||
+        config.channels[0] ||
+        createModelChannel({
+            id: "default",
+            name: i18n.t("config.channels.defaultName"),
+            baseUrl: config.baseUrl,
+            apiKey: config.apiKey,
+            apiFormat: config.apiFormat,
+            models: config.models.map(modelOptionName).map((name) => ({ name, capability: guessCapability(name) })),
+        })
+    );
 }
 
 export function resolveModelRequestConfig(config: AiConfig, value: string) {

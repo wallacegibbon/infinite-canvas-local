@@ -104,15 +104,35 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, onParamsCha
         };
     }, [onOpenChange, open]);
 
-    const panel = open && buttonRect ? <ImageSettingsPortal buttonRect={buttonRect} panelRef={panelRef} placement={placement} theme={theme} config={config} onConfigChange={onConfigChange} onParamsChange={onParamsChange} onOpenMaskEditor={onOpenMaskEditor} onOpenOutpaintEditor={onOpenOutpaintEditor} onOpenMossLayoutEditor={onOpenMossLayoutEditor} onClose={() => updateOpen(false)} /> : null;
+    const panel =
+        open && buttonRect ? (
+            <ImageSettingsPortal
+                buttonRect={buttonRect}
+                panelRef={panelRef}
+                placement={placement}
+                theme={theme}
+                config={config}
+                onConfigChange={onConfigChange}
+                onParamsChange={onParamsChange}
+                onOpenMaskEditor={onOpenMaskEditor}
+                onOpenOutpaintEditor={onOpenOutpaintEditor}
+                onOpenMossLayoutEditor={onOpenMossLayoutEditor}
+                onClose={() => updateOpen(false)}
+            />
+        ) : null;
 
     return (
         <>
             <span ref={buttonRef} className="inline-flex min-w-0">
-                <Button size="small" type="text" className={buttonClassName || "!h-8 !max-w-[180px] !justify-start !rounded-full !px-2.5"} style={{ background: theme.node.fill, color: theme.node.text }} icon={<Settings2 className="size-3.5" />} onClick={() => updateOpen(!open)}>
-                    <span className="truncate">
-                        {qwen ? qwenTriggerLabel : `${imageSizeLabel(activeSize)} · ${t("canvas.controls.images", { count })}`}
-                    </span>
+                <Button
+                    size="small"
+                    type="text"
+                    className={buttonClassName || "!h-8 !max-w-[180px] !justify-start !rounded-full !px-2.5"}
+                    style={{ background: theme.node.fill, color: theme.node.text }}
+                    icon={<Settings2 className="size-3.5" />}
+                    onClick={() => updateOpen(!open)}
+                >
+                    <span className="truncate">{qwen ? qwenTriggerLabel : `${imageSizeLabel(activeSize)} · ${t("canvas.controls.images", { count })}`}</span>
                 </Button>
             </span>
             {panel}
@@ -179,35 +199,30 @@ function ImageSettingsPortal({
     } as const;
 
     return createPortal(
-        <div
-            ref={panelRef}
-            className="canvas-image-settings-popover"
-            style={style}
-            onPointerDown={(event) => event.stopPropagation()}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-        >
+        <div ref={panelRef} className="canvas-image-settings-popover" style={style} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
             {qwen ? (
                 <div className="space-y-4">
                     <div className="text-lg font-semibold">Qwen Image 2.1</div>
                     <div className="space-y-2.5">
                         <SettingTitle color={theme.node.muted}>{t("canvas.imagePopover.mode")}</SettingTitle>
                         <div className="grid grid-cols-2 gap-2.5">
-                            {["t2i", "edit", "inpaint", "outpaint"].filter((mode) => qwen.modes.includes(mode)).map((mode) => (
-                                <OptionPill
-                                    key={mode}
-                                    selected={qwenMode === mode}
-                                    theme={theme}
-                                    onClick={() => {
-                                        onConfigChange("imageMode", mode);
-                                        if (mode === "inpaint" || mode === "outpaint") onClose();
-                                        if (mode === "inpaint") onOpenMaskEditor?.();
-                                        if (mode === "outpaint") onOpenOutpaintEditor?.();
-                                    }}
-                                >
-                                    {qwenVariantLabel(mode, qwen.labels)}
-                                </OptionPill>
-                            ))}
+                            {["t2i", "edit", "inpaint", "outpaint"]
+                                .filter((mode) => qwen.modes.includes(mode))
+                                .map((mode) => (
+                                    <OptionPill
+                                        key={mode}
+                                        selected={qwenMode === mode}
+                                        theme={theme}
+                                        onClick={() => {
+                                            onConfigChange("imageMode", mode);
+                                            if (mode === "inpaint" || mode === "outpaint") onClose();
+                                            if (mode === "inpaint") onOpenMaskEditor?.();
+                                            if (mode === "outpaint") onOpenOutpaintEditor?.();
+                                        }}
+                                    >
+                                        {qwenVariantLabel(mode, qwen.labels)}
+                                    </OptionPill>
+                                ))}
                         </div>
                         <div className="text-xs leading-4" style={{ color: theme.node.muted }}>
                             {modeHints[qwenMode] || modeHints.t2i}
@@ -223,12 +238,7 @@ function ImageSettingsPortal({
                                             {t("canvas.imagePopover.followFirst")}
                                         </OptionPill>
                                         {editRatioOptions.map((ratio) => (
-                                            <OptionPill
-                                                key={ratio}
-                                                selected={editCanvasRatio === ratio}
-                                                theme={theme}
-                                                onClick={() => onParamsChange?.({ editCanvasRatio: ratio, editCanvasSize: qwenCanvasSize(refResolution, ratio) })}
-                                            >
+                                            <OptionPill key={ratio} selected={editCanvasRatio === ratio} theme={theme} onClick={() => onParamsChange?.({ editCanvasRatio: ratio, editCanvasSize: qwenCanvasSize(refResolution, ratio) })}>
                                                 {ratio}
                                             </OptionPill>
                                         ))}
@@ -246,7 +256,12 @@ function ImageSettingsPortal({
                                             ["2048", "2k"],
                                             ["0", t("canvas.imagePopover.resolutionOriginal")],
                                         ].map(([value, label]) => (
-                                            <OptionPill key={value} selected={refResolution === value} theme={theme} onClick={() => onParamsChange?.({ resolution: Number(value), ...(editCanvasRatio !== "auto" ? { editCanvasSize: qwenCanvasSize(value, editCanvasRatio) } : {}) })}>
+                                            <OptionPill
+                                                key={value}
+                                                selected={refResolution === value}
+                                                theme={theme}
+                                                onClick={() => onParamsChange?.({ resolution: Number(value), ...(editCanvasRatio !== "auto" ? { editCanvasSize: qwenCanvasSize(value, editCanvasRatio) } : {}) })}
+                                            >
                                                 {label}
                                             </OptionPill>
                                         ))}

@@ -42,7 +42,18 @@ const h3FrameModeOptions = [
     { value: "both" as const, labelKey: "bothFrames" },
 ];
 
-export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5", frameMode = "both", onFrameModeChange, onModeChange, durationLocked = false, sourceDurationSeconds }: VideoSettingsPanelProps) {
+export function VideoSettingsPanel({
+    config,
+    onConfigChange,
+    theme,
+    showTitle = true,
+    className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5",
+    frameMode = "both",
+    onFrameModeChange,
+    onModeChange,
+    durationLocked = false,
+    sourceDurationSeconds,
+}: VideoSettingsPanelProps) {
     const { t } = useTranslation();
     const seconds = Number(clampVideoSeconds(config.videoSeconds || "6"));
     const videoMode = normalizeVideoModeValue(config.videoMode);
@@ -117,13 +128,18 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
                     {durationLocked ? (
                         <div className="flex h-8 items-center gap-1.5 text-xs" style={{ color: theme.node.muted }}>
                             <Lock className="size-3.5" />
-                            <span>{t("settingsPanels.video.followSource")}{sourceDurationSeconds != null ? ` · ${sourceDurationSeconds.toFixed(1)}s` : ""}</span>
+                            <span>
+                                {t("settingsPanels.video.followSource")}
+                                {sourceDurationSeconds != null ? ` · ${sourceDurationSeconds.toFixed(1)}s` : ""}
+                            </span>
                         </div>
                     ) : (
                         <div className="flex items-center gap-3" onMouseDown={(event) => event.stopPropagation()}>
                             <Slider className="min-w-0 flex-1" min={VIDEO_SECONDS_MIN} max={VIDEO_SECONDS_MAX} step={1} value={seconds} onChange={(value) => onConfigChange("videoSeconds", String(Array.isArray(value) ? value[0] : value))} />
                             <SecondsInput value={seconds} theme={theme} onCommit={(value) => onConfigChange("videoSeconds", String(value))} />
-                            <span className="shrink-0 text-sm" style={{ color: theme.node.muted }}>s</span>
+                            <span className="shrink-0 text-sm" style={{ color: theme.node.muted }}>
+                                s
+                            </span>
                         </div>
                     )}
                 </SettingGroup>
@@ -236,7 +252,14 @@ function updateDimension(key: "width" | "height", value: number | null, dimensio
 
 function OptionPill({ selected, disabled = false, theme, onClick, children }: { selected: boolean; disabled?: boolean; theme: CanvasTheme; onClick: () => void; children: ReactNode }) {
     return (
-        <button type="button" disabled={disabled} className="h-9 cursor-pointer rounded-full border px-2 text-sm transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-35" style={{ background: "transparent", borderColor: selected ? theme.node.text : theme.node.stroke, color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()} onClick={onClick}>
+        <button
+            type="button"
+            disabled={disabled}
+            className="h-9 cursor-pointer rounded-full border px-2 text-sm transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-35"
+            style={{ background: "transparent", borderColor: selected ? theme.node.text : theme.node.stroke, color: theme.node.text }}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={onClick}
+        >
             {children}
         </button>
     );
@@ -256,7 +279,14 @@ function SettingGroup({ title, color, children }: { title: string; color: string
 function ResolutionInput({ value, theme, onChange }: { value: string; theme: CanvasTheme; onChange: (value: string) => void }) {
     return (
         <label className="flex h-9 overflow-hidden rounded-full border text-sm" style={{ borderColor: theme.node.stroke, color: theme.node.text }}>
-            <input type="number" min={1} className="min-w-0 flex-1 bg-transparent px-3 text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" value={value} onChange={(event) => onChange(event.target.value)} onMouseDown={(event) => event.stopPropagation()} />
+            <input
+                type="number"
+                min={1}
+                className="min-w-0 flex-1 bg-transparent px-3 text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                onMouseDown={(event) => event.stopPropagation()}
+            />
             <span className="grid w-7 place-items-center pr-1" style={{ color: theme.node.muted }}>
                 p
             </span>
@@ -296,7 +326,15 @@ function DimensionInput({ prefix, value, disabled, theme, onChange }: { prefix: 
             <span className="grid w-9 place-items-center" style={{ color: theme.node.muted }}>
                 {prefix}
             </span>
-            <input type="number" min={1} disabled={disabled} className="min-w-0 flex-1 bg-transparent px-2 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" value={value || ""} onChange={(event) => onChange(Number(event.target.value) || null)} onMouseDown={(event) => event.stopPropagation()} />
+            <input
+                type="number"
+                min={1}
+                disabled={disabled}
+                className="min-w-0 flex-1 bg-transparent px-2 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                value={value || ""}
+                onChange={(event) => onChange(Number(event.target.value) || null)}
+                onMouseDown={(event) => event.stopPropagation()}
+            />
         </label>
     );
 }

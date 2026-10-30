@@ -56,15 +56,9 @@ export function TagInput({
     };
 
     return (
-        <div
-            className={cn(FIELD, className)}
-            onClick={(event) => (event.currentTarget.querySelector("input") as HTMLInputElement | null)?.focus()}
-        >
+        <div className={cn(FIELD, className)} onClick={(event) => (event.currentTarget.querySelector("input") as HTMLInputElement | null)?.focus()}>
             {value.map((tag) => (
-                <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 rounded border border-stone-200 bg-stone-100 px-1.5 py-0.5 text-xs text-stone-700 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300"
-                >
+                <span key={tag} className="inline-flex items-center gap-1 rounded border border-stone-200 bg-stone-100 px-1.5 py-0.5 text-xs text-stone-700 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300">
                     {tag}
                     <button
                         type="button"

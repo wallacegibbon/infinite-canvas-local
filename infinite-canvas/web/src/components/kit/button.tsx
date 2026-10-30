@@ -31,7 +31,8 @@ type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> & {
     shape?: "default" | "circle" | "round";
 };
 
-const BASE = "relative inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md border font-normal whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-stone-400/40 disabled:cursor-not-allowed disabled:opacity-60";
+const BASE =
+    "relative inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md border font-normal whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-stone-400/40 disabled:cursor-not-allowed disabled:opacity-60";
 
 const SIZES: Record<ButtonSize, string> = {
     small: "h-6 gap-1 px-[7px] text-sm",
@@ -62,12 +63,7 @@ const DANGER: Record<ButtonType, string> = {
 export function Button({ type = "default", size = "middle", danger = false, icon, iconPlacement = "start", loading = false, shape = "default", className, children, disabled, ...props }: ButtonProps): ReactNode {
     const square = shape === "circle" || shape === "round";
     return (
-        <button
-            type="button"
-            disabled={disabled || loading}
-            className={cn(BASE, SIZES[size], square && CIRCLE_SIZES[size], shape === "circle" && "rounded-full", danger ? DANGER[type] : PLAIN[type], className)}
-            {...props}
-        >
+        <button type="button" disabled={disabled || loading} className={cn(BASE, SIZES[size], square && CIRCLE_SIZES[size], shape === "circle" && "rounded-full", danger ? DANGER[type] : PLAIN[type], className)} {...props}>
             {loading ? <LoaderCircle data-slot="icon" className="size-3.5 shrink-0 animate-spin" /> : iconPlacement === "start" ? startIcon(icon) : null}
             {children === undefined || children === null || children === false ? null : <span data-slot="text">{children}</span>}
             {!loading && iconPlacement === "end" ? startIcon(icon) : null}

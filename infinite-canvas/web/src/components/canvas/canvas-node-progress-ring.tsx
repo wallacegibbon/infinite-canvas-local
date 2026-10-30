@@ -149,24 +149,8 @@ export function CanvasNodeProgressRing({ width, height, step, total, complete = 
                     ) : null}
                     {complete ? (
                         <>
-                            <path
-                                d={path}
-                                fill="none"
-                                stroke={glow}
-                                strokeWidth={look.haloWidth + 3}
-                                strokeLinecap="round"
-                                opacity={0}
-                                style={{ filter: `blur(${look.haloBlur}px)`, animation: "canvas-ring-flash .95s ease-out forwards" }}
-                            />
-                            <path
-                                d={path}
-                                fill="none"
-                                stroke={core}
-                                strokeWidth={coreWidth + 0.2}
-                                strokeLinecap="round"
-                                opacity={0}
-                                style={{ filter: `drop-shadow(0 0 4px ${glow})`, animation: "canvas-ring-core-flash .95s ease-out forwards" }}
-                            />
+                            <path d={path} fill="none" stroke={glow} strokeWidth={look.haloWidth + 3} strokeLinecap="round" opacity={0} style={{ filter: `blur(${look.haloBlur}px)`, animation: "canvas-ring-flash .95s ease-out forwards" }} />
+                            <path d={path} fill="none" stroke={core} strokeWidth={coreWidth + 0.2} strokeLinecap="round" opacity={0} style={{ filter: `drop-shadow(0 0 4px ${glow})`, animation: "canvas-ring-core-flash .95s ease-out forwards" }} />
                         </>
                     ) : null}
                 </g>
@@ -246,7 +230,10 @@ function TideOverlay({ width, height, ratio, complete, palette }: { width: numbe
                 {complete ? (
                     <>
                         <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 50% 72%, ${palette.core}d9 0%, ${palette.glow}66 38%, transparent 72%)`, animation: "tide-flash .75s ease-out .5s forwards", opacity: 0 }} />
-                        <div className="absolute inset-x-0 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${palette.core}, transparent)`, boxShadow: `0 0 10px ${palette.glow}`, animation: "tide-flash .6s ease-out .5s forwards", opacity: 0 }} />
+                        <div
+                            className="absolute inset-x-0 top-0 h-px"
+                            style={{ background: `linear-gradient(90deg, transparent, ${palette.core}, transparent)`, boxShadow: `0 0 10px ${palette.glow}`, animation: "tide-flash .6s ease-out .5s forwards", opacity: 0 }}
+                        />
                     </>
                 ) : null}
             </div>

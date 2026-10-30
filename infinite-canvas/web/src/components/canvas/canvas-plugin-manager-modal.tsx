@@ -113,7 +113,9 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
         </div>
     );
 
-    const localTab = <div className="thin-scrollbar max-h-[52vh] space-y-2 overflow-auto">{localPlugins.map((record) => row(record.id, <Puzzle className="size-4" />, record.name, record.version, record.description || record.url, installedControls(record)))}</div>;
+    const localTab = (
+        <div className="thin-scrollbar max-h-[52vh] space-y-2 overflow-auto">{localPlugins.map((record) => row(record.id, <Puzzle className="size-4" />, record.name, record.version, record.description || record.url, installedControls(record)))}</div>
+    );
 
     const thirdPartyTab = (
         <div className="space-y-3">
@@ -123,14 +125,15 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
                     {t("canvas.plugins.install")}
                 </Button>
             </div>
-            <div className="thin-scrollbar max-h-[42vh] space-y-2 overflow-auto">{thirdPartyPlugins.length === 0 ? emptyHint(t("canvas.plugins.noThirdParty")) : thirdPartyPlugins.map((record) => row(record.id, <Puzzle className="size-4" />, record.name, record.version, record.description || record.url, installedControls(record)))}</div>
+            <div className="thin-scrollbar max-h-[42vh] space-y-2 overflow-auto">
+                {thirdPartyPlugins.length === 0
+                    ? emptyHint(t("canvas.plugins.noThirdParty"))
+                    : thirdPartyPlugins.map((record) => row(record.id, <Puzzle className="size-4" />, record.name, record.version, record.description || record.url, installedControls(record)))}
+            </div>
         </div>
     );
 
-    const tabs = [
-        ...(localPlugins.length > 0 ? [{ key: "local", label: t("canvas.plugins.local"), children: localTab }] : []),
-        { key: "third", label: t("canvas.plugins.thirdParty"), children: thirdPartyTab },
-    ];
+    const tabs = [...(localPlugins.length > 0 ? [{ key: "local", label: t("canvas.plugins.local"), children: localTab }] : []), { key: "third", label: t("canvas.plugins.thirdParty"), children: thirdPartyTab }];
 
     return (
         <Dialog title={t("canvas.plugins.title")} open={open} onClose={onClose} size="panel">

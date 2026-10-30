@@ -26,7 +26,8 @@ const BORDERS: Record<Status, string> = {
     warning: "border-amber-400 focus:border-amber-500 dark:border-amber-600 dark:focus:border-amber-500",
 };
 
-const FIELD = "w-full rounded-md border bg-white text-stone-900 outline-none transition-colors placeholder:text-stone-400 focus:ring-2 focus:ring-stone-400/20 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500";
+const FIELD =
+    "w-full rounded-md border bg-white text-stone-900 outline-none transition-colors placeholder:text-stone-400 focus:ring-2 focus:ring-stone-400/20 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500";
 
 type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "prefix"> & {
     size?: Size;
@@ -52,12 +53,7 @@ export function Input({ size = "middle", prefix, status = "normal", onPressEnter
                 {...props}
             />
             {showClear ? (
-                <button
-                    type="button"
-                    aria-label="Clear"
-                    onClick={() => onChange?.({ target: { value: "" } } as unknown as React.ChangeEvent<HTMLInputElement>)}
-                    className="absolute right-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
-                >
+                <button type="button" aria-label="Clear" onClick={() => onChange?.({ target: { value: "" } } as unknown as React.ChangeEvent<HTMLInputElement>)} className="absolute right-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200">
                     ×
                 </button>
             ) : null}
@@ -81,14 +77,7 @@ function TextArea({ rows = 3, autoSize, status = "normal", className, ...props }
         el.style.height = `${next}px`;
     }, [autoSize, maxRows, props.value]);
 
-    return (
-        <textarea
-            ref={ref}
-            rows={autoSize ? (minRows ?? 2) : rows}
-            className={cn(FIELD, "resize-none px-2.5 py-1.5 text-sm", BORDERS[status], autoSize && "overflow-hidden", className)}
-            {...props}
-        />
-    );
+    return <textarea ref={ref} rows={autoSize ? (minRows ?? 2) : rows} className={cn(FIELD, "resize-none px-2.5 py-1.5 text-sm", BORDERS[status], autoSize && "overflow-hidden", className)} {...props} />;
 }
 
 function Password({ value, onChange, className, size = "middle", status = "normal", ...props }: Omit<InputProps, "prefix">): ReactNode {
@@ -96,12 +85,7 @@ function Password({ value, onChange, className, size = "middle", status = "norma
     return (
         <span className={cn("relative inline-flex w-full items-center", className)}>
             <input type={visible ? "text" : "password"} value={value} onChange={onChange} className={cn(FIELD, HEIGHTS[size], BORDERS[status], "px-2.5 pr-9")} {...props} />
-            <button
-                type="button"
-                aria-label={visible ? "Hide" : "Show"}
-                onClick={() => setVisible((current) => !current)}
-                className="absolute right-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
-            >
+            <button type="button" aria-label={visible ? "Hide" : "Show"} onClick={() => setVisible((current) => !current)} className="absolute right-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200">
                 {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
         </span>
@@ -129,7 +113,17 @@ Input.Password = Password;
 Input.Search = Search;
 
 /** Number entry, replacing antd's `InputNumber`. Emits `number | null`, as antd did. */
-export function InputNumber({ value, onChange, min, max, step = 1, precision, size = "middle", className, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "size"> & { value?: number | null; onChange?: (value: number | null) => void; min?: number; max?: number; step?: number; precision?: number; size?: Size }): ReactNode {
+export function InputNumber({
+    value,
+    onChange,
+    min,
+    max,
+    step = 1,
+    precision,
+    size = "middle",
+    className,
+    ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "size"> & { value?: number | null; onChange?: (value: number | null) => void; min?: number; max?: number; step?: number; precision?: number; size?: Size }): ReactNode {
     return (
         <input
             type="number"
