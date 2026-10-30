@@ -1265,3 +1265,38 @@ stamping in `catch` — because they are about the canvas, not about one request
 the two registry calls go in as `GenerationRunDeps`, the same shape as `NodeEditorDeps` (#43).
 
 **Where** `infinite-canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`.
+
+## 45. Retry joins the generation module, and `project.tsx` drops under 3,000
+
+**Decision** `handleRetryNode` (156 lines) moved to `use-generation-runs.ts` as `retryNode`.
+The page now holds no generation logic at all: `handleGenerateNode` dispatches, `handleRetryNode` was
+a second entry point, and both live behind `useGenerationRuns`. `project.tsx`: 3,150 → 2,990 lines.
+
+**Why it belongs there even though it shares no code** It looked like a duplicate of `handleGenerateNode`
+and is not. Retry has no `mode`, spawns nothing, and writes into the node that already exists — into
+the image slot that failed, if one was named. Its four type branches total 88 lines where generation's
+total 334. What they share is not code but *ownership*: both resolve a config, both check it is ready,
+both drive exactly one request into exactly one node, both stamp the outcome. Keeping one in the page
+and one in the module was the wrong seam; the seam is "the page owns the canvas, the module owns
+generation", and it is now consistent.
+
+**`GenerationRunDeps` grew by four** `nodesRef`, `connectionsRef`, `setRunningNodeId`, `pollVideoNodeTask`.
+The first two are the only place the module reads the graph rather than appending to it —
+`findRetrySourceNode` has to walk backwards from the failed node to find what produced it. That is a
+real difference from the editors (#43), which never read, and it is why retry needed refs where they
+needed nothing.
+
+`effectiveConfig`, `isAiConfigReady` and `openConfigDialog` are read from the stores inside the hook,
+as in #43, so they are not in the contract.
+
+**Verified the same way** The moved body diffs against `git show HEAD` at 146 non-blank lines in,
+146 out, zero differences.
+
+**The gap** `retryNode` was not exercised in a browser. Retry only appears in the node toolbar and
+context menu for a node in `error` status, and there is no way to manufacture one without a failing
+API call. What was checked live: the page loads on the new bundle, nodes render, selection and the
+context menu work, and the console is empty. The body is a byte-identical move and the contract is
+type-checked, but the runtime path itself remains unexercised — worth one click from a human on a
+node that has actually failed.
+
+**Where** `infinite-canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`.
