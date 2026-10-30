@@ -1563,3 +1563,36 @@ screen it is 760, and only the tallest editors scroll.
 confirmation: 520×161, unchanged.
 
 **Where** `components/kit/dialog.tsx` and the thirty call sites.
+
+## 51. The editors' canvases fill the panel instead of guessing at the viewport
+
+**Decision** The four editors that sized their image area against the *viewport* now size it against
+the *panel*. The dialog body becomes a flex column (`bodyClassName="flex flex-col"`) and the image
+area takes the remaining space (`flex-1 min-h-0`), with a small `min-h` as a floor rather than a
+typical value.
+
+| editor | was | is |
+|---|---|---|
+| crop | `h-[min(62vh,620px)] min-h-[340px]` | `flex-1 min-h-[260px]` |
+| mask edit | `h-[min(68vh,720px)] min-h-[360px]` | `min-h-[320px]` (stretched by the grid row) |
+| split | `h-[340px] min-h-[300px]` | `flex-1 min-h-[240px]` |
+| node info | `h-[56vh] min-h-[360px]` | `flex-1 min-h-0` |
+
+**Why this was needed at all** Prettier-adjacent: #50 made every panel a fixed height, and these four
+had heights expressed in `vh`. On a viewport where `88dvh` is smaller than `62vh` plus chrome — which
+is exactly what a 734px-tall window gives — the editor content came out taller than the panel and the
+body scrolled. Measured before: the crop dialog needed a scrollbar and its footer was below the fold.
+Measured after: `scrollHeight - clientHeight` is 0 in all four, and the crop dialog's Reset / Cancel /
+Crop row is visible without scrolling.
+
+The numbers were also the wrong kind of number. `62vh` is a guess about how tall an image wants to be
+on somebody else's monitor; `flex-1` is the actual answer, because the panel already knows its height.
+
+**A predating bug found while measuring** In the mask editor the action row needs about 360px for
+Reset, Export to canvas and Generate, and sits in a fixed `320px` grid column — so Generate was
+clipped by the dialog's `overflow-hidden`. This was true at the old 980px width as well, since the
+column was 320 then too; the arithmetic, not the change, is what shows it. The row now wraps
+(`flex-wrap`), so the three buttons reflow instead of the last one disappearing.
+
+**Where** `components/canvas/canvas-node-{crop,mask-edit,split}-dialog.tsx`,
+`components/canvas/canvas-node-hover-toolbar.tsx`.

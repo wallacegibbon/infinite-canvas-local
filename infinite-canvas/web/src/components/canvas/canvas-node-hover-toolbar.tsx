@@ -264,9 +264,9 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
     );
 
     return (
-        <Dialog title={title} open={open && Boolean(node)} onClose={onClose} size="panel">
+        <Dialog title={title} open={open && Boolean(node)} onClose={onClose} size="panel" bodyClassName="flex flex-col">
             {node ? (
-                <div className="h-[56vh] min-h-[360px] select-text text-sm" data-canvas-shortcuts-ignore>
+                <div className="min-h-0 flex-1 select-text text-sm" data-canvas-shortcuts-ignore>
                     {view === "info" ? (
                         <div className="thin-scrollbar h-full space-y-3 overflow-auto pr-1">
                             <InfoRow label="ID" value={node.id} />

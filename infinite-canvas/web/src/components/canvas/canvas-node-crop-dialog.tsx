@@ -73,12 +73,12 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
     };
 
     return (
-        <Dialog title={t("canvas.editors.cropTitle")} open={open && Boolean(dataUrl)} onClose={onClose} size="panel">
-            <div className="space-y-4">
+        <Dialog title={t("canvas.editors.cropTitle")} open={open && Boolean(dataUrl)} onClose={onClose} size="panel" bodyClassName="flex flex-col">
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <div
                     ref={viewport.viewportRef}
                     {...viewport.panHandlers}
-                    className={`relative h-[min(62vh,620px)] min-h-[340px] rounded-lg bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
+                    className={`relative min-h-[260px] flex-1 rounded-lg bg-black/5 ${viewport.scrollClassName} ${viewport.isPanning ? "cursor-grabbing" : viewport.spacePressed ? "cursor-grab" : ""}`}
                 >
                     <div className="relative" style={viewport.contentStyle}>
                         <div ref={boxRef} className="absolute isolate overflow-hidden rounded-lg bg-black select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
