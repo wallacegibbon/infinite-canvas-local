@@ -908,3 +908,40 @@ Five more were implemented but never exercised (`Space.direction`, `Field.htmlFo
 `types/canvas-plugin.ts`, which is the **published plugin contract** mirrored by
 `plugins/canvas/sdk/src/types.ts` — plugin authors import them, so "unused in this repo" means the
 opposite of dead. The rest are candidates for a later pass, one at a time, with a browser.
+
+---
+
+## 36. One HTTP layer, replacing axios and three copies of the error reader
+
+**Decision** `services/api/http.ts` owns the transport. `httpJson` / `httpBlob` / `httpVoid` wrap
+`fetch`; `readApiErrorMessage` and `apiErrorMessage` own the failure-to-sentence mapping. The four
+service files that used axios now call these, and their three copies of
+`readApiErrorMessage` / `readAxiosError` / `statusMessage` are gone.
+
+**Why it was not necessary** Nothing used a capability only axios has. The one thing that would
+have justified it — `onUploadProgress`, which `fetch` cannot do — appears nowhere. No interceptors
+beyond the one below, no `CancelToken` (the app already passes `AbortSignal`), no transform
+pipeline. Meanwhile the codebase was already split: 32 axios calls in four files against 17 `fetch`
+calls elsewhere, including SSE streaming and blob downloads.
+
+**The part that had to be carried over, not dropped** `image.ts` registered an axios response
+interceptor that called `noteGatewayError` for requests to the local gateway. That is what flips the
+shared "reconnecting" banner instead of raising one toast per node when the gateway restarts. It now
+lives in `http.ts`'s `send()`: any network failure reports its URL, and `noteGatewayError` itself is
+selective about which URLs and which errors count. A test pins it. This is the second time in this
+migration that the risk was a behaviour hiding in library-specific plumbing rather than in our code
+(see #27's missing JSX brace, #33's `<form>`).
+
+**Two behaviours improved** A timeout is now distinguishable from a cancel: `fetch` is aborted with a
+`TimeoutError` reason, so the image service keeps its `imageTimeout` wording instead of the axios
+path's `ECONNABORTED` special case in one file only. And a non-2xx that a caller expected to be a
+blob is still read as text, where axios produced an unreadable `Blob`.
+
+**Verification** 28 tests in `tests/api-http.test.ts` pin every branch of the mapping — cancel,
+timeout, API-supplied message, each status, the fallback, HTML error pages, and the gateway report —
+because a browser can demonstrate the result but cannot enumerate the branches.
+
+**Result** vendor chunk 556.7 → 514.4 kB (≈16 kB gzip), runtime dependencies 19 → 17.
+
+**Where** `services/api/http.ts`, `services/api/{image,video,audio,skin-unlocks}.ts`,
+`tests/api-http.test.ts`.

@@ -1,5 +1,3 @@
-import axios from "axios";
-
 import i18n from "@/i18n";
 import { LOCAL_GATEWAY_BASE_URL, isLocalGatewayUrl } from "@/constant/app-mode";
 import { buildApiUrl, channelModelOf, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
@@ -8,17 +6,9 @@ import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import { imageSizePresets } from "@/lib/media-size";
+import { apiErrorMessage, httpJson } from "@/services/api/http";
 import { publishStepProgress } from "@/services/api/step-progress";
-import { noteGatewayError } from "@/services/api/gateway-status";
 import type { ReferenceImage } from "@/types/image";
-
-// While the local gateway is down, errors are folded into the shared reconnect notice instead of one toast per node.
-axios.interceptors.response.use(undefined, (error) => {
-    const url = String(error?.config?.url || "");
-    const base = String(error?.config?.baseURL || "");
-    if ((url && isLocalGatewayUrl(url)) || (base && isLocalGatewayUrl(base))) noteGatewayError(error, url || base);
-    return Promise.reject(error);
-});
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
@@ -134,10 +124,10 @@ export function attachLocalProgress(config: AiConfig, requestId: string, signal?
     const tick = async () => {
         if (stopped) return;
         try {
-            const response = await axios.get<{ step?: number; total?: number }>(`${root}/api/progress/${encodeURIComponent(requestId)}`, { timeout: 3000 });
+            const progress = await httpJson<{ step?: number; total?: number }>(`${root}/api/progress/${encodeURIComponent(requestId)}`, { timeout: 3000 });
             if (stopped) return;
-            const total = Math.floor(Number(response.data?.total) || 0);
-            const step = Math.floor(Number(response.data?.step) || 0);
+            const total = Math.floor(Number(progress?.total) || 0);
+            const step = Math.floor(Number(progress?.step) || 0);
             if (total > 0) publishStepProgress(signal, { step: Math.min(total, Math.max(0, step)), total, requestId });
         } catch {
             // Progress is best-effort and must never fail the generation itself.
@@ -289,57 +279,6 @@ function parseImagePayload(payload: ImageApiResponse) {
     }
 
     return images;
-}
-
-function readApiErrorMessage(value: unknown): string {
-    if (!value) return "";
-    if (typeof value === "string") {
-        // The value may be serialized JSON, such as error.message, or a plain-text error.
-        try {
-            const parsed = JSON.parse(value);
-            const inner = readApiErrorMessage(parsed) || value;
-            // Treat an empty parsed object such as "{}" as having no useful message.
-            if (inner === value && typeof parsed === "object" && Object.keys(parsed).length === 0) return "";
-            return inner;
-        } catch {
-            // Detect HTML error pages.
-            if (/^\s*<(!doctype\s+html|html[\s>])/i.test(value)) return apiText("htmlError", { preview: `${value.slice(0, 80)}...` });
-            return value;
-        }
-    }
-    if (typeof value !== "object") return "";
-    const payload = value as { msg?: unknown; message?: unknown; error?: unknown; detail?: unknown };
-    // error may be a string or an object containing a message.
-    const errorMsg =
-        typeof payload.error === "string"
-            ? payload.error
-            : (payload.error as { message?: unknown })?.message;
-    return (
-        readApiErrorMessage(payload.msg) ||
-        readApiErrorMessage(payload.message) ||
-        readApiErrorMessage(errorMsg) ||
-        readApiErrorMessage(payload.detail) ||
-        ""
-    );
-}
-
-function readAxiosError(error: unknown, fallback: string) {
-    if (axios.isCancel(error)) return apiText("requestCanceled");
-    if (axios.isAxiosError(error)) {
-        if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") return apiText("imageTimeout");
-        if (!error.response && error.code === "ERR_NETWORK") return apiText("requestFailed");
-        const responseData = error.response?.data;
-        // Prefer the API error from the response body.
-        const apiMsg = readApiErrorMessage(responseData);
-        if (apiMsg) return apiMsg;
-        // Infer the error from the HTTP status when the response body has no usable message.
-        const statusMsg = readStatusError(error.response?.status, fallback);
-        if (statusMsg) return statusMsg;
-        // Fall back to Axios's own error message.
-        return error.message || fallback;
-    }
-    if (error instanceof DOMException && error.name === "AbortError") return apiText("requestCanceled");
-    return error instanceof Error ? readApiErrorMessage(error.message) || error.message : fallback;
 }
 
 function readStatusError(status: number | undefined, fallback: string) {
@@ -685,15 +624,17 @@ async function requestGeminiImagesOnce(config: AiConfig, prompt: string, referen
     for (const image of references) {
         parts.push(toGeminiImagePart(await imageToDataUrl(image)));
     }
-    const response = await axios.post<GeminiPayload>(
-        geminiApiUrl(config, "generateContent"),
-        {
+    const payload = await httpJson<GeminiPayload>(geminiApiUrl(config, "generateContent"), {
+        method: "POST",
+        headers: geminiHeaders(config),
+        body: JSON.stringify({
             ...toGeminiBody(config, [{ role: "user", content: prompt }], { generationConfig: { responseModalities: ["TEXT", "IMAGE"], ...resolveGeminiImageConfig(config) } }),
             contents: [{ role: "user", parts }],
-        },
-        { headers: geminiHeaders(config), signal: options?.signal, timeout: IMAGE_REQUEST_TIMEOUT_MS },
-    );
-    return parseGeminiImagePayload(response.data);
+        }),
+        signal: options?.signal,
+        timeout: IMAGE_REQUEST_TIMEOUT_MS,
+    });
+    return parseGeminiImagePayload(payload);
 }
 
 function parseGeminiImagePayload(payload: GeminiPayload) {
@@ -719,7 +660,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
         try {
             return await requestGeminiImages(requestConfig, prompt, [], n, options);
         } catch (error) {
-            throw new Error(readAxiosError(error, apiText("requestFailed")));
+            throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
         }
     }
     const requestSize = resolveRequestSize(config.size);
@@ -734,9 +675,9 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     const detachCancel = attachLocalCancel(requestConfig, requestId, options?.signal);
     const detachProgress = attachLocalProgress(requestConfig, requestId, options?.signal);
     try {
-        const response = await axios.post<ImageApiResponse>(
-            aiApiUrl(requestConfig, "/images/generations"),
-            {
+        const payload = await httpJson<ImageApiResponse>(aiApiUrl(requestConfig, "/images/generations"), {
+            method: "POST",
+            body: JSON.stringify({
                 model: requestConfig.model,
                 prompt: withSystemPrompt(requestConfig, prompt),
                 n,
@@ -747,17 +688,15 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 // gpt-image models reject response_format; they always return b64.
                 ...(/gpt-image/.test(requestConfig.model) ? {} : { response_format: "b64_json" }),
                 output_format: IMAGE_OUTPUT_FORMAT,
-            },
-            {
-                headers: { ...aiHeaders(requestConfig, "application/json"), ...(detachCancel ? { "X-Request-Id": requestId } : {}) },
-                signal: options?.signal,
-                timeout: IMAGE_REQUEST_TIMEOUT_MS,
-            },
-        );
-        const images = await parseImagePayload(response.data);
+            }),
+            headers: { ...aiHeaders(requestConfig, "application/json"), ...(detachCancel ? { "X-Request-Id": requestId } : {}) },
+            signal: options?.signal,
+            timeout: IMAGE_REQUEST_TIMEOUT_MS,
+        });
+        const images = await parseImagePayload(payload);
         return images;
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
     } finally {
         detachCancel?.();
         detachProgress?.();
@@ -772,7 +711,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         try {
             return await requestGeminiImages(requestConfig, requestPrompt, references, n, options);
         } catch (error) {
-            throw new Error(readAxiosError(error, apiText("requestFailed")));
+            throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
         }
     }
 
@@ -817,15 +756,17 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     const detachCancel = attachLocalCancel(requestConfig, requestId, options?.signal);
     const detachProgress = attachLocalProgress(requestConfig, requestId, options?.signal);
     try {
-        const response = await axios.post<ImageApiResponse>(aiApiUrl(requestConfig, "/images/edits"), formData, {
+        const payload = await httpJson<ImageApiResponse>(aiApiUrl(requestConfig, "/images/edits"), {
+            method: "POST",
             headers: { ...aiHeaders(requestConfig), ...(detachCancel ? { "X-Request-Id": requestId } : {}) },
+            body: formData,
             signal: options?.signal,
             timeout: IMAGE_REQUEST_TIMEOUT_MS,
         });
-        const images = await parseImagePayload(response.data);
+        const images = await parseImagePayload(payload);
         return images;
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
     } finally {
         detachCancel?.();
         detachProgress?.();
@@ -864,14 +805,16 @@ export async function requestImageAngle(
     const detachCancel = attachLocalCancel(requestConfig, requestId, options?.signal);
     const detachProgress = attachLocalProgress(requestConfig, requestId, options?.signal);
     try {
-        const response = await axios.post<ImageApiResponse>(aiApiUrl(requestConfig, "/images/edits"), formData, {
+        const payload = await httpJson<ImageApiResponse>(aiApiUrl(requestConfig, "/images/edits"), {
+            method: "POST",
             headers: { ...aiHeaders(requestConfig), ...(detachCancel ? { "X-Request-Id": requestId } : {}) },
+            body: formData,
             signal: options?.signal,
             timeout: IMAGE_REQUEST_TIMEOUT_MS,
         });
-        return await parseImagePayload(response.data);
+        return await parseImagePayload(payload);
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
     } finally {
         detachCancel?.();
         detachProgress?.();
@@ -902,15 +845,17 @@ export async function requestPromptOptimize(
     const files = await Promise.all(images.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file, index) => formData.append(index === 0 ? "image" : `image${index + 1}`, file));
     try {
-        const response = await axios.post<PromptOptimizeResult>(`${root}/v1/prompts/optimize`, formData, {
+        const payload = await httpJson<PromptOptimizeResult>(`${root}/v1/prompts/optimize`, {
+            method: "POST",
             headers: aiHeaders(requestConfig),
+            body: formData,
             signal: options?.signal,
             timeout: 240000,
         });
-        if (!response.data?.prompt) throw new Error(apiText("promptOptimizeEmpty"));
-        return response.data;
+        if (!payload?.prompt) throw new Error(apiText("promptOptimizeEmpty"));
+        return payload;
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
     }
 }
 
@@ -939,15 +884,17 @@ export async function requestImagePromptOptimize(
         files.forEach((file, index) => formData.append(index === 0 ? "image" : `image${index + 1}`, file));
     }
     try {
-        const response = await axios.post<ImagePromptOptimizeResult>(`${root}/v1/prompts/optimize-image`, formData, {
+        const payload = await httpJson<ImagePromptOptimizeResult>(`${root}/v1/prompts/optimize-image`, {
+            method: "POST",
             headers: aiHeaders(requestConfig),
+            body: formData,
             signal: options?.signal,
             timeout: 240000,
         });
-        if (!response.data?.prompt) throw new Error(apiText("promptOptimizeEmpty"));
-        return response.data;
+        if (!payload?.prompt) throw new Error(apiText("promptOptimizeEmpty"));
+        return payload;
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
     }
 }
 
@@ -970,15 +917,17 @@ export async function requestImageCaption(config: AiConfig, params: { images: Re
     const file = await dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) });
     formData.append("image", file);
     try {
-        const response = await axios.post<ImageCaptionResult>(`${root}/v1/prompts/caption`, formData, {
+        const payload = await httpJson<ImageCaptionResult>(`${root}/v1/prompts/caption`, {
+            method: "POST",
             headers: aiHeaders(requestConfig),
+            body: formData,
             signal: options?.signal,
             timeout: 240000,
         });
-        if (!response.data?.prompt) throw new Error(apiText("promptOptimizeEmpty"));
-        return response.data;
+        if (!payload?.prompt) throw new Error(apiText("promptOptimizeEmpty"));
+        return payload;
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
     }
 }
 
@@ -1009,11 +958,11 @@ export type UpscaleOptions = { workflowId: string; params?: Record<string, unkno
 export async function requestUpscaleWorkflows(config: AiConfig): Promise<UpscaleWorkflow[]> {
     const root = localGatewayRoot(config.baseUrl);
     if (!root) return [];
-    const response = await axios.get<{ workflows?: UpscaleWorkflow[] }>(`${root}/api/upscale/workflows`, {
+    const payload = await httpJson<{ workflows?: UpscaleWorkflow[] }>(`${root}/api/upscale/workflows`, {
         headers: aiHeaders(config),
         timeout: 8000,
     });
-    return Array.isArray(response.data?.workflows) ? response.data.workflows : [];
+    return Array.isArray(payload?.workflows) ? payload.workflows : [];
 }
 
 export async function requestUpscale(config: AiConfig, image: ReferenceImage, options: UpscaleOptions) {
@@ -1029,14 +978,16 @@ export async function requestUpscale(config: AiConfig, image: ReferenceImage, op
     const detachCancel = attachLocalCancel(requestConfig, requestId, options.signal);
     const detachProgress = attachLocalProgress(requestConfig, requestId, options.signal);
     try {
-        const response = await axios.post<ImageApiResponse>(`${root}/v1/images/upscale`, formData, {
+        const payload = await httpJson<ImageApiResponse>(`${root}/v1/images/upscale`, {
+            method: "POST",
             headers: { ...aiHeaders(requestConfig), ...(detachCancel ? { "X-Request-Id": requestId } : {}) },
+            body: formData,
             signal: options.signal,
             timeout: IMAGE_REQUEST_TIMEOUT_MS,
         });
-        return await parseImagePayload(response.data);
+        return await parseImagePayload(payload);
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
     } finally {
         detachCancel?.();
         detachProgress?.();
@@ -1058,31 +1009,31 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
         if (answer === apiText("noContent")) onDelta(answer);
         return answer;
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
     }
 }
 
 export async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKey" | "apiFormat">) {
     try {
         if (config.apiFormat === "gemini") {
-            const response = await axios.get<GeminiPayload>(geminiApiUrl({ ...defaultGeminiConfig, ...config }), { headers: geminiHeaders({ ...defaultGeminiConfig, ...config }) });
-            validateGeminiPayload(response.data);
-            return (response.data.models || [])
+            const payload = await httpJson<GeminiPayload>(geminiApiUrl({ ...defaultGeminiConfig, ...config }), { headers: geminiHeaders({ ...defaultGeminiConfig, ...config }) });
+            validateGeminiPayload(payload);
+            return (payload.models || [])
                 .map((model) => model.name?.replace(/^models\//, ""))
                 .filter((id): id is string => Boolean(id))
                 .sort((a, b) => a.localeCompare(b));
         }
-        const response = await axios.get<{ data?: Array<{ id?: string }>; error?: { message?: string } }>(buildApiUrl(config.baseUrl, "/models"), {
+        const payload = await httpJson<{ data?: Array<{ id?: string }>; error?: { message?: string } }>(buildApiUrl(config.baseUrl, "/models"), {
             headers: {
                 Authorization: `Bearer ${config.apiKey}`,
             },
         });
-        return (response.data.data || [])
+        return (payload.data || [])
             .map((model) => model.id)
             .filter((id): id is string => Boolean(id))
             .sort((a, b) => a.localeCompare(b));
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("modelReadFailed")));
+        throw new Error(apiErrorMessage(error, apiText("modelReadFailed"), "imageTimeout"));
     }
 }
 
