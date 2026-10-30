@@ -1,6 +1,5 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { Check, ChevronRight, Download, Eye, FileText, Image as ImageIcon, LayoutGrid, ListChecks, Music2, Plus, Rows3, Search, Settings2, Square, Trash2, Type, Video } from "lucide-react";
-import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 
 import { confirm } from "@/components/kit/confirm";
@@ -22,8 +21,18 @@ import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 
 import type { InsertAssetPayload } from "./asset-picker-modal";
 
-const PANEL_MOTION_SECONDS = CANVAS_SIDE_PANEL_MOTION_MS / 1000;
-const PANEL_EASE = [0.22, 1, 0.36, 1] as const;
+/**
+ * The panel's open/close animation was `motion` (framer-motion); it is a CSS transition now.
+ *
+ * What it animates and why it is still a transition on `width`: this panel is a flex sibling
+ * that pushes the canvas, so the canvas has to reflow as the panel grows and shrinks. That
+ * means a layout property either way — motion was writing `style.width` per frame from JS,
+ * and CSS transitions `width` on the compositor-driven animation timeline instead. Same
+ * layout cost, one fewer dependency; `transform` would be cheaper but the canvas would not
+ * follow along. During a resize drag the duration is 0, exactly as before.
+ */
+const PANEL_TRANSITION_MS = CANVAS_SIDE_PANEL_MOTION_MS;
+const PANEL_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 type PanelTab = "canvas" | "assets" | "prompts";
 
@@ -64,6 +73,25 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, onFocusNode, onPreview
     const panelClosing = useCanvasSidePanelStore((state) => state.panelClosing);
     const setWidth = useCanvasSidePanelStore((state) => state.setWidth);
     const [resizing, setResizing] = useState(false);
+    // CSS transitions do not run on an element's first paint, so a freshly mounted panel would
+    // appear at full width. It renders at 0 for one frame, then flips — that two-pass is what
+    // `motion`'s `initial={{ width: 0 }}` was doing for us.
+    const [entered, setEntered] = useState(false);
+    useEffect(() => {
+        if (!panelMounted || !panelOpen) {
+            setEntered(false);
+            return;
+        }
+        // Two frames: one for the 0-width style to be committed, one to change away from it.
+        let second = 0;
+        const first = requestAnimationFrame(() => {
+            second = requestAnimationFrame(() => setEntered(true));
+        });
+        return () => {
+            cancelAnimationFrame(first);
+            if (second) cancelAnimationFrame(second);
+        };
+    }, [panelMounted, panelOpen]);
 
     const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
         event.preventDefault();
@@ -88,19 +116,30 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, onFocusNode, onPreview
     if (!panelMounted) return null;
 
     return (
-        <motion.div
+        <div
             className="relative z-[60] flex h-full shrink-0"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: panelOpen ? width + 1 : 0, opacity: panelOpen ? 1 : 0 }}
-            transition={{ duration: resizing ? 0 : PANEL_MOTION_SECONDS, ease: PANEL_EASE }}
-            style={{ overflow: "clip", pointerEvents: panelClosing ? "none" : undefined }}
+            style={{
+                width: panelOpen && entered ? width + 1 : 0,
+                opacity: panelOpen && entered ? 1 : 0,
+                overflow: "clip",
+                pointerEvents: panelClosing ? "none" : undefined,
+                transitionProperty: "width, opacity",
+                transitionDuration: resizing ? "0ms" : `${PANEL_TRANSITION_MS}ms`,
+                transitionTimingFunction: PANEL_EASE,
+            }}
         >
-            <motion.aside
+            <aside
                 className="relative flex h-full shrink-0 flex-col overflow-hidden border-r"
-                initial={{ x: -48 }}
-                animate={{ x: panelClosing ? -28 : 0 }}
-                transition={{ duration: resizing ? 0 : PANEL_MOTION_SECONDS, ease: PANEL_EASE }}
-                style={{ width, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+                style={{
+                    width,
+                    background: theme.toolbar.panel,
+                    borderColor: theme.toolbar.border,
+                    color: theme.node.text,
+                    transform: `translateX(${!entered ? -48 : panelClosing ? -28 : 0}px)`,
+                    transitionProperty: "transform",
+                    transitionDuration: resizing ? "0ms" : `${PANEL_TRANSITION_MS}ms`,
+                    transitionTimingFunction: PANEL_EASE,
+                }}
                 data-canvas-no-zoom
             >
                 <div className="flex items-center gap-5 px-4 pt-3.5">
@@ -115,8 +154,8 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, onFocusNode, onPreview
                     ) : null}
                 </div>
                 <button type="button" className="absolute inset-y-0 right-0 z-40 w-4 translate-x-1/2 cursor-col-resize" onPointerDown={startResize} aria-label={t("canvas.sidePanel.resize")} />
-            </motion.aside>
-        </motion.div>
+            </aside>
+        </div>
     );
 }
 
@@ -124,7 +163,10 @@ function TabButton({ label, active, theme, onClick }: { label: string; active: b
     return (
         <button type="button" onClick={onClick} className="relative pb-1.5 text-sm font-semibold transition-opacity" style={{ color: theme.node.text, opacity: active ? 1 : 0.45 }}>
             {label}
-            {active ? <motion.span layoutId="sidePanelTabIndicator" className="absolute inset-x-0 -bottom-px h-0.5 rounded-full" style={{ background: theme.toolbar.activeText }} transition={{ type: "spring", stiffness: 500, damping: 34 }} /> : null}
+            {/* Was motion's `layoutId` shared-element spring. CSS has no equivalent, so each tab owns
+                its own underline and fades instead of sliding — the only visual difference from
+                before, and the reason the dependency could go. */}
+            <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full transition-opacity duration-200" style={{ background: theme.toolbar.activeText, opacity: active ? 1 : 0 }} />
         </button>
     );
 }
