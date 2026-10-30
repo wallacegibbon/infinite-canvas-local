@@ -1,12 +1,13 @@
 import { Copy, Download, PencilLine, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Drawer, Form } from "antd";
+import { Form } from "antd";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
 import { Card } from "@/components/kit/card";
 import { Dialog } from "@/components/kit/dialog";
+import { Drawer } from "@/components/kit/drawer";
 import { Empty, Space } from "@/components/kit/display";
 import { Input } from "@/components/kit/input";
 import { Image } from "@/components/kit/media";

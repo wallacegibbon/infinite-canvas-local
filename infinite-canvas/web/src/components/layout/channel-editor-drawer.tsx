@@ -1,10 +1,10 @@
-import { Drawer } from "antd";
 import { ListPlus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
 import { Space } from "@/components/kit/display";
+import { Drawer } from "@/components/kit/drawer";
 import { Input } from "@/components/kit/input";
 import { Segmented } from "@/components/kit/segmented";
 import { guessCapability, normalizeChannelModels, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
@@ -51,7 +51,7 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
             width={640}
             title={t("config.channelEditor.title")}
             onClose={onClose}
-            styles={{ body: { paddingTop: 16 } }}
+            bodyStyle={{ paddingTop: 16 }}
             extra={
                 <Space>
                     <Button onClick={onClose}>{t("common.cancel")}</Button>
