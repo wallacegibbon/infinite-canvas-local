@@ -4,8 +4,8 @@ import UserLayout from "@/layouts/user-layout";
 import AssetsPage from "@/pages/assets";
 import CanvasPage from "@/pages/canvas";
 import CanvasProjectPage from "@/pages/canvas/project";
+import { CanvasEntry } from "@/pages/canvas/entry";
 import ConfigPage from "@/pages/config";
-import HomePage from "@/pages/home";
 import NotFound from "@/pages/not-found";
 
 export const router = createBrowserRouter([
@@ -16,7 +16,7 @@ export const router = createBrowserRouter([
             </UserLayout>
         ),
         children: [
-            { path: "/", element: <HomePage /> },
+            { path: "/", element: <CanvasEntry /> },
             { path: "/assets", element: <AssetsPage /> },
             { path: "/canvas", element: <CanvasPage /> },
             { path: "/canvas/:id", element: <CanvasProjectPage /> },

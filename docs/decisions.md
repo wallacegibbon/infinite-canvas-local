@@ -1059,3 +1059,42 @@ dictionary's shape for its types. Both are visible where they are written down.
 
 **Where** `components/layout/resource-center-panel.tsx`, `components/layout/resource-setup-gate.tsx`,
 `src/i18n/locales/{zh-CN,en-US}.ts` (`resources.*`).
+
+---
+
+## 40. There is no landing page; `/` is a redirect to a canvas
+
+**Decision** `pages/home` is deleted. `/` renders `CanvasEntry`, which resolves to a canvas
+address and replaces the URL with it. The app has exactly one kind of screen — a canvas —
+and no page that exists only to be looked at on the way in.
+
+The resolution order is deliberate:
+
+1. the canvas you were **last inside**, from a stored `lastProjectId`;
+2. otherwise the most recently modified one;
+3. otherwise a new canvas.
+
+**Why not "most recently modified" for step 1** Opening a canvas to read it does not touch
+`updatedAt`. Look at canvas A for ten minutes, edit B, close the browser: `updatedAt` says B
+but you left A. The remembered id is the only thing that actually answers "where was I".
+
+**Why `replace`, and why it matters more than it looks** Without it the history keeps `/` and
+every Back press bounces through the redirect again. This single attribute is the difference
+between "the URL is the canvas" and a browser that fights you.
+
+**What it costs** The app has no brand surface left: the toolbar title shows the canvas name,
+and `无界工作台` now appears only in the browser tab, appended to the canvas name. That was
+the trade the request asked for — the tool is the work, not a front door — but it should be
+named rather than discovered.
+
+**Two bugs this surfaced, both pre-existing** The dictionary never had `assets.kinds.audio`,
+which the built-in Audio node asks for by name, and it never had `agent.composer.mentions.*`,
+which two error paths in `canvas-resource-references.ts` still threw. Both printed raw keys
+to the user. The node title was wrong since audio nodes existed; the error messages only fire
+when a reference image cannot be read, which is why neither was noticed. They were found by a
+check that compares every literal `t("…")` against the flattened dictionary — the inverse of
+the dead-key pass in #38, and worth running whenever keys move.
+
+**Where** `src/pages/canvas/entry.tsx`, `src/router.tsx`, `stores/canvas/use-canvas-store.ts`
+(`lastProjectId`), `components/canvas/canvas-top-bar.tsx` (the canvas switcher this made
+obvious: switching used to mean leaving the canvas for a 625-line list page).

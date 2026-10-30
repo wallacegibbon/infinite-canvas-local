@@ -208,6 +208,7 @@ function InfiniteCanvasPage() {
     const hydrated = useCanvasStore((state) => state.hydrated);
     const createProject = useCanvasStore((state) => state.createProject);
     const openProject = useCanvasStore((state) => state.openProject);
+    const setLastProjectId = useCanvasStore((state) => state.setLastProjectId);
     const updateProject = useCanvasStore((state) => state.updateProject);
     const renameProject = useCanvasStore((state) => state.renameProject);
     const deleteProjects = useCanvasStore((state) => state.deleteProjects);
@@ -518,6 +519,8 @@ function InfiniteCanvasPage() {
             navigate("/canvas", { replace: true });
             return;
         }
+        // Remember where the browser was, so `/` can send it back here.
+        setLastProjectId(projectId);
 
         const restore = async () => {
             const restoredNodes = await hydrateCanvasImages(clearStaleNodeErrors(resetInterruptedGeneration(project.nodes)));
@@ -546,7 +549,7 @@ function InfiniteCanvasPage() {
             setProjectLoaded(true);
         };
         void restore();
-    }, [hydrated, navigate, openProject, projectId]);
+    }, [hydrated, navigate, openProject, projectId, setLastProjectId]);
 
     useEffect(() => {
         if (!projectLoaded) return;
@@ -2678,6 +2681,16 @@ function InfiniteCanvasPage() {
         [createAudioFileNode, createImageFileNode, createVideoFileNode, screenToCanvas],
     );
 
+    // The tab tells you which canvas you are in. With no landing page, the browser tab is
+    // the map — and multi-canvas work makes "which one is this?" a real question.
+    // Restored on unmount so the list pages keep the plain app title.
+    useEffect(() => {
+        document.title = currentProject?.title ? `${currentProject.title} — ${t("meta.title")}` : t("meta.title");
+        return () => {
+            document.title = t("meta.title");
+        };
+    }, [currentProject?.title, t]);
+
     const startTitleEditing = useCallback(() => {
         setTitleDraft(currentProject?.title || t("canvas.projectPage.untitledCanvas"));
         setTitleEditing(true);
@@ -3605,7 +3618,7 @@ function InfiniteCanvasPage() {
                     onCancelTitleEditing={() => setTitleEditing(false)}
                     canUndo={historyState.canUndo}
                     canRedo={historyState.canRedo}
-                    onHome={() => navigate("/")}
+                    onSwitchProject={(id) => navigate(`/canvas/${id}`)}
                     onProjects={() => navigate("/canvas")}
                     onCreateProject={createAndOpenProject}
                     onDeleteProject={deleteCurrentProject}

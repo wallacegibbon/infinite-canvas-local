@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Download, Home, Images, Menu, PanelLeftClose, PanelLeftOpen, Plus, Redo2, Trash2, Undo2, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, Download, Images, Menu, PanelLeftClose, PanelLeftOpen, Plus, Pencil, Redo2, Trash2, Undo2, Upload } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
 
@@ -9,6 +9,7 @@ import { Tooltip } from "@/components/kit/tooltip";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { CanvasSystemStatus } from "@/components/canvas/canvas-system-status";
 import { canvasThemes } from "@/lib/canvas-theme";
+import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useCanvasSidePanelStore } from "@/stores/use-canvas-side-panel-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 
@@ -22,7 +23,7 @@ export function CanvasTopBar({
     onCancelTitleEditing,
     canUndo,
     canRedo,
-    onHome,
+    onSwitchProject,
     onProjects,
     onCreateProject,
     onDeleteProject,
@@ -41,7 +42,7 @@ export function CanvasTopBar({
     onCancelTitleEditing: () => void;
     canUndo: boolean;
     canRedo: boolean;
-    onHome: () => void;
+    onSwitchProject: (id: string) => void;
     onProjects: () => void;
     onCreateProject: () => void;
     onDeleteProject: () => void;
@@ -58,6 +59,14 @@ export function CanvasTopBar({
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const sidePanelOpen = useCanvasSidePanelStore((state) => state.panelOpen);
     const toggleSidePanel = useCanvasSidePanelStore((state) => state.togglePanel);
+    const projects = useCanvasStore((state) => state.projects);
+    // Current canvas first, the rest most-recent-first: switching is a "where am I" question,
+    // so the answer you are most likely looking for should not be buried.
+    const orderedProjects = useMemo(() => {
+        const current = projects.find((project) => project.title === title);
+        const rest = projects.filter((project) => project !== current).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        return current ? [current, ...rest] : rest;
+    }, [projects, title]);
 
     useEffect(() => {
         if (!isTitleEditing) return;
@@ -86,7 +95,6 @@ export function CanvasTopBar({
                     <Dropdown
                         menu={{
                             items: [
-                                { key: "home", icon: <Home className="size-4" />, label: t("canvas.home"), onClick: onHome },
                                 { key: "projects", icon: <Images className="size-4" />, label: t("canvas.projects"), onClick: onProjects },
                                 { type: "divider" },
                                 { key: "new", icon: <Plus className="size-4" />, label: t("canvas.create"), onClick: onCreateProject },
@@ -120,14 +128,38 @@ export function CanvasTopBar({
                                 style={{ color: theme.node.text }}
                             />
                         ) : (
-                            <button
-                                type="button"
-                                className="max-w-[280px] truncate border-b border-dashed border-transparent text-left text-lg font-semibold tracking-normal transition hover:border-current"
-                                onDoubleClick={onStartTitleEditing}
-                                title={t("canvas.renameHint")}
+                            <Dropdown
+                                className="max-h-[60vh] overflow-y-auto"
+                                menu={{
+                                    items: [
+                                        ...orderedProjects.map((project) => ({
+                                            key: project.id,
+                                            icon: project.title === title ? <Check className="size-4" /> : undefined,
+                                            label: (
+                                                <span className="flex min-w-0 items-center justify-between gap-4">
+                                                    <span className="max-w-[200px] truncate">{project.title}</span>
+                                                    <span className="shrink-0 text-xs opacity-45">{t("canvas.node.nodeCount", { count: project.nodes.length })}</span>
+                                                </span>
+                                            ),
+                                            onClick: () => onSwitchProject(project.id),
+                                        })),
+                                        { type: "divider" as const },
+                                        { key: "rename", icon: <Pencil className="size-4" />, label: t("canvas.project.rename"), onClick: onStartTitleEditing },
+                                        { key: "new", icon: <Plus className="size-4" />, label: t("canvas.create"), onClick: onCreateProject },
+                                        { key: "all", icon: <Images className="size-4" />, label: t("canvas.projects"), onClick: onProjects },
+                                    ],
+                                }}
                             >
-                                {title}
-                            </button>
+                                <button
+                                    type="button"
+                                    className="flex max-w-[280px] items-center gap-1.5 rounded-md border-b border-dashed border-transparent text-left text-lg font-semibold tracking-normal transition hover:border-current"
+                                    title={t("canvas.switchProject")}
+                                    aria-label={t("canvas.switchProject")}
+                                >
+                                    <span className="truncate">{title}</span>
+                                    <ChevronDown className="size-4 shrink-0 opacity-50" />
+                                </button>
+                            </Dropdown>
                         )}
                     </div>
                 </div>

@@ -58,7 +58,7 @@ export default {
         importFailed: "Import failed. Select a valid asset package.",
         deleted: "Asset deleted",
         packageName: "my-assets.zip",
-        kinds: { text: "Text", image: "Image", video: "Video" },
+        kinds: { text: "Text", image: "Image", video: "Video", audio: "Audio" },
         fields: {
             title: "Title",
             titleRequired: "Enter a title",
@@ -310,15 +310,14 @@ export default {
         emptyDescription: "Create a canvas to save its nodes, connections, and appearance independently.",
         collapsePanel: "Collapse panel",
         expandPanel: "Expand panel",
-        home: "Home",
         projects: "My Canvases",
         deleteCurrent: "Delete current canvas",
         importAsset: "Import asset",
         exportCurrent: "Export current canvas",
         undo: "Undo",
         redo: "Redo",
+        switchProject: "Switch canvas",
         openMenu: "Open canvas menu",
-        renameHint: "Double-click to rename the canvas",
         shortcuts: "Keyboard shortcuts",
         miniMapOpen: "Open minimap",
         miniMapClose: "Close minimap",
@@ -450,9 +449,6 @@ export default {
         shortcuts: "Keyboard shortcuts",
         lightTheme: "Switch to light theme",
         darkTheme: "Switch to dark theme"
-    },
-    home: {
-        start: "Get started"
     },
     config: {
         title: "Settings & Preferences",

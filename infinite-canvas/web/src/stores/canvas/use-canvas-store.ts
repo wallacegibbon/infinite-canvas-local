@@ -32,6 +32,11 @@ type CanvasStore = {
     deletedProjects: CanvasDeletedProject[];
     createProject: (title?: string) => string;
     importProject: (project: Partial<CanvasProject>) => string;
+    // The canvas the browser was last inside. `/` sends you back here rather than
+    // guessing from `updatedAt`: reading a canvas does not touch it, so the most
+    // recently *modified* one is not the one you left.
+    lastProjectId: string;
+    setLastProjectId: (id: string) => void;
     openProject: (id: string) => CanvasProject | null;
     renameProject: (id: string, title: string) => void;
     deleteProjects: (ids: string[]) => void;
@@ -41,7 +46,7 @@ type CanvasStore = {
 
 const initialViewport: ViewportTransform = { x: 0, y: 0, k: 1 };
 const CANVAS_STORE_KEY = "infinite-canvas:canvas_store";
-type PersistedCanvasState = Pick<CanvasStore, "projects" | "deletedProjects">;
+type PersistedCanvasState = Pick<CanvasStore, "projects" | "deletedProjects" | "lastProjectId">;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let queuedPersistState: PersistedCanvasState | null = null;
 
@@ -72,6 +77,7 @@ export const useCanvasStore = create<CanvasStore>()(
             hydrated: false,
             projects: [],
             deletedProjects: [],
+            lastProjectId: "",
             createProject: (title = i18n.t("canvas.project.untitled")) => {
                 const now = new Date().toISOString();
                 const id = nanoid();
@@ -109,6 +115,9 @@ export const useCanvasStore = create<CanvasStore>()(
                 set((state) => ({ projects: [project, ...state.projects] }));
                 return project.id;
             },
+            setLastProjectId: (id) => {
+                if (get().lastProjectId !== id) set({ lastProjectId: id });
+            },
             openProject: (id) => {
                 return get().projects.find((item) => item.id === id) || null;
             },
@@ -122,7 +131,8 @@ export const useCanvasStore = create<CanvasStore>()(
                     const removing = new Set(ids);
                     const projects = state.projects.filter((project) => !removing.has(project.id));
                     const deletedProjects = [...state.deletedProjects.filter((item) => !removing.has(item.id)), ...ids.map((id) => ({ id, deletedAt: now }))];
-                    return { projects, deletedProjects };
+                    const lastProjectId = removing.has(state.lastProjectId) ? "" : state.lastProjectId;
+                    return { projects, deletedProjects, lastProjectId };
                 }),
             replaceProjects: (projects, deletedProjects = []) => set({ projects, deletedProjects }),
             updateProject: (id, patch) =>
@@ -137,6 +147,7 @@ export const useCanvasStore = create<CanvasStore>()(
                 ({
                     projects: state.projects,
                     deletedProjects: state.deletedProjects,
+                    lastProjectId: state.lastProjectId,
                 }) as StorageValue<CanvasStore>["state"],
             onRehydrateStorage: () => () => {
                 useCanvasStore.setState({ hydrated: true });

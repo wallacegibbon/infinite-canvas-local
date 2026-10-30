@@ -85,7 +85,7 @@ export default {
         importFailed: "导入失败，请选择有效的资产压缩包",
         deleted: "资产已删除",
         packageName: "我的资产.zip",
-        kinds: { text: "文本", image: "图片", video: "视频" },
+        kinds: { text: "文本", image: "图片", video: "视频", audio: "音频" },
         fields: {
             title: "标题",
             titleRequired: "请输入标题",
@@ -337,15 +337,14 @@ export default {
         emptyDescription: "新建一个画布后，就可以独立保存节点、连线和画布外观。",
         collapsePanel: "收起面板",
         expandPanel: "展开面板",
-        home: "主页",
         projects: "我的画布",
         deleteCurrent: "删除当前画布",
         importAsset: "导入资产",
         exportCurrent: "导出当前画布",
         undo: "撤销",
         redo: "重做",
+        switchProject: "切换画布",
         openMenu: "打开画布菜单",
-        renameHint: "双击修改画布名称",
         shortcuts: "快捷键",
         miniMapOpen: "打开小地图",
         miniMapClose: "关闭小地图",
@@ -477,9 +476,6 @@ export default {
         shortcuts: "快捷键",
         lightTheme: "切换到浅色主题",
         darkTheme: "切换到深色主题"
-    },
-    home: {
-        start: "开始使用"
     },
     config: {
         title: "配置与用户偏好",
