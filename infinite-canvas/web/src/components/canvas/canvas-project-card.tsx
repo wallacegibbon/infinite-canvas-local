@@ -7,6 +7,7 @@ import { Button } from "@/components/kit/button";
 import { Input } from "@/components/kit/input";
 import { useCanvasStore, type CanvasProject } from "@/stores/canvas/use-canvas-store";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
+import { usePanelStore } from "@/stores/use-panel-store";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 
 export function CanvasProjectCard({ project }: { project: CanvasProject }) {
@@ -21,7 +22,7 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
     const stopEditing = useCanvasUiStore((state) => state.stopEditingProject);
     const toggleSelected = useCanvasUiStore((state) => state.toggleSelectedProjectId);
     const setDeleteIds = useCanvasUiStore((state) => state.setDeleteProjectIds);
-    const setManagerOpen = useCanvasUiStore((state) => state.setManagerOpen);
+    const setManagerOpen = usePanelStore((state) => state.setCanvasManagerOpen);
     const editing = editingId === project.id;
     const selected = selectedIds.includes(project.id);
     // No query passthrough any more: the manager is a panel, not a route, so there is no URL

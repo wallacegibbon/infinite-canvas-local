@@ -23,6 +23,7 @@ import { getMediaBlob } from "@/services/file-storage";
 import { getImageBlob, getImagePreviewRevision, subscribeImagePreviews, uploadImage } from "@/services/image-storage";
 import { cn } from "@/lib/utils";
 import { assetCoverUrl, useAssetStore, type Asset, type AssetKind, type ImageAsset } from "@/stores/use-asset-store";
+import { usePanelStore } from "@/stores/use-panel-store";
 import { exportAssets, readAssetPackage } from "./asset-transfer";
 
 type AssetFormValues = {
@@ -42,8 +43,22 @@ const EMPTY_ASSET_FORM: AssetFormValues = { kind: "text", title: "", coverUrl: "
 
 const kindOptions = ["all", "text", "image", "video"] as const;
 
-export default function AssetsPage() {
+/**
+ * The asset library, as a panel over the canvas.
+ *
+ * It used to be `/assets` — a 625-line page with its own header, search, pagination and
+ * three nested dialogs. None of that needed an address: an asset library is something you
+ * open, use, and close, and leaving the canvas to look at it was the cost of a route that
+ * bought nothing.
+ *
+ * The body is unchanged. The outer `<Dialog>` replaces the page's `<div>`/`<main>` shell,
+ * and the three inner dialogs are siblings of it rather than children, so radix sees
+ * independent roots instead of a nested focus trap.
+ */
+export function AssetsManagerDialog() {
     const { t } = useTranslation();
+    const open = usePanelStore((state) => state.assetsOpen);
+    const setOpen = usePanelStore((state) => state.setAssetsOpen);
     const copyText = useCopyText();
     const [values, setValues] = useState<AssetFormValues>(EMPTY_ASSET_FORM);
     const [errors, setErrors] = useState<Partial<Record<keyof AssetFormValues, string>>>({});
@@ -227,13 +242,10 @@ export default function AssetsPage() {
     };
 
     return (
-        <div className="flex h-full flex-col overflow-hidden bg-background text-stone-900 dark:text-stone-100">
-            <main className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] px-6 py-8 [background-size:16px_16px] dark:bg-[radial-gradient(rgba(245,245,244,.14)_1px,transparent_1px)]">
-                <div className="pb-8">
-                    <div className="mx-auto max-w-5xl text-center">
-                        <h1 className="text-4xl font-semibold tracking-tight text-stone-950 dark:text-stone-100">{t("assets.title")}</h1>
-                        <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">{t("assets.description")}</p>
-                    </div>
+        <>
+            <Dialog open={open} onClose={() => setOpen(false)} title={t("assets.title")} width={1100} bodyStyle={{ maxHeight: "76vh" }} bodyClassName="pr-1">
+                <div className="pb-4">
+                    <p className="text-sm text-stone-500 dark:text-stone-400">{t("assets.description")}</p>
 
                     <div className="mx-auto mt-8 w-full max-w-2xl">
                         <Input.Search
@@ -325,7 +337,7 @@ export default function AssetsPage() {
                         />
                     </div>
                 </div>
-            </main>
+            </Dialog>
 
             <Dialog
                 title={editingAsset ? t("assets.edit") : t("assets.add")}
@@ -466,7 +478,7 @@ export default function AssetsPage() {
             >
                 {t("assets.deleteConfirm", { name: deletingAsset?.title })}
             </Dialog>
-        </div>
+        </>
     );
 }
 

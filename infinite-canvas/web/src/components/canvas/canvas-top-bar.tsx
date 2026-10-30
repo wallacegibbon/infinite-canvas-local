@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Download, Images, Menu, PanelLeftClose, PanelLeftOpen, Plus, Pencil, Redo2, Trash2, Undo2, Upload } from "lucide-react";
+import { Check, ChevronDown, Download, Images, LayoutGrid, Menu, PanelLeftClose, PanelLeftOpen, Plus, Pencil, Redo2, Trash2, Undo2, Upload } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
 
@@ -10,7 +10,7 @@ import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { CanvasSystemStatus } from "@/components/canvas/canvas-system-status";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
-import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
+import { usePanelStore } from "@/stores/use-panel-store";
 import { useCanvasSidePanelStore } from "@/stores/use-canvas-side-panel-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 
@@ -59,8 +59,9 @@ export function CanvasTopBar({
     const sidePanelOpen = useCanvasSidePanelStore((state) => state.panelOpen);
     const toggleSidePanel = useCanvasSidePanelStore((state) => state.togglePanel);
     const projects = useCanvasStore((state) => state.projects);
-    // The list is a panel over the canvas now, not a route.
-    const openManager = useCanvasUiStore((state) => state.setManagerOpen);
+    // The list and the asset library are panels over the canvas, not routes.
+    const openManager = usePanelStore((state) => state.setCanvasManagerOpen);
+    const openAssets = usePanelStore((state) => state.setAssetsOpen);
     // Current canvas first, the rest most-recent-first: switching is a "where am I" question,
     // so the answer you are most likely looking for should not be buried.
     const orderedProjects = useMemo(() => {
@@ -96,7 +97,8 @@ export function CanvasTopBar({
                     <Dropdown
                         menu={{
                             items: [
-                                { key: "projects", icon: <Images className="size-4" />, label: t("canvas.projects"), onClick: () => openManager(true) },
+                                { key: "assets", icon: <Images className="size-4" />, label: t("navigation.assets"), onClick: () => openAssets(true) },
+                                { key: "projects", icon: <LayoutGrid className="size-4" />, label: t("canvas.projects"), onClick: () => openManager(true) },
                                 { type: "divider" },
                                 { key: "new", icon: <Plus className="size-4" />, label: t("canvas.create"), onClick: onCreateProject },
                                 { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: t("canvas.deleteCurrent"), onClick: onDeleteProject },

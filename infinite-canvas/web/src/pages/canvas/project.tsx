@@ -29,6 +29,7 @@ import { ActiveConnectionPath, ConnectionPath } from "@/components/canvas/canvas
 import { CanvasConfigComposer } from "@/components/canvas/canvas-config-composer";
 import { CanvasConfigNodePanel } from "@/components/canvas/canvas-config-node-panel";
 import { CanvasManagerDialog } from "@/components/canvas/canvas-manager-dialog";
+import { AssetsManagerDialog } from "@/components/assets/assets-manager-dialog";
 import { CanvasNodeContextMenu } from "@/components/canvas/canvas-context-menu";
 import type { CanvasImageAngleParams } from "@/components/canvas/canvas-node-angle-dialog";
 
@@ -3610,6 +3611,7 @@ function InfiniteCanvasPage() {
             <CanvasSidePanel nodes={nodes} selectedNodeIds={selectedNodeIds} onFocusNode={focusNode} onPreviewNode={setPreviewNodeId} onPreviewImage={handleSidebarPreviewImage} onHoverNode={handleSidebarHoverNode} onHoverImage={handleSidebarHoverImage} onInsertAsset={handleAssetInsert} />
             <section className="relative min-w-0 flex-1 overflow-hidden">
                 <CanvasManagerDialog />
+                <AssetsManagerDialog />
                 <CanvasTopBar
                     title={currentProject?.title || t("canvas.projectPage.untitledCanvas")}
                     titleDraft={titleDraft}

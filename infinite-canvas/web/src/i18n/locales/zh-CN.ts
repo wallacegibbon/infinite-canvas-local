@@ -459,17 +459,10 @@ export default {
         }
     },
     navigation: {
-        canvas: "我的画布",
-        image: "生图工作台",
-        video: "视频创作台",
-        prompts: "提示词库",
-        assets: "我的资产",
-        config: "配置"
+        assets: "我的资产"
     },
     topNav: {
-        openMenu: "打开导航菜单",
-        menu: "导航菜单",
-        navigation: "导航",
+        settings: "设置",
         plugins: "节点插件",
         switchLanguage: "切换到 {{language}}",
         shortcuts: "快捷键",
@@ -478,8 +471,6 @@ export default {
     },
     config: {
         title: "配置与用户偏好",
-        localTitle: "本地配置",
-        localDescription: "本地网关、模型选择与本地存储",
         localStorageNote: "配置只保存在本机浏览器。",
         modalDescription: "渠道聚合、默认模型、同步与本地存储",
         tabs: {

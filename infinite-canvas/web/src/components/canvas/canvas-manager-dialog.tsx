@@ -14,6 +14,7 @@ import { setMediaBlob } from "@/services/file-storage";
 import { setImageBlob } from "@/services/image-storage";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
+import { usePanelStore } from "@/stores/use-panel-store";
 import type { CanvasExportFile } from "@/types/canvas-export";
 
 /**
@@ -32,8 +33,8 @@ export function CanvasManagerDialog() {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const inputRef = useRef<HTMLInputElement>(null);
-    const open = useCanvasUiStore((state) => state.managerOpen);
-    const setOpen = useCanvasUiStore((state) => state.setManagerOpen);
+    const open = usePanelStore((state) => state.canvasManagerOpen);
+    const setOpen = usePanelStore((state) => state.setCanvasManagerOpen);
     const hydrated = useCanvasStore((state) => state.hydrated);
     const projects = useCanvasStore((state) => state.projects);
     const createProject = useCanvasStore((state) => state.createProject);

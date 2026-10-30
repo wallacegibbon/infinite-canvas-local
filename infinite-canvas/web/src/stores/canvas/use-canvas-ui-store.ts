@@ -1,9 +1,6 @@
 import { create } from "zustand";
 
 type CanvasUiStore = {
-    /** Whether the canvas manager (list + multi-select + import/export) is floating over the canvas. */
-    managerOpen: boolean;
-    setManagerOpen: (open: boolean) => void;
     editingProjectId: string | null;
     editingProjectTitle: string;
     selectedProjectIds: string[];
@@ -17,8 +14,6 @@ type CanvasUiStore = {
 };
 
 export const useCanvasUiStore = create<CanvasUiStore>((set) => ({
-    managerOpen: false,
-    setManagerOpen: (managerOpen) => set({ managerOpen }),
     editingProjectId: null,
     editingProjectTitle: "",
     selectedProjectIds: [],

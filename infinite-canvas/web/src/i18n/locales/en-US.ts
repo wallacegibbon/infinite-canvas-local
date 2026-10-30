@@ -432,17 +432,10 @@ export default {
         }
     },
     navigation: {
-        canvas: "My Canvases",
-        image: "Image Studio",
-        video: "Video Studio",
-        prompts: "Prompt Library",
-        assets: "My Assets",
-        config: "Settings"
+        assets: "My Assets"
     },
     topNav: {
-        openMenu: "Open navigation menu",
-        menu: "Navigation menu",
-        navigation: "Navigation",
+        settings: "Settings",
         plugins: "Node plugins",
         switchLanguage: "Switch to {{language}}",
         shortcuts: "Keyboard shortcuts",
@@ -451,8 +444,6 @@ export default {
     },
     config: {
         title: "Settings & Preferences",
-        localTitle: "Local settings",
-        localDescription: "Local gateway, model selection, and local storage",
         localStorageNote: "Settings are stored only in this browser.",
         modalDescription: "Providers, default models, sync, and local storage",
         tabs: {
