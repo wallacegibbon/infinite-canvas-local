@@ -86,14 +86,12 @@ export function ConfirmHost() {
         >
             <AlertDialog.Portal>
                 <AlertDialog.Overlay className="fixed inset-0 z-[1400] bg-black/45" />
-                <AlertDialog.Content
-                    // `content` is optional here, and radix warns when an alert dialog has no
-                    // description; an explicit undefined opts out of that check.
-                    aria-describedby={undefined}
-                    className="fixed left-1/2 top-1/2 z-[1401] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-stone-200 bg-white p-5 shadow-2xl dark:border-stone-800 dark:bg-stone-900"
-                >
+                <AlertDialog.Content className="fixed left-1/2 top-1/2 z-[1401] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-stone-200 bg-white p-5 shadow-2xl dark:border-stone-800 dark:bg-stone-900">
                     <AlertDialog.Title className="text-base font-semibold text-stone-900 dark:text-stone-100">{request?.title}</AlertDialog.Title>
-                    {request?.content ? <p className="mt-2 text-sm leading-6 text-stone-500 dark:text-stone-400">{request.content}</p> : null}
+                    {/* radix requires a description on an alert dialog and wires `aria-describedby`
+                        from this child, so it is always rendered; with no copy it is hidden visually
+                        and the title carries the meaning. */}
+                    <AlertDialog.Description className={request?.content ? "mt-2 text-sm leading-6 text-stone-500 dark:text-stone-400" : "sr-only"}>{request?.content || request?.title}</AlertDialog.Description>
                     <div className="mt-5 flex justify-end gap-2">
                         <button type="button" className={cancelClass} disabled={pending} onClick={dismiss}>
                             {request?.cancelText}

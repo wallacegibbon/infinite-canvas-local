@@ -182,7 +182,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                         children: (
                             <div>
                                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                                    <div className="text-xs text-stone-500">t("config.channels.localOnlyDescription")</div>
+                                    <div className="text-xs text-stone-500">{t("config.channels.localOnlyDescription")}</div>
                                 </div>
                                 <div className="space-y-2">
                                     {config.channels.map((channel) => (
@@ -190,7 +190,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                             <div className="min-w-0">
                                                 <div className="truncate text-sm font-semibold">{channel.name || t("config.channels.unnamed")}</div>
                                                 <div className="mt-1 truncate text-xs text-stone-500">
-                                                    t("config.channels.localGateway") · {t("config.channels.modelCount", { count: channel.models.length })} · {channel.baseUrl || t("config.channels.missingUrl")}
+                                                    {t("config.channels.localGateway")} · {t("config.channels.modelCount", { count: channel.models.length })} · {channel.baseUrl || t("config.channels.missingUrl")}
                                                 </div>
                                             </div>
                                             <div className="flex shrink-0 gap-2">

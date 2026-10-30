@@ -599,6 +599,12 @@ graph cannot see: unused imports and unused locals (45 of them). Three Chinese U
 the local branches already carried moved into the locale files, because inline copy violates
 #17 whether or not a flag guards it.
 
+Neither of those tools can see a third class: a JSX expression whose braces were lost, which
+compiles and renders the *source* of the call instead of its result. Two of those shipped into a
+build — `t("config.channels.localOnlyDescription")` printed literally in the settings panel —
+and only a click-through found them. Any rewrite of this shape needs one pass through the app
+afterwards; type checks prove the code is well formed, not that it is right.
+
 **Cost** The upstream fork's interface is gone, so re-adopting cloud providers later means
 rewriting those pages rather than flipping a flag. That was an explicit trade: this repository
 is maintained on its own and may be rewritten. The cascade also removed `services/config-file`
