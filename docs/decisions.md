@@ -1367,3 +1367,37 @@ than created and shown empty.
 
 **Where** `components/settings/`, `stores/canvas/`, `services/localforage-databases.ts`,
 `services/local-storage-usage.ts`.
+
+## 47. Content ingress is a module: `File | string` in, node out
+
+**Decision** Eight callbacks that turn something the user handed us into a node moved to
+`pages/canvas/hooks/use-content-ingress.ts` (310 lines): the three `create*FileNode`, the clipboard
+text node, the system-clipboard paste, the file-picker request, the file-picker handler, and drop.
+`project.tsx`: 2,990 → 2,735 lines.
+
+**The line that makes it a module** Not one of them reads the graph. They take a `File` or a string
+and append. The only thing they need from the page is where the viewport is looking
+(`screenToCanvas`, `getCanvasCenter`, `size`, `containerRef`) plus five setters. That is
+`ContentIngressDeps`.
+
+**The picker owns its input** `imageInputRef` and `uploadTargetRef` moved into the hook rather than
+being passed in, because the module owns the behaviour that clicks the hidden `<input type="file">`.
+The page still renders the element — it destructures `imageInputRef` and attaches it — but it no
+longer knows what the ref is for. Passing it in would have been the page owning a piece of the
+module's mechanism.
+
+**What stayed behind** `pasteCopiedNodes` (copy/paste of *canvas nodes*, which is graph logic with
+connection re-mapping, not content ingress) and `handleAssetInsert` (which inserts from the asset
+library and asks the page where the selection is).
+
+**A line was almost lost** The first attempt sliced one line too far and left `handleNodeResize`
+with an empty body — a callback that silently does nothing. The compiler caught it only because the
+destructured parameters became unused under `--noUnusedParameters`. Every move since then is
+checked by reconstructing HEAD minus the moved ranges and diffing it against the result; that diff
+is now exactly zero, which is a stronger statement than "tsc passes".
+
+**Verified end to end, not just compiled** The hidden input was driven from the browser with a real
+`File` built from a canvas and a `DataTransfer`: a node titled `ingress-test.png` appeared with its
+image, selected, composer open, and was deleted afterwards. Console empty.
+
+**Where** `infinite-canvas/web/src/pages/canvas/hooks/use-content-ingress.ts`.
