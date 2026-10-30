@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { Compass, Focus, HelpCircle } from "lucide-react";
 import { useState } from "react";
-import { Tooltip } from "antd";
+
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
+import { Tooltip } from "@/components/kit/tooltip";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 

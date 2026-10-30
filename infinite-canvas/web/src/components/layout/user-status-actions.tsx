@@ -1,8 +1,9 @@
 import type { CSSProperties } from "react";
-import { Tooltip } from "antd";
+
 import { Keyboard, Puzzle, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Tooltip } from "@/components/kit/tooltip";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { changeAppLocale, type AppLocale } from "@/i18n";
 import { canvasThemes } from "@/lib/canvas-theme";

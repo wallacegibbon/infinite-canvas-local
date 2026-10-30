@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { Group, Play, Ungroup } from "lucide-react";
-import { Tooltip } from "antd";
+
 import { useTranslation } from "react-i18next";
 
-
+import { Tooltip } from "@/components/kit/tooltip";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { nodeBounds } from "@/lib/canvas/canvas-node-geometry";
 import type { CanvasNodeData, ViewportTransform } from "@/types/canvas";

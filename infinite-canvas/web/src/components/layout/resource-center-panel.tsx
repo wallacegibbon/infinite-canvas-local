@@ -1,4 +1,4 @@
-import { Checkbox, Progress, Tooltip } from "antd";
+import { Checkbox, Progress } from "antd";
 import { AlertTriangle, ChevronDown, Download, HardDriveDownload, RefreshCw, Server, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,7 @@ import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { Tag } from "@/components/kit/tag";
 import { toast } from "@/components/kit/toast";
+import { Tooltip } from "@/components/kit/tooltip";
 import { cancelResourceJob, fetchResourceJob, fetchResourceStatus, formatBytes, installResources, pickResourceReplacement, refreshResourceStatus, setResourceReplacement, setWorkflowVisibility, type ResourceItem, type ResourceJob, type ResourcePack, type ResourceStatus } from "@/services/api/resources";
 import { gatewayVariantLabel } from "@/lib/gateway-labels";
 import { isGatewayDown } from "@/services/api/gateway-status";
