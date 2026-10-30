@@ -11,7 +11,7 @@ import (
 func isolateEnv(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{
-		"GATEWAY_PORT", "GATEWAY_HOST", "COMFY_URL", "COMFY_PYTHON", "COMFY_FRONTEND_DIR",
+		"GATEWAY_PORT", "GATEWAY_HOST", "COMFY_URL", "COMFY_FRONTEND_DIR",
 		"COMFY_MODELS_SHARED",
 		"SCAN_ON_START",
 		"WORKFLOW_DIR", "DATA_DIR", "OUTPUT_DIR", "PUBLIC_BASE_URL", "CORS_ORIGINS",

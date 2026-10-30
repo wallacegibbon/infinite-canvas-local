@@ -87,7 +87,7 @@ make web               # installs infinite-canvas/web deps if needed, then vite 
 make build             # Go gateway, static binary; start.sh builds it too if missing
 
 # Configure and start
-cp .env.example .env   # set COMFY_PYTHON for this machine
+cp .env.example .env   # adjust COMFY_URL / GATEWAY_HOST for this machine
                         # (COMFY_MODELS_SHARED=1 there is what allows the panel to install models)
 ./start.sh
 ```

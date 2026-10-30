@@ -214,7 +214,6 @@ type Status struct {
 	IndexVersion   string              `json:"indexVersion"`
 	Channel        string              `json:"channel"`
 	ComfyRoot      string              `json:"comfyRoot"`
-	ComfyPython    string              `json:"comfyPython"`
 	ComfyReachable bool                `json:"comfyReachable"`
 	ModelInstall   InstallPolicy       `json:"modelInstall"`
 	RuntimeDeps    []RuntimeDep        `json:"runtimeDeps"`
@@ -247,7 +246,6 @@ type Manager struct {
 	lock         map[string]any
 	jobs         map[string]*Job
 	inventory    map[string]inventoryEntry
-	pythonHint   string
 }
 
 type inventoryEntry struct {
@@ -448,29 +446,6 @@ func (m *Manager) ComfyRoot() string {
 		return ""
 	}
 	return setup.InstallRoot(m.setup.FolderPaths())
-}
-
-// ComfyPython returns the interpreter ComfyUI uses, for the runtime-deps hint.
-//
-// Without an accurate path the hint is useless, so an unset COMFY_PYTHON falls back
-// to inspecting the running ComfyUI process.
-func (m *Manager) ComfyPython() string {
-	if m.cfg.ComfyPython != "" {
-		return m.cfg.ComfyPython
-	}
-
-	m.mu.Lock()
-	cached := m.pythonHint
-	m.mu.Unlock()
-	if cached != "" {
-		return cached
-	}
-
-	probed := m.probeComfyPython(m.ComfyRoot())
-	m.mu.Lock()
-	m.pythonHint = probed
-	m.mu.Unlock()
-	return probed
 }
 
 // modelDirs returns every directory a logical model type may live in.

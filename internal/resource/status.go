@@ -605,7 +605,6 @@ func (m *Manager) Status() *Status {
 		IndexVersion:   util.Stringify(index.Version),
 		Channel:        index.Channel,
 		ComfyRoot:      root,
-		ComfyPython:    m.ComfyPython(),
 		ComfyReachable: m.setup.Status().ComfyReachable,
 		ModelInstall:   modelInstall,
 		RuntimeDeps:    runtimeDeps(),

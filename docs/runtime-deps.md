@@ -6,10 +6,10 @@ Python environment and regularly broke the venv (wrong version, overwritten torc
 dependencies, half-installed builds after a compile failure), so this is now a command
 you run yourself.
 
-> Before installing, make sure you are installing into **the Python ComfyUI actually runs**.
-> In the canvas, "Add workflows → Runtimes (manual install)" shows the interpreter path the
-> workbench detected; you can also read `COMFY_PYTHON` from `.env`, or run `ps aux | grep main.py`.
-> **Do not** use the system `python3`, and do not use the canvas's own Node environment.
+> Before installing, make sure you are installing into **the Python ComfyUI actually runs** —
+> the workbench does not guess it: the commands below carry `/path/to/ComfyUI/venv/bin/python`
+> as a placeholder for you to replace. `ps aux | grep main.py` shows the interpreter ComfyUI was
+> started with. **Do not** use the system `python3`, and not the canvas's Node environment.
 
 Restart ComfyUI after installing.
 

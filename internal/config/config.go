@@ -27,7 +27,6 @@ type Config struct {
 	GatewayHost string
 
 	ComfyURL            string
-	ComfyPython         string
 	ComfyModelsShared   bool // COMFY_MODELS_SHARED=1; installs are refused without it (internal/resource/install_policy.go)
 	PromptThinkingParam string
 	PromptMaxTokens     int
@@ -82,9 +81,6 @@ func WithDataDir(dir string) Option { return func(c *Config) { c.DataDir = dir }
 // WithOutputDir overrides the output directory.
 func WithOutputDir(dir string) Option { return func(c *Config) { c.OutputDir = dir } }
 
-// WithComfyPython overrides the ComfyUI interpreter path hint.
-func WithComfyPython(path string) Option { return func(c *Config) { c.ComfyPython = path } }
-
 // WithComfyFrontendDir overrides the ComfyUI frontend directory.
 func WithComfyFrontendDir(dir string) Option { return func(c *Config) { c.ComfyFrontendDir = dir } }
 
@@ -111,7 +107,6 @@ func Load(opts ...Option) (*Config, error) {
 		GatewayPort:         intValue(os.Getenv("GATEWAY_PORT"), 8190),
 		GatewayHost:         stringOr(os.Getenv("GATEWAY_HOST"), "127.0.0.1"),
 		ComfyURL:            stringOr(os.Getenv("COMFY_URL"), "http://127.0.0.1:8188"),
-		ComfyPython:         strings.TrimSpace(os.Getenv("COMFY_PYTHON")),
 		ComfyModelsShared:   boolValue(os.Getenv("COMFY_MODELS_SHARED")),
 		PromptThinkingParam: stringOr(os.Getenv("PROMPT_THINKING_PARAM"), "none"),
 		PromptMaxTokens:     intValue(os.Getenv("PROMPT_MAX_TOKENS"), 8192),

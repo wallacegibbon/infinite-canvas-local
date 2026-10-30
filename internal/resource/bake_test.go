@@ -13,7 +13,6 @@ func TestBakeResourceReportsTheRealCommand(t *testing.T) {
 	comfyRoot := filepath.Join(root, "ComfyUI")
 	manager := quietManagerAt(t, comfyRoot)
 	manager.cfg.RootDir = root
-	manager.cfg.ComfyPython = "/venv/bin/python"
 	manager.index = &Index{Resources: []*Resource{
 		{ID: "moss_image_base_bf16", Type: "model", Target: "diffusion_models/moss_image_base_bf16.safetensors"},
 		{ID: "moss_image_sft_bf16", Type: "model", Target: "diffusion_models/moss_image_sft_bf16.safetensors"},
@@ -43,7 +42,7 @@ func TestBakeResourceReportsTheRealCommand(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"/venv/bin/python",
+		"/path/to/ComfyUI/venv/bin/python",
 		"tools/bake-moss-preset.py",
 		"--preset Balanced",
 		"--strength 1",
@@ -61,9 +60,8 @@ func TestBakeResourceReportsTheRealCommand(t *testing.T) {
 	}
 }
 
-func TestBakeResourceWithoutPythonStillHasACommand(t *testing.T) {
+func TestBakeResourceCommandMarksTheInterpreterToFillIn(t *testing.T) {
 	manager := quietManager(t)
-	manager.cfg.ComfyPython = ""
 	manager.index = &Index{Resources: []*Resource{
 		{ID: "base", Type: "model", Target: "diffusion_models/base.safetensors"},
 	}}
@@ -74,8 +72,8 @@ func TestBakeResourceWithoutPythonStillHasACommand(t *testing.T) {
 	if !errors.As(err, &manual) {
 		t.Fatalf("error is %T, want *manualStepError", err)
 	}
-	if !strings.HasPrefix(manual.command, "python3 ") {
-		t.Errorf("command should fall back to python3, got:\n%s", manual.command)
+	if !strings.HasPrefix(manual.command, "/path/to/ComfyUI/venv/bin/python ") {
+		t.Errorf("command should carry the interpreter placeholder, got:\n%s", manual.command)
 	}
 	// A single requirement fills --base only; --sft is left out rather than guessed.
 	if strings.Contains(manual.command, "--sft") {

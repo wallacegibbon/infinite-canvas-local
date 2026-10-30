@@ -145,7 +145,6 @@ export type ResourceStatus = {
     indexVersion?: string;
     channel?: string;
     comfyRoot?: string;
-    comfyPython?: string;
     comfyReachable?: boolean;
     modelInstall?: ResourceModelInstall;
     runtimeDeps?: Array<{ id: string; packages: string[] }>;

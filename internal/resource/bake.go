@@ -23,10 +23,11 @@ func (e *manualStepError) Error() string { return e.summary }
 // request. The command carries real paths because "run the merge in ComfyUI" only leaves
 // the user guessing.
 func (m *Manager) bakeCommand(resource *Resource, root string) string {
-	python := m.ComfyPython()
-	if python == "" {
-		python = "python3"
-	}
+	// The merge needs the Python ComfyUI runs under (it imports torch), and only the user
+	// knows where that is: nothing here guesses, so the command carries a placeholder to fill
+	// in. A wrong interpreter reports "no module named torch", which reads like a broken
+	// install instead of a path to fix.
+	const python = "/path/to/ComfyUI/venv/bin/python"
 	script := filepath.Join(m.cfg.RootDir, "tools", "bake-moss-preset.py")
 	if !util.Exists(script) {
 		script = filepath.Join("tools", "bake-moss-preset.py")

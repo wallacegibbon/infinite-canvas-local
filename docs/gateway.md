@@ -43,7 +43,6 @@ and degrade on their own elsewhere rather than failing the process:
 | Probe | On Linux | Elsewhere |
 |---|---|---|
 | RAM usage | `/proc/meminfo` | panel shows nothing (returns an empty record) |
-| ComfyUI's interpreter | `/proc/<pid>/cmdline` + `/proc/<pid>/exe` | detection returns nothing; set `COMFY_PYTHON` instead |
 | "Pick a model file" dialog | `zenity` | the request fails with a message telling you to type the relative path |
 
 `start.sh` is a bash script, so Windows needs WSL or Git Bash; running `bin/comfyui-gateway`
@@ -53,7 +52,7 @@ by hand works anywhere.
 
 ```bash
 make build          # -> bin/comfyui-gateway (static, ~2 MB)
-COMFY_PYTHON=/path/to/venv/bin/python ./bin/comfyui-gateway
+GATEWAY_HOST=192.168.3.232 ./bin/comfyui-gateway
 ```
 
 Run it from the repository root: the asset root (`workflows/`, `resources/`, `prompts/`)
@@ -71,7 +70,6 @@ Every variable is optional; the defaults match the previous implementation.
 | `GATEWAY_HOST` | `127.0.0.1` | Gateway listen address, bound as given. `0.0.0.0` accepts every interface. |
 | `GATEWAY_PORT` | `8190` | Gateway listen port. |
 | `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI base URL. |
-| `COMFY_PYTHON` | *(empty)* | Interpreter shown in the "runtime deps" hint. |
 | `COMFY_MODELS_SHARED` | *(empty)* | `1` = the gateway can write into ComfyUI's model folders (same machine, or a mount). Model installs stay off without it. |
 | `WORKFLOW_DIR` | `<root>/workflows` | Registry directory. |
 | `DATA_DIR` | `<root>/data` | Tasks, locks, preferences. |

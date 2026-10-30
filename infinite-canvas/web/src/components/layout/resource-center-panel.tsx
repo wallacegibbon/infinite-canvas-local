@@ -27,7 +27,7 @@ const copyByLocale = {
         title: "添加工作流",
         runtimeHelp: "运行库（需手动安装）",
         runtimeHelpIntro: "下面这些不是模型文件，而是 ComfyUI 运行时要用的 Python 包。工作台不再替你往 ComfyUI 的 Python 环境里装东西（以前那样做经常把 venv 搞坏），请你自己执行命令。",
-        runtimeHelpPython: "检测到的 ComfyUI Python",
+        runtimeHelpPython: "ComfyUI 用的 Python",
         runtimeHelpNote: "装完重启 ComfyUI。SageAttention 可能需要按你的 CUDA 版本编译，参见 docs/runtime-deps.md。",
         runtimeDep_h3: "H3 视频（必需）",
         runtimeDepNote_h3: "SageAttention。缺了它 H3 / VDN 工作流会在运行时报错。",
@@ -131,7 +131,7 @@ const copyByLocale = {
         title: "Add workflows",
         runtimeHelp: "Runtimes (manual install)",
         runtimeHelpIntro: "These are ComfyUI runtime Python packages, not model files. The app no longer installs into ComfyUI's Python environment (that used to break venvs), so run the command yourself.",
-        runtimeHelpPython: "Detected ComfyUI Python",
+        runtimeHelpPython: "ComfyUI's Python",
         runtimeHelpNote: "Restart ComfyUI afterwards. SageAttention may need to be built for your CUDA version; see docs/runtime-deps.md.",
         runtimeDep_h3: "H3 video (required)",
         runtimeDepNote_h3: "SageAttention. Without it H3 / VDN workflows fail at runtime.",
@@ -770,11 +770,11 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                     <div className="rounded-md border border-stone-200 p-2 dark:border-stone-800">
                         <div className="flex items-center justify-between gap-2">
                             <span className="text-xs text-stone-500 dark:text-stone-400">{copy.runtimeHelpPython}</span>
-                            <span className="min-w-0 truncate font-mono text-[11px]">{status?.comfyPython || "python3"}</span>
+                            <span className="min-w-0 truncate font-mono text-[11px]">{"/path/to/ComfyUI/venv/bin/python"}</span>
                         </div>
                     </div>
                     {(status?.runtimeDeps || []).map((entry) => {
-                        const command = `"${status?.comfyPython || "python3"}" -m pip install ${entry.packages.join(" ")}`;
+                        const command = `"${"/path/to/ComfyUI/venv/bin/python"}" -m pip install ${entry.packages.join(" ")}`;
                         return (
                             <div key={entry.id} className="rounded-md border border-stone-200 p-2 dark:border-stone-800">
                                 <div className="flex items-center justify-between gap-2">
