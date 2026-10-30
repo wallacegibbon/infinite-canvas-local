@@ -2,12 +2,12 @@ import { Button } from "@/components/kit/button";
 import { Card } from "@/components/kit/card";
 import { Switch, Checkbox } from "@/components/kit/choice";
 import { Dialog } from "@/components/kit/dialog";
+import { Field } from "@/components/kit/field";
 import { Space } from "@/components/kit/display";
 import { Tag } from "@/components/kit/tag";
 import { Typography } from "@/components/kit/text";
 import { Tooltip } from "@/components/kit/tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Form, theme as antdTheme } from "antd";
 import { Ellipsis, Image as ImageIcon, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -58,7 +58,6 @@ export function ImageToolSettingsModal({
     onSave: () => void;
 }) {
     const { t } = useTranslation();
-    const { token } = antdTheme.useToken();
     const previewToolbarRef = useRef<HTMLDivElement>(null);
     const scrollbarTrackRef = useRef<HTMLInputElement>(null);
     const [previewScroll, setPreviewScroll] = useState<PreviewScroll>({ left: 0, max: 0, viewport: 1, content: 1 });
@@ -167,8 +166,7 @@ export function ImageToolSettingsModal({
                 <div className="relative flex min-h-[300px] w-full justify-center pt-20 pb-9">
                     <div
                         ref={previewToolbarRef}
-                        className="hide-scrollbar absolute left-2 right-2 top-3 z-10 flex h-12 items-center overflow-x-auto rounded-[18px] border px-1 text-[13px]"
-                        style={{ background: token.colorBgElevated, borderColor: token.colorBorderSecondary, boxShadow: token.boxShadowSecondary, color: token.colorText }}
+                        className="hide-scrollbar absolute left-2 right-2 top-3 z-10 flex h-12 items-center overflow-x-auto rounded-[18px] border border-stone-200 bg-white px-1 text-[13px] text-stone-900 shadow-lg dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
                         onScroll={syncPreviewScroll}
                     >
                         {previewTools.map((tool) => (
@@ -176,8 +174,7 @@ export function ImageToolSettingsModal({
                         ))}
                     </div>
                     <div
-                        className="flex h-48 w-full max-w-[360px] flex-col items-center justify-center rounded-xl border"
-                        style={{ background: token.colorFillAlter, borderColor: token.colorBorderSecondary, color: token.colorTextSecondary }}
+                        className="flex h-48 w-full max-w-[360px] flex-col items-center justify-center rounded-xl border border-stone-200 bg-stone-100 text-stone-500 dark:border-stone-800 dark:bg-stone-800 dark:text-stone-400"
                     >
                         <ImageIcon className="mb-2 size-8" />
                         <Typography.Text type="secondary">{t("canvas.imageTools.imageNode")}</Typography.Text>
@@ -197,9 +194,9 @@ export function ImageToolSettingsModal({
                 </div>
             </Card>
 
-            <Form layout="vertical" className="!mb-0">
-                <Form.Item
-                    className="!mb-4"
+            <div>
+                <Field
+                    className="mb-4"
                     label={
                         <Space size={8}>
                             <span>{t("canvas.imageTools.quickTools")}</span>
@@ -219,8 +216,8 @@ export function ImageToolSettingsModal({
                             </Checkbox>
                         ))}
                     </Checkbox.Group>
-                </Form.Item>
-            </Form>
+                </Field>
+            </div>
         </Dialog>
     );
 }

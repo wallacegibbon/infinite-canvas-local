@@ -1,6 +1,5 @@
 import { Copy, Download, PencilLine, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Form } from "antd";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +7,7 @@ import { Button } from "@/components/kit/button";
 import { Card } from "@/components/kit/card";
 import { Dialog } from "@/components/kit/dialog";
 import { Drawer } from "@/components/kit/drawer";
+import { Field } from "@/components/kit/field";
 import { Empty, Space } from "@/components/kit/display";
 import { Input } from "@/components/kit/input";
 import { Image } from "@/components/kit/media";
@@ -37,12 +37,16 @@ type AssetFormValues = {
 
 type ImageDraft = ImageAsset["data"] | null;
 
+/** The create-form's blank state. `source` is filled in with a translated label on open. */
+const EMPTY_ASSET_FORM: AssetFormValues = { kind: "text", title: "", coverUrl: "", tags: [], source: "", note: "", content: "" };
+
 const kindOptions = ["all", "text", "image", "video"] as const;
 
 export default function AssetsPage() {
     const { t } = useTranslation();
     const copyText = useCopyText();
-    const [form] = Form.useForm<AssetFormValues>();
+    const [values, setValues] = useState<AssetFormValues>(EMPTY_ASSET_FORM);
+    const [errors, setErrors] = useState<Partial<Record<keyof AssetFormValues, string>>>({});
     const coverInputRef = useRef<HTMLInputElement>(null);
     const imageInputRef = useRef<HTMLInputElement>(null);
     const assetInputRef = useRef<HTMLInputElement>(null);
@@ -58,12 +62,19 @@ export default function AssetsPage() {
     const [isAssetOpen, setIsAssetOpen] = useState(false);
     const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
     const [deletingAsset, setDeletingAsset] = useState<Asset | null>(null);
-    const [formKind, setFormKind] = useState<AssetKind>("text");
     const [imageDraft, setImageDraft] = useState<ImageDraft>(null);
-    const coverUrl = Form.useWatch("coverUrl", form) || "";
-    const title = Form.useWatch("title", form) || "";
-    const tags = Form.useWatch("tags", form) || [];
-    const content = Form.useWatch("content", form) || "";
+    const formKind = values.kind;
+    const coverUrl = values.coverUrl || "";
+    const title = values.title;
+    const tags = values.tags;
+    const content = values.content || "";
+
+    /** One field at a time, so a handler never has to rebuild the whole record. */
+    const setField = <K extends keyof AssetFormValues>(key: K, value: AssetFormValues[K]) => {
+        setValues((current) => ({ ...current, [key]: value }));
+        // Clear the error as soon as the user edits the field it was about.
+        setErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
+    };
     const validAssets = useMemo(() => assets.filter((asset) => asset.kind === "text" || asset.kind === "image" || asset.kind === "video"), [assets]);
 
     const filteredAssets = useMemo(() => {
@@ -88,29 +99,34 @@ export default function AssetsPage() {
     const openCreate = () => {
         setEditingAsset(null);
         setImageDraft(null);
-        setFormKind("text");
-        form.setFieldsValue({ kind: "text", title: "", coverUrl: "", tags: [], source: t("assets.manual"), note: "", content: "" });
+        setValues({ ...EMPTY_ASSET_FORM, source: t("assets.manual") });
+        setErrors({});
         setIsAssetOpen(true);
     };
 
     const openEdit = (asset: Asset) => {
         setEditingAsset(asset);
-        setFormKind(asset.kind);
         setImageDraft(asset.kind === "image" ? asset.data : null);
-        form.setFieldsValue({
+        setValues({
             kind: asset.kind,
             title: asset.title,
             coverUrl: asset.coverUrl,
             tags: asset.tags || [],
-            source: asset.source,
-            note: asset.note,
+            source: asset.source ?? "",
+            note: asset.note ?? "",
             content: asset.kind === "text" ? asset.data.content : "",
         });
+        setErrors({});
         setIsAssetOpen(true);
     };
 
-    const saveAsset = async () => {
-        const values = await form.validateFields();
+    const saveAsset = () => {
+        const problems: Partial<Record<keyof AssetFormValues, string>> = {};
+        if (!values.title.trim()) problems.title = t("assets.fields.titleRequired");
+        if (values.kind === "text" && !(values.content || "").trim()) problems.content = t("assets.fields.textRequired");
+        setErrors(problems);
+        if (Object.keys(problems).length) return;
+
         const base = {
             title: values.title.trim(),
             coverUrl: values.coverUrl?.trim() || (values.kind === "image" && imageDraft ? imageDraft.dataUrl : ""),
@@ -139,7 +155,7 @@ export default function AssetsPage() {
     const readCoverFile = async (file?: File) => {
         if (!file) return;
         const dataUrl = await readFileAsDataUrl(file);
-        form.setFieldValue("coverUrl", dataUrl);
+        setField("coverUrl", dataUrl);
     };
 
     const readImageFile = async (file?: File) => {
@@ -147,8 +163,13 @@ export default function AssetsPage() {
         const image = await uploadImage(file);
         const draft = { dataUrl: image.url, storageKey: image.storageKey, width: image.width, height: image.height, bytes: image.bytes, mimeType: image.mimeType };
         setImageDraft(draft);
-        if (!form.getFieldValue("coverUrl")) form.setFieldValue("coverUrl", draft.dataUrl);
-        if (!form.getFieldValue("title")) form.setFieldValue("title", file.name);
+        // Fill the first image the user picks into an empty cover and title, so a file drop is
+        // enough to save an asset.
+        setValues((current) => ({
+            ...current,
+            coverUrl: current.coverUrl || draft.dataUrl,
+            title: current.title || file.name,
+        }));
     };
 
     const copyAssetText = async (asset: Asset) => {
@@ -321,44 +342,45 @@ export default function AssetsPage() {
                 }
             >
                 <div className="grid gap-6 pt-1 lg:grid-cols-[minmax(0,1fr)_320px]">
-                    <Form form={form} layout="vertical" requiredMark={false} initialValues={{ kind: "text", tags: [] }}>
-                        <Form.Item name="kind" label={t("assets.type")}>
+                    <div>
+                        <Field label={t("assets.type")}>
                             <Select
+                                value={values.kind}
                                 options={[
                                     { label: t("assets.kinds.text"), value: "text" },
                                     { label: t("assets.kinds.image"), value: "image" },
                                 ]}
-                                onChange={(value) => setFormKind(value)}
+                                onChange={(value) => setField("kind", value)}
                             />
-                        </Form.Item>
-                        <Form.Item name="title" label={t("assets.fields.title")} rules={[{ required: true, message: t("assets.fields.titleRequired") }]}>
-                            <Input size="large" placeholder={t("assets.fields.titlePlaceholder")} />
-                        </Form.Item>
-                        <Form.Item name="coverUrl" label={t("assets.fields.coverUrl")}>
+                        </Field>
+                        <Field label={t("assets.fields.title")} error={errors.title}>
+                            <Input size="large" placeholder={t("assets.fields.titlePlaceholder")} value={values.title} onChange={(event) => setField("title", event.target.value)} />
+                        </Field>
+                        <Field label={t("assets.fields.coverUrl")}>
                             <Space.Compact className="w-full">
-                                <Input placeholder={t("assets.fields.coverPlaceholder")} />
+                                <Input placeholder={t("assets.fields.coverPlaceholder")} value={values.coverUrl} onChange={(event) => setField("coverUrl", event.target.value)} />
                                 <Button icon={<Upload className="size-3.5" />} onClick={() => coverInputRef.current?.click()}>
                                     {t("common.upload")}
                                 </Button>
                             </Space.Compact>
-                        </Form.Item>
-                        <Form.Item name="tags" label={t("assets.fields.tags")}>
-                            <TagInput separators={[",", "，"]} placeholder={t("assets.fields.tagsPlaceholder")} />
-                        </Form.Item>
+                        </Field>
+                        <Field label={t("assets.fields.tags")}>
+                            <TagInput separators={[",", "，"]} placeholder={t("assets.fields.tagsPlaceholder")} value={values.tags} onChange={(next) => setField("tags", next)} />
+                        </Field>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Form.Item name="source" label={t("assets.fields.source")}>
-                                <Input placeholder={t("assets.fields.sourcePlaceholder")} />
-                            </Form.Item>
-                            <Form.Item name="note" label={t("assets.fields.note")}>
-                                <Input placeholder={t("assets.fields.optional")} />
-                            </Form.Item>
+                            <Field label={t("assets.fields.source")}>
+                                <Input placeholder={t("assets.fields.sourcePlaceholder")} value={values.source} onChange={(event) => setField("source", event.target.value)} />
+                            </Field>
+                            <Field label={t("assets.fields.note")}>
+                                <Input placeholder={t("assets.fields.optional")} value={values.note} onChange={(event) => setField("note", event.target.value)} />
+                            </Field>
                         </div>
                         {formKind === "text" ? (
-                            <Form.Item name="content" label={t("assets.fields.textContent")} rules={[{ required: true, message: t("assets.fields.textRequired") }]}>
-                                <Input.TextArea rows={8} placeholder={t("assets.fields.textPlaceholder")} />
-                            </Form.Item>
+                            <Field label={t("assets.fields.textContent")} error={errors.content}>
+                                <Input.TextArea rows={8} placeholder={t("assets.fields.textPlaceholder")} value={values.content} onChange={(event) => setField("content", event.target.value)} />
+                            </Field>
                         ) : (
-                            <Form.Item label={t("assets.fields.imageContent")} required>
+                            <Field label={t("assets.fields.imageContent")}>
                                 <div className="rounded-lg border border-dashed border-stone-300 p-4 dark:border-stone-700">
                                     <Button icon={<Upload className="size-4" />} onClick={() => imageInputRef.current?.click()}>
                                         {t("assets.selectImageFile")}
@@ -373,9 +395,9 @@ export default function AssetsPage() {
                                         </Typography.Text>
                                     )}
                                 </div>
-                            </Form.Item>
+                            </Field>
                         )}
-                    </Form>
+                    </div>
                     <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950">
                         <Typography.Text strong>{t("assets.preview")}</Typography.Text>
                         <div className="mt-3 overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">

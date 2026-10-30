@@ -1,4 +1,3 @@
-import { Form } from "antd";
 import { ArrowLeft, ArrowRight, ChevronDown, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/kit/button";
 import { Switch, Radio } from "@/components/kit/choice";
 import { Dialog } from "@/components/kit/dialog";
+import { Field } from "@/components/kit/field";
 import { Input } from "@/components/kit/input";
 import { Tabs } from "@/components/kit/nav";
 import { Select } from "@/components/kit/select";
@@ -26,6 +26,10 @@ import { persistSkinUnlock } from "@/services/api/skin-unlocks";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ConfigTabKey, type ModelCapability, type ModelChannel, type PromptCloudApi } from "@/stores/use-config-store";
 
+type CloudApiDraft = { name: string; baseUrl: string; apiKey: string; model: string };
+
+const EMPTY_CLOUD_API: CloudApiDraft = { name: "", baseUrl: "", apiKey: "", model: "" };
+
 type ModelGroup = {
     capability: ModelCapability;
     modelKey: "imageModel" | "videoModel" | "textModel" | "audioModel";
@@ -45,7 +49,8 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     const [editingChannelId, setEditingChannelId] = useState("");
     const [cloudApiEditorOpen, setCloudApiEditorOpen] = useState(false);
     const [editingCloudApiId, setEditingCloudApiId] = useState("");
-    const [cloudApiForm] = Form.useForm<{ name: string; baseUrl: string; apiKey: string; model: string }>();
+    const [cloudApiDraft, setCloudApiDraft] = useState<CloudApiDraft>(EMPTY_CLOUD_API);
+    const [cloudApiErrors, setCloudApiErrors] = useState<Partial<Record<keyof CloudApiDraft, string>>>({});
     const [passwordSkinId, setPasswordSkinId] = useState<CardSkinId | null>(null);
     const [skinPassword, setSkinPassword] = useState("");
     const [skinPasswordError, setSkinPasswordError] = useState("");
@@ -148,20 +153,29 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
 
     const openCloudApiEditor = (api?: PromptCloudApi) => {
         setEditingCloudApiId(api?.id || "");
-        cloudApiForm.setFieldsValue(api ? { name: api.name, baseUrl: api.baseUrl, apiKey: api.apiKey, model: api.model } : { name: "", baseUrl: "", apiKey: "", model: "" });
+        setCloudApiDraft(api ? { name: api.name, baseUrl: api.baseUrl, apiKey: api.apiKey, model: api.model } : EMPTY_CLOUD_API);
+        setCloudApiErrors({});
         setCloudApiEditorOpen(true);
     };
 
-    const saveCloudApi = async () => {
-        try {
-            const values = await cloudApiForm.validateFields();
-            if (editingCloudApiId) updatePromptCloudApi(editingCloudApiId, values);
-            else addPromptCloudApi(values);
-            setCloudApiEditorOpen(false);
-            toast.success(t("config.cloudApi.saved"));
-        } catch {
-            // Form validation errors are displayed inline.
-        }
+    const setCloudApiField = <K extends keyof CloudApiDraft>(key: K, value: CloudApiDraft[K]) => {
+        setCloudApiDraft((current) => ({ ...current, [key]: value }));
+        setCloudApiErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
+    };
+
+    const saveCloudApi = () => {
+        const problems: Partial<Record<keyof CloudApiDraft, string>> = {};
+        if (!cloudApiDraft.name.trim()) problems.name = t("config.cloudApi.nameRequired");
+        if (!cloudApiDraft.baseUrl.trim()) problems.baseUrl = t("config.cloudApi.baseUrlRequired");
+        if (!cloudApiDraft.model.trim()) problems.model = t("config.cloudApi.modelRequired");
+        if (!cloudApiDraft.apiKey.trim()) problems.apiKey = t("config.cloudApi.keyRequired");
+        setCloudApiErrors(problems);
+        if (Object.keys(problems).length) return;
+
+        if (editingCloudApiId) updatePromptCloudApi(editingCloudApiId, cloudApiDraft);
+        else addPromptCloudApi(cloudApiDraft);
+        setCloudApiEditorOpen(false);
+        toast.success(t("config.cloudApi.saved"));
     };
 
     const deleteCloudApi = (api: PromptCloudApi) => {
@@ -285,24 +299,24 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                         key: "preferences",
                         label: t("config.tabs.preferences"),
                         children: (
-                            <Form layout="vertical" requiredMark={false}>
+                            <div>
                                 <div className="mb-2 text-sm font-semibold">{t("config.preferences.defaultModels")}</div>
                                 <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                                     {modelGroups
                                         .filter((group) => group.capability === "image" || group.capability === "video")
                                         .map((group) => (
-                                            <Form.Item key={group.modelKey} label={t(group.labelKey)} className="mb-0">
+                                            <Field key={group.modelKey} label={t(group.labelKey)} className="mb-0">
                                                 {group.capability === "image" || group.capability === "video" ? (
                                                     <WorkflowModelPicker config={config} value={config[group.modelKey]} onChange={(model) => updateConfig(group.modelKey, model)} capability={group.capability} fullWidth />
                                                 ) : (
                                                     <ModelPicker config={config} value={config[group.modelKey]} onChange={(model) => updateConfig(group.modelKey, model)} capability={group.capability} fullWidth />
                                                 )}
-                                            </Form.Item>
+                                            </Field>
                                         ))}
                                 </div>
                                 <div className="mb-2 text-sm font-semibold">{t("config.preferences.generation")}</div>
                                 <div className="grid gap-4 md:grid-cols-4">
-                                    <Form.Item label={t("config.preferences.canvasImageCount")} extra={t("config.preferences.canvasImageCountDescription")} className="mb-4">
+                                    <Field label={t("config.preferences.canvasImageCount")} extra={t("config.preferences.canvasImageCountDescription")} className="mb-4">
                                         <Input
                                             type="number"
                                             min={1}
@@ -311,18 +325,18 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                             onChange={(event) => updateConfig("canvasImageCount", event.target.value)}
                                             onBlur={(event) => updateConfig("canvasImageCount", normalizeImageCount(event.target.value))}
                                         />
-                                    </Form.Item>
-                                    <Form.Item label={t("config.preferences.imageResolution")} className="mb-4">
+                                    </Field>
+                                    <Field label={t("config.preferences.imageResolution")} className="mb-4">
                                         <Select value={inferMediaScale(config.size)} options={imageResolutionOptions} onChange={(scale) => updateConfig("size", computeMediaSize(scale, inferMediaRatio(config.size)))} />
-                                    </Form.Item>
-                                    <Form.Item label={t("config.preferences.imageAspectRatio")} className="mb-4">
+                                    </Field>
+                                    <Field label={t("config.preferences.imageAspectRatio")} className="mb-4">
                                         <Select value={inferMediaRatio(config.size)} options={imageAspectOptions} onChange={(ratio) => updateConfig("size", computeMediaSize(inferMediaScale(config.size), ratio))} />
-                                    </Form.Item>
-                                    <Form.Item label={t("config.preferences.videoResolution")} className="mb-4">
+                                    </Field>
+                                    <Field label={t("config.preferences.videoResolution")} className="mb-4">
                                         <Select value={parseVideoResolution(config.vquality)} options={videoResolutionOptions} onChange={(value) => updateConfig("vquality", value)} />
-                                    </Form.Item>
+                                    </Field>
                                 </div>
-                                <Form.Item label={t("config.preferences.cardSkin")} extra={t("config.preferences.cardSkinDescription")} className="mb-4">
+                                <Field label={t("config.preferences.cardSkin")} extra={t("config.preferences.cardSkinDescription")} className="mb-4">
                                     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                                         {cardSkinIds.map((id) => {
                                             const locked = isCardSkinLocked(id) && !unlockedCardSkins.includes(id);
@@ -388,8 +402,8 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                             </div>
                                         </div>
                                     ) : null}
-                                </Form.Item>
-                                <Form.Item label={t("config.preferences.progressRingSkin")} extra={t("config.preferences.progressRingSkinDescription")} className="mb-4">
+                                </Field>
+                                <Field label={t("config.preferences.progressRingSkin")} extra={t("config.preferences.progressRingSkinDescription")} className="mb-4">
                                     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                                         {progressRingSkins.map((skin) => {
                                             const selected = (config.progressRingSkin || "cyan") === skin.id;
@@ -422,8 +436,8 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                             );
                                         })}
                                     </div>
-                                </Form.Item>
-                                <Form.Item label={t("config.preferences.regenerateBehavior")} className="mb-4">
+                                </Field>
+                                <Field label={t("config.preferences.regenerateBehavior")} className="mb-4">
                                     <Radio.Group value={config.nodeRegenerateBehavior} onChange={(event) => updateConfig("nodeRegenerateBehavior", event.target.value as "new-node" | "overwrite")} className="flex flex-col gap-2">
                                         <Radio value="overwrite">
                                             <span className="block text-sm font-medium">{t("config.preferences.regenerateBehaviorOverwrite")}</span>
@@ -434,17 +448,17 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                             <span className="mt-0.5 block text-xs opacity-60">{t("config.preferences.regenerateBehaviorNewNodeDescription")}</span>
                                         </Radio>
                                     </Radio.Group>
-                                </Form.Item>
-                                <Form.Item className="mb-4">
+                                </Field>
+                                <Field className="mb-4">
                                     <div className="flex items-center justify-between gap-3">
                                         <span className="text-sm">{t("config.preferences.autoFocusOnSelect")}</span>
                                         <Switch checked={config.autoFocusOnSelect} onChange={(checked) => updateConfig("autoFocusOnSelect", checked)} />
                                     </div>
-                                </Form.Item>
-                                <Form.Item label={t("config.preferences.systemPrompt")} className="mb-0">
+                                </Field>
+                                <Field label={t("config.preferences.systemPrompt")} className="mb-0">
                                     <Input.TextArea rows={4} value={config.systemPrompt} placeholder={t("config.preferences.systemPromptPlaceholder")} onChange={(event) => updateConfig("systemPrompt", event.target.value)} />
-                                </Form.Item>
-                            </Form>
+                                </Field>
+                            </div>
                         ),
                     },
                     {
@@ -514,20 +528,20 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                     </>
                 }
             >
-                <Form form={cloudApiForm} layout="vertical" requiredMark={false}>
-                    <Form.Item label={t("config.cloudApi.name")} name="name" rules={[{ required: true, whitespace: true, message: t("config.cloudApi.nameRequired") }]}>
-                        <Input placeholder={t("config.cloudApi.namePlaceholder")} />
-                    </Form.Item>
-                    <Form.Item label={t("config.cloudApi.baseUrl")} name="baseUrl" rules={[{ required: true, whitespace: true, message: t("config.cloudApi.baseUrlRequired") }]}>
-                        <Input placeholder="https://api.deepseek.com/v1" />
-                    </Form.Item>
-                    <Form.Item label={t("config.cloudApi.model")} name="model" rules={[{ required: true, whitespace: true, message: t("config.cloudApi.modelRequired") }]}>
-                        <Input placeholder="deepseek-chat" />
-                    </Form.Item>
-                    <Form.Item label={t("config.cloudApi.apiKey")} name="apiKey" rules={[{ required: true, whitespace: true, message: t("config.cloudApi.keyRequired") }]}>
-                        <Input.Password placeholder="sk-..." autoComplete="off" />
-                    </Form.Item>
-                </Form>
+                <div>
+                    <Field label={t("config.cloudApi.name")} error={cloudApiErrors.name}>
+                        <Input placeholder={t("config.cloudApi.namePlaceholder")} value={cloudApiDraft.name} onChange={(event) => setCloudApiField("name", event.target.value)} />
+                    </Field>
+                    <Field label={t("config.cloudApi.baseUrl")} error={cloudApiErrors.baseUrl}>
+                        <Input placeholder="https://api.deepseek.com/v1" value={cloudApiDraft.baseUrl} onChange={(event) => setCloudApiField("baseUrl", event.target.value)} />
+                    </Field>
+                    <Field label={t("config.cloudApi.model")} error={cloudApiErrors.model}>
+                        <Input placeholder="deepseek-chat" value={cloudApiDraft.model} onChange={(event) => setCloudApiField("model", event.target.value)} />
+                    </Field>
+                    <Field label={t("config.cloudApi.apiKey")} error={cloudApiErrors.apiKey}>
+                        <Input.Password placeholder="sk-..." autoComplete="off" value={cloudApiDraft.apiKey} onChange={(event) => setCloudApiField("apiKey", event.target.value)} />
+                    </Field>
+                </div>
                 <div className="text-xs text-stone-500">{t("config.cloudApi.hint")}</div>
             </Dialog>
         </>
