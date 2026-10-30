@@ -1,99 +1,65 @@
 #!/usr/bin/env bash
-# Starts the services the local infinite canvas needs: the gateway (default :8190) and the
-# static canvas server (default :3000).
-# ComfyUI is out of scope by default (external mode); set START_COMFY=1 in .env to launch it too.
+# Starts what this project runs: the gateway (default :8190) and a static server for the
+# canvas bundle (default :3000). Ctrl+C stops both; there is no crash recovery.
 #
-# Runs in the foreground; Ctrl+C stops everything. There is no crash recovery: if it dies,
-# run ./start.sh again.
+# ComfyUI is external and stays that way: nothing here starts, stops or waits for it. It may
+# be on another machine, in a container, or under whatever manager the user prefers — the
+# gateway only needs COMFY_URL.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# .env is sourced into this shell with `set -a`, so without protection anything the caller
-# passed explicitly would be silently overwritten: `PORT=9000 ./start.sh` used to come up
-# on 8190 anyway. Only the variables .env declares are at risk — everything else is simply
-# inherited by the child processes — so those names are collected first, the caller's
-# values are snapshotted, and the snapshot is restored after the source.
+# .env is data, not shell state: a variable the caller passed explicitly wins over it.
+# Sourcing without this makes `PORT=9000 ./start.sh` come up on the .env port instead.
 if [ -f "$ROOT/.env" ]; then
-  env_names=()
-  while IFS= read -r name; do
-    [ -n "$name" ] && env_names+=("$name")
-  done < <(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/p' "$ROOT/.env")
-
-  caller_values=()
-  for name in "${env_names[@]}"; do
-    if [ -n "${!name+set}" ]; then
-      caller_values+=("$name=${!name}")
-    fi
+  declared=$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/p' "$ROOT/.env")
+  saved=()
+  for name in $declared; do
+    if [ -n "${!name+set}" ]; then saved+=("$name=${!name}"); fi
   done
-
   set -a
   # shellcheck disable=SC1091
   . "$ROOT/.env"
   set +a
-
-  restored=()
-  if [ "${#caller_values[@]}" -gt 0 ]; then
-    for pair in "${caller_values[@]}"; do
-      name="${pair%%=*}"
-      value="${pair#*=}"
-      if [ "${!name-}" != "$value" ]; then
-        restored+=("$name")
-        export "$name=$value"
-      fi
-    done
+  if [ "${#saved[@]}" -gt 0 ]; then
+    for pair in "${saved[@]}"; do export "$pair"; done
   fi
-  if [ "${#restored[@]}" -gt 0 ]; then
-    echo "→ command-line variables win over .env: ${restored[*]}"
-  fi
-  unset env_names caller_values restored name value pair
 fi
 
 export COMFY_URL="${COMFY_URL:-http://127.0.0.1:8188}"
-# Only start.sh needs to know where ComfyUI lives (the optional START_COMFY branch);
-# the gateway asks ComfyUI itself.
-COMFY_START_DIR="${COMFY_START_DIR:-$HOME/comfy/ComfyUI}"
 export HOST="${HOST:-127.0.0.1}"
 export PORT="${PORT:-8190}"
-
 CANVAS_HOST="${CANVAS_HOST:-127.0.0.1}"
 CANVAS_PORT="${CANVAS_PORT:-3000}"
 
 VITE_BIN="$ROOT/infinite-canvas/web/node_modules/.bin/vite"
 GATEWAY_BIN="$ROOT/bin/comfyui-gateway"
+DIST_INDEX="$ROOT/infinite-canvas/web/dist/index.html"
 
 command -v node >/dev/null 2>&1 || { echo "node not found; install Node.js first" >&2; exit 1; }
-[ -x "$VITE_BIN" ] || { echo "missing $VITE_BIN; run: make web-deps (or make web)" >&2; exit 1; }
-[ -f "$ROOT/infinite-canvas/web/dist/index.html" ] || { echo "canvas bundle is missing; run: make web" >&2; exit 1; }
+[ -x "$VITE_BIN" ] || { echo "missing $VITE_BIN; run: make web-deps" >&2; exit 1; }
+[ -f "$DIST_INDEX" ] || { echo "canvas bundle is missing; run: make web" >&2; exit 1; }
 
-# The canvas is a static bundle, so the gateway address has to be injected at start: the same
-# build runs against 127.0.0.1:8190 here and against 192.168.3.232:8190 for a phone on the LAN.
-# dist/config.js is the injection point the frontend already reads (window.__RUNTIME_CONFIG__)
-# and it is a plain, unhashed file, so overwriting it per run is safe and `make web` restores
-# the template from public/.
-# A wildcard bind has no address a browser could use, so nothing is injected and the frontend
-# falls back to the hostname the page was loaded from. The file is rewritten on every run
-# either way: leaving a previous run's address in place is how a stale 127.0.0.1 survives a
-# switch to a LAN address.
-gateway_url=""
+# The canvas is a static bundle, so the gateway address is injected at start: the same build
+# serves a browser on 127.0.0.1 and one on the LAN. dist/config.js is the injection point the
+# frontend reads (window.__RUNTIME_CONFIG__) and is unhashed, so rewriting it per run is safe;
+# `make web` restores the template. A wildcard bind has no usable address, so nothing is
+# injected and the frontend falls back to the hostname it was loaded from.
 case "$HOST" in
-  0.0.0.0 | :: | "[::]" | "") ;;
+  0.0.0.0 | :: | "[::]" | "") gateway_url="" ;;
   *) gateway_url="http://${HOST}:${PORT}/v1" ;;
 esac
 {
-  echo "// Generated by start.sh on every run from .env; \`make web\` restores the public/ template."
+  echo "// Generated by start.sh on every run; \`make web\` restores the public/ template."
   if [ -n "$gateway_url" ]; then
     echo "window.__RUNTIME_CONFIG__ = Object.assign({ LOCAL_GATEWAY_URL: \"${gateway_url}\" }, window.__RUNTIME_CONFIG__ || {});"
   else
-    echo "// HOST is a wildcard bind, so the client uses the hostname it loaded the page from."
     echo "window.__RUNTIME_CONFIG__ = window.__RUNTIME_CONFIG__ || {};"
   fi
 } > "$ROOT/infinite-canvas/web/dist/config.js"
 
-# The gateway already allows a canvas served from its own host (same address, any port). An
-# explicit list covers the rest: a canvas on another machine, or a name that differs from the
-# address the browser used for the gateway. Deriving it here keeps .env the single place to
-# describe the setup.
+# The gateway accepts a canvas served from its own host already; this covers a canvas on
+# another machine or a name that differs from the address the browser used for the gateway.
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:${CANVAS_PORT},http://127.0.0.1:${CANVAS_PORT},http://${CANVAS_HOST}:${CANVAS_PORT},http://localhost:8188,http://127.0.0.1:8188}"
 
 pids=()
@@ -104,24 +70,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-if [ "${START_COMFY:-0}" = "1" ]; then
-  echo "→ ComfyUI   ${COMFY_START_DIR} (${COMFY_PYTHON:-python} main.py ${COMFY_ARGS:-})"
-  ( cd "$COMFY_START_DIR" && exec "${COMFY_PYTHON:-python}" main.py ${COMFY_ARGS:-} ) & pids+=($!)
-fi
-
-# The gateway is a static binary: build it once when it is missing (needs the Go toolchain),
-# after which startup takes milliseconds.
+# The gateway is a static binary: build it once when it is missing, then startup is instant.
 if [ ! -x "$GATEWAY_BIN" ]; then
   echo "→ building the gateway (first run, needs the Go toolchain)"
   ( cd "$ROOT" && make build ) || { echo "gateway build failed" >&2; exit 1; }
 fi
 
-echo "→ gateway   http://${HOST}:${PORT}"
+echo "→ gateway   http://${HOST}:${PORT}   (ComfyUI at ${COMFY_URL})"
 ( cd "$ROOT" && exec "$GATEWAY_BIN" ) & pids+=($!)
 
 echo "→ canvas    http://${CANVAS_HOST}:${CANVAS_PORT}"
 ( cd "$ROOT/infinite-canvas/web" && exec "$VITE_BIN" preview --host "$CANVAS_HOST" --port "$CANVAS_PORT" ) & pids+=($!)
 
 echo
-echo "All services are up. Ctrl+C stops every process."
+echo "Both services are up. Ctrl+C stops them."
 wait

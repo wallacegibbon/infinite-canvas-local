@@ -131,7 +131,7 @@ Four processes, all calls one-directional; the browser only talks to the gateway
 |---|---|---|---|
 | Canvas frontend | `3000` | Prebuilt static pages (`vite preview`) | `./start.sh` |
 | Gateway | `8190` | Go static binary that wraps ComfyUI workflows as OpenAI-compatible models | `./start.sh` |
-| ComfyUI | `8188` | Python, does the actual image / video work | You (`START_COMFY=0` means the workbench leaves it alone) |
+| ComfyUI | `8188` | Python, does the actual image / video work | You, wherever it runs — nothing here starts it |
 | llama-server | `8099` | Optional, the model behind prompt optimization | You, see [`docs/local-llm.md`](docs/local-llm.md) |
 
 ```text

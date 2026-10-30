@@ -249,8 +249,9 @@ worker mutates it).
 ## 16. The gateway never starts or stops ComfyUI
 
 **Decision** ComfyUI is external: the gateway connects to `COMFY_URL` and reports when it is
-unreachable. `start.sh` can launch it only when `START_COMFY=1`, and that is the script's
-decision, not the gateway's.
+unreachable. `start.sh` does not launch it either: ComfyUI may be on another machine, in a
+container, or under a supervisor the user chose, so a start script that assumes it is local
+would be wrong more often than right.
 
 **Why** ComfyUI owns the GPU and is usually already running with a user's own configuration.
 A gateway that restarts it would race with whatever the user is doing.
