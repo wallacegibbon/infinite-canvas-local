@@ -4,6 +4,7 @@ import { persist, type PersistStorage, type StorageValue } from "zustand/middlew
 import { nanoid } from "nanoid";
 import { localForageStorage } from "@/lib/localforage-storage";
 import { preserveUnreadable } from "@/lib/persist-recovery";
+import { ASSET_PERSIST_VERSION, readAssetPersisted } from "@/stores/asset-persist";
 import { isStoreUnreadable } from "@/stores/use-storage-recovery-store";
 import { cleanupUnusedImages, ensureImagePreview, previewUrlFor, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { cleanupUnusedMedia, resolveMediaUrl } from "@/services/file-storage";
@@ -48,9 +49,9 @@ export function assetCoverUrl(asset: Asset) {
 const ASSET_STORE_KEY = "infinite-canvas:asset_store";
 
 async function hydrateSavedAssets(value: string) {
-    const parsed = JSON.parse(value) as StorageValue<AssetStore>;
-    parsed.state.assets = await Promise.all(
-        parsed.state.assets.map(async (asset) => {
+    const state = readAssetPersisted(value);
+    state.assets = (await Promise.all(
+        state.assets.map(async (asset) => {
             if (asset.kind === "video" && asset.data.storageKey) return { ...asset, data: { ...asset.data, url: await resolveMediaUrl(asset.data.storageKey, asset.data.url) } };
             if (asset.kind !== "image") return asset;
             if (asset.data.storageKey) {
@@ -65,8 +66,8 @@ async function hydrateSavedAssets(value: string) {
             const image = await uploadImage(asset.data.dataUrl);
             return { ...asset, coverUrl: asset.coverUrl.startsWith("data:image/") ? image.url : asset.coverUrl, data: { ...asset.data, dataUrl: image.url, storageKey: image.storageKey, bytes: image.bytes, mimeType: image.mimeType } };
         }),
-    );
-    return parsed;
+    )) as Asset[];
+    return state;
 }
 
 const assetStorage: PersistStorage<AssetStore> = {
@@ -74,7 +75,8 @@ const assetStorage: PersistStorage<AssetStore> = {
         const value = await localForageStorage.getItem(name);
         if (!value) return null;
         try {
-            return await hydrateSavedAssets(value);
+            const state = await hydrateSavedAssets(value);
+            return { state: state as StorageValue<AssetStore>["state"], version: ASSET_PERSIST_VERSION };
         } catch (error) {
             // An unreadable asset store used to abort hydration and boot empty, then get written
             // over. Recorded, refused, explained by the recovery banner instead.
@@ -117,6 +119,7 @@ export const useAssetStore = create<AssetStore>()(
         }),
         {
             name: ASSET_STORE_KEY,
+            version: ASSET_PERSIST_VERSION,
             storage: assetStorage,
             partialize: (state) => ({ assets: state.assets }) as StorageValue<AssetStore>["state"],
             onRehydrateStorage: () => () => {

@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import i18n from "@/i18n";
 import { localForageStorage } from "@/lib/localforage-storage";
 import { preserveUnreadable } from "@/lib/persist-recovery";
+import { CANVAS_PERSIST_VERSION, readCanvasPersisted } from "@/stores/canvas/canvas-persist";
 import { isStoreUnreadable } from "@/stores/use-storage-recovery-store";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import type { CanvasAssistantSession, CanvasConnection, CanvasNodeData, ViewportTransform } from "@/types/canvas";
@@ -57,9 +58,12 @@ const canvasStorage: PersistStorage<CanvasStore> = {
         const value = await localForageStorage.getItem(name);
         if (!value) return null;
         try {
-            const parsed = JSON.parse(value) as StorageValue<CanvasStore>;
-            queuedPersistState = parsed.state as PersistedCanvasState;
-            return parsed;
+            // Version check, migration and shape validation all happen here rather than in
+            // zustand's `migrate`, so a blob we cannot read takes the recovery path instead of
+            // being quietly discarded.
+            const state = readCanvasPersisted(value);
+            queuedPersistState = state;
+            return { state: state as StorageValue<CanvasStore>["state"], version: CANVAS_PERSIST_VERSION };
         } catch (error) {
             // Returning null instead of throwing: zustand turns a throw into an
             // `onRehydrateStorage` error that nothing reads, and the app boots empty over data that
@@ -153,6 +157,7 @@ export const useCanvasStore = create<CanvasStore>()(
         }),
         {
             name: CANVAS_STORE_KEY,
+            version: CANVAS_PERSIST_VERSION,
             storage: canvasStorage,
             partialize: (state) =>
                 ({

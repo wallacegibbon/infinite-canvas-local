@@ -259,10 +259,25 @@ and refuse to write while the failure stands. A banner over the canvas says what
 the raw bytes as a download, offers a retry, and offers a "clear and start over" that re-enables
 writing and rewrites the main key.
 
-**Still open** Neither `persist` configuration has a `version` or a `migrate`, so a *shape* change
-(the addition of `lastProjectId` earlier in this work is one) hydrates a partially-defined state
-instead of being migrated. Nothing breaks today because the missing fields fall back to falsy, but
-the mechanism that should catch it does not exist.
+**The other half, now also fixed** Neither `persist` configuration had a `version` or a `migrate`.
+zustand's `merge` is `{...currentState, ...persistedState}` — shallow — so `projects[]` was taken
+from disk verbatim and any field added inside a project came back `undefined`. A viewport without
+`k` is `NaN` in every coordinate calculation on the canvas.
+
+Three things were added: `version: 1` on both stores so what we write is labelled; a `migrate` pass
+that backfills per-project fields (this is the part zustand's shallow merge could not do); and a
+shape assertion after migration, so a blob that cannot be brought to the current shape throws and
+takes the same recovery path as invalid JSON — copied aside, write refused, banner shown.
+
+The check lives in `getItem` rather than in zustand's own `migrate` hook on purpose. That hook runs
+*after* `getItem`, so a failure there cannot reuse this app's recovery; zustand logs and discards,
+and the empty state is persisted over the blob — the same data-loss path as the first half, with one
+exception: a *version mismatch* with no `migrate` would have gone straight through even with the
+write refusal in place, because `getItem` succeeded.
+
+Covered by `tests/persist-migration.test.ts` (14 cases): versionless blobs, missing `lastProjectId`,
+missing per-project fields, a viewport with no `k`, a zero zoom, a blob from a newer build,
+malformed JSON, and assets with no `data`.
 
 
 ---

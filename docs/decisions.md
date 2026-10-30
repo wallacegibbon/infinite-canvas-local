@@ -1596,3 +1596,59 @@ column was 320 then too; the arithmetic, not the change, is what shows it. The r
 
 **Where** `components/canvas/canvas-node-{crop,mask-edit,split}-dialog.tsx`,
 `components/canvas/canvas-node-hover-toolbar.tsx`.
+
+## 52. The persisted format has a version, and a migration that can refuse
+
+**Decision** Both persisted stores carry `version: 1`, and both read their blob through a module that
+checks the version, migrates an older blob, and then asserts the result has the current shape. A
+throw from any of those three steps is the same signal as invalid JSON: copy the blob aside, refuse
+to write, show the banner.
+
+**What was wrong without it** zustand's default `merge` is
+
+```js
+(persistedState, currentState) => ({ ...currentState, ...persistedState })
+```
+
+which is **shallow at the top level**. `projects` is replaced wholesale by whatever was on disk, so
+nothing inside a project ever receives a default. A field added to `CanvasProject` comes back
+`undefined` on every canvas that predates it. `viewport` is the sharp case: it is `{x, y, k}` and
+every coordinate on the canvas passes through `k`, so a missing `k` is not a cosmetic gap, it is
+`NaN` in the transform and a blank canvas.
+
+And nothing checked. Both stores left `version` at zustand's default of `0`, so the stored version
+and the expected version were always equal and the comparison always took the branch that uses the
+state unexamined.
+
+**Why the migration lives in `getItem`, not in zustand's `migrate`** zustand runs its migration
+*after* `getItem` returns. A failure there cannot reach this app's recovery: it logs
+`State loaded from storage couldn't be migrated` and discards the state, and the store then persists
+defaults over the blob — the data-loss path #49 was written to close. Worse, it would have got
+through even with the write refusal, because `getItem` had succeeded. Doing the work inside
+`getItem` means there is exactly one failure path, and it is the one with a banner on it.
+
+**The three steps**
+
+1. *Version check.* A blob from a **newer** build throws rather than being guessed at. There is no
+   safe interpretation of a format we have never seen.
+2. *Migration (`version < 1`).* Backfills what older blobs lack — `lastProjectId`, and per project
+   `chatSessions`, `activeChatId`, `backgroundMode`, `showImageInfo`, `viewport`. The per-project
+   pass is the part zustand's shallow merge structurally could not do.
+3. *Assertion.* Shallow, but it guarantees the canvas can render: every project has an id, a title,
+   array `nodes`, array `connections`, and a viewport with finite `x`, `y` and a positive `k`. This
+   is what catches a shape change nobody migrated.
+
+**Tested both ways**
+
+`tests/persist-migration.test.ts` — 14 cases against the real read path: a current blob passes
+through, a versionless blob gains `lastProjectId`, a project missing the newer fields is backfilled,
+a viewport with no `k` becomes `k: 1`, a zero zoom is treated as unset, a newer version throws,
+malformed JSON throws, `nodes` that is not an array throws, an asset with no `data` is dropped.
+
+End to end in the browser: a forged versionless blob whose viewport had only `x` and `y` was written
+to IndexedDB and the page reloaded. It came back at `version: 1` with `k: 1`, both nodes intact,
+rendering at 100% — no `NaN`, no blank canvas, no banner (it was migratable, not unreadable). The
+original blob was restored afterwards and checked.
+
+**Where** `stores/canvas/canvas-persist.ts`, `stores/asset-persist.ts`, both stores,
+`tests/persist-migration.test.ts`.

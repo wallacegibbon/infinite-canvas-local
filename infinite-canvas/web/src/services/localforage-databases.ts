@@ -16,6 +16,5 @@ export const APP_DATABASE = "infinite-canvas";
 export const PLUGIN_DATABASE = "infinite-canvas-plugins";
 
 /** Every object store in {@link APP_DATABASE}, in rough order of size. */
-export const APP_STORES = ["app_state", "media_files", "image_files", "image_previews", "image_generation_logs", "video_generation_logs"] as const;
+const APP_STORES = ["app_state", "media_files", "image_files", "image_previews", "image_generation_logs", "video_generation_logs"] as const;
 
-export type AppStoreName = (typeof APP_STORES)[number];
