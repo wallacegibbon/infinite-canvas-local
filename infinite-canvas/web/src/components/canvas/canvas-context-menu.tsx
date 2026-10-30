@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ContextMenuState } from "@/types/canvas";
 import type { VideoFramePosition } from "@/lib/canvas/canvas-video-frame";
+import { CANVAS_DISMISS_GUARD } from "@/lib/canvas-overlay";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 
 export function CanvasNodeContextMenu({ menu, canCaptureVideoFrame, canGroup, canUngroup, onClose, onCaptureVideoFrame, onDuplicate, onGroup, onUngroup, onDelete }: { menu: ContextMenuState; canCaptureVideoFrame: boolean; canGroup?: boolean; canUngroup?: boolean; onClose: () => void; onCaptureVideoFrame: (position: VideoFramePosition) => void; onDuplicate: () => void; onGroup?: () => void; onUngroup?: () => void; onDelete: () => void }) {
@@ -15,7 +16,7 @@ export function CanvasNodeContextMenu({ menu, canCaptureVideoFrame, canGroup, ca
     useEffect(() => {
         const close = (event: PointerEvent) => {
             const target = event.target;
-            if (target instanceof Element && target.closest(".ant-popover")) return;
+            if (target instanceof Element && target.closest(CANVAS_DISMISS_GUARD)) return;
             onClose();
         };
         window.addEventListener("pointerdown", close);

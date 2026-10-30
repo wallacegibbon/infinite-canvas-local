@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { FileText, Image as ImageIcon, Music2, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
+import { CANVAS_DIALOG_CONTENT } from "@/lib/canvas-overlay";
 import { isImeComposing, isPlainEnterKey } from "@/lib/keyboard-event";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
@@ -216,7 +217,7 @@ function MentionHighlightText({ value, labels, placeholder }: { value: string; l
 function MentionMenu({ textarea, caretIndex, references, activeIndex, theme, onSelect }: { textarea: HTMLTextAreaElement; caretIndex: number; references: CanvasResourceReference[]; activeIndex: number; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onSelect: (reference: CanvasResourceReference) => void }) {
     const selectedRef = useRef(false);
     const rect = textarea.getBoundingClientRect();
-    const boundary = textarea.closest(".ant-modal-content")?.getBoundingClientRect() || { left: 8, top: 8, right: window.innerWidth - 8, bottom: window.innerHeight - 8 };
+    const boundary = textarea.closest(CANVAS_DIALOG_CONTENT)?.getBoundingClientRect() || { left: 8, top: 8, right: window.innerWidth - 8, bottom: window.innerHeight - 8 };
     const menuWidth = 256;
     const maxMenuHeight = 224;
     const gap = 6;

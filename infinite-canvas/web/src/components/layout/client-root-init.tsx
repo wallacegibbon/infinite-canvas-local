@@ -1,21 +1,18 @@
 import type { ReactNode } from "react";
 import { useEffect, useRef } from "react";
-import { App } from "antd";
 import { useTranslation } from "react-i18next";
 
+import { toast } from "@/components/kit/toast";
 import { useConfigStore } from "@/stores/use-config-store";
-import { usePromptSourceScheduler } from "@/hooks/use-prompt-source-scheduler";
 import { useLocalGatewaySync } from "@/hooks/use-local-gateway-sync";
 import { useSkinUnlockPersistence } from "@/hooks/use-skin-unlock-persistence";
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
-    const { message } = App.useApp();
     const { t } = useTranslation();
     const handledConfigParams = useRef(false);
     const importChannelCredentials = useConfigStore((state) => state.importChannelCredentials);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
 
-    usePromptSourceScheduler();
     useLocalGatewaySync();
     useSkinUnlockPersistence();
 
@@ -33,11 +30,11 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         window.history.replaceState(null, "", `${window.location.pathname}${searchParams.size ? `?${searchParams}` : ""}${window.location.hash}`);
         const result = importChannelCredentials({ baseUrl, apiKey });
         openConfigDialog(false, "channels");
-        if (result.status === "created") message.success(t("config.importedChannelCreated", { name: result.channelName }));
-        else if (result.status === "updated") message.success(t("config.importedChannelUpdated", { name: result.channelName }));
-        else if (result.status === "missing-base-url") message.error(t("config.importedChannelBaseUrlRequired"));
-        else message.error(t("config.importedChannelBaseUrlInvalid"));
-    }, [importChannelCredentials, message, openConfigDialog, t]);
+        if (result.status === "created") toast.success(t("config.importedChannelCreated", { name: result.channelName }));
+        else if (result.status === "updated") toast.success(t("config.importedChannelUpdated", { name: result.channelName }));
+        else if (result.status === "missing-base-url") toast.error(t("config.importedChannelBaseUrlRequired"));
+        else toast.error(t("config.importedChannelBaseUrlInvalid"));
+    }, [importChannelCredentials, openConfigDialog, t]);
 
     return <>{children}</>;
 }

@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 
 import { pickImageSource } from "../src/lib/image-thumbnail";
 

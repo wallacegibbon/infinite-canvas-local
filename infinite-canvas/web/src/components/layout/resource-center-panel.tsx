@@ -1,24 +1,10 @@
-import { App, Button, Checkbox, Modal, Progress, Select, Tag, Tooltip } from "antd";
+import { Button, Checkbox, Modal, Progress, Tag, Tooltip } from "antd";
 import { AlertTriangle, ChevronDown, Download, HardDriveDownload, RefreshCw, Server, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-    cancelResourceJob,
-    fetchResourceJob,
-    fetchResourceStatus,
-    formatBytes,
-    installResources,
-    pickResourceReplacement,
-    refreshResourceStatus,
-    setResourceReplacement,
-    setPackMainModel,
-    setWorkflowVisibility,
-    type ResourceItem,
-    type ResourceJob,
-    type ResourcePack,
-    type ResourceStatus,
-} from "@/services/api/resources";
+import { toast } from "@/components/kit/toast";
+import { cancelResourceJob, fetchResourceJob, fetchResourceStatus, formatBytes, installResources, pickResourceReplacement, refreshResourceStatus, setResourceReplacement, setWorkflowVisibility, type ResourceItem, type ResourceJob, type ResourcePack, type ResourceStatus } from "@/services/api/resources";
 import { gatewayVariantLabel } from "@/lib/gateway-labels";
 import { isGatewayDown } from "@/services/api/gateway-status";
 
@@ -235,13 +221,6 @@ const copyByLocale = {
 
 type Copy = typeof copyByLocale.zh;
 
-function runtimeLabel(item: ResourceItem) {
-    const runtime = item.pipRuntime;
-    if (!runtime) return item.pythonVersion ? `Python ${item.pythonVersion}` : "?";
-    return [runtime.python ? `Python ${runtime.python}` : "", runtime.torch ? `Torch ${runtime.torch}` : "", runtime.cuda ? `CUDA ${runtime.cuda}` : ""]
-        .filter(Boolean)
-        .join(" / ") || "?";
-}
 
 function sourceSummary(item: ResourceItem, copy: Copy) {
     return `${copy.sources} ${item.sources.length}`;
@@ -432,11 +411,11 @@ function WorkflowResourceRow({
 }
 
 export function ResourceCenterPanel({ compact = false, footer }: { compact?: boolean; footer?: React.ReactNode }) {
-    const { message, modal } = App.useApp();
+
     // A dropped gateway is reported by the shared banner; do not raise one error per request.
     const showError = (error: unknown) => {
         if (isGatewayDown()) return;
-        message.error(error instanceof Error ? error.message : String(error));
+        toast.error(error instanceof Error ? error.message : String(error));
     };
     const { i18n } = useTranslation();
     const copy = i18n.language.startsWith("zh") ? copyByLocale.zh : copyByLocale.en;
@@ -452,7 +431,6 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
     const [expandedWorkflows, setExpandedWorkflows] = useState<Set<string>>(new Set());
     const [speeds, setSpeeds] = useState<Record<string, number>>({});
     const [stopping, setStopping] = useState(false);
-    const [mainModelSaving, setMainModelSaving] = useState("");
     const [replacementSaving, setReplacementSaving] = useState("");
     const pollRef = useRef<number | null>(null);
     const selectedInitialized = useRef(false);
@@ -536,8 +514,8 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                     stopPolling();
                     speedSamples.current.clear();
                     setSpeeds({});
-                    if (next.status === "done") message.success(copy.done);
-                    else if (next.status === "error") message.error(next.message || copy.failed);
+                    if (next.status === "done") toast.success(copy.done);
+                    else if (next.status === "error") toast.error(next.message || copy.failed);
                     await load(true);
                     window.dispatchEvent(new Event("local-gateway-refresh-models"));
                 }
@@ -548,7 +526,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
         };
         pollRef.current = window.setInterval(() => void tick(), 900);
         void tick();
-    }, [copy.done, copy.failed, load, message, stopPolling]);
+    }, [copy.done, copy.failed, load, stopPolling]);
 
     // Installs are local file writes, so a gateway on another machine can only download to
     // the wrong disk. They stay off until the deployment states otherwise
@@ -561,11 +539,11 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
         // The server refuses this too (model_install_disabled); catching it here keeps the
         // reason readable instead of surfacing a raw API message.
         if (installDisabled) {
-            message.warning(copy.installDisabled);
+            toast.warning(copy.installDisabled);
             return;
         }
         if (!input.ids?.length && !input.packs?.length) {
-            message.info(copy.emptyMissing);
+            toast.info(copy.emptyMissing);
             return;
         }
         const nextInput = input;
@@ -593,9 +571,9 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
     const copyHintText = async (text: string) => {
         try {
             await navigator.clipboard.writeText(text);
-            message.success(copy.hintCopied);
+            toast.success(copy.hintCopied);
         } catch (copyError) {
-            message.error(copyError instanceof Error ? copyError.message : String(copyError));
+            toast.error(copyError instanceof Error ? copyError.message : String(copyError));
         }
     };
 
@@ -654,13 +632,13 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
     const replaceResource = async (item: ResourceItem) => {
         if (replacementSaving) return;
         setReplacementSaving(item.id);
-        message.info(copy.picking);
+        toast.info(copy.picking);
         try {
             const file = await pickResourceReplacement(item.id);
             if (!file) return;
             setStatus(await setResourceReplacement(item.id, file));
             window.dispatchEvent(new Event("local-gateway-refresh-models"));
-            message.success(copy.replaced);
+            toast.success(copy.replaced);
         } catch (error) {
             showError(error);
         } finally {
@@ -680,19 +658,6 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
         }
     };
 
-    const switchMainModel = async (packId: string, file: string) => {
-        if (mainModelSaving) return;
-        setMainModelSaving(packId);
-        try {
-            const next = await setPackMainModel(packId, file);
-            setStatus(next);
-            window.dispatchEvent(new Event("local-gateway-refresh-models"));
-        } catch (changeError) {
-            showError(changeError);
-        } finally {
-            setMainModelSaving("");
-        }
-    };
 
     const toggleExpanded = (id: string) => {
         setExpandedPacks((current) => {
@@ -866,48 +831,6 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                     ];
                     const expandable = pack.total > 0 || pack.optionalTotal > 0 || workflowDependencies.length > 0;
                     const optionalLabel = pack.optionalLabel?.trim() || copy.optionalSection;
-                    const mainModel = pack.mainModel;
-                    const mainModelOptions = mainModel
-                        ? [
-                              { value: "", label: `${copy.mainModelDefault} · ${mainModel.defaultLabel}` },
-                              ...(mainModel.options.some((option) => option.source === "pack")
-                                  ? [{
-                                        label: copy.mainModelPack,
-                                        options: mainModel.options
-                                            .filter((option) => option.source === "pack")
-                                            .map((option) => ({
-                                                value: option.file,
-                                                label: option.installed ? option.label : `${option.label} · ${copy.mainModelMissing}`,
-                                                disabled: !option.installed && option.file !== mainModel.selected,
-                                            })),
-                                    }]
-                                  : []),
-                              ...(mainModel.options.some((option) => option.source === "local" && option.matches !== false)
-                                  ? [{
-                                        label: copy.mainModelLocal,
-                                        options: mainModel.options
-                                            .filter((option) => option.source === "local" && option.matches !== false)
-                                            .map((option) => ({
-                                                value: option.file,
-                                                label: option.installed ? option.label : `${option.label} · ${copy.mainModelMissing}`,
-                                                disabled: !option.installed && option.file !== mainModel.selected,
-                                            })),
-                                    }]
-                                  : []),
-                              ...(mainModel.options.some((option) => option.source === "local" && option.matches === false)
-                                  ? [{
-                                        label: copy.mainModelOther,
-                                        options: mainModel.options
-                                            .filter((option) => option.source === "local" && option.matches === false)
-                                            .map((option) => ({
-                                                value: option.file,
-                                                label: option.installed ? option.label : `${option.label} · ${copy.mainModelMissing}`,
-                                                disabled: !option.installed && option.file !== mainModel.selected,
-                                            })),
-                                    }]
-                                  : []),
-                          ]
-                        : [];
                     const headerBody = (
                         <>
                             <div className="flex flex-wrap items-center gap-2">

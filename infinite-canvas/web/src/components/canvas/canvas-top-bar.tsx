@@ -8,7 +8,6 @@ import { CanvasSystemStatus } from "@/components/canvas/canvas-system-status";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasSidePanelStore } from "@/stores/use-canvas-side-panel-store";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { LOCAL_ONLY } from "@/constant/app-mode";
 
 export function CanvasTopBar({
     title,
@@ -132,7 +131,7 @@ export function CanvasTopBar({
                 </div>
 
                 <div className="pointer-events-auto flex items-center gap-1.5">
-                    {LOCAL_ONLY ? <CanvasSystemStatus /> : null}
+                    <CanvasSystemStatus />
                     <UserStatusActions variant="canvas" onOpenShortcuts={() => setShortcutsOpen(true)} onOpenPlugins={onOpenPlugins} />
                 </div>
             </div>

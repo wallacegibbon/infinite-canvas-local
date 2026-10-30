@@ -5,6 +5,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Colour contract: the palette lives in `src/lib/design-tokens.ts` — Tailwind's
+ * `stone` scale for surfaces, plus a cold `pureNeutral` ink for primary buttons.
+ * The custom properties below carry the same decisions as oklch so utilities like
+ * `bg-popover` and `border-border` can reach them. CSS cannot import that module,
+ * so changing a semantic colour is two edits: `design-tokens.ts` first, then the
+ * matching property here. The `.ant-*` rules further down are overrides, not a
+ * second palette — when antd goes, they go with it.
+ */
+
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);

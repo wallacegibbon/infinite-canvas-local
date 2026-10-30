@@ -2,13 +2,12 @@ import axios from "axios";
 
 import i18n from "@/i18n";
 import { LOCAL_GATEWAY_BASE_URL, isLocalGatewayUrl } from "@/constant/app-mode";
-import { buildApiUrl, channelModelOf, resolveModelRequestConfig, resolveModelScript, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
-import { normalizePluginImages, runModelPlugin } from "./model-plugin";
+import { buildApiUrl, channelModelOf, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
-import { imageSizePresets, inferMediaScale } from "@/lib/media-size";
+import { imageSizePresets } from "@/lib/media-size";
 import { publishStepProgress } from "@/services/api/step-progress";
 import { noteGatewayError } from "@/services/api/gateway-status";
 import type { ReferenceImage } from "@/types/image";
@@ -40,35 +39,18 @@ type ResponseInputMessage =
     | { type: "function_call"; call_id: string; name: string; arguments: string; thoughtSignature?: string }
     | { role: "tool"; tool_call_id: string; content: string };
 
-type ResponseFunctionTool = {
-    type: "function";
-    function: {
-        name: string;
-        description?: string;
-        parameters: Record<string, unknown>;
-        strict?: boolean;
-    };
-};
 
 type ToolResponseResult = {
     content: string;
     toolCalls: ResponseToolCall[];
 };
 
-type ToolChoice = "auto" | "required" | { type: "function"; name: string };
 type ResponseMessageContent = AiTextMessage["content"] | string;
 type ResponseInputContent = { type: "input_text"; text: string } | { type: "input_image"; image_url: string };
 type ResponseInputItem =
     | { role: "system" | "user" | "assistant"; content: string | ResponseInputContent[] }
     | { type: "function_call"; call_id: string; name: string; arguments: string }
     | { type: "function_call_output"; call_id: string; output: string };
-type ResponseApiToolDefinition = {
-    type: "function";
-    name: string;
-    description?: string;
-    parameters: Record<string, unknown>;
-    strict?: boolean;
-};
 type ResponseApiOutputItem =
     | { type?: "message"; content?: Array<{ type?: string; text?: string }> }
     | { type?: "function_call"; id?: string; call_id?: string; name?: string; arguments?: string };
@@ -108,7 +90,6 @@ type GeminiPayload = {
 type GeminiStreamState = { buffer: string; text: string; toolCalls: ResponseToolCall[]; error?: string };
 type RequestOptions = { signal?: AbortSignal; params?: Record<string, unknown> };
 
-const IMAGE_QUALITY_VALUES = ["low", "medium", "high", "xhigh", "max"];
 const DEFAULT_IMAGE_SHORT_SIDE = 1024;
 const IMAGE_SIZE_STEP = 16;
 const IMAGE_MIN_PIXELS = 655360;
@@ -171,11 +152,6 @@ export function attachLocalProgress(config: AiConfig, requestId: string, signal?
 }
 
 const GEMINI_SUPPORTED_RATIOS = ["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"];
-
-function normalizeQuality(quality: string) {
-    const value = quality.trim().toLowerCase();
-    return IMAGE_QUALITY_VALUES.includes(value) ? value : undefined;
-}
 
 /** Only "transparent" is forwarded; any other value (incl. empty) means keep the default opaque background. */
 function normalizeBackground(background: string | undefined) {
@@ -432,15 +408,6 @@ function toResponseContent(content: ResponseMessageContent): string | ResponseIn
     return content.map((item) => (item.type === "text" ? { type: "input_text" as const, text: item.text } : { type: "input_image" as const, image_url: item.image_url.url }));
 }
 
-function toResponseTool(tool: ResponseFunctionTool): ResponseApiToolDefinition {
-    return {
-        type: "function",
-        name: tool.function.name,
-        description: tool.function.description,
-        parameters: tool.function.parameters,
-        strict: tool.function.strict,
-    };
-}
 
 function parseToolResponse(payload: ResponseApiPayload): ToolResponseResult {
     const output = payload.output || [];
@@ -629,22 +596,6 @@ function jsonValue(value: string): unknown {
     }
 }
 
-function toGeminiToolOptions(tools: ResponseFunctionTool[], toolChoice: ToolChoice) {
-    if (!tools.length) return {};
-    const functionDeclarations = tools.map((tool) => ({
-        name: tool.function.name,
-        description: tool.function.description,
-        parameters: tool.function.parameters,
-    }));
-    const functionCallingConfig =
-        typeof toolChoice === "object"
-            ? { mode: "ANY", allowedFunctionNames: [toolChoice.name] }
-            : { mode: toolChoice === "required" ? "ANY" : "AUTO" };
-    return {
-        tools: [{ functionDeclarations }],
-        toolConfig: { functionCallingConfig },
-    };
-}
 
 async function requestGeminiStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
     const response = await fetch(`${geminiApiUrl(config, "streamGenerateContent")}?alt=sse`, {
@@ -764,26 +715,6 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
 export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
-    const script = resolveModelScript(config, config.model || config.imageModel);
-    if (script) {
-        const quality = normalizeQuality(config.quality);
-        const requestSize = resolveRequestSize(config.size);
-        const background = normalizeBackground(config.background);
-        try {
-            const result = await runModelPlugin({
-                capability: "image",
-                script,
-                config: requestConfig,
-                prompt: withSystemPrompt(requestConfig, prompt),
-                images: [],
-                params: { size: requestSize, resolution: inferMediaScale(config.size), quality, count: n, ...(background ? { background } : {}) },
-                signal: options?.signal,
-            });
-            return normalizePluginImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
-        } catch (error) {
-            throw new Error(readAxiosError(error, apiText("requestFailed")));
-        }
-    }
     if (requestConfig.apiFormat === "gemini") {
         try {
             return await requestGeminiImages(requestConfig, prompt, [], n, options);
@@ -837,27 +768,6 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = buildImageReferencePromptText(prompt, references);
-    const script = resolveModelScript(config, config.model || config.imageModel);
-    if (script) {
-        const quality = normalizeQuality(config.quality);
-        const requestSize = resolveRequestSize(config.size);
-        const background = normalizeBackground(config.background);
-        const refs = await Promise.all(references.map((image) => imageToDataUrl(image)));
-        try {
-            const result = await runModelPlugin({
-                capability: "image",
-                script,
-                config: requestConfig,
-                prompt: withSystemPrompt(requestConfig, requestPrompt),
-                images: refs,
-                params: { size: requestSize, resolution: inferMediaScale(config.size), quality, count: n, ...(background ? { background } : {}) },
-                signal: options?.signal,
-            });
-            return normalizePluginImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
-        } catch (error) {
-            throw new Error(readAxiosError(error, apiText("requestFailed")));
-        }
-    }
     if (requestConfig.apiFormat === "gemini") {
         try {
             return await requestGeminiImages(requestConfig, requestPrompt, references, n, options);
@@ -1134,24 +1044,6 @@ export async function requestUpscale(config: AiConfig, image: ReferenceImage, op
 }
 
 export async function requestImageQuestion(config: AiConfig, messages: AiTextMessage[], onDelta: (text: string) => void, options?: RequestOptions) {    const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
-    const script = resolveModelScript(config, config.model || config.textModel);
-    if (script) {
-        try {
-            const answer = await runModelPlugin<string>({
-                capability: "text",
-                script,
-                config: requestConfig,
-                messages: withSystemMessage(requestConfig, messages),
-                signal: options?.signal,
-                onDelta,
-            });
-            const text = String(answer ?? "").trim() || apiText("noContent");
-            if (text === apiText("noContent")) onDelta(text);
-            return text;
-        } catch (error) {
-            throw new Error(readAxiosError(error, apiText("requestFailed")));
-        }
-    }
     try {
         if (requestConfig.apiFormat === "gemini") {
             const answer = (await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages), onDelta, options)).content || apiText("noContent");

@@ -1,27 +1,24 @@
-import { App, Button, Form, Input, Modal, Progress, Radio, Select, Switch, Tabs } from "antd";
-import type { TFunction } from "i18next";
-import { ArrowLeft, ArrowRight, Cloud, ChevronDown, Download, Lock, Pencil, Plus, RefreshCw, Trash2, Upload, Wifi } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Button, Form, Input, Modal, Radio, Select, Switch, Tabs } from "antd";
+import { ArrowLeft, ArrowRight, ChevronDown, Lock, Pencil, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { toast } from "@/components/kit/toast";
+import { confirm } from "@/components/kit/confirm";
 import { ModelPicker, WorkflowModelPicker } from "@/components/model-picker";
 import { imageAspectOptions } from "@/components/image-settings-panel";
-import { LOCAL_ONLY } from "@/constant/app-mode";
 import { videoResolutionOptions } from "@/components/video-settings-panel";
 import { ChannelEditorDrawer } from "@/components/layout/channel-editor-drawer";
-import { ConfigPromptSources } from "@/components/layout/config-prompt-sources";
 import { ConfigLocalStorage } from "@/components/layout/config-local-storage";
 import { ResourceCenterPanel } from "@/components/layout/resource-center-panel";
-import type { AppLocale } from "@/i18n";
-import { exportAppConfig, importAppConfig } from "@/services/config-file";
-import { audioFormatOptions, audioVoiceOptions, normalizeAudioSpeedValue } from "@/lib/audio-generation";
 import { computeMediaSize, inferMediaRatio, inferMediaScale, mediaScaleOptions, parseVideoResolution } from "@/lib/media-size";
 import { progressRingSkins } from "@/lib/canvas/progress-ring-skins";
 import { cardSkinIds, getCanvasTheme, type CardSkinId } from "@/lib/canvas-theme";
+import { stone } from "@/lib/design-tokens";
 import { isCardSkinLocked, verifySkinPassword } from "@/lib/canvas/skin-unlocks";
 import { persistSkinUnlock } from "@/services/api/skin-unlocks";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { createModelChannel, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel, type PromptCloudApi } from "@/stores/use-config-store";
+import { modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ConfigTabKey, type ModelCapability, type ModelChannel, type PromptCloudApi } from "@/stores/use-config-store";
 
 type ModelGroup = {
     capability: ModelCapability;
@@ -37,9 +34,7 @@ const modelGroups: ModelGroup[] = [
 ];
 
 export function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { showDoneButton?: boolean; initialTab?: ConfigTabKey }) {
-    const { message, modal } = App.useApp();
-    const { i18n, t } = useTranslation();
-    const configInputRef = useRef<HTMLInputElement>(null);
+    const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState<ConfigTabKey>(initialTab);
     const [editingChannelId, setEditingChannelId] = useState("");
     const [cloudApiEditorOpen, setCloudApiEditorOpen] = useState(false);
@@ -71,7 +66,6 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
     const editingChannel = config.channels.find((channel) => channel.id === editingChannelId) || null;
     const cloudApis = config.promptCloudApis || [];
     const activeCloudApiId = config.promptCloudApiId || "";
-    const locale = i18n.resolvedLanguage as AppLocale;
     const imageResolutionOptions = mediaScaleOptions.map((value) => ({ value, label: value === "auto" ? t("settingsPanels.common.auto") : value.toUpperCase() }));
     useEffect(() => setActiveTab(initialTab), [initialTab]);
 
@@ -115,7 +109,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
             unlockCardSkin(passwordSkinId);
             if (passwordSkinId === "fish") setFishOptionsOpen(true);
             void persistSkinUnlock(passwordSkinId).catch(() => undefined);
-            message.success(t("config.preferences.cardSkinUnlocked", { name: t(`config.preferences.cardSkins.${passwordSkinId}.label`) }));
+            toast.success(t("config.preferences.cardSkinUnlocked", { name: t(`config.preferences.cardSkins.${passwordSkinId}.label`) }));
             setPasswordSkinId(null);
             setSkinPassword("");
         } catch {
@@ -133,36 +127,14 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
         const ready = config.channels.some((channel) => channel.baseUrl.trim() && channel.apiKey.trim() && channel.models.length);
         setConfigDialogOpen(false);
         if (!ready) return;
-        message.success(t(shouldPromptContinue ? "config.savedContinue" : "config.saved"));
+        toast.success(t(shouldPromptContinue ? "config.savedContinue" : "config.saved"));
         clearPromptContinue();
     };
 
-    const loadConfigFile = async (file: File) => {
-        try {
-            await importAppConfig(file);
-            message.success(t("config.imported"));
-        } catch (error) {
-            message.error(error instanceof Error ? error.message : t("config.importFailed"));
-        } finally {
-            if (configInputRef.current) configInputRef.current.value = "";
-        }
-    };
 
     const updateChannels = (channels: ModelChannel[]) => saveConfig(withChannels(config, channels));
 
-    const addChannel = () => {
-        const channel = createModelChannel({ name: t("config.channels.numberedName", { count: config.channels.length + 1 }) });
-        updateChannels([...config.channels, channel]);
-        setEditingChannelId(channel.id);
-    };
 
-    const deleteChannel = (id: string) => {
-        if (config.channels.length <= 1) {
-            message.warning(t("config.channels.keepOne"));
-            return;
-        }
-        updateChannels(config.channels.filter((channel) => channel.id !== id));
-    };
 
     const saveChannel = (channel: ModelChannel) => {
         updateChannels(config.channels.map((item) => (item.id === channel.id ? channel : item)));
@@ -180,42 +152,26 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
             if (editingCloudApiId) updatePromptCloudApi(editingCloudApiId, values);
             else addPromptCloudApi(values);
             setCloudApiEditorOpen(false);
-            message.success(t("config.cloudApi.saved"));
+            toast.success(t("config.cloudApi.saved"));
         } catch {
             // Form validation errors are displayed inline.
         }
     };
 
     const deleteCloudApi = (api: PromptCloudApi) => {
-        modal.confirm({
+        confirm({
             title: t("config.cloudApi.deleteTitle", { name: api.name || t("config.cloudApi.unnamed") }),
             content: t("config.cloudApi.deleteDescription"),
             okText: t("common.delete"),
-            okButtonProps: { danger: true },
+            danger: true,
             cancelText: t("common.cancel"),
             onOk: () => removePromptCloudApi(api.id),
         });
     };
 
-
     return (
         <>
-            {!LOCAL_ONLY ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-3 dark:border-stone-800">
-                    <div className="text-xs text-stone-500">{t("config.fileSecurity")}</div>
-                    <div className="flex gap-2">
-                        <Button icon={<Upload className="size-4" />} onClick={() => configInputRef.current?.click()}>
-                            {t("config.import")}
-                        </Button>
-                        <Button icon={<Download className="size-4" />} onClick={exportAppConfig}>
-                            {t("config.export")}
-                        </Button>
-                        <input ref={configInputRef} type="file" accept="application/json,.json" className="hidden" onChange={(event) => event.target.files?.[0] && void loadConfigFile(event.target.files[0])} />
-                    </div>
-                </div>
-            ) : (
-                <div className="border-b border-stone-200 pb-3 text-xs text-stone-500 dark:border-stone-800">配置只保存在本机浏览器。</div>
-            )}
+            <div className="border-b border-stone-200 pb-3 text-xs text-stone-500 dark:border-stone-800">{t("config.localStorageNote")}</div>
             <Tabs
                 activeKey={activeTab}
                 onChange={(key) => setActiveTab(key as ConfigTabKey)}
@@ -226,12 +182,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                         children: (
                             <div>
                                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                                    <div className="text-xs text-stone-500">{LOCAL_ONLY ? t("config.channels.localOnlyDescription") : t("config.channels.description")}</div>
-                                    {!LOCAL_ONLY ? (
-                                        <Button type="primary" icon={<Plus className="size-4" />} onClick={addChannel}>
-                                            {t("config.channels.add")}
-                                        </Button>
-                                    ) : null}
+                                    <div className="text-xs text-stone-500">t("config.channels.localOnlyDescription")</div>
                                 </div>
                                 <div className="space-y-2">
                                     {config.channels.map((channel) => (
@@ -239,14 +190,13 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                             <div className="min-w-0">
                                                 <div className="truncate text-sm font-semibold">{channel.name || t("config.channels.unnamed")}</div>
                                                 <div className="mt-1 truncate text-xs text-stone-500">
-                                                    {LOCAL_ONLY ? t("config.channels.localGateway") : apiFormatLabel(channel.apiFormat)} · {t("config.channels.modelCount", { count: channel.models.length })} · {channel.baseUrl || t("config.channels.missingUrl")}
+                                                    t("config.channels.localGateway") · {t("config.channels.modelCount", { count: channel.models.length })} · {channel.baseUrl || t("config.channels.missingUrl")}
                                                 </div>
                                             </div>
                                             <div className="flex shrink-0 gap-2">
                                                 <Button size="small" icon={<Pencil className="size-3.5" />} onClick={() => setEditingChannelId(channel.id)}>
                                                     {t("common.edit")}
                                                 </Button>
-                                                {!LOCAL_ONLY ? <Button size="small" danger icon={<Trash2 className="size-3.5" />} onClick={() => deleteChannel(channel.id)} /> : null}
                                             </div>
                                         </div>
                                     ))}
@@ -333,7 +283,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                 <div className="mb-2 text-sm font-semibold">{t("config.preferences.defaultModels")}</div>
                                 <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                                     {modelGroups
-                                        .filter((group) => !LOCAL_ONLY || group.capability === "image" || group.capability === "video")
+                                        .filter((group) => group.capability === "image" || group.capability === "video")
                                         .map((group) => (
                                             <Form.Item key={group.modelKey} label={t(group.labelKey)} className="mb-0">
                                                 {group.capability === "image" || group.capability === "video" ? (
@@ -365,27 +315,6 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                     <Form.Item label={t("config.preferences.videoResolution")} className="mb-4">
                                         <Select value={parseVideoResolution(config.vquality)} options={videoResolutionOptions} onChange={(value) => updateConfig("vquality", value)} />
                                     </Form.Item>
-                                    {!LOCAL_ONLY ? (
-                                        <>
-                                            <Form.Item label={t("config.preferences.audioVoice")} className="mb-4">
-                                                <Select value={config.audioVoice} options={audioVoiceOptions} onChange={(value) => updateConfig("audioVoice", value)} />
-                                            </Form.Item>
-                                            <Form.Item label={t("config.preferences.audioFormat")} className="mb-4">
-                                                <Select value={config.audioFormat} options={audioFormatOptions} onChange={(value) => updateConfig("audioFormat", value)} />
-                                            </Form.Item>
-                                            <Form.Item label={t("config.preferences.audioSpeed")} className="mb-4">
-                                                <Input
-                                                    type="number"
-                                                    min={0.25}
-                                                    max={4}
-                                                    step={0.05}
-                                                    value={config.audioSpeed}
-                                                    onChange={(event) => updateConfig("audioSpeed", event.target.value)}
-                                                    onBlur={(event) => updateConfig("audioSpeed", normalizeAudioSpeedValue(event.target.value))}
-                                                />
-                                            </Form.Item>
-                                        </>
-                                    ) : null}
                                 </div>
                                 <Form.Item label={t("config.preferences.cardSkin")} extra={t("config.preferences.cardSkinDescription")} className="mb-4">
                                     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -466,7 +395,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                                     onClick={() => updateConfig("progressRingSkin", skin.id)}
                                                     className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition ${selected ? "border-stone-900 bg-stone-100 dark:border-stone-100 dark:bg-white/10" : "border-stone-200 hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-white/5"}`}
                                                 >
-                                                    <span className="relative grid h-7 w-14 shrink-0 place-items-center overflow-hidden rounded-md" style={{ background: appTheme === "dark" ? "#1c1917" : "#f5f5f4" }}>
+                                                    <span className="relative grid h-7 w-14 shrink-0 place-items-center overflow-hidden rounded-md" style={{ background: appTheme === "dark" ? stone[900] : stone[100] }}>
                                                         {skin.mode === "tide" ? (
                                                             <span
                                                                 className="absolute inset-x-0 bottom-0 h-[62%]"
@@ -506,21 +435,11 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                                         <Switch checked={config.autoFocusOnSelect} onChange={(checked) => updateConfig("autoFocusOnSelect", checked)} />
                                     </div>
                                 </Form.Item>
-                                {!LOCAL_ONLY ? (
-                                    <Form.Item label={t("config.preferences.audioInstructions")} className="mb-4">
-                                        <Input.TextArea rows={2} value={config.audioInstructions} placeholder={t("config.preferences.audioInstructionsPlaceholder")} onChange={(event) => updateConfig("audioInstructions", event.target.value)} />
-                                    </Form.Item>
-                                ) : null}
                                 <Form.Item label={t("config.preferences.systemPrompt")} className="mb-0">
                                     <Input.TextArea rows={4} value={config.systemPrompt} placeholder={t("config.preferences.systemPromptPlaceholder")} onChange={(event) => updateConfig("systemPrompt", event.target.value)} />
                                 </Form.Item>
                             </Form>
                         ),
-                    },
-                    {
-                        key: "prompt-sources",
-                        label: t("config.tabs.promptSources"),
-                        children: <ConfigPromptSources />,
                     },
                     {
                         key: "resources",
@@ -532,7 +451,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
                         label: t("config.tabs.localStorage"),
                         children: <ConfigLocalStorage active={activeTab === "local-storage"} />,
                     },
-                ].filter((tab) => !LOCAL_ONLY || !["prompt-sources"].includes(tab.key))}
+                ]}
             />
             {showDoneButton ? (
                 <div className="mt-4 flex justify-end">
@@ -655,13 +574,4 @@ function normalizeImageCount(value: string) {
     return String(Math.max(1, Math.min(15, Math.floor(Math.abs(Number(value)) || 3))));
 }
 
-function apiFormatLabel(apiFormat: ApiCallFormat) {
-    if (apiFormat === "gemini") return "Gemini";
-    return "OpenAI";
-}
 
-function formatBytes(bytes: number) {
-    if (bytes < 1024) return `${bytes}B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-    return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
-}

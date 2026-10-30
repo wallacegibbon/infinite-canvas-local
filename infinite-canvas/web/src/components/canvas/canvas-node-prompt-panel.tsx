@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ChevronRight, LoaderCircle, Maximize2, ScanText, Sparkles, Square, X } from "lucide-react";
-import { Button, message, Modal, Tooltip } from "antd";
+import { Button, Modal, Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 
+import { toast } from "@/components/kit/toast";
 import { BaseModelPicker, ModelPicker, WorkflowModelPicker } from "@/components/model-picker";
 import { channelModelOf, defaultConfig, modelImageInputs, modelOptionName, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 
@@ -46,7 +47,6 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
     const { t } = useTranslation();
     const globalConfig = useEffectiveConfig();
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
-    const updateConfig = useConfigStore((state) => state.updateConfig);
     const theme = useCanvasTheme();
     const mode = modeOverride ?? defaultMode(node.type);
     const config = buildNodeConfig(globalConfig, node, mode);
@@ -204,7 +204,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
         const text = draft.trim();
         if (!text || isRunning) return;
         if (textVideoHasReferences) {
-            message.warning(t("canvas.promptPanel.videoTextRefsWarning"));
+            toast.warning(t("canvas.promptPanel.videoTextRefsWarning"));
             return;
         }
         commitPrompt(draft);
@@ -246,7 +246,7 @@ export function CanvasNodePromptPanel({ node, nodes, isRunning, onPromptChange, 
     // ✨ starts immediately: if the endpoint is not configured, warn and jump to settings instead of opening another panel first.
     const startOptimize = (run: () => void) => {
         if (!optimizeCloudReady) {
-            message.warning(t("canvas.promptPanel.optimizeCloudMissing"));
+            toast.warning(t("canvas.promptPanel.optimizeCloudMissing"));
             openConfigDialog(true, "cloud-api");
             return;
         }

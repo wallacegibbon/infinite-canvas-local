@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
+import { CANVAS_CLICK_GUARD, CANVAS_WHEEL_GUARD } from "@/lib/canvas-overlay";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { ViewportTransform } from "@/types/canvas";
 
-// Ant Design renders dropdowns/popovers in portals. React still bubbles their
-// pointer events through this canvas, so without this guard a click on an
-// option would be treated as a background click and close the node panel.
-const OVERLAY_SELECTOR = "[data-canvas-no-zoom],.ant-select-dropdown,.ant-dropdown,.ant-popover,.ant-picker-dropdown,.ant-tooltip,.ant-modal-root,.ant-notification,.ant-message";
+// Overlay guards live in `@/lib/canvas-overlay` — see the comment there for why a
+// click inside a portal has to be told apart from a click on the canvas.
 
 type InfiniteCanvasProps = {
     containerRef: React.RefObject<HTMLDivElement | null>;
@@ -91,7 +90,7 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
 
     const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
         const target = event.target instanceof Element ? event.target : null;
-        if (target?.closest("[data-canvas-no-zoom],.ant-modal,.ant-popover,.ant-dropdown,.ant-select-dropdown,.ant-picker-dropdown")) return;
+        if (target?.closest(CANVAS_WHEEL_GUARD)) return;
 
         const delta = -event.deltaY;
         const factor = Math.pow(1.1, delta / 100);
@@ -113,7 +112,7 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
 
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         const target = event.target instanceof Element ? event.target : null;
-        if (target?.closest(OVERLAY_SELECTOR)) return;
+        if (target?.closest(CANVAS_CLICK_GUARD)) return;
         if (target?.closest("[data-connection-create-menu]")) return;
         const isBackgroundClick = !target?.closest("[data-node-id],[data-connection-id]");
         const temporaryTool = event.ctrlKey || isSpacePressed;
@@ -146,7 +145,7 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
 
     const handleDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
         const target = event.target instanceof Element ? event.target : null;
-        if (target?.closest(OVERLAY_SELECTOR)) return;
+        if (target?.closest(CANVAS_CLICK_GUARD)) return;
         if (target?.closest("[data-node-id],[data-connection-id]")) return;
         onCanvasDoubleClick?.(event);
     };
@@ -202,7 +201,7 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
         // Prevent canvas scrolling from moving the page while preserving native scrolling inside overlays and dialogs.
         const preventWheelScroll = (event: WheelEvent) => {
             const target = event.target instanceof Element ? event.target : null;
-            if (target?.closest("[data-canvas-no-zoom],.ant-modal,.ant-popover,.ant-dropdown,.ant-select-dropdown,.ant-picker-dropdown")) return;
+            if (target?.closest(CANVAS_WHEEL_GUARD)) return;
             event.preventDefault();
         };
         container.addEventListener("wheel", preventWheelScroll, { passive: false });

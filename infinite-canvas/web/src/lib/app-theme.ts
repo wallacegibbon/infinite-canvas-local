@@ -1,35 +1,19 @@
 import type { ThemeConfig } from "antd";
 import { theme as antdTheme } from "antd";
 
-const neutral = {
-    light: {
-        primary: "#171717",
-        primaryHover: "#000000",
-        primaryText: "#ffffff",
-        elevatedBg: "#ffffff",
-        itemHoverBg: "rgba(23, 23, 23, 0.06)",
-        itemSelectedBg: "rgba(23, 23, 23, 0.1)",
-        itemSelectedHoverBg: "rgba(23, 23, 23, 0.14)",
-        itemText: "#171717",
-        tableSelectedBg: "rgba(17, 17, 17, 0.05)",
-        tableSelectedHoverBg: "rgba(17, 17, 17, 0.08)",
-    },
-    dark: {
-        primary: "#fafafa",
-        primaryHover: "#ffffff",
-        primaryText: "#171717",
-        elevatedBg: "#1c1917",
-        itemHoverBg: "rgba(250, 250, 249, 0.08)",
-        itemSelectedBg: "rgba(250, 250, 249, 0.12)",
-        itemSelectedHoverBg: "rgba(250, 250, 249, 0.16)",
-        itemText: "#fafafa",
-        tableSelectedBg: "rgba(255, 255, 255, 0.08)",
-        tableSelectedHoverBg: "rgba(255, 255, 255, 0.12)",
-    },
-};
+import { appPalette } from "@/lib/design-tokens";
 
+/**
+ * Maps our palette onto antd's token model.
+ *
+ * This file owns *how* our colours are expressed in antd, not *what* they are —
+ * the values live in `@/lib/design-tokens`. Component-level overrides are only
+ * here where antd has no global token for the surface in question (dropdown,
+ * menu, select popup, selected table row), which is why they are spelled out
+ * one component at a time instead of being derived.
+ */
 export function getAntThemeConfig(dark: boolean): ThemeConfig {
-    const color = dark ? neutral.dark : neutral.light;
+    const color = appPalette[dark ? "dark" : "light"];
 
     return {
         algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
@@ -63,10 +47,10 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
                 itemHoverBg: color.itemHoverBg,
                 itemSelectedBg: color.itemSelectedBg,
                 itemSelectedColor: color.itemText,
-                darkPopupBg: neutral.dark.elevatedBg,
-                darkItemHoverBg: neutral.dark.itemHoverBg,
-                darkItemSelectedBg: neutral.dark.itemSelectedBg,
-                darkItemSelectedColor: neutral.dark.itemText,
+                darkPopupBg: appPalette.dark.elevatedBg,
+                darkItemHoverBg: appPalette.dark.itemHoverBg,
+                darkItemSelectedBg: appPalette.dark.itemSelectedBg,
+                darkItemSelectedColor: appPalette.dark.itemText,
             },
             Select: {
                 optionActiveBg: color.itemHoverBg,

@@ -26,7 +26,7 @@ Maintained here: the workflow graphs and `registry.json`, the resource index and
 - **Local plugins**: LoRA strength card, ComfyUI parameter card.
 - **Prompt optimization**: optional, points at any local or remote OpenAI-compatible endpoint — see [`docs/local-llm.md`](docs/local-llm.md).
 - **System panel**: VRAM / RAM / GPU / ComfyUI status, one-click VRAM release.
-- **Local-only mode**: cloud model channels, WebDAV and the prompt library are hidden by default; the prompt optimizer's "prompt API" tab stays, because it accepts any OpenAI-compatible endpoint including `127.0.0.1`.
+- **Local-only by construction**: there is no cloud mode and no flag to re-enable one. The image/video/prompt workbenches, cloud model channels and the prompt library are deleted, not hidden; the prompt optimizer's "prompt API" tab stays, because it accepts any OpenAI-compatible endpoint including `127.0.0.1`.
 
 ## Layout
 

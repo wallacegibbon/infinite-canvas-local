@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_ONLY } from "@/constant/app-mode";
+import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL } from "@/constant/app-mode";
 import { markGatewayUp, noteGatewayError } from "@/services/api/gateway-status";
 import { encodeChannelModel, guessCapability, modelOptionsFromChannels, useConfigStore, type ModelCapability } from "@/stores/use-config-store";
 
@@ -12,10 +12,9 @@ function syncableCapability(name: string): ModelCapability | null {
     return capability === "image" || capability === "video" ? capability : null;
 }
 
-/** In local mode, sync models from the gateway automatically, so adding or removing a workflow needs no manual channel refresh. */
+/** Sync models from the gateway automatically, so adding or removing a workflow needs no manual channel refresh. */
 export function useLocalGatewaySync() {
     useEffect(() => {
-        if (!LOCAL_ONLY) return;
         let stopped = false;
         let timer: number | undefined;
 

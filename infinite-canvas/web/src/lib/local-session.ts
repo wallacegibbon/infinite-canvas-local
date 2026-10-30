@@ -1,4 +1,4 @@
-import { LOCAL_GATEWAY_BASE_URL, LOCAL_ONLY } from "@/constant/app-mode";
+import { LOCAL_GATEWAY_BASE_URL } from "@/constant/app-mode";
 import { noteGatewayError } from "@/services/api/gateway-status";
 
 const HEARTBEAT_MS = 5000;
@@ -8,9 +8,9 @@ function sessionUrl(path: string) {
     return `${LOCAL_GATEWAY_BASE_URL.replace(/\/v1\/?$/, "")}${path}`;
 }
 
-// Local mode: register the canvas session with the gateway so the launcher can reclaim the backend once the last page closes.
+// Register the canvas session with the gateway so the launcher can reclaim the backend once the last page closes.
 export function startLocalSession() {
-    if (!LOCAL_ONLY || started || typeof window === "undefined") return;
+    if (started || typeof window === "undefined") return;
     started = true;
     const id = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     let timer: number | undefined;

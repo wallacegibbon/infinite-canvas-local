@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { App, Button } from "antd";
+import { Button } from "antd";
 import { Download, FileUp, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { toast } from "@/components/kit/toast";
 import { readZip } from "@/lib/zip";
 import { setMediaBlob } from "@/services/file-storage";
 import { setImageBlob } from "@/services/image-storage";
@@ -15,7 +16,6 @@ import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 
 export default function CanvasPage() {
-    const { message } = App.useApp();
     const { t } = useTranslation();
     const navigate = useNavigate();
     const inputRef = useRef<HTMLInputElement>(null);
@@ -48,9 +48,9 @@ export default function CanvasPage() {
                 ),
             );
             data.projects.forEach((item) => importProject(item.project));
-            message.success(t("canvas.imported", { count: data.projects.length }));
+            toast.success(t("canvas.imported", { count: data.projects.length }));
         } catch {
-            message.error(t("canvas.importFailed"));
+            toast.error(t("canvas.importFailed"));
         } finally {
             if (inputRef.current) inputRef.current.value = "";
         }

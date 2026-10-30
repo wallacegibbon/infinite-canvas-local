@@ -433,3 +433,225 @@ only hide them.
 
 **Where** `internal/workflow` (registry, inference), `internal/comfy`, `internal/resource`,
 `workflows/*.json`.
+
+---
+
+## 23. antd stays; the two ways it leaks are quarantined
+
+**Decision** The canvas keeps antd 6 as its component library. Two kinds of knowledge about
+it are not allowed to spread past one file each:
+
+- *antd's internal DOM.* Every `.ant-*` class name used by application logic now lives in
+  `src/lib/canvas-overlay.ts`. The overlay guards match our own `data-canvas-overlay` marker
+  and the existing `data-canvas-no-zoom` first; the antd class list is a documented fallback
+  array beneath them. When antd goes, that array goes and the canvas is not touched.
+- *The palette.* Colour values live in `src/lib/design-tokens.ts`; `src/lib/app-theme.ts`
+  only maps them onto antd's `ThemeConfig`. `src/lib/canvas-theme.ts` keeps its own hex on
+  purpose — it is feature data (six card skins handed to node renderers and the plugin
+  context), not app chrome.
+
+**Why** Measured before this decision: 60 of 167 frontend files import antd, ~530 JSX
+instances and 121 `message.*` calls go through `App.useApp()`, and the antd chunk is 916 kB
+(298 kB gzip), the single largest third-party block. The number that made this worth writing
+down is not the byte count though, it is the fighting ratio: `globals.css` spends 323 of its
+897 lines overriding `.ant-*`, with 155 `!` utility prefixes across 13 components and 23
+`[&_…ant-…]` arbitrary variants in 3. A library that 36% of the file tree depends on and a
+third of the stylesheet fights is one we can neither swap nor leave alone.
+
+**Why not remove it now** Replacing it is roughly 14–22 engineer-days, and the expensive part
+is exactly the part antd has earned: `Form`, `Modal` and `message`, i.e. focus trapping,
+nested dialogs, validation ordering and toast key reuse. The seams above turn removal into a
+later, cheaper decision rather than an immediate, riskier one. The real blocker was the
+`Modal`–canvas coupling: while the guards read `.ant-*`, any migration would have produced
+silent drag/zoom regressions instead of compile errors.
+
+**Verified** `CANVAS_CLICK_GUARD` and `CANVAS_WHEEL_GUARD` reproduce the two previous
+selectors byte for byte once the new marker is stripped, and `appPalette` matches the old
+inline `neutral` object on all 20 colour slots — the quarantine is a refactor, not a
+restyle. Note that `#fafafa` in the dark theme is a cold `neutral-50` while its elevated
+surface is a warm `stone-900`; that mix predates this decision and is preserved.
+
+**Cost** Whoever finishes the migration must delete the `ANTD_*` constants in
+`canvas-overlay.ts`; leaving them behind means the canvas keeps a hidden dependency on a
+library that is no longer installed. `design-tokens.ts` and the `:root` / `.dark` block in
+`globals.css` cannot import each other, so changing a semantic colour is two edits — both
+file headers say so.
+
+**Where** `infinite-canvas/web/src/lib/canvas-overlay.ts`, `design-tokens.ts`, `app-theme.ts`,
+`canvas-theme.ts`, `styles/globals.css`, `components/canvas/infinite-canvas.tsx`,
+`canvas-context-menu.tsx`, `canvas-size-picker.tsx`, `canvas-resource-mention-textarea.tsx`.
+
+---
+
+## 24. Transient messages go through one facade, not antd
+
+**Decision** Showing a transient message is `toast.success / error / warning / info / loading`
+from `@/components/kit/toast`. That module owns the implementation — currently sonner, which
+has no dependencies and only a React peer — and is mounted once, in `AppProviders`. Call sites
+deliberately keep antd's shape: `toast.loading(text)` returns its own dismiss handler instead
+of an id, so the three export/import flows that do `const hide = …; hide()` were not rewritten.
+Do not "simplify" that away; it is the seam that keeps the library choice out of the callers.
+
+**Why** antd's `message` was reached 121 times from 20 files, 19 of them through
+`const { message } = App.useApp()`. That hook was the only reason those files imported `App`
+at all. After the move, `hooks/use-copy-text.ts` and `components/layout/client-root-init.tsx`
+import nothing from antd, the file count went 60 → 58, and `App.useApp()` now survives only in
+the three files that still need `modal.confirm` (`pages/canvas/project.tsx`,
+`layout/app-config-modal.tsx`, `layout/config-prompt-sources.tsx`) — which is the next slice.
+It also fixed a real inconsistency: `canvas-node-prompt-panel.tsx` used antd's *static*
+`message`, which does not read `ConfigProvider` and therefore rendered with antd's default
+theme rather than ours.
+
+**Cost** The toast looks slightly different — sonner's pill, not antd's, and it shows at most
+three at a time where antd showed unbounded. The copy and the timing did not change:
+`duration: 3000` matches antd's default, and `loading()` is still sticky. The bundle barely
+moved (antd 916 kB → 912 kB) because `message` was a thin slice of a library that is still
+installed — the byte win only arrives when antd goes entirely, so do not read this migration
+as a size optimisation.
+
+**Verified** `tsc --noEmit` and `vite build` clean; the 121 call sites are accounted for
+one-for-one, no bare `message` identifier is left in application code, and the three files
+that keep `modal` still destructure it correctly.
+
+**Where** `infinite-canvas/web/src/components/kit/toast.ts`,
+`components/layout/app-providers.tsx`, `package.json` (sonner), and the 20 migrated files.
+
+---
+
+## 25. Confirmations are a kit primitive, and antd's static helpers are gone
+
+**Decision** Asking "really?" is `confirm({ title, content, okText, cancelText, danger, onOk })`
+from `@/components/kit/confirm`, rendered by a single `<ConfirmHost />` in `AppProviders`. It is
+imperative on purpose: all three call sites fire from an event handler deep inside a component,
+and threading an `open` boolean through them would cost more than the question is worth. The
+dialog is radix's `AlertDialog` — it supplies the focus trap, ESC handling and aria wiring that
+made antd's version trustworthy — while every class name is ours. `AppProviders` no longer wraps
+the tree in antd's `App`; nothing reaches `App.useApp()` any more (measured: 0 call sites, and
+the only remaining `.ant-app` reference in the repo is gone too, so no styles depended on it).
+
+**Why** `App.useApp()` was down to the three files that needed `modal.confirm`
+(`pages/canvas/project.tsx`, `layout/app-config-modal.tsx`, `layout/config-prompt-sources.tsx`),
+i.e. the last thing keeping those files tied to antd's context. With it gone, the antd chunk fell
+from 912.9 kB to 883.5 kB purely by deleting the `App` wrapper, and a future migration no longer
+has to reason about a context layer.
+
+**Cost** The `onOk` contract is antd's, not radix's: returning a promise keeps the dialog open
+with OK disabled until it settles, and a rejection leaves it open rather than closing silently.
+That behaviour had to be reimplemented by hand, so if someone later "cleans up" `handleOk` the
+async cases will start closing early. The styling is also ours now — it is meant to look like the
+antd dialogs around it, and will need a touch-up if the surrounding design moves.
+
+**Where** `infinite-canvas/web/src/components/kit/confirm.tsx`,
+`components/layout/app-providers.tsx`, the three call sites above.
+
+---
+
+## 26. Unit tests run on vitest, because bun was never installed
+
+**Decision** `npm test` is `vitest run`. The three suites under `tests/` import from `vitest`
+instead of `bun:test`, and `vitest.config.ts` exists so the tests do not drag in the app's build
+plugins. `bun.lock`, `pnpm-lock.yaml` and `pnpm-workspace.yaml` are deleted: `Makefile` sets
+`NPM ?= npm`, so `package-lock.json` is the only lockfile that was ever authoritative — the
+other two were stale duplicates that would have installed different trees.
+
+**Why** `bun test` could not run here at all (`bun: command not found`), so the suite was
+vestigial: it had never been executed, and its state was unknown. Running it once made that
+concrete — **4 of 15 assertions were failing**, in `tests/model-selection.test.ts`. They assert
+the *cloud-mode* contract (an explicit but unavailable model selection is preserved so readiness
+blocks the request), while `resolveModelForCapability` implemented the opposite: a model the
+registry no longer knows falls back to its capability default. Since `LOCAL_ONLY` defaulted to
+true, those four were wrong on every build this repository ever produced. They were first gated
+behind `test.skipIf(LOCAL_ONLY)`; decision #27 then deleted cloud mode outright, so the four
+assertions and the gate are gone too. The suite is 11 passing, no skips.
+
+**Cost** The suite covers only pure functions — viewport focus, thumbnail choice, model
+selection. There are no component or canvas interaction tests, so the overlay guards and the
+kit primitives (toast, confirm) are still verified by hand.
+
+**Where** `infinite-canvas/web/package.json`, `vitest.config.ts`, `tests/*.test.ts`.
+
+---
+
+## 27. Cloud mode is deleted, not hidden
+
+**Decision** `LOCAL_ONLY` and everything behind it are gone. There is no `VITE_LOCAL_ONLY`, no
+branch to restore the cloud interface, and no dead UI kept "just in case". Deleted: the
+`/image`, `/video` and `/prompts` workbenches, the cloud model-channel editor paths, the
+audio capability in the canvas, config import/export, the prompt library and prompt-source
+scheduler, the model-script editor, and the cloud default config. Routes and the navigation
+list now contain only what this build can actually serve.
+
+**Why** The flag defaulted to on and nothing anywhere — not `.env`, not `.env.example`, not
+`start.sh`, not `Makefile` — ever set `VITE_LOCAL_ONLY=0`, so no build this repository produced
+could reach the cloud interface. It was inherited from the upstream fork, where it *was* the
+main interface, and kept as an escape hatch that only a source-code comment mentioned. A branch
+nobody builds is a branch nobody validates: it had already produced four permanently failing
+tests (#26), and two of its pages were the largest single consumers of antd. The rule applied
+here is the one from #23 — an unsimplified fork is not a smaller dependency, it is a second
+product that silently rots.
+
+**How the deletion was bounded** Not by reading: by reachability. A script walked imports from
+`main.tsx`, simulating the removed routes as absent, and reported modules nothing could reach.
+That found 8 modules (956 lines) already dead *before* any decision, and after each removal it
+was re-run until only `vite-env.d.ts` remained — an ambient-types file, not dead code.
+`tsc --noUnusedLocals --noUnusedParameters` then caught the second class of leftovers the
+graph cannot see: unused imports and unused locals (45 of them). Three Chinese UI strings that
+the local branches already carried moved into the locale files, because inline copy violates
+#17 whether or not a flag guards it.
+
+**Cost** The upstream fork's interface is gone, so re-adopting cloud providers later means
+rewriting those pages rather than flipping a flag. That was an explicit trade: this repository
+is maintained on its own and may be rewritten. The cascade also removed `services/config-file`
+(settings import/export) and the prompt library, which are user-visible features — they were
+unreachable in every build, but someone who only ever ran `VITE_LOCAL_ONLY=0 npm run build` by
+hand will notice their absence.
+
+**Result** Frontend 167 modules / 34,112 lines → 145 modules / 29,620 lines. Files importing
+antd 60 → 44. antd chunk 916 kB → 739 kB (298 → 240 kB gzip); vendor chunk 1,090 kB → 571 kB
+(366 → 192 kB gzip), the latter from dropping the prompt-source and config-file graphs.
+
+**Where** `src/constant/app-mode.ts` (`LOCAL_ONLY` removed), `src/router.tsx`,
+`src/constant/navigation-tools.ts`, `src/stores/use-config-store.ts`, and every file that used
+to branch on the flag.
+
+---
+
+## 28. Model call scripts are gone; everything is OpenAI-compatible
+
+**Decision** `services/api/model-plugin.ts` is deleted, along with the `script` field on
+`ChannelModel`, `resolveModelScript()`, the eight per-capability templates, the LLM authoring
+prompt, the full-screen CodeMirror editor, and the `modelPlugin` / `config.scriptEditor` /
+`apiErrors.script*` copy. The client no longer evaluates user-authored JavaScript to perform a
+model call.
+
+**What it was** An escape hatch for providers whose request shape matched nothing the app knew.
+You wrote an async function body; the app injected `prompt`, `images`, `params`, `model`,
+`baseUrl`, `apiKey`, `http`, `request`, `poll`, `sleep`, `signal`, `onDelta`, and your code did
+the HTTP itself. An empty script meant "use the built-in OpenAI-compatible call", so it was an
+override, never a requirement.
+
+**Why it could not fire** Nothing could set a script. The editor's open button was rendered under
+`!LOCAL_ONLY`; the local gateway sync maps `name`, `capability`, `label`, `workflowId`,
+`baseModel`, `imageInputs`, `variantModes`, `variantLabels` — never `script`. So
+`resolveModelScript()` returned `""` on every code path, and all five `if (script)` branches
+(image ×3, video, audio) were unreachable. Only a localStorage blob saved by an older cloud build
+could have carried one.
+
+**Why not keep it** Three reasons, in order of weight. First, it contradicts the project's core
+invariant: the gateway exists to present every ComfyUI workflow as an OpenAI-compatible model, so
+the canvas "only changes its base URL" (README). A client-side override is a hole in that
+guarantee. Second, unreachable code is untested code — including five branches nobody had run and
+an editor nobody could open. Third, it was a `new Function()` evaluation surface shipped in the
+bundle for zero reachable benefit.
+
+**Cost** A provider needing a bespoke request shape must now be adapted in the Go gateway. If
+client-side scripting is ever wanted again it has to come back deliberately, with an authoring UI
+and tests; `git log` keeps the deleted version.
+
+**Result** 991 + 184 lines removed plus the branch bodies; `src` is 145 modules / 29,620 lines →
+144 modules / 28,377 lines. Vendor chunk unchanged (571 kB) because the runtime was tree-shaken
+out of reachable paths already; the win is comprehensibility, not bytes.
+
+**Where** `services/api/model-plugin.ts`, `services/api/image.ts`, `video.ts`, `audio.ts`,
+`stores/use-config-store.ts`, `components/layout/channel-editor-drawer.tsx`,
+`i18n/locales/{zh-CN,en-US}.ts`.

@@ -1,10 +1,5 @@
 import { RUNTIME_LOCAL_GATEWAY_HOST, RUNTIME_LOCAL_GATEWAY_PORT, RUNTIME_LOCAL_GATEWAY_URL } from "./runtime-config";
 
-// Local mode: keep only the ComfyUI gateway and hide cloud model channels and similar entries.
-// Note that Settings → prompt API (the OpenAI-compatible endpoint behind /v1/prompts/*) stays, because it also accepts 127.0.0.1.
-// Set VITE_LOCAL_ONLY=0 to restore the full interface.
-export const LOCAL_ONLY = import.meta.env.VITE_LOCAL_ONLY !== "0";
-
 function runtimeGatewayBaseUrl() {
     if (RUNTIME_LOCAL_GATEWAY_URL) return RUNTIME_LOCAL_GATEWAY_URL.replace(/\/+$/, "").endsWith("/v1") ? RUNTIME_LOCAL_GATEWAY_URL.replace(/\/+$/, "") : `${RUNTIME_LOCAL_GATEWAY_URL.replace(/\/+$/, "")}/v1`;
     const host = RUNTIME_LOCAL_GATEWAY_HOST || pageHostname() || "127.0.0.1";

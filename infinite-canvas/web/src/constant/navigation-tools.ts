@@ -1,21 +1,12 @@
-import { FileText, ImagePlus, Images, Maximize2, Settings2, Video } from "lucide-react";
+import { Maximize2, Images, Settings2 } from "lucide-react";
 
+// Only the entries this build can actually serve. The cloud interfaces (image,
+// video and prompt workbenches) were removed, so their slugs are gone rather than
+// filtered out at render time.
 export const navigationTools = [
     {
         slug: "canvas",
         icon: Maximize2,
-    },
-    {
-        slug: "image",
-        icon: ImagePlus,
-    },
-    {
-        slug: "video",
-        icon: Video,
-    },
-    {
-        slug: "prompts",
-        icon: FileText,
     },
     {
         slug: "assets",

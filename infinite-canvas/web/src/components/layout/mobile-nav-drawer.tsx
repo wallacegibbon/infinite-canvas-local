@@ -2,7 +2,6 @@ import { Drawer } from "antd";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { LOCAL_ONLY } from "@/constant/app-mode";
 import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
 import { cn } from "@/lib/utils";
 
@@ -14,12 +13,11 @@ type MobileNavDrawerProps = {
 
 export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDrawerProps) {
     const { t } = useTranslation();
-    const visibleTools = LOCAL_ONLY ? navigationTools.filter((tool) => !["prompts", "image", "video"].includes(tool.slug)) : navigationTools;
 
     return (
         <Drawer title={t("topNav.navigation")} placement="left" size={280} open={open} onClose={onClose} className="md:hidden">
             <div className="space-y-1">
-                {visibleTools.map((tool) => {
+                {navigationTools.map((tool) => {
                     const Icon = tool.icon;
                     const active = tool.slug === activeToolSlug;
                     return (

@@ -1,9 +1,10 @@
 import { Copy, Download, PencilLine, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { App, Button, Card, Drawer, Empty, Form, Image, Input, Modal, Pagination, Select, Space, Tag, Typography } from "antd";
+import { Button, Card, Drawer, Empty, Form, Image, Input, Modal, Pagination, Select, Space, Tag, Typography } from "antd";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
+import { toast } from "@/components/kit/toast";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { formatBytes, readFileAsDataUrl } from "@/lib/image-utils";
 import { getMediaBlob } from "@/services/file-storage";
@@ -27,7 +28,6 @@ type ImageDraft = ImageAsset["data"] | null;
 const kindOptions = ["all", "text", "image", "video"] as const;
 
 export default function AssetsPage() {
-    const { message } = App.useApp();
     const { t } = useTranslation();
     const copyText = useCopyText();
     const [form] = Form.useForm<AssetFormValues>();
@@ -113,14 +113,14 @@ export default function AssetsPage() {
             editingAsset ? updateAsset(editingAsset.id, asset) : addAsset(asset);
         } else {
             if (!imageDraft) {
-                message.error(t("assets.selectImage"));
+                toast.error(t("assets.selectImage"));
                 return;
             }
             const asset = { ...base, kind: "image" as const, data: imageDraft };
             editingAsset ? updateAsset(editingAsset.id, asset) : addAsset(asset);
         }
 
-        message.success(editingAsset ? t("assets.updated") : t("assets.saved"));
+        toast.success(editingAsset ? t("assets.updated") : t("assets.saved"));
         setIsAssetOpen(false);
     };
 
@@ -149,19 +149,19 @@ export default function AssetsPage() {
         try {
             const blob = await readAssetMediaBlob(asset);
             if (!blob) {
-                message.error(t("assets.downloadFailed"));
+                toast.error(t("assets.downloadFailed"));
                 return;
             }
             const ext = asset.data.mimeType?.split("/")[1]?.split("+")[0] || (asset.kind === "video" ? "mp4" : "png");
             saveAs(blob, `${asset.title || "asset"}.${ext}`);
         } catch {
-            message.error(t("assets.downloadFailed"));
+            toast.error(t("assets.downloadFailed"));
         }
     };
 
     const exportAllAssets = async () => {
         if (!validAssets.length) {
-            message.warning(t("assets.noneToExport"));
+            toast.warning(t("assets.noneToExport"));
             return;
         }
         await exportAssets(validAssets, t("assets.packageName"));
@@ -178,9 +178,9 @@ export default function AssetsPage() {
                 delete payload.updatedAt;
                 addAsset(payload as Parameters<typeof addAsset>[0]);
             });
-            message.success(t("assets.imported", { count: importedAssets.length }));
+            toast.success(t("assets.imported", { count: importedAssets.length }));
         } catch {
-            message.error(t("assets.importFailed"));
+            toast.error(t("assets.importFailed"));
         } finally {
             if (assetInputRef.current) assetInputRef.current.value = "";
         }
@@ -189,7 +189,7 @@ export default function AssetsPage() {
     const confirmDelete = () => {
         if (!deletingAsset) return;
         removeAsset(deletingAsset.id);
-        message.success(t("assets.deleted"));
+        toast.success(t("assets.deleted"));
         setDeletingAsset(null);
     };
 

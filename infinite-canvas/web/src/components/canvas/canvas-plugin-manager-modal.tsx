@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { App, Button, Input, Modal, Popconfirm, Switch, Tabs } from "antd";
+import { useMemo, useState, type ReactNode } from "react";
+import { Button, Input, Modal, Popconfirm, Switch, Tabs } from "antd";
 import { AlertTriangle, Puzzle, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { toast } from "@/components/kit/toast";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { installPluginFromUrl, setPluginEnabled, uninstallPlugin, updatePlugin } from "@/lib/canvas/plugin-loader";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -11,7 +12,6 @@ import { usePluginStore, type InstalledPlugin } from "@/stores/canvas/use-plugin
 export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { t } = useTranslation();
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
-    const { message } = App.useApp();
     const plugins = usePluginStore((state) => state.plugins);
     const [url, setUrl] = useState("");
     const [installing, setInstalling] = useState(false);
@@ -26,10 +26,10 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
         setInstalling(true);
         try {
             const plugin = await installPluginFromUrl(target);
-            message.success(t("canvas.plugins.installedPlugin", { name: plugin.name }));
+            toast.success(t("canvas.plugins.installedPlugin", { name: plugin.name }));
             setUrl("");
         } catch (error) {
-            message.error(t("canvas.plugins.installFailed", { error: error instanceof Error ? error.message : String(error) }));
+            toast.error(t("canvas.plugins.installFailed", { error: error instanceof Error ? error.message : String(error) }));
         } finally {
             setInstalling(false);
         }
@@ -39,9 +39,9 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
         setBusyId(record.id);
         try {
             await action();
-            message.success(successText);
+            toast.success(successText);
         } catch (error) {
-            message.error(`${error instanceof Error ? error.message : String(error)}`);
+            toast.error(`${error instanceof Error ? error.message : String(error)}`);
         } finally {
             setBusyId(null);
         }

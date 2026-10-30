@@ -1,25 +1,16 @@
-import { Button, Drawer, Input, Segmented, Select, Space } from "antd";
+import { Button, Drawer, Input, Segmented, Space } from "antd";
 import { ListPlus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { defaultBaseUrlForApiFormat, guessCapability, normalizeChannelModels, type ApiCallFormat, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
-import { LOCAL_ONLY } from "@/constant/app-mode";
-import { ModelScriptEditor } from "./model-script-editor";
+import { guessCapability, normalizeChannelModels, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 import { ModelSelectModal } from "./model-select-modal";
-
-type ScriptTarget = { name: string; capability: ModelCapability; value: string };
 
 export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: boolean; channel: ModelChannel | null; onSave: (channel: ModelChannel) => void; onClose: () => void }) {
     const { t } = useTranslation();
     const [draft, setDraft] = useState<ModelChannel | null>(channel);
     const [selectOpen, setSelectOpen] = useState(false);
-    const [scriptTarget, setScriptTarget] = useState<ScriptTarget | null>(null);
-    const apiFormatOptions: Array<{ label: string; value: ApiCallFormat }> = [
-        { label: "OpenAI", value: "openai" },
-        { label: "Gemini", value: "gemini" },
-    ];
-    const capabilityOptions: Array<{ label: string; value: ModelCapability }> = (LOCAL_ONLY ? ["image", "video"] : ["image", "video", "text", "audio"]).map((value) => ({ label: t(`config.channelEditor.capabilities.${value}`), value: value as ModelCapability }));
+    const capabilityOptions: Array<{ label: string; value: ModelCapability }> = (["image", "video"] as ModelCapability[]).map((value) => ({ label: t(`config.channelEditor.capabilities.${value}`), value }));
 
     useEffect(() => {
         if (open && channel) setDraft(channel);
@@ -30,27 +21,21 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
     const patch = (value: Partial<ModelChannel>) => setDraft((current) => (current ? { ...current, ...value } : current));
     const setModels = (models: ChannelModel[]) => patch({ models });
 
-    const changeApiFormat = (apiFormat: ApiCallFormat) => {
-        const baseUrl = !draft.baseUrl.trim() || draft.baseUrl.trim() === defaultBaseUrlForApiFormat(draft.apiFormat) ? defaultBaseUrlForApiFormat(apiFormat) : draft.baseUrl;
-        patch({ apiFormat, baseUrl });
-    };
-
     const applySelection = (names: string[]) => {
         const map = new Map(draft.models.map((model) => [model.name, model]));
         const next = names.map((name) => map.get(name) || { name, capability: guessCapability(name) });
-        setModels(LOCAL_ONLY ? next.filter((model) => model.capability === "image" || model.capability === "video") : next);
+        setModels(next.filter((model) => model.capability === "image" || model.capability === "video"));
     };
 
     const setCapability = (name: string, capability: ModelCapability) => setModels(draft.models.map((model) => (model.name === name ? { ...model, capability } : model)));
-    const setScript = (name: string, script: string) => setModels(draft.models.map((model) => (model.name === name ? { ...model, script: script || undefined } : model)));
     const removeModel = (name: string) => setModels(draft.models.filter((model) => model.name !== name));
 
     const save = () => {
         onSave({
             ...draft,
             name: draft.name.trim() || t("config.channels.unnamed"),
-            apiFormat: LOCAL_ONLY ? "openai" : draft.apiFormat,
-            apiKey: LOCAL_ONLY ? "local" : draft.apiKey,
+            apiFormat: "openai",
+            apiKey: "local",
             models: normalizeChannelModels(draft.models),
         });
         onClose();
@@ -79,30 +64,18 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
                 </label>
                 <div className="block">
                     <span className="mb-1 block text-sm font-medium">{t("config.channelEditor.protocol")}</span>
-                    {LOCAL_ONLY ? (
-                        <div className="flex h-8 items-center text-sm text-stone-500">OpenAI 兼容（本地网关）</div>
-                    ) : (
-                        <Select className="w-full" value={draft.apiFormat} options={apiFormatOptions} onChange={changeApiFormat} />
-                    )}
+                    <div className="flex h-8 items-center text-sm text-stone-500">{t("config.channelEditor.localProtocol")}</div>
                 </div>
                 <label className="block md:col-span-2">
                     <span className="mb-1 block text-sm font-medium">{t("config.channelEditor.baseUrl")}</span>
                     <Input value={draft.baseUrl} onChange={(event) => patch({ baseUrl: event.target.value })} placeholder="https://api.example.com" />
                 </label>
-                {!LOCAL_ONLY ? (
-                    <label className="block md:col-span-2">
-                        <span className="mb-1 block text-sm font-medium">API Key</span>
-                        <Input.Password value={draft.apiKey} onChange={(event) => patch({ apiKey: event.target.value })} placeholder="sk-..." />
-                    </label>
-                ) : null}
             </div>
 
             <div className="mt-6 mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <div className="text-sm font-semibold">{t("config.channelEditor.models")}</div>
-                    <div className="mt-0.5 text-xs text-stone-500">
-                        {LOCAL_ONLY ? `已选 ${draft.models.length} 个；为每个模型指定生图/视频能力。` : t("config.channelEditor.modelDescription", { count: draft.models.length })}
-                    </div>
+                    <div className="mt-0.5 text-xs text-stone-500">{t("config.channelEditor.localModelDescription", { count: draft.models.length })}</div>
                 </div>
                 <Button type="primary" icon={<ListPlus className="size-4" />} onClick={() => setSelectOpen(true)}>
                     {t("config.channelEditor.selectModels")}
@@ -118,11 +91,6 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
                             </span>
                             <div className="flex shrink-0 items-center gap-2">
                                 <Segmented size="small" value={model.capability} options={capabilityOptions} onChange={(value) => setCapability(model.name, value as ModelCapability)} />
-                                {!LOCAL_ONLY ? (
-                                    <Button size="small" type={model.script ? "primary" : "default"} ghost={Boolean(model.script)} onClick={() => setScriptTarget({ name: model.name, capability: model.capability, value: model.script || "" })}>
-                                        {t(model.script ? "config.channelEditor.scriptReady" : "config.channelEditor.script")}
-                                    </Button>
-                                ) : null}
                                 <Button size="small" danger type="text" icon={<Trash2 className="size-3.5" />} onClick={() => removeModel(model.name)} />
                             </div>
                         </div>
@@ -133,15 +101,6 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
             </div>
 
             <ModelSelectModal open={selectOpen} channel={draft} selectedNames={draft.models.map((model) => model.name)} onConfirm={applySelection} onClose={() => setSelectOpen(false)} />
-
-            <ModelScriptEditor
-                open={Boolean(scriptTarget)}
-                capability={scriptTarget?.capability || "text"}
-                modelName={scriptTarget?.name || ""}
-                value={scriptTarget?.value || ""}
-                onSave={(script) => scriptTarget && setScript(scriptTarget.name, script)}
-                onClose={() => setScriptTarget(null)}
-            />
         </Drawer>
     );
 }

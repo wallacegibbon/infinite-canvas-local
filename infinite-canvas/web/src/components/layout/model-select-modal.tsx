@@ -1,14 +1,14 @@
-import { App, Button, Checkbox, Input, Modal, Tabs } from "antd";
+import { Button, Checkbox, Input, Modal, Tabs } from "antd";
 import { RefreshCw, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { toast } from "@/components/kit/toast";
 import { fetchChannelModels } from "@/services/api/image";
 import type { ModelChannel } from "@/stores/use-config-store";
 
 // Channel model selector: fetch upstream models or add them manually, then include checked models in the channel list.
 export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onClose }: { open: boolean; channel: ModelChannel | null; selectedNames: string[]; onConfirm: (names: string[]) => void; onClose: () => void }) {
-    const { message } = App.useApp();
     const { t } = useTranslation();
     const [existing, setExisting] = useState<string[]>([]);
     const [fetched, setFetched] = useState<string[]>([]);
@@ -62,7 +62,7 @@ export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onCl
     const fetchModels = async () => {
         if (!channel) return;
         if (!channel.baseUrl.trim() || !channel.apiKey.trim()) {
-            message.error(t("config.modelSelect.missingConfig"));
+            toast.error(t("config.modelSelect.missingConfig"));
             return;
         }
         setLoading(true);
@@ -70,9 +70,9 @@ export function ModelSelectModal({ open, channel, selectedNames, onConfirm, onCl
             const models = await fetchChannelModels(channel);
             setFetched(models);
             setActiveTab("new");
-            message.success(t("config.modelSelect.fetched", { count: models.length }));
+            toast.success(t("config.modelSelect.fetched", { count: models.length }));
         } catch (error) {
-            message.error(error instanceof Error ? error.message : t("config.modelSelect.fetchFailed"));
+            toast.error(error instanceof Error ? error.message : t("config.modelSelect.fetchFailed"));
         } finally {
             setLoading(false);
         }

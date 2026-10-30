@@ -1,13 +1,15 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App, ConfigProvider } from "antd";
+import { ConfigProvider } from "antd";
 import enUS from "antd/es/locale/en_US";
 import zhCN from "antd/es/locale/zh_CN";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import { useTranslation } from "react-i18next";
+import { Toaster } from "sonner";
 
+import { ConfirmHost } from "@/components/kit/confirm";
 import { ClientRootInit } from "@/components/layout/client-root-init";
 import { GatewayReconnectBanner } from "@/components/layout/gateway-reconnect-banner";
 import type { AppLocale } from "@/i18n";
@@ -24,6 +26,15 @@ const queryClient = new QueryClient({
     },
 });
 
+/**
+ * App-level providers.
+ *
+ * antd is wrapped in `ConfigProvider` only — its `App` component used to be here to
+ * provide context for the static `message` / `modal` helpers. Nothing calls those any
+ * more: toasts come from `@/components/kit/toast` and confirmations from
+ * `@/components/kit/confirm`. Do not reintroduce `App.useApp()`; add a kit primitive
+ * instead, so the library stays replaceable (see docs/decisions.md #23/#24).
+ */
 export function AppProviders({ children }: { children: ReactNode }) {
     const { i18n, t } = useTranslation();
     const theme = useThemeStore((state) => state.theme);
@@ -44,12 +55,15 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
     return (
         <ConfigProvider locale={locale === "zh-CN" ? zhCN : enUS} theme={getAntThemeConfig(dark)}>
-            <App>
-                <QueryClientProvider client={queryClient}>
-                    <ClientRootInit>{children}</ClientRootInit>
-                    <GatewayReconnectBanner />
-                </QueryClientProvider>
-            </App>
+            <QueryClientProvider client={queryClient}>
+                <ClientRootInit>{children}</ClientRootInit>
+                <GatewayReconnectBanner />
+            </QueryClientProvider>
+            {/* Toasts are rendered by `@/components/kit/toast`, not by antd. Sticky
+                loading toasts rely on `duration: Infinity`; 3000 matches antd's default
+                for the auto-dismissing ones so the pacing of the UI does not change. */}
+            <Toaster position="top-center" theme={dark ? "dark" : "light"} toastOptions={{ duration: 3000 }} />
+            <ConfirmHost />
         </ConfigProvider>
     );
 }

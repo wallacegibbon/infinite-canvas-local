@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
 import { gatewayModelLabel } from "@/lib/gateway-labels";
-import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_GATEWAY_CHANNEL_ID, LOCAL_GATEWAY_MODELS, LOCAL_GATEWAY_MODEL_VALUES, LOCAL_ONLY } from "@/constant/app-mode";
+import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_GATEWAY_CHANNEL_ID, LOCAL_GATEWAY_MODELS, LOCAL_GATEWAY_MODEL_VALUES } from "@/constant/app-mode";
 import { normalizeProgressRingSkin, type ProgressRingSkinId } from "@/lib/canvas/progress-ring-skins";
 
 export type ApiCallFormat = "openai" | "gemini";
@@ -15,7 +15,6 @@ export type ReasoningEffort = "auto" | "low" | "medium" | "high" | "xhigh";
 export type ChannelModel = {
     name: string;
     capability: ModelCapability;
-    script?: string;
     label?: string;
     workflowId?: string;
     baseModel?: string;
@@ -99,64 +98,6 @@ export type ChannelCredentialsImportResult = {
 
 export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
 const CHANNEL_MODEL_SEPARATOR = "::";
-const OPENAI_BASE_URL = "https://api.openai.com";
-const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
-
-const cloudDefaultConfig: AiConfig = {
-    channelMode: "local",
-    baseUrl: OPENAI_BASE_URL,
-    apiKey: "",
-    apiFormat: "openai",
-    channels: [
-        {
-            id: "default",
-            name: i18n.t("config.channels.defaultName"),
-            baseUrl: OPENAI_BASE_URL,
-            apiKey: "",
-            apiFormat: "openai",
-            models: [
-                { name: "gpt-image-2", capability: "image" },
-                { name: "grok-imagine-video", capability: "video" },
-                { name: "gpt-5.5", capability: "text" },
-                { name: "gpt-4o-mini-tts", capability: "audio" },
-            ],
-        },
-    ],
-    model: "default::gpt-image-2",
-    imageModel: "default::gpt-image-2",
-    videoModel: "default::grok-imagine-video",
-    textModel: "default::gpt-5.5",
-    audioModel: "default::gpt-4o-mini-tts",
-    audioVoice: "alloy",
-    audioFormat: "mp3",
-    audioSpeed: "1",
-    audioInstructions: "",
-    videoSeconds: "6",
-    vquality: "720",
-    videoGenerateAudio: "true",
-    videoWatermark: "false",
-    videoMode: "frames",
-    videoInterpolation: "off",
-    videoSelfLiftMode: "fast",
-    promptOptimizeLanguage: "zh",
-    promptCloudBaseUrl: "",
-    promptCloudApiKey: "",
-    promptCloudModel: "",
-    promptCloudApis: [],
-    promptCloudApiId: "",
-    systemPrompt: "",
-    reasoningEffort: "auto",
-    models: ["default::gpt-image-2", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
-    quality: "auto",
-    size: "1:1",
-    background: "",
-    count: "1",
-    canvasImageCount: "3",
-    nodeRegenerateBehavior: "new-node",
-    autoFocusOnSelect: false,
-    progressRingSkin: "cyan",
-};
-
 const localDefaultChannel: ModelChannel = {
     id: LOCAL_GATEWAY_CHANNEL_ID,
     name: "本地 ComfyUI",
@@ -169,21 +110,50 @@ const localDefaultChannel: ModelChannel = {
 const localImageModel = `${LOCAL_GATEWAY_CHANNEL_ID}::image-z-image-turbo`;
 const localVideoModel = `${LOCAL_GATEWAY_CHANNEL_ID}::video-h3-t2v`;
 
-export const defaultConfig: AiConfig = LOCAL_ONLY
-    ? {
-          ...cloudDefaultConfig,
-          baseUrl: LOCAL_GATEWAY_BASE_URL,
-          apiKey: "local",
-          channels: [localDefaultChannel],
-          model: localImageModel,
-          imageModel: localImageModel,
-          videoModel: localVideoModel,
-          videoMode: "text",
-          textModel: "",
-          audioModel: "",
-          models: LOCAL_GATEWAY_MODEL_VALUES,
-      }
-    : cloudDefaultConfig;
+// One literal, no shared "cloud" base to override: this build only ever talks to the
+// local gateway, so a second default config would be dead weight that has to be kept
+// in sync field by field.
+export const defaultConfig: AiConfig = {
+    channelMode: "local",
+    baseUrl: LOCAL_GATEWAY_BASE_URL,
+    apiKey: "local",
+    apiFormat: "openai",
+    channels: [localDefaultChannel],
+    model: localImageModel,
+    imageModel: localImageModel,
+    videoModel: localVideoModel,
+    textModel: "",
+    audioModel: "",
+    audioVoice: "alloy",
+    audioFormat: "mp3",
+    audioSpeed: "1",
+    audioInstructions: "",
+    videoSeconds: "6",
+    vquality: "720",
+    videoGenerateAudio: "true",
+    videoWatermark: "false",
+    // Local workflows are driven by a start frame, not by free text.
+    videoMode: "text",
+    videoInterpolation: "off",
+    videoSelfLiftMode: "fast",
+    promptOptimizeLanguage: "zh",
+    promptCloudBaseUrl: "",
+    promptCloudApiKey: "",
+    promptCloudModel: "",
+    promptCloudApis: [],
+    promptCloudApiId: "",
+    systemPrompt: "",
+    reasoningEffort: "auto",
+    models: LOCAL_GATEWAY_MODEL_VALUES,
+    quality: "auto",
+    size: "1:1",
+    background: "",
+    count: "1",
+    canvasImageCount: "3",
+    nodeRegenerateBehavior: "new-node",
+    autoFocusOnSelect: false,
+    progressRingSkin: "cyan",
+};
 
 type ConfigStore = {
     config: AiConfig;
@@ -243,7 +213,7 @@ export function resolveModelForCapability(config: AiConfig, currentModel: string
         if (!model) continue;
         const configuredCapability = modelCapabilityOf(config, model);
         // In local mode a model that has disappeared from the registry falls back to the default for its capability.
-        if (LOCAL_ONLY && !configuredCapability) continue;
+        if (!configuredCapability) continue;
         // Keep unavailable selections visible so the readiness check blocks the
         // request. Only a known capability switch may choose another model.
         if (!configuredCapability || configuredCapability === capability) return model;
@@ -306,11 +276,6 @@ export function baseModelOptions(config: AiConfig, value: string) {
 export function modelImageInputs(config: AiConfig, value: string) {
     const found = channelModelOf(config, value);
     return typeof found?.model.imageInputs === "number" ? found.model.imageInputs : undefined;
-}
-
-/** The user script (if any) attached to a model; empty string means use the system default call. */
-export function resolveModelScript(config: AiConfig, value: string) {
-    return findChannelModel(config, value)?.model.script?.trim() || "";
 }
 
 function isAiConfigReady(config: AiConfig, model: string) {
@@ -463,7 +428,7 @@ export const useConfigStore = create<ConfigStore>()(
                 const persistedConfig = (persistedState.config || {}) as Partial<AiConfig>;
                 const config = { ...defaultConfig, ...persistedConfig };
                 if (!Array.isArray(persistedConfig.channels)) config.channels = [];
-                if (LOCAL_ONLY) {
+                {
                     try {
                         const backupKey = `${CONFIG_STORE_KEY}:pre-local-only-backup`;
                         if (typeof window !== "undefined" && !window.localStorage.getItem(backupKey)) {
@@ -498,22 +463,22 @@ export const useConfigStore = create<ConfigStore>()(
                 const imageOptions = channels.flatMap((channel) => channel.models.filter((model) => model.capability === "image").map((model) => encodeChannelModel(channel.id, model.name)));
                 const videoOptions = channels.flatMap((channel) => channel.models.filter((model) => model.capability === "video").map((model) => encodeChannelModel(channel.id, model.name)));
                 const pickModel = (current: string, options: string[]) => (options.includes(current) ? current : options[0] || "");
-                const imageModel = LOCAL_ONLY ? pickModel(config.imageModel || config.model, imageOptions) : normalizeModelOptionValue(config.imageModel || config.model, channels);
-                const videoModel = LOCAL_ONLY ? pickModel(config.videoModel, videoOptions) : normalizeModelOptionValue(config.videoModel, channels);
+                const imageModel = pickModel(config.imageModel || config.model, imageOptions);
+                const videoModel = pickModel(config.videoModel, videoOptions);
                 const normalizedCloud = normalizePromptCloudConfig(config);
                 return {
                     ...current,
                     config: {
                         ...config,
                         channelMode: "local",
-                        model: LOCAL_ONLY ? pickModel(config.model || config.imageModel, imageOptions) : config.model,
-                        apiFormat: LOCAL_ONLY ? "openai" : normalizeApiFormat(config.apiFormat),
+                        model: pickModel(config.model || config.imageModel, imageOptions),
+                        apiFormat: "openai",
                         channels,
                         models,
                         imageModel,
                         videoModel,
-                        textModel: LOCAL_ONLY ? "" : normalizeModelOptionValue(config.textModel || config.model, channels),
-                        audioModel: LOCAL_ONLY ? "" : normalizeModelOptionValue(config.audioModel || defaultConfig.audioModel, channels),
+                        textModel: "",
+                        audioModel: "",
                         audioVoice: config.audioVoice || defaultConfig.audioVoice,
                         audioFormat: config.audioFormat || defaultConfig.audioFormat,
                         audioSpeed: config.audioSpeed || defaultConfig.audioSpeed,
@@ -556,7 +521,6 @@ export function normalizeChannelModels(models: Array<string | ChannelModel> | un
         if (!name || seen.has(name)) continue;
         seen.add(name);
         const capability = typeof item === "string" ? guessCapability(name) : item.capability || guessCapability(name);
-        const script = typeof item === "string" ? undefined : item.script?.trim() || undefined;
         const label = typeof item === "string" ? undefined : item.label?.trim() || undefined;
         const workflowId = typeof item === "string" ? undefined : item.workflowId?.trim() || undefined;
         const baseModel = typeof item === "string" ? undefined : item.baseModel?.trim() || undefined;
@@ -564,7 +528,7 @@ export function normalizeChannelModels(models: Array<string | ChannelModel> | un
         const variantModes = typeof item === "string" ? undefined : Array.isArray(item.variantModes) ? item.variantModes.map((mode) => String(mode).trim()).filter(Boolean) : undefined;
         const variantLabels = typeof item === "string" ? undefined : item.variantLabels && typeof item.variantLabels === "object" ? item.variantLabels : undefined;
         const imageInputs = typeof item === "string" ? undefined : typeof item.imageInputs === "number" ? item.imageInputs : undefined;
-        result.push({ name, capability, script, label, workflowId, baseModel, baseModelLabel, variantModes, variantLabels, imageInputs });
+        result.push({ name, capability, label, workflowId, baseModel, baseModelLabel, variantModes, variantLabels, imageInputs });
     }
     return result;
 }
@@ -574,7 +538,7 @@ export function createModelChannel(channel?: Partial<ModelChannel>): ModelChanne
     return {
         id: channel?.id?.trim() || nanoid(),
         name: channel?.name?.trim() || i18n.t("config.channels.newName"),
-        baseUrl: channel?.baseUrl?.trim() || defaultBaseUrlForApiFormat(apiFormat),
+        baseUrl: channel?.baseUrl?.trim() || defaultBaseUrl(),
         apiKey: channel?.apiKey || "",
         apiFormat,
         models: normalizeChannelModels(channel?.models),
@@ -734,10 +698,9 @@ function normalizeChannels(config: AiConfig) {
     return channels;
 }
 
-export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
-    if (LOCAL_ONLY) return LOCAL_GATEWAY_BASE_URL;
-    if (apiFormat === "gemini") return GEMINI_BASE_URL;
-    return OPENAI_BASE_URL;
+/** Every channel in this build points at the local gateway; there is no cloud default. */
+export function defaultBaseUrl() {
+    return LOCAL_GATEWAY_BASE_URL;
 }
 
 function normalizeApiFormat(apiFormat: unknown): ApiCallFormat {

@@ -1,6 +1,19 @@
 export type CanvasColorTheme = "light" | "dark";
 export type CanvasBackgroundMode = "dots" | "lines" | "blank";
 
+/**
+ * Canvas surface palette — deliberately its own thing.
+ *
+ * This is *feature data*, not app chrome: `useCanvasTheme()` hands these values to
+ * node renderers and to the plugin context, and the `cardSkin` variants below swap
+ * the node palette at runtime. It therefore stays plain hex/rgba in TS rather than
+ * moving into CSS custom properties.
+ *
+ * The `warm` base leans on the same warm neutrals as `@/lib/design-tokens` (`stone`)
+ * but is not generated from it: the canvas is warm paper, while app chrome is
+ * cooler, and several values here have no `stone` counterpart. Don't "unify" it
+ * without deciding that the canvas should stop looking like paper.
+ */
 export const canvasThemes = {
     light: {
         canvas: {
