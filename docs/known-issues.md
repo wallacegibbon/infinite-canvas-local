@@ -296,6 +296,14 @@ style, it was not `npm run format`.
 2400-line diff across 45 files, which buries whatever change they actually wanted to make. That
 happened during decisions #50 and had to be reverted.
 
-**Fix** Run `npm run format` once, as its own commit with nothing else in it, and add
-`format:check` to `npm run check` so it cannot drift again. Not done here because a formatting-only
-commit should not share a commit with a behaviour change.
+**Fixed** `npm run format` was run once as its own commit (`0a20e8f`, 81 files), and
+`format:check` is now the third gate in `npm run check`. Two things were needed to make it stick:
+
+- `public/plugins` is in `.prettierignore`. `comfyui-lora.js` and `comfyui-params.js` have no source
+  anywhere else in the repo, are served to the browser as plugin code, and are not part of the app
+  build, so they are assets rather than source — the same reasoning that already excludes `dist`.
+- The reformat is provably semantic-null: the built bundle hash is identical before and after
+  (`index-rG39eRfp.js`, 694725 bytes), and `globals.css` keeps its 133/133 brace balance.
+
+The gate was checked in both directions: appending one badly formatted line to a source file makes
+`npm run check` exit 1, and reverting it makes it exit 0.
