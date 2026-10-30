@@ -1232,3 +1232,36 @@ implicit. The win is that "what a node editor may touch" is now a 23-line type y
 screen, and that proving an editor correct no longer means standing up a 3,459-line component.
 
 **Where** `infinite-canvas/web/src/pages/canvas/hooks/`, `infinite-canvas/web/src/lib/canvas/`.
+
+## 44. `handleGenerateNode` was 440 lines and four of them did not talk to each other
+
+**Decision** The four generation modes — image, video, audio, text — moved out of `handleGenerateNode`
+into `pages/canvas/hooks/use-generation-runs.ts`, one function each. `handleGenerateNode` is now a
+123-line orchestrator: resolve config, hydrate the prompt, build a `GenerationRun`, dispatch on mode,
+own the shared `catch` and `finally`.
+
+`project.tsx`: 3,459 → 3,150 lines.
+
+**What the four actually shared** Almost nothing. A 440-line function was: ~45 lines of plugin
+`writeBackToSelf` special case, ~40 lines of shared setup, then four branches of 143 / 47 / 29 / 115
+lines, then a `catch`/`finally`. The branches agreed only on inputs — which node, the hydrated
+prompt, the resolved config, whether to overwrite the source, and the run controller. That is the
+whole of `GenerationRun`, and it is why the split is a move and not a rewrite.
+
+**The one thing that is not a pure move** `pendingChildIds`. Each mode records the nodes it created
+so the caller's `catch` can stamp them as failed; it has to survive the mode returning early, so it
+is a mutable field on the run rather than a return value. Four `pendingChildIds = [...]`
+assignments became `run.pendingChildIds = [...]`. Everything else in the four bodies is
+byte-identical to what was there before — verified by diffing the moved ranges against
+`git show HEAD` with indentation normalised, which leaves only the `}, [deps]);` closer.
+
+**Why not also `handleRetryNode`** It looks like the same function and is not. Retry writes into the
+node that already exists instead of spawning a sibling, has no `mode`, and branches on
+saved-metadata-vs-hydrated-context instead. Merging the two would have meant a flag for every
+difference. It stays where it is, at ~340 lines, and is the next thing worth its own pass.
+
+**Which state stayed in the page** `runningNodeId`, `setExpandedBatchNodeIds` and the error
+stamping in `catch` — because they are about the canvas, not about one request. The five setters and
+the two registry calls go in as `GenerationRunDeps`, the same shape as `NodeEditorDeps` (#43).
+
+**Where** `infinite-canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`.
