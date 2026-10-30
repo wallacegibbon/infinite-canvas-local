@@ -46,9 +46,11 @@ func (m *Manager) Scan() (Status, error) {
 	if m.comfy == nil {
 		return m.degrade(errors.New("no ComfyUI client configured"), started)
 	}
-	if _, err := m.comfy.SystemStats(ctx); err != nil {
+	stats, err := m.comfy.SystemStats(ctx)
+	if err != nil {
 		return m.degrade(err, started)
 	}
+	m.noteComfyVersion(comfyVersion(stats))
 	objectInfo, err := m.comfy.ObjectInfo(ctx)
 	if err != nil {
 		return m.degrade(err, started)
@@ -196,6 +198,34 @@ func summariseScanFailures(summary *workflow.ScanSummary) string {
 		parts = append(parts[:3:3], "...")
 	}
 	return strings.Join(parts, "; ")
+}
+
+// comfyVersion reads the version ComfyUI reports in /system_stats.
+func comfyVersion(stats map[string]any) string {
+	system, ok := stats["system"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	value, _ := system["comfyui_version"].(string)
+	return strings.TrimSpace(value)
+}
+
+// noteComfyVersion records the version and logs it when it changes.
+//
+// One line, once per version, because "which ComfyUI is this gateway talking to" is the
+// first question whenever an install or a workflow misbehaves.
+func (m *Manager) noteComfyVersion(version string) {
+	m.mu.Lock()
+	changed := version != m.status.ComfyVersion
+	m.status.ComfyVersion = version
+	url := m.cfg.ComfyURL
+	m.mu.Unlock()
+	if changed && version != "" {
+		m.logger.Info("ComfyUI %s at %s", version, url)
+	}
+	if changed && version == "" {
+		m.logger.Warn("ComfyUI at %s did not report its version", url)
+	}
 }
 
 // degrade records a failed scan without discarding the last good availability data.

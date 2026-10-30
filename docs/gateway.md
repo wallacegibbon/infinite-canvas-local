@@ -71,7 +71,7 @@ Every variable is optional; the defaults match the previous implementation.
 | `HOST` | `127.0.0.1` | Listen address, bound as given. `0.0.0.0` accepts every interface. |
 | `PORT` | `8190` | Listen port. |
 | `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI base URL. |
-| `COMFYUI_DIR` | *(empty)* | ComfyUI install dir **on this host**. Locates model roots and `extra_model_paths.yaml`. Unset: ComfyUI's own `GET /internal/folder_paths` is used. |
+| `COMFYUI_DIR` | *(empty)* | ComfyUI install dir **on this host**. Unset: the gateway asks ComfyUI for its folder layout (`GET /internal/folder_paths`) and uses the reported `custom_nodes` entry, or a model folder's parent. Set it when ComfyUI cannot report that, e.g. behind a proxy that hides `/internal/*`. |
 | `COMFY_PYTHON` | *(empty)* | Interpreter shown in the "runtime deps" hint. |
 | `COMFY_MODELS_SHARED` | *(empty)* | `1` = the gateway can write into ComfyUI's model folders (same machine, or a mount). Model installs stay off without it. |
 | `WORKFLOW_DIR` | `<root>/workflows` | Registry directory. |
@@ -128,11 +128,19 @@ gateway's own host by definition.
 | Which models are installed (panel "present/missing") | HTTP (`/object_info`) |
 | Installing models and custom nodes | **local write** — needs `COMFY_MODELS_SHARED=1` and the folders on this host |
 | `extra_model_paths.yaml` (mapped drives, NFS model dirs) | **local read** of `COMFYUI_DIR` and its parent |
+| Knowing where to write at all | `COMFYUI_DIR`, or the folder layout ComfyUI reports |
 | "Runtime deps" interpreter hint | **local read** of `/proc` |
 | Replacing a model via the file picker | **local** GUI dialog |
 
 So a gateway on another machine still generates images; it just cannot install models, and it says
 so instead of filling the wrong disk. Run it beside ComfyUI when you want the whole panel.
+
+An install also needs to know *where* ComfyUI is. That is `COMFYUI_DIR`, or the layout ComfyUI
+reports at `GET /internal/folder_paths` — its `custom_nodes` entry, falling back to two levels up
+from a model folder. A build that serves neither (no such endpoint, or a `/internal/*` blocked by
+a proxy) cannot be installed into: the request answers `400 install_root_unknown`, names the
+version ComfyUI reported, and gives the two fixes. There is no minimum ComfyUI version to
+remember, because the capability is checked rather than the version number.
 
 Workflows are the gateway's own: `workflows/registry.json` plus its graphs. There is no polling and
 no automatic import of ComfyUI's workflow folder. To add a graph made in ComfyUI, export it in

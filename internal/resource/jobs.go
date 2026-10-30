@@ -133,6 +133,13 @@ func (m *Manager) Install(ids, packs []string) (*Job, error) {
 		return nil, httpxBadRequest("model_install_disabled", installRefusedMessage(policy))
 	}
 
+	// Writing needs a directory. ComfyUI can supply one (the folder layout it reports), the
+	// operator can (COMFYUI_DIR); when neither does, say which one is missing instead of
+	// inventing a relative path.
+	if root == "" {
+		return nil, httpxBadRequest("install_root_unknown", m.installRootUnknownMessage())
+	}
+
 	items := make([]*JobItem, 0, len(ordered))
 	for _, id := range ordered {
 		resource := findResource(index, id)

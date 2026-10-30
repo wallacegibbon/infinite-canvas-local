@@ -30,6 +30,27 @@ func (m *Manager) InstallPolicy() InstallPolicy {
 	return InstallPolicy{Allowed: m.cfg.ComfyModelsShared, ComfyHost: hostOf(m.cfg.ComfyURL)}
 }
 
+// installRootUnknownMessage explains that the ComfyUI directory could not be determined.
+//
+// The capability, not a version number, is what decides: a build without
+// GET /internal/folder_paths, or a proxy that hides /internal/*, both end up here, and the
+// version ComfyUI reported goes into the message so a bug report needs no follow-up question.
+func (m *Manager) installRootUnknownMessage() string {
+	version := ""
+	if m.setup != nil {
+		version = m.setup.Status().ComfyVersion
+	}
+	detected := "ComfyUI"
+	if version != "" {
+		detected = "ComfyUI " + version
+	}
+	return fmt.Sprintf(
+		"cannot tell where %s is installed: it did not report its folder layout (GET /internal/folder_paths) "+
+			"and COMFYUI_DIR is unset. Set COMFYUI_DIR=/path/to/ComfyUI, or upgrade ComfyUI at %s so it serves "+
+			"that endpoint.",
+		detected, m.cfg.ComfyURL)
+}
+
 // installRefusedMessage explains the refusal in terms the user can act on. Both fixes are
 // named because the reader knows which one applies and the process does not.
 func installRefusedMessage(policy InstallPolicy) string {

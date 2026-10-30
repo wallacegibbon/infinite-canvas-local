@@ -139,3 +139,31 @@ func TestInstallStopsWhenTheTargetFolderCannotBeCreated(t *testing.T) {
 	}
 	t.Error("the install job did not finish within 5s")
 }
+
+// Without a reported folder layout and without COMFYUI_DIR there is nowhere to write, and
+// the refusal has to say which of the two is missing.
+func TestInstallRefusesWhenTheComfyUIDirectoryIsUnknown(t *testing.T) {
+	manager := quietManager(t)
+	manager.cfg.ComfyDir = ""
+	manager.index = &Index{Resources: []*Resource{{
+		ID:      "m1",
+		Type:    "model",
+		Label:   "Model",
+		Target:  "checkpoints/m1.safetensors",
+		Sources: []any{"http://127.0.0.1:1/m1.safetensors"},
+	}}}
+
+	job, err := manager.Install([]string{"m1"}, nil)
+	if job != nil {
+		t.Fatalf("job = %v, want a refusal", job)
+	}
+	var apiErr *httpx.Error
+	if !errors.As(err, &apiErr) || apiErr.Code != "install_root_unknown" {
+		t.Fatalf("err = %v, want install_root_unknown", err)
+	}
+	for _, want := range []string{"COMFYUI_DIR", "/internal/folder_paths"} {
+		if !strings.Contains(apiErr.Message, want) {
+			t.Errorf("message %q does not mention %q", apiErr.Message, want)
+		}
+	}
+}

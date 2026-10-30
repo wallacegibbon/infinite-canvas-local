@@ -64,6 +64,7 @@ type Missing struct {
 type Status struct {
 	Phase          string          `json:"phase"`
 	ComfyURL       string          `json:"comfyUrl"`
+	ComfyVersion   string          `json:"comfyVersion"`
 	ComfyReachable bool            `json:"comfyReachable"`
 	ScanStartedAt  *string         `json:"scanStartedAt"`
 	ScannedAt      *string         `json:"scannedAt"`
@@ -354,18 +355,7 @@ func (m *Manager) modelRootsLocked(dir string) []string {
 }
 
 func (m *Manager) comfyRootLocked() string {
-	if m.cfg.ComfyDir != "" {
-		return m.cfg.ComfyDir
-	}
-	for _, key := range []string{"diffusion_models", "unet", "checkpoints"} {
-		if list, ok := m.folderPathCatalog[key].([]any); ok && len(list) > 0 {
-			if first, ok := list[0].(string); ok {
-				// models/<type> -> the directory two levels up.
-				return filepath.Dir(filepath.Dir(first))
-			}
-		}
-	}
-	return ""
+	return InstallRoot(m.cfg.ComfyDir, m.folderPathCatalog)
 }
 
 // SetModelAlias records one alias override and rescans.

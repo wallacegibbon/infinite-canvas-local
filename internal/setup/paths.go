@@ -175,6 +175,50 @@ func ExtraModelPathsFor(root, comfyDir string) map[string][]string {
 	return merged
 }
 
+// InstallRoot resolves where ComfyUI is installed, which is where an install has to write.
+//
+// The layers, most trustworthy first:
+//
+//  1. COMFYUI_DIR — the operator said so.
+//  2. The parent of a "custom_nodes" folder ComfyUI reported — ComfyUI said so, and it is
+//     exactly the folder an install needs.
+//  3. Two levels up from a reported model folder (<root>/models/<type>) — an inference, and
+//     the one that breaks when extra_model_paths points models outside the tree.
+//  4. "" — cannot tell. Callers must refuse rather than invent a path.
+func InstallRoot(comfyDir string, folderPaths map[string]any) string {
+	if comfyDir != "" {
+		return comfyDir
+	}
+	if dir := firstReportedDir(folderPaths, "custom_nodes"); dir != "" {
+		return filepath.Dir(dir)
+	}
+	for _, key := range []string{"diffusion_models", "unet", "checkpoints"} {
+		if dir := firstReportedDir(folderPaths, key); dir != "" {
+			return filepath.Dir(filepath.Dir(dir))
+		}
+	}
+	return ""
+}
+
+// firstReportedDir returns the first path ComfyUI reported for one folder key.
+func firstReportedDir(folderPaths map[string]any, key string) string {
+	switch list := folderPaths[key].(type) {
+	case []any:
+		for _, entry := range list {
+			if text, ok := entry.(string); ok && strings.TrimSpace(text) != "" {
+				return text
+			}
+		}
+	case []string:
+		for _, entry := range list {
+			if strings.TrimSpace(entry) != "" {
+				return entry
+			}
+		}
+	}
+	return ""
+}
+
 // CollectModelRoots lists every directory a logical model type may live in.
 func CollectModelRoots(dir string, folderPaths map[string]any, comfyDir, comfyRoot string) []string {
 	keys, ok := ModelDirKeys[dir]
