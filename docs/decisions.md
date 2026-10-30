@@ -1154,3 +1154,44 @@ actually means here.
 
 **Where** `infinite-canvas/web/scripts/check-i18n.cjs`, `scripts/check-exports.cjs`,
 `package.json`.
+
+## 42. Ten "which node has which dialog open" states become one
+
+**Decision** `project.tsx` held ten independent `useState<string | null>` — `cropNodeId`,
+`maskEditNodeId`, `outpaintNodeId`, `mossLayoutNodeId`, `splitNodeId`, `upscaleNodeId`,
+`superResolveNodeId`, `videoUpscaleNodeId`, `angleNodeId`, `infoNodeId` — each meaning "this
+editor is open on this node". They are now one nullable record:
+
+```ts
+type CanvasNodeTool = "info" | "crop" | … | "angle";
+const [activeNodeTool, setActiveNodeTool] = useState<{ kind: CanvasNodeTool; nodeId: string } | null>(null);
+```
+
+with `openNodeTool(kind, nodeId)` / `closeNodeTool()`, and the ten `xxxNode` render variables
+derived from it by a one-line kind check each.
+
+**Why not leave it alone** It was not merely verbose, it was a bug generator. Three code paths
+reset "the open editor" and each cleared a different, incomplete subset:
+
+| path | cleared |
+|---|---|
+| `deleteNodes` | info, crop, maskEdit, angle — **not** outpaint, mossLayout, split, upscale, superResolve, videoUpscale |
+| `clearCanvas` | the same four |
+| the `Escape` handler | info, crop, maskEdit only |
+
+So pressing Escape with the split dialog up did nothing. Opening the outpaint dialog and then
+deleting the node from the keyboard left `outpaintNodeId` pointing at an id that no longer
+existed — invisible only because every render site guards on `node.metadata?.content`, so the
+stale id silently rendered nothing and stayed set until the next open. With one state the resets
+are one line each and cannot drift apart again.
+
+**The invariant it buys** "At most one node editor is open" was previously a convention nobody
+enforced; nothing in the type system prevented `cropNodeId` and `splitNodeId` from both being
+set. Now it is the shape of the state. `dialogNodeId` deliberately stayed separate: that one is
+the composer panel, which is long-lived and *does* coexist with a modal (you can have the prompt
+panel open while a crop dialog floats above it). Only the modal ten were collapsed.
+
+**Cost** 52 `useState` in the component became 43. The diff is 59 insertions and 64 deletions,
+almost all of them mechanical renames the compiler checked.
+
+**Where** `infinite-canvas/web/src/pages/canvas/project.tsx`.

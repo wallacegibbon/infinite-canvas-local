@@ -121,6 +121,13 @@ type CanvasGenerationRequest = {
     controller: AbortController;
 };
 
+// The ten per-node editors used to be ten independent `string | null` states. That meant "which
+// editor is open" had no single answer, so each reset path cleared a different subset: delete and
+// clear closed five of the ten, Escape closed three. One nullable record instead makes "at most one
+// editor is open" an invariant the compiler can see, and leaves the resets a single thing to clear.
+type CanvasNodeTool = "info" | "crop" | "maskEdit" | "outpaint" | "mossLayout" | "split" | "upscale" | "superResolve" | "videoUpscale" | "angle";
+type CanvasNodeToolState = { kind: CanvasNodeTool; nodeId: string } | null;
+
 const VIDEO_NODE_MAX_WIDTH = 420;
 const VIDEO_NODE_MAX_HEIGHT = 420;
 // Stable empty reference array prevents `... || []` from invalidating CanvasNode's React.memo on every render.
@@ -244,17 +251,8 @@ function InfiniteCanvasPage() {
     const [toolbarNodeId, setToolbarNodeId] = useState<string | null>(null);
     const [nodeImageSettingsOpen, setNodeImageSettingsOpen] = useState(false);
     const [dialogNodeId, setDialogNodeId] = useState<string | null>(null);
-    const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
+    const [activeNodeTool, setActiveNodeTool] = useState<CanvasNodeToolState>(null);
     const [pluginManagerOpen, setPluginManagerOpen] = useState(false);
-    const [cropNodeId, setCropNodeId] = useState<string | null>(null);
-    const [maskEditNodeId, setMaskEditNodeId] = useState<string | null>(null);
-    const [outpaintNodeId, setOutpaintNodeId] = useState<string | null>(null);
-    const [mossLayoutNodeId, setMossLayoutNodeId] = useState<string | null>(null);
-    const [splitNodeId, setSplitNodeId] = useState<string | null>(null);
-    const [upscaleNodeId, setUpscaleNodeId] = useState<string | null>(null);
-    const [superResolveNodeId, setSuperResolveNodeId] = useState<string | null>(null);
-    const [videoUpscaleNodeId, setVideoUpscaleNodeId] = useState<string | null>(null);
-    const [angleNodeId, setAngleNodeId] = useState<string | null>(null);
     const [previewNodeId, setPreviewNodeId] = useState<string | null>(null);
     const [hoverPreviewNodeId, setHoverPreviewNodeId] = useState<string | null>(null);
     const [hoverPreviewImageId, setHoverPreviewImageId] = useState<string | null>(null);
@@ -282,6 +280,10 @@ function InfiniteCanvasPage() {
     const generationStepTimersRef = useRef(new Map<string, number>());
     const generationStepTracksRef = useRef(new Map<string, Map<string, { step: number; total: number }>>());
     const videoPollIdsRef = useRef(new Set<string>());
+
+    // Opening an editor displaces whatever was open: there is only one slot to put it in.
+    const openNodeTool = useCallback((kind: CanvasNodeTool, nodeId: string) => setActiveNodeTool({ kind, nodeId }), []);
+    const closeNodeTool = useCallback(() => setActiveNodeTool(null), []);
 
     const createHistoryEntry = useCallback(
         (): CanvasHistoryEntry => ({
@@ -805,16 +807,17 @@ function InfiniteCanvasPage() {
     // It stays hidden for multi-selection and while isNodeDragging is true.
     const singleSelectedNodeId = selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null;
     const toolbarNode = (toolbarNodeId ? nodeById.get(toolbarNodeId) || null : null) || (singleSelectedNodeId ? nodeById.get(singleSelectedNodeId) || null : null);
-    const infoNode = infoNodeId ? nodeById.get(infoNodeId) || null : null;
-    const cropNode = cropNodeId ? nodeById.get(cropNodeId) || null : null;
-    const maskEditNode = maskEditNodeId ? nodeById.get(maskEditNodeId) || null : null;
-    const outpaintNode = outpaintNodeId ? nodeById.get(outpaintNodeId) || null : null;
-    const mossLayoutNode = mossLayoutNodeId ? nodeById.get(mossLayoutNodeId) || null : null;
-    const splitNode = splitNodeId ? nodeById.get(splitNodeId) || null : null;
-    const upscaleNode = upscaleNodeId ? nodeById.get(upscaleNodeId) || null : null;
-    const superResolveNode = superResolveNodeId ? nodeById.get(superResolveNodeId) || null : null;
-    const videoUpscaleNode = videoUpscaleNodeId ? nodeById.get(videoUpscaleNodeId) || null : null;
-    const angleNode = angleNodeId ? nodeById.get(angleNodeId) || null : null;
+    const activeNodeToolNode = activeNodeTool ? nodeById.get(activeNodeTool.nodeId) || null : null;
+    const infoNode = activeNodeTool?.kind === "info" ? activeNodeToolNode : null;
+    const cropNode = activeNodeTool?.kind === "crop" ? activeNodeToolNode : null;
+    const maskEditNode = activeNodeTool?.kind === "maskEdit" ? activeNodeToolNode : null;
+    const outpaintNode = activeNodeTool?.kind === "outpaint" ? activeNodeToolNode : null;
+    const mossLayoutNode = activeNodeTool?.kind === "mossLayout" ? activeNodeToolNode : null;
+    const splitNode = activeNodeTool?.kind === "split" ? activeNodeToolNode : null;
+    const upscaleNode = activeNodeTool?.kind === "upscale" ? activeNodeToolNode : null;
+    const superResolveNode = activeNodeTool?.kind === "superResolve" ? activeNodeToolNode : null;
+    const videoUpscaleNode = activeNodeTool?.kind === "videoUpscale" ? activeNodeToolNode : null;
+    const angleNode = activeNodeTool?.kind === "angle" ? activeNodeToolNode : null;
     const contextMenuNode = contextMenu?.type === "node" ? nodeById.get(contextMenu.nodeId) || null : null;
     const previewNode = previewNodeId ? nodeById.get(previewNodeId) || null : null;
     const previewContent = previewImageId ? previewNode?.metadata?.images?.find((image) => image.id === previewImageId)?.content : previewNode?.metadata?.content;
@@ -956,10 +959,7 @@ function InfiniteCanvasPage() {
             setHoveredNodeId((current) => (current && allIds.has(current) ? null : current));
             setToolbarNodeId((current) => (current && allIds.has(current) ? null : current));
             setDialogNodeId((current) => (current && allIds.has(current) ? null : current));
-            setInfoNodeId((current) => (current && allIds.has(current) ? null : current));
-            setCropNodeId((current) => (current && allIds.has(current) ? null : current));
-            setMaskEditNodeId((current) => (current && allIds.has(current) ? null : current));
-            setAngleNodeId((current) => (current && allIds.has(current) ? null : current));
+            setActiveNodeTool((current) => (current && allIds.has(current.nodeId) ? null : current));
             setPreviewNodeId((current) => (current && allIds.has(current) ? null : current));
             setRunningNodeId((current) => (current && allIds.has(current) ? null : current));
             setReferencePickerNodeId((current) => (current && allIds.has(current) ? null : current));
@@ -1056,10 +1056,7 @@ function InfiniteCanvasPage() {
     const clearCanvas = useCallback(() => {
         setNodes([]);
         setConnections([]);
-        setInfoNodeId(null);
-        setCropNodeId(null);
-        setMaskEditNodeId(null);
-        setAngleNodeId(null);
+        setActiveNodeTool(null);
         setPreviewNodeId(null);
         setRunningNodeId(null);
         deselectCanvas();
@@ -1733,9 +1730,7 @@ function InfiniteCanvasPage() {
                 setHoveredNodeId(null);
                 setToolbarNodeId(null);
                 setDialogNodeId(null);
-                setInfoNodeId(null);
-                setCropNodeId(null);
-                setMaskEditNodeId(null);
+                setActiveNodeTool(null);
                 setPendingConnectionCreate(null);
             }
         };
@@ -2026,13 +2021,13 @@ function InfiniteCanvasPage() {
         setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
         setSelectedNodeIds(new Set([childId]));
         setDialogNodeId(childId);
-        setCropNodeId(null);
+        closeNodeTool();
     }, []);
 
     const splitImageNode = useCallback(
         async (node: CanvasNodeData, params: CanvasImageSplitParams) => {
             if (!node.metadata?.content) return;
-            setSplitNodeId(null);
+            closeNodeTool();
             const pieces = await splitDataUrl(node.metadata.content, params);
             const gap = 16;
             const cellWidth = node.width / params.columns;
@@ -2083,7 +2078,7 @@ function InfiniteCanvasPage() {
             }
             const userPrompt = payload.prompt.trim();
             const prompt = isQwenImage ? userPrompt : t("canvas.runtime.maskPrompt", { source: imageReferenceLabel(0), mask: imageReferenceLabel(1), prompt: userPrompt });
-            setMaskEditNodeId(null);
+            closeNodeTool();
             const maskImage = await uploadImage(payload.maskDataUrl);
             const generationMask = isQwenImage ? await uploadImage(payload.binaryMaskDataUrl) : null;
             const maskNodeId = nanoid();
@@ -2157,7 +2152,7 @@ function InfiniteCanvasPage() {
                 openConfigDialog(true);
                 return;
             }
-            setOutpaintNodeId(null);
+            closeNodeTool();
             const childId = nanoid();
             const source = { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey };
             const references = [source];
@@ -2211,7 +2206,7 @@ function InfiniteCanvasPage() {
                 openConfigDialog(true);
                 return;
             }
-            setMossLayoutNodeId(null);
+            closeNodeTool();
             setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, imageMode: "layout", layout: payload } } : item)));
             const childId = nanoid();
             const generationMetadata = buildImageGenerationMetadata("generation", generationConfig, 1, []);
@@ -2482,7 +2477,7 @@ function InfiniteCanvasPage() {
                 storageKey: node.metadata.storageKey,
             };
             const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [sourceReference]);
-            setAngleNodeId(null);
+            closeNodeTool();
             setRunningNodeId(childId);
             setNodes((prev) => [
                 ...prev,
@@ -3542,9 +3537,9 @@ function InfiniteCanvasPage() {
                     onStop={confirmStopGeneration}
                     onDisconnectReference={disconnectNodeReference}
                     onStartReferenceSelection={startNodeReferenceSelection}
-                    onOpenMaskEditor={(nodeId) => setMaskEditNodeId(nodeId)}
-                    onOpenOutpaintEditor={(nodeId) => setOutpaintNodeId(nodeId)}
-                    onOpenMossLayoutEditor={(nodeId) => setMossLayoutNodeId(nodeId)}
+                    onOpenMaskEditor={(nodeId) => openNodeTool("maskEdit", nodeId)}
+                    onOpenOutpaintEditor={(nodeId) => openNodeTool("outpaint", nodeId)}
+                    onOpenMossLayoutEditor={(nodeId) => openNodeTool("mossLayout", nodeId)}
                     modeOverride={getNodeDefinition(panelNode.type)?.useBuiltinPanel?.mode}
                     onImageSettingsOpenChange={(open) => {
                         setNodeImageSettingsOpen(open);
@@ -3563,9 +3558,9 @@ function InfiniteCanvasPage() {
                 inputSummary={getInputSummary(configInputsById.get(contentNode.id) || [])}
                 onConfigChange={handleConfigNodeChange}
                 onComposerToggle={() => setDialogNodeId((current) => (current === contentNode.id ? null : contentNode.id))}
-                onOpenMaskEditor={(nodeId) => setMaskEditNodeId(nodeId)}
-                onOpenOutpaintEditor={(nodeId) => setOutpaintNodeId(nodeId)}
-                onOpenMossLayoutEditor={(nodeId) => setMossLayoutNodeId(nodeId)}
+                onOpenMaskEditor={(nodeId) => openNodeTool("maskEdit", nodeId)}
+                onOpenOutpaintEditor={(nodeId) => openNodeTool("outpaint", nodeId)}
+                onOpenMossLayoutEditor={(nodeId) => openNodeTool("mossLayout", nodeId)}
                 onStop={confirmStopGeneration}
                 onGenerate={(nodeId) => {
                     const target = nodesRef.current.find((item) => item.id === nodeId);
@@ -3777,22 +3772,22 @@ function InfiniteCanvasPage() {
                     extraTools={toolbarNode ? buildNodeToolbarItems(toolbarNode) : undefined}
                     onKeep={keepNodeToolbar}
                     onLeave={hideNodeToolbar}
-                    onInfo={(node) => setInfoNodeId(node.id)}
+                    onInfo={(node) => openNodeTool("info", node.id)}
                     onDecreaseFont={(node) => handleFontSizeChange(node.id, Math.max(10, (node.metadata?.fontSize || 14) - 2))}
                     onIncreaseFont={(node) => handleFontSizeChange(node.id, Math.min(32, (node.metadata?.fontSize || 14) + 2))}
                     onToggleDialog={(node) => setDialogNodeId((current) => (current === node.id ? null : node.id))}
                     onGenerateImage={generateImageFromTextNode}
                     onUpload={(node) => handleUploadRequest(node.id)}
-                    onVideoUpscale={(node) => setVideoUpscaleNodeId(node.id)}
+                    onVideoUpscale={(node) => openNodeTool("videoUpscale", node.id)}
                     onInterpolateVideo={(node) => void interpolateVideoNode(node)}
                     onDownload={downloadNodeImage}
                     onSaveAsset={(node) => void saveNodeAsset(node)}
-                    onMaskEdit={(node) => setMaskEditNodeId(node.id)}
-                    onCrop={(node) => setCropNodeId(node.id)}
-                    onSplit={(node) => setSplitNodeId(node.id)}
-                    onUpscale={(node) => setUpscaleNodeId(node.id)}
-                    onSuperResolve={(node) => setSuperResolveNodeId(node.id)}
-                    onAngle={(node) => setAngleNodeId(node.id)}
+                    onMaskEdit={(node) => openNodeTool("maskEdit", node.id)}
+                    onCrop={(node) => openNodeTool("crop", node.id)}
+                    onSplit={(node) => openNodeTool("split", node.id)}
+                    onUpscale={(node) => openNodeTool("upscale", node.id)}
+                    onSuperResolve={(node) => openNodeTool("superResolve", node.id)}
+                    onAngle={(node) => openNodeTool("angle", node.id)}
                     onViewImage={handleNodeViewImage}
                     onReversePrompt={createImageReversePromptNodes}
                     onRetry={(node) => void handleRetryNode(node)}
@@ -3873,13 +3868,13 @@ function InfiniteCanvasPage() {
 
                 <input ref={imageInputRef} type="file" multiple accept="image/*,video/*,audio/mpeg,audio/wav,audio/x-wav,.mp3,.wav" className="hidden" onChange={handleImageInputChange} />
 
-                <CanvasNodeInfoModal node={infoNode} open={Boolean(infoNode)} onClose={() => setInfoNodeId(null)} />
+                <CanvasNodeInfoModal node={infoNode} open={Boolean(infoNode)} onClose={() => closeNodeTool()} />
                 <CanvasPluginManagerModal open={pluginManagerOpen} onClose={() => setPluginManagerOpen(false)} />
 
-                {cropNode?.metadata?.content ? <CanvasNodeCropDialog dataUrl={cropNode.metadata.content} open={Boolean(cropNode)} onClose={() => setCropNodeId(null)} onConfirm={(crop) => void cropImageNode(cropNode!, crop)} /> : null}
+                {cropNode?.metadata?.content ? <CanvasNodeCropDialog dataUrl={cropNode.metadata.content} open={Boolean(cropNode)} onClose={() => closeNodeTool()} onConfirm={(crop) => void cropImageNode(cropNode!, crop)} /> : null}
 
                 {maskEditNode?.metadata?.content ? (
-                    <CanvasNodeMaskEditDialog dataUrl={maskEditNode.metadata.content} open={Boolean(maskEditNode)} onClose={() => setMaskEditNodeId(null)} onConfirm={(payload) => void maskEditImageNode(maskEditNode!, payload)} />
+                    <CanvasNodeMaskEditDialog dataUrl={maskEditNode.metadata.content} open={Boolean(maskEditNode)} onClose={() => closeNodeTool()} onConfirm={(payload) => void maskEditImageNode(maskEditNode!, payload)} />
                 ) : null}
 
                 {outpaintNode?.metadata?.content ? (
@@ -3887,7 +3882,7 @@ function InfiniteCanvasPage() {
                         dataUrl={outpaintNode.metadata.content}
                         open={Boolean(outpaintNode)}
                         promptDefault={outpaintNode.metadata.composerContent ?? outpaintNode.metadata.prompt ?? ""}
-                        onClose={() => setOutpaintNodeId(null)}
+                        onClose={() => closeNodeTool()}
                         onConfirm={(payload) => void outpaintImageNode(outpaintNode!, payload)}
                     />
                 ) : null}
@@ -3900,12 +3895,12 @@ function InfiniteCanvasPage() {
                         size={mossLayoutNode.metadata?.size}
                         modelLabel="MOSS-Image"
                         layout={mossLayoutNode.metadata?.layout}
-                        onClose={() => setMossLayoutNodeId(null)}
+                        onClose={() => closeNodeTool()}
                         onConfirm={(payload) => void mossLayoutImageNode(mossLayoutNode, payload)}
                     />
                 ) : null}
 
-                {splitNode?.metadata?.content ? <CanvasNodeSplitDialog dataUrl={splitNode.metadata.content} open={Boolean(splitNode)} onClose={() => setSplitNodeId(null)} onConfirm={(params) => void splitImageNode(splitNode!, params)} /> : null}
+                {splitNode?.metadata?.content ? <CanvasNodeSplitDialog dataUrl={splitNode.metadata.content} open={Boolean(splitNode)} onClose={() => closeNodeTool()} onConfirm={(params) => void splitImageNode(splitNode!, params)} /> : null}
 
                 {upscaleNode?.metadata?.content ? (
                     <CanvasNodeSuperResolveDialog
@@ -3916,9 +3911,9 @@ function InfiniteCanvasPage() {
                         title={t("canvas.superResolve.fastTitle")}
                         actionLabel={t("canvas.editors.upscale")}
                         note={t("canvas.superResolve.fastNote")}
-                        onClose={() => setUpscaleNodeId(null)}
+                        onClose={() => closeNodeTool()}
                         onConfirm={(params) => {
-                            setUpscaleNodeId(null);
+                            closeNodeTool();
                             if (upscaleNode) void runFastUpscale(upscaleNode, params);
                         }}
                     />
@@ -3928,9 +3923,9 @@ function InfiniteCanvasPage() {
                     dataUrl={superResolveNode?.metadata?.content || ""}
                     open={Boolean(superResolveNode)}
                     config={effectiveConfig}
-                    onClose={() => setSuperResolveNodeId(null)}
+                    onClose={() => closeNodeTool()}
                     onConfirm={(params) => {
-                        setSuperResolveNodeId(null);
+                        closeNodeTool();
                         if (superResolveNode) void runSuperResolve(superResolveNode, params);
                     }}
                 />
@@ -3938,17 +3933,17 @@ function InfiniteCanvasPage() {
                 <CanvasNodeVideoUpscaleDialog
                     open={Boolean(videoUpscaleNode)}
                     node={videoUpscaleNode}
-                    onClose={() => setVideoUpscaleNodeId(null)}
+                    onClose={() => closeNodeTool()}
                     onConfirm={(params) => {
                         const target = videoUpscaleNode;
-                        setVideoUpscaleNodeId(null);
+                        closeNodeTool();
                         if (target) void upscaleVideoNode(target, params);
                     }}
                 />
 
                 {angleNode?.metadata?.content ? (
                     <Suspense fallback={null}>
-                        <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} open={Boolean(angleNode)} onClose={() => setAngleNodeId(null)} onConfirm={(params) => void generateAngleNode(angleNode!, params)} />
+                        <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} open={Boolean(angleNode)} onClose={() => closeNodeTool()} onConfirm={(params) => void generateAngleNode(angleNode!, params)} />
                     </Suspense>
                 ) : null}
 
