@@ -12,7 +12,7 @@ func isolateEnv(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{
 		"GATEWAY_PORT", "GATEWAY_HOST", "COMFY_URL", "COMFY_FRONTEND_DIR",
-		"COMFY_MODELS_SHARED",
+		"INSTALL_INTO_COMFY",
 		"SCAN_ON_START",
 		"WORKFLOW_DIR", "DATA_DIR", "OUTPUT_DIR", "PUBLIC_BASE_URL", "CORS_ORIGINS",
 		"REQUEST_TIMEOUT_MS", "VIDEO_TIMEOUT_MS", "POLL_INTERVAL_MS",
@@ -123,7 +123,7 @@ func TestInvalidNumbersFallBack(t *testing.T) {
 
 // Installs are refused unless this is set, so a typo must read as "not set" rather than
 // silently enabling them.
-func TestComfyModelsSharedIsOptIn(t *testing.T) {
+func TestInstallIntoComfyIsOptIn(t *testing.T) {
 	isolateEnv(t)
 	root := t.TempDir()
 	t.Setenv("GATEWAY_ROOT", root)
@@ -134,29 +134,29 @@ func TestComfyModelsSharedIsOptIn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.ComfyModelsShared {
-		t.Error("ComfyModelsShared is on by default; installs must be refused until stated")
+	if cfg.InstallIntoComfy {
+		t.Error("InstallIntoComfy is on by default; installs must be refused until stated")
 	}
 
 	for _, value := range []string{"1", "true", "TRUE", " on "} {
-		t.Setenv("COMFY_MODELS_SHARED", value)
+		t.Setenv("INSTALL_INTO_COMFY", value)
 		cfg, err = Load()
 		if err != nil {
 			t.Fatalf("Load: %v", err)
 		}
-		if !cfg.ComfyModelsShared {
-			t.Errorf("COMFY_MODELS_SHARED=%q was not read as true", value)
+		if !cfg.InstallIntoComfy {
+			t.Errorf("INSTALL_INTO_COMFY=%q was not read as true", value)
 		}
 	}
 
 	for _, value := range []string{"0", "false", "nope", "", "yes please"} {
-		t.Setenv("COMFY_MODELS_SHARED", value)
+		t.Setenv("INSTALL_INTO_COMFY", value)
 		cfg, err = Load()
 		if err != nil {
 			t.Fatalf("Load: %v", err)
 		}
-		if cfg.ComfyModelsShared {
-			t.Errorf("COMFY_MODELS_SHARED=%q was read as true", value)
+		if cfg.InstallIntoComfy {
+			t.Errorf("INSTALL_INTO_COMFY=%q was read as true", value)
 		}
 	}
 }

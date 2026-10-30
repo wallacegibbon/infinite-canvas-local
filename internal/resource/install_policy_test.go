@@ -11,12 +11,12 @@ import (
 	"comfyui-gateway/internal/httpx"
 )
 
-// Without COMFY_MODELS_SHARED=1 no download may start: the dangerous case is not a failed
+// Without INSTALL_INTO_COMFY=1 no download may start: the dangerous case is not a failed
 // download but a successful one into a path that happens to exist on this host.
 func TestInstallRefusesUnlessTheDeploymentSaysShared(t *testing.T) {
 	manager := quietManager(t)
 	manager.cfg.ComfyURL = "http://192.168.3.50:8188"
-	manager.cfg.ComfyModelsShared = false
+	manager.cfg.InstallIntoComfy = false
 	manager.index = &Index{Resources: []*Resource{{
 		ID:      "m1",
 		Type:    "model",
@@ -37,7 +37,7 @@ func TestInstallRefusesUnlessTheDeploymentSaysShared(t *testing.T) {
 		t.Errorf("(status, code) = (%d, %q), want (400, model_install_disabled)", apiErr.Status, apiErr.Code)
 	}
 	// Both fixes and the machine to move to have to be in the message.
-	for _, want := range []string{"192.168.3.50:8188", "COMFY_MODELS_SHARED=1"} {
+	for _, want := range []string{"192.168.3.50:8188", "INSTALL_INTO_COMFY=1"} {
 		if !strings.Contains(apiErr.Message, want) {
 			t.Errorf("message %q does not mention %q", apiErr.Message, want)
 		}
@@ -48,15 +48,15 @@ func TestInstallPolicyFollowsTheFlagOnly(t *testing.T) {
 	manager := quietManager(t)
 	manager.cfg.ComfyURL = "http://127.0.0.1:8188"
 
-	manager.cfg.ComfyModelsShared = false
+	manager.cfg.InstallIntoComfy = false
 	if policy := manager.InstallPolicy(); policy.Allowed {
 		t.Errorf("policy = %+v, want refused while the flag is unset", policy)
 	}
 
-	manager.cfg.ComfyModelsShared = true
+	manager.cfg.InstallIntoComfy = true
 	policy := manager.InstallPolicy()
 	if !policy.Allowed {
-		t.Errorf("policy = %+v, want allowed for COMFY_MODELS_SHARED=1", policy)
+		t.Errorf("policy = %+v, want allowed for INSTALL_INTO_COMFY=1", policy)
 	}
 	if policy.ComfyHost != "127.0.0.1:8188" {
 		t.Errorf("ComfyHost = %q, want the COMFY_URL host", policy.ComfyHost)
@@ -68,7 +68,7 @@ func TestInstallPolicyFollowsTheFlagOnly(t *testing.T) {
 func TestInstallPolicyIgnoresTheLocalFilesystem(t *testing.T) {
 	// ComfyUI is installed and reported here; the policy still has the last word.
 	manager := quietManagerAt(t, t.TempDir())
-	manager.cfg.ComfyModelsShared = false
+	manager.cfg.InstallIntoComfy = false
 
 	if manager.InstallPolicy().Allowed {
 		t.Error("a known ComfyUI directory must not enable installs on its own")

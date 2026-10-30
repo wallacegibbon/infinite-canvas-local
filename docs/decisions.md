@@ -373,7 +373,7 @@ input (#9), and `name` / `source.name` / `lora.filter` are identifiers and patte
 
 ## 21. Model installs are a configured fact, and they are off until stated
 
-**Decision** `COMFY_MODELS_SHARED=1` is required to install models. Without it
+**Decision** `INSTALL_INTO_COMFY=1` is required to install models. Without it
 `POST /api/resources/install` answers `400 model_install_disabled`, the panel shows a banner and
 disables the download buttons, and nothing is inspected to decide any of this. `.env.example` — the
 single-machine template the README tells you to copy — ships the line set.

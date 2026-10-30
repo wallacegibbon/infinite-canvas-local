@@ -88,7 +88,7 @@ make build             # Go gateway, static binary; start.sh builds it too if mi
 
 # Configure and start
 cp .env.example .env   # adjust COMFY_URL / GATEWAY_HOST for this machine
-                        # (COMFY_MODELS_SHARED=1 there is what allows the panel to install models)
+                        # (INSTALL_INTO_COMFY=1 there is what allows the panel to install models)
 ./start.sh
 ```
 

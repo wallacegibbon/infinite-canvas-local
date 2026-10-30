@@ -70,7 +70,7 @@ Every variable is optional; the defaults match the previous implementation.
 | `GATEWAY_HOST` | `127.0.0.1` | Gateway listen address, bound as given. `0.0.0.0` accepts every interface. |
 | `GATEWAY_PORT` | `8190` | Gateway listen port. |
 | `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI base URL. |
-| `COMFY_MODELS_SHARED` | *(empty)* | `1` = the gateway can write into ComfyUI's model folders (same machine, or a mount). Model installs stay off without it. |
+| `INSTALL_INTO_COMFY` | *(empty)* | `1` = this gateway can write into ComfyUI's folders (`models/`, `custom_nodes/`) because it runs there or sees them through a mount. Installs stay off without it. |
 | `WORKFLOW_DIR` | `<root>/workflows` | Registry directory. |
 | `DATA_DIR` | `<root>/data` | Tasks, locks, preferences. |
 | `OUTPUT_DIR` | `<data>/outputs` | Generated files served under `/files/`. |
@@ -103,9 +103,9 @@ discovered from inside the process — a mount at another path looks exactly lik
 and two machines that both install to `/opt/ComfyUI` look exactly like one — so it is configured,
 not detected:
 
-| `COMFY_MODELS_SHARED` | Behaviour |
+| `INSTALL_INTO_COMFY` | Behaviour |
 | --- | --- |
-| `1` | the gateway may write into ComfyUI's model folders: installs allowed, nothing is inspected |
+| `1` | the gateway may write into ComfyUI's folders: installs allowed, nothing is inspected |
 | unset / anything else | installs off: `GET /api/resources/status` reports `modelInstall { allowed: false, comfyHost }`, the canvas shows a banner and disables the download buttons, and `POST /api/resources/install` answers `400 model_install_disabled` naming `COMFY_URL`'s host |
 
 Fail-closed on purpose. The failure this prevents is not one the user can react to: writing into a
@@ -123,7 +123,7 @@ on the gateway's own host by definition.
 | --- | --- |
 | Generation, uploads, fetching images/videos, queue, system stats | HTTP (`/prompt`, `/upload/image`, `/view`, `/queue`, `/system_stats`) |
 | Which models are installed (panel "present/missing") | HTTP (`/object_info`) |
-| Installing models and custom nodes | **local write** — needs `COMFY_MODELS_SHARED=1` and the folders on this host |
+| Installing models and custom nodes | **local write** — needs `INSTALL_INTO_COMFY=1` and the folders on this host |
 | `extra_model_paths.yaml` (mapped drives, NFS model dirs) | **local read** under ComfyUI's own directory |
 | Knowing where to write at all | ComfyUI's reported folder layout (`custom_nodes`) |
 | "Runtime deps" interpreter hint | **local read** of `/proc` |

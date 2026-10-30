@@ -102,7 +102,7 @@ const copyByLocale = {
         installDisabled: "模型安装已关闭：还没有确认 Gateway 能写进 ComfyUI 的模型目录",
         installDisabledBody: "模型是 Gateway 直接写进 ComfyUI 模型目录的。没有这条确认，下载只会落到当前机器的磁盘上，ComfyUI 那边仍然显示缺少——而且不会报错，只会白下载几个 GB。",
         installDisabledHost: "ComfyUI 所在机器",
-        installDisabledFix: "如果 Gateway 就跑在 ComfyUI 这台机器上（或它的模型目录已经挂载到本机），在 .env 里设置 COMFY_MODELS_SHARED=1 并重启 gateway。如果 Gateway 在另一台机器上，请把它搬到 ComfyUI 所在机器上用同一份工作目录启动（画布可以留在浏览器这边，改一下网关地址即可）。",
+        installDisabledFix: "如果 Gateway 就跑在 ComfyUI 这台机器上（或它的模型目录已经挂载到本机），在 .env 里设置 INSTALL_INTO_COMFY=1 并重启 gateway。如果 Gateway 在另一台机器上，请把它搬到 ComfyUI 所在机器上用同一份工作目录启动（画布可以留在浏览器这边，改一下网关地址即可）。",
         indexError: "资源索引读取失败：",
         indexWarning: "资源索引提示：",
         selectHint: "选择需要安装的功能包；已具备的资源会自动跳过。",
@@ -206,7 +206,7 @@ const copyByLocale = {
         installDisabled: "Model installs are off: this gateway has not confirmed it can write into ComfyUI's model folders",
         installDisabledBody: "The gateway installs models by writing straight into ComfyUI's model folders. Without that confirmation a download only reaches this host's disk while ComfyUI keeps reporting the model as missing — and nothing fails, so gigabytes are wasted quietly.",
         installDisabledHost: "ComfyUI host",
-        installDisabledFix: "If the gateway runs on the ComfyUI machine (or its model folders are mounted here), set COMFY_MODELS_SHARED=1 in .env and restart the gateway. If it runs on another machine, move it there and start it from the same working directory (the canvas can stay in your browser — just point it at that gateway).",
+        installDisabledFix: "If the gateway runs on the ComfyUI machine (or its model folders are mounted here), set INSTALL_INTO_COMFY=1 in .env and restart the gateway. If it runs on another machine, move it there and start it from the same working directory (the canvas can stay in your browser — just point it at that gateway).",
         indexError: "Failed to load the resource index: ",
         indexWarning: "Resource index notice: ",
         selectHint: "Select the packs to install; existing resources are skipped.",
@@ -552,7 +552,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
 
     // Installs are local file writes, so a gateway on another machine can only download to
     // the wrong disk. They stay off until the deployment states otherwise
-    // (COMFY_MODELS_SHARED=1); the server refuses too (code model_install_disabled), and this
+    // (INSTALL_INTO_COMFY=1); the server refuses too (code model_install_disabled), and this
     // keeps the buttons from offering something that cannot work.
     const modelInstall = status?.modelInstall;
     const installDisabled = modelInstall?.allowed === false;

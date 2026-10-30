@@ -887,7 +887,7 @@ func installHint(err error) string {
 	case strings.Contains(message, "quota"):
 		return "the disk quota for this volume is exhausted"
 	case strings.Contains(message, "cannot write into ComfyUI's folders"):
-		// The wrong-machine case is refused before a byte moves (COMFY_MODELS_SHARED), so
+		// The wrong-machine case is refused before a byte moves (INSTALL_INTO_COMFY), so
 		// this is a folder that is missing, read-only, or owned by another user — including
 		// a mount that went away, which is why "disk full" was the wrong thing to say.
 		return "check that this folder exists, is mounted writable, and belongs to this user (docs/gateway.md)"

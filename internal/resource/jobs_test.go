@@ -43,9 +43,9 @@ func quietManagerAt(t *testing.T, root string) *Manager {
 	logger := logx.NewWithWriter("test", io.Discard)
 	// A scanned-on-demand setup manager over empty directories: the status paths call into
 	// it (folder paths, loader options, model aliases), and an unscanned one is harmless.
-	// ComfyModelsShared mirrors what .env.example ships: installs are refused unless the
+	// InstallIntoComfy mirrors what .env.example ships: installs are refused unless the
 	// deployment states that ComfyUI's model folders are reachable.
-	cfg := &config.Config{RootDir: t.TempDir(), DataDir: dataDir, ComfyModelsShared: true}
+	cfg := &config.Config{RootDir: t.TempDir(), DataDir: dataDir, InstallIntoComfy: true}
 	return &Manager{
 		cfg:       cfg,
 		setup:     setup.New(setup.Options{Config: cfg, Logger: logger, FolderPaths: comfyLayout(t, root)}),

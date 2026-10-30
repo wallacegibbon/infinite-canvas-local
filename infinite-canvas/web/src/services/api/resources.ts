@@ -128,7 +128,7 @@ export type PromptCapabilities = {
 
 /**
  * Whether this gateway may install models at all. Configured, never inferred: installs are
- * refused unless COMFY_MODELS_SHARED=1 states that ComfyUI's model folders are reachable.
+ * refused unless INSTALL_INTO_COMFY=1 states that ComfyUI's model folders are reachable.
  */
 export type ResourceModelInstall = {
     allowed: boolean;

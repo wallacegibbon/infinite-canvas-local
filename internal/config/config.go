@@ -27,7 +27,7 @@ type Config struct {
 	GatewayHost string
 
 	ComfyURL            string
-	ComfyModelsShared   bool // COMFY_MODELS_SHARED=1; installs are refused without it (internal/resource/install_policy.go)
+	InstallIntoComfy    bool // INSTALL_INTO_COMFY=1; installs are refused without it (internal/resource/install_policy.go)
 	PromptThinkingParam string
 	PromptMaxTokens     int
 	ComfyFrontendDir    string
@@ -107,7 +107,7 @@ func Load(opts ...Option) (*Config, error) {
 		GatewayPort:         intValue(os.Getenv("GATEWAY_PORT"), 8190),
 		GatewayHost:         stringOr(os.Getenv("GATEWAY_HOST"), "127.0.0.1"),
 		ComfyURL:            stringOr(os.Getenv("COMFY_URL"), "http://127.0.0.1:8188"),
-		ComfyModelsShared:   boolValue(os.Getenv("COMFY_MODELS_SHARED")),
+		InstallIntoComfy:    boolValue(os.Getenv("INSTALL_INTO_COMFY")),
 		PromptThinkingParam: stringOr(os.Getenv("PROMPT_THINKING_PARAM"), "none"),
 		PromptMaxTokens:     intValue(os.Getenv("PROMPT_MAX_TOKENS"), 8192),
 		ComfyFrontendDir:    strings.TrimSpace(os.Getenv("COMFY_FRONTEND_DIR")),
@@ -274,7 +274,7 @@ func countValue(value string) int {
 }
 
 // boolValue reads an opt-in flag. Anything that is not an accepted spelling is false, which
-// is the safe direction here: COMFY_MODELS_SHARED gates a refusal, and a typo must not
+// is the safe direction here: INSTALL_INTO_COMFY gates a refusal, and a typo must not
 // silently enable installs on a host that cannot reach ComfyUI's model folders.
 func boolValue(value string) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
