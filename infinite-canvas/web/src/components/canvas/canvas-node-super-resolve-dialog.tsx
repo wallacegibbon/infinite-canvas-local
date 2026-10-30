@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Select } from "antd";
 import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +7,7 @@ import { Dialog } from "@/components/kit/dialog";
 import { InputNumber } from "@/components/kit/input";
 import { Collapse } from "@/components/kit/nav";
 import { Segmented } from "@/components/kit/segmented";
+import { Select } from "@/components/kit/select";
 import { readImageMeta } from "@/lib/image-utils";
 import { requestUpscaleWorkflows, type UpscaleParameter, type UpscaleWorkflow } from "@/services/api/image";
 import type { AiConfig } from "@/stores/use-config-store";
@@ -214,8 +214,6 @@ export function CanvasNodeSuperResolveDialog({
                                     value={String(values[modelParameter.key] ?? "")}
                                     options={(modelParameter.options || []).map((option) => ({ value: optionValue(option), label: prettyModel(optionLabel(option)) }))}
                                     onChange={(value) => setValues((current) => ({ ...current, [modelParameter.key]: value }))}
-                                    optionFilterProp="label"
-                                    showSearch
                                 />
                             </div>
                         ) : null}

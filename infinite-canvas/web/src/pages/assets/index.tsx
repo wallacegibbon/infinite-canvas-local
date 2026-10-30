@@ -1,6 +1,6 @@
 import { Copy, Download, PencilLine, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Drawer, Form, Select } from "antd";
+import { Drawer, Form } from "antd";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
@@ -11,6 +11,8 @@ import { Empty, Space } from "@/components/kit/display";
 import { Input } from "@/components/kit/input";
 import { Image } from "@/components/kit/media";
 import { Pagination } from "@/components/kit/nav";
+import { Select } from "@/components/kit/select";
+import { TagInput } from "@/components/kit/tag-input";
 import { CheckableTag, Tag } from "@/components/kit/tag";
 import { Typography } from "@/components/kit/text";
 import { toast } from "@/components/kit/toast";
@@ -340,7 +342,7 @@ export default function AssetsPage() {
                             </Space.Compact>
                         </Form.Item>
                         <Form.Item name="tags" label={t("assets.fields.tags")}>
-                            <Select mode="tags" tokenSeparators={[",", "，"]} placeholder={t("assets.fields.tagsPlaceholder")} />
+                            <TagInput separators={[",", "，"]} placeholder={t("assets.fields.tagsPlaceholder")} />
                         </Form.Item>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Form.Item name="source" label={t("assets.fields.source")}>

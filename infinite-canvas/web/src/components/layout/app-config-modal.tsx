@@ -1,4 +1,4 @@
-import { Form, Select } from "antd";
+import { Form } from "antd";
 import { ArrowLeft, ArrowRight, ChevronDown, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -8,6 +8,7 @@ import { Switch, Radio } from "@/components/kit/choice";
 import { Dialog } from "@/components/kit/dialog";
 import { Input } from "@/components/kit/input";
 import { Tabs } from "@/components/kit/nav";
+import { Select } from "@/components/kit/select";
 import { toast } from "@/components/kit/toast";
 import { confirm } from "@/components/kit/confirm";
 import { ModelPicker, WorkflowModelPicker } from "@/components/model-picker";

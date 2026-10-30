@@ -739,3 +739,49 @@ step buys removability rather than bytes.
 
 **Where** `components/kit/button.tsx`, `styles/globals.css`, `main.tsx`, and the 30 files whose
 antd import lost `Button`.
+
+---
+
+## 31. `Select` is the radix primitive, and `mode="tags"` was never a select
+
+**Decision** `kit/select.tsx` keeps antd's prop shape — `value` / `onChange` / `options` /
+`placeholder` / `size` / `loading` / `notFoundContent` — but renders the radix primitive already in
+`components/ui/select` (the one `model-picker` uses). The popup portal is marked
+`data-canvas-overlay`, which is what lets the canvas stop zooming and deselecting under an open
+dropdown without knowing what drew it.
+
+`<Select mode="tags">` at the asset form is a different control and is now `kit/tag-input.tsx`: a
+chip list plus a text field, with `,` `，` as separators. Routing it through a listbox bought a
+portal, an aria listbox and a hidden search input for a field that has no options to list. It keeps
+antd's `value` / `onChange` contract, so `Form.Item` binds to it unchanged — verified by watching
+the live preview panel pick up the tags as they are typed.
+
+**Two antd features deliberately not carried over**
+
+- `showSearch` / `optionFilterProp` — the radix listbox has built-in typeahead driven by
+  `textValue`. Typing a prefix jumps to the matching option. This is slightly weaker than antd's
+  substring filter (it matches from the start), and it is the only behaviour difference from antd
+  in this migration. The one call site was a handful of upscale models, so it was not worth a second
+  combobox implementation with its own keyboard and aria handling.
+- Empty string as a value — radix rejects `value=""`. Both directions travel through a sentinel that
+  maps back to `""`, so `value=""` still renders as the placeholder, which is what antd did when no
+  option carried `""`.
+
+**The bug the browser caught** The first build rendered **two chevrons**: `kit` drew one so it could
+swap it for a spinner while loading, and `SelectTrigger` drew its own. Nothing about that is
+type-visible. Fixed with `hideChevron`.
+
+**Dead CSS removed here** The last `.ant-select` users were the three `.canvas-control-select`
+workflow rules and `.canvas-compact-control.canvas-control-select`, which had had no matching
+element since an earlier pass; plus `.canvas-image-settings-popover .ant-popover-inner`, which had
+had none since that panel became a hand-styled portal. `globals.css` now contains no third-party
+class name at all.
+
+**Result** files importing antd 10 → 8, and the component kinds left are `Form`, `Drawer`,
+`ConfigProvider` and `theme`; antd JS chunk 714 kB → 249 kB (gzip 232 → 87). These are the
+first bytes this migration has actually returned, because `Select` was the last component pulled in
+from outside the `Button`/`Modal`/`Tooltip` subtree that the remaining components drag along.
+
+**Where** `components/kit/select.tsx`, `components/kit/tag-input.tsx`, `styles/globals.css`, and the
+four call sites (`pages/assets/index.tsx`, `components/canvas/canvas-side-panel.tsx`,
+`components/canvas/canvas-node-super-resolve-dialog.tsx`, `components/layout/app-config-modal.tsx`).
