@@ -141,10 +141,19 @@ export function hasResumableVideoTask(node: CanvasNodeData) {
     return node.type === CanvasNodeType.Video && Boolean(node.metadata?.videoTaskId) && !node.metadata?.content;
 }
 
+/**
+ * An audio node whose run is still in flight. The gateway keeps the run when the page goes away, so
+ * the node stays `loading` and is polled again after a reload instead of being marked interrupted.
+ * Only loading nodes qualify: an error node keeps its last run id, but resuming it would be noise.
+ */
+export function hasResumableAudioRun(node: CanvasNodeData) {
+    return node.type === CanvasNodeType.Audio && node.metadata?.status === "loading" && Boolean(node.metadata?.audioRunId) && !node.metadata?.content;
+}
+
 export function resetInterruptedGeneration(nodes: CanvasNodeData[]) {
     return nodes.map((node) =>
         node.metadata?.status === "loading"
-            ? hasResumableVideoTask(node)
+            ? hasResumableVideoTask(node) || hasResumableAudioRun(node)
                 ? node
                 : {
                       ...node,

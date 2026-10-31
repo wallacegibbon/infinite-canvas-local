@@ -1865,3 +1865,45 @@ protocol; it is the shortest description of what we are and are not.
 
 **Where** `docs/gateway.md`, `docs/protocol.md`, `internal/comfy/client.go` (the endpoints we borrow),
 `internal/workflow/bindings.go` (the translation), `internal/server/routes_runs.go`.
+
+## 58. The canvas's first node lives on the run protocol
+
+**Decision** Audio nodes submit `POST /api/runs` and keep the returned id on the node
+(`metadata.audioRunId`). A reload reattaches to that run instead of re-submitting, the step ring is
+driven by the run's own `progress`, and stopping a generation deletes the run (which interrupts
+ComfyUI, so the GPU is actually freed). Channels that are not the local gateway keep the
+`/v1/audio/speech` contract.
+
+**Why audio first** It is the newest node in the canvas and the least entangled: no batch, no
+reference images, one artifact. It is also the node that most needed what the protocol provides — a
+song takes minutes, so "the browser stayed open" must not be a requirement. Doing it first proves
+the protocol against a real node before the image and video paths (uploads, multiple outputs) are
+touched.
+
+**How the node decides which contract to use** Two conditions, both cheap and both already known:
+the channel's base URL is the local gateway, and the model id starts with `audio-`. The gateway's
+naming rule is `<type>-<slug>`, so an audio workflow is recognisable without another request; every
+other channel keeps the speech call. When image and video migrate, the same rule does the work.
+
+**What it bought, concretely**
+
+- A closed tab or a refresh no longer loses a finished or still-running song: `hasResumableAudioRun`
+  keeps the node `loading` through the restore pass, and one effect resumes the poll.
+- Stop is real: aborting the wait calls `DELETE /api/runs/{id}` (`cancelOnAbort`), where the old
+  blocking call only dropped the connection and left ComfyUI rendering.
+- Errors are the gateway's: a refused container or a ComfyUI validation failure arrives as a run
+  error with its code and message, not as a generic "audio generation failed".
+- The step ring works without a preview stream, which audio never had.
+
+**A bug it exposed** `format: "wav"` used to reach ComfyUI and fail there; the run path now validates
+the declared container at submission — fixed one commit earlier, because the canvas now sends the
+container the user chose rather than one the adapter guessed.
+
+**Tested** `tests/api-runs.test.ts` (root resolution, submit body, polling to terminal, failed runs,
+abort-cancels-only-when-asked, relative output URLs) and `tests/canvas-resumable-runs.test.ts`
+(which nodes survive a reload). End to end against a real ComfyUI with the exact payload the canvas
+sends: a run reached `succeeded` 30/30 and the downloaded mp3 played; `opus` came back as Ogg/Opus.
+
+**Where** `infinite-canvas/web/src/services/api/runs.ts`, `services/api/audio.ts`,
+`pages/canvas/hooks/use-generation-runs.ts`, `pages/canvas/project.tsx`,
+`lib/canvas/canvas-generation-helpers.ts`.

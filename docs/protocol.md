@@ -15,11 +15,12 @@ criterion.
 - Done: `/api/runs` and `/api/uploads` exist with the shape below — submit, status, outputs, preview
   and cancel, media referenced by upload id and role, one row per artifact (a batch image request
   returns several). Audio is already an adapter on the same execution path.
-- Next: typed `inputs` per workflow (type, range, enum) so submission rejects a bad value with a
-  `400` instead of failing inside ComfyUI; then the canvas moves node type by node type (audio,
-  image, video) and `/v1/*` is deleted. Until the canvas has moved, `POST /api/runs` accepts the
-  generic `prompt`/`negative`/`size`/`count`/`quality`/`seconds`/`mode` keys plus any binding key
-  passed through `inputs`, which is the same mapping the adapters use.
+- Done: `inputs` is typed and checked at submission (closed key set, types, ranges, `required`,
+  output container), with `GET /api/workflows/{id}/schema` publishing the same contract.
+- Done: **the canvas's audio nodes use this protocol.** They submit a run, keep its id on the node,
+  drive the step ring from the run's progress, resume polling after a reload, and cancel the run
+  when the user stops it. Image and video nodes still use the `/v1` adapters.
+- Next: image nodes (uploads + multi-output), then video nodes; then delete `/v1/*`.
 
 The routes below are the contract to build against; where a route already exists with the same
 name (`/api/workflows`, `/api/tasks`), it is the real thing.

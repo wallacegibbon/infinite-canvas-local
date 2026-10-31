@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { nanoid } from "nanoid";
@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { toast } from "@/components/kit/toast";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
+import { downloadRunOutput, waitForRun, type Run, type RunProgress } from "@/services/api/runs";
 import { isVideoTaskFailed } from "@/services/api/video";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { uploadImage } from "@/services/image-storage";
@@ -97,6 +98,22 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+
+    /** Node ids whose run is currently being polled, so a resume and a live run cannot both poll. */
+    const audioPollIdsRef = useRef(new Set<string>());
+
+    /**
+     * Run progress is the only source of the step ring for audio: the node is not a video task, so
+     * there is no preview stream to read steps from.
+     */
+    const setAudioStepProgress = useCallback(
+        (nodeId: string, progress?: RunProgress) => {
+            const total = progress?.total && progress.total > 0 ? progress.total : 0;
+            const step = Math.max(0, progress?.step || 0);
+            setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, stepProgress: total > 0 ? { step: Math.min(total, step), total } : undefined } } : node)));
+        },
+        [setNodes],
+    );
 
     const runImageGeneration = useCallback(
         async (run: GenerationRun) => {
@@ -346,14 +363,26 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             if (!reuseAudioNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: audioId }]);
             const controller = startGenerationRequest(audioId, nodeId, nodeId, runController);
             try {
-                const audio = await storeGeneratedAudio(await requestAudioGeneration(generationConfig, effectivePrompt, { signal: controller.signal }), generationConfig.audioFormat);
-                setNodes((prev) => prev.map((node) => (node.id === audioId ? { ...node, metadata: { ...node.metadata, ...audioMetadata(audio), prompt: effectivePrompt, ...buildAudioGenerationMetadata(generationConfig) } } : node)));
+                const audio = await storeGeneratedAudio(
+                    await requestAudioGeneration(generationConfig, effectivePrompt, {
+                        signal: controller.signal,
+                        // The id lands on the node before the first poll, so a reload can resume it.
+                        onRun: (runId) => setNodes((prev) => prev.map((node) => (node.id === audioId ? { ...node, metadata: { ...node.metadata, audioRunId: runId } } : node))),
+                        onProgress: (run) => setAudioStepProgress(audioId, run.progress),
+                    }),
+                    generationConfig.audioFormat,
+                );
+                setNodes((prev) =>
+                    prev.map((node) =>
+                        node.id === audioId ? { ...node, metadata: { ...node.metadata, ...audioMetadata(audio), prompt: effectivePrompt, ...buildAudioGenerationMetadata(generationConfig), audioRunId: undefined, stepProgress: undefined } } : node,
+                    ),
+                );
             } finally {
                 finishGenerationRequest(audioId, controller);
             }
             return;
         },
-        [finishGenerationRequest, startGenerationRequest, t],
+        [finishGenerationRequest, setAudioStepProgress, setNodes, startGenerationRequest],
     );
 
     const runTextGeneration = useCallback(
@@ -599,8 +628,17 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                     return;
                 }
                 if (node.type === CanvasNodeType.Audio) {
-                    const audio = await storeGeneratedAudio(await requestAudioGeneration(generationConfig, prompt, { signal: controller.signal }), generationConfig.audioFormat);
-                    setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, ...audioMetadata(audio), prompt, ...buildAudioGenerationMetadata(generationConfig) } } : item)));
+                    const audio = await storeGeneratedAudio(
+                        await requestAudioGeneration(generationConfig, prompt, {
+                            signal: controller.signal,
+                            onRun: (runId) => setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, audioRunId: runId } } : item))),
+                            onProgress: (run) => setAudioStepProgress(node.id, run.progress),
+                        }),
+                        generationConfig.audioFormat,
+                    );
+                    setNodes((prev) =>
+                        prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, ...audioMetadata(audio), prompt, ...buildAudioGenerationMetadata(generationConfig), audioRunId: undefined, stepProgress: undefined } } : item)),
+                    );
                     return;
                 }
 
@@ -683,8 +721,60 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                 setRunningNodeId(null);
             }
         },
-        [completeVideoNodeTask, effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, pollVideoNodeTask, startGenerationRequest, t],
+        [completeVideoNodeTask, effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, pollVideoNodeTask, setAudioStepProgress, startGenerationRequest, t],
     );
 
-    return { runImageGeneration, runVideoGeneration, runAudioGeneration, runTextGeneration, retryNode };
+    /**
+     * Resume the run an audio node was waiting on when the page went away.
+     *
+     * This is the reason audio was the first node migrated: the gateway keeps the run, so the canvas
+     * only has to reattach to it. Nothing is re-submitted, and the same step ring is driven from the
+     * run's own progress.
+     */
+    const pollAudioRun = useCallback(
+        async (node: CanvasNodeData, silent = false) => {
+            const runId = node.metadata?.audioRunId;
+            if (!runId || node.metadata?.content || audioPollIdsRef.current.has(node.id)) return;
+            audioPollIdsRef.current.add(node.id);
+            let controller: AbortController | undefined;
+            try {
+                const generationConfig = buildGenerationConfig(effectiveConfig, node, "audio");
+                if (!isAiConfigReady(generationConfig, generationConfig.model)) {
+                    if (silent) {
+                        setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: t("workbench.configFirst") } } : item)));
+                        return;
+                    }
+                    openConfigDialog(true);
+                    return;
+                }
+                setRunningNodeId(node.id);
+                setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined } } : item)));
+                controller = startGenerationRequest(node.id, node.id, node.id);
+                const finished = await waitForRun(generationConfig, runId, {
+                    signal: controller.signal,
+                    onProgress: (run) => setAudioStepProgress(node.id, run.progress),
+                    // Watching a run must not kill it: the page leaving is exactly the case this exists for.
+                    cancelOnAbort: false,
+                });
+                const audio = await storeGeneratedAudio(await downloadRunOutput(generationConfig, finished, 0, { signal: controller.signal }), generationConfig.audioFormat);
+                setNodes((prev) =>
+                    prev.map((item) =>
+                        item.id === node.id ? { ...item, metadata: { ...item.metadata, ...audioMetadata(audio), prompt: item.metadata?.prompt, ...buildAudioGenerationMetadata(generationConfig), audioRunId: undefined, stepProgress: undefined } } : item,
+                    ),
+                );
+            } catch (error) {
+                if (isGenerationCanceled(error)) return;
+                const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
+                if (!silent) toast.error(errorDetails);
+                setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails, audioRunId: undefined, stepProgress: undefined } } : item)));
+            } finally {
+                if (controller) finishGenerationRequest(node.id, controller);
+                setRunningNodeId((current) => (current === node.id ? null : current));
+                audioPollIdsRef.current.delete(node.id);
+            }
+        },
+        [effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, setAudioStepProgress, setNodes, setRunningNodeId, startGenerationRequest, t],
+    );
+
+    return { runImageGeneration, runVideoGeneration, runAudioGeneration, runTextGeneration, retryNode, pollAudioRun };
 }
