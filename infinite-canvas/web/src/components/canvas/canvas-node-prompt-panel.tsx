@@ -212,7 +212,11 @@ export function CanvasNodePromptPanel({
         }
         commitPrompt(draft);
         if (mode === "image" && workflowId === "image-qwen21") {
-            if (config.imageMode === "inpaint") {
+            // The mask belongs to the run, not to the connections: an inpaint node already records the
+            // binary mask it was made with, so only the first run has to ask for marks. Asking again
+            // would make the user redraw what the canvas is already showing them.
+            const hasSavedMask = node.metadata?.imageMode === "inpaint" && (node.metadata?.references?.length || 0) >= 2;
+            if (config.imageMode === "inpaint" && !hasSavedMask) {
                 onOpenMaskEditor?.(node.id);
                 return;
             }

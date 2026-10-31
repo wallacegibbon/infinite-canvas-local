@@ -181,9 +181,14 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             const count = getGenerationCount(generationConfig.count);
             const isConfigNode = sourceNode?.type === CanvasNodeType.Config;
             const isImageNode = sourceNode?.type === CanvasNodeType.Image;
+            // Inpaint is the one run whose mask is not the picture on the canvas: the editor uploads a
+            // binary mask to the workflow and draws a tinted copy for the eye, so the node records the
+            // binary one among the references it was run with, and running again repeats *that* run.
+            // Everything else is conditioned by what is connected now.
+            const savedInpaintReferences = generationConfig.imageMode === "inpaint" ? await resolveMetadataReferences(sourceNode?.metadata || {}) : null;
             // An image node answers in place. A variant is a new node fed with this one through the
             // reference bar — whatever is connected here is what conditions the request, nothing else.
-            const referenceImages = [...new Map(generationContext.referenceImages.map((image) => [image.id, image])).values()];
+            const referenceImages = savedInpaintReferences?.length ? savedInpaintReferences : [...new Map(generationContext.referenceImages.map((image) => [image.id, image])).values()];
             const generationType = referenceImages.length ? ("edit" as const) : ("generation" as const);
             const generationMetadata = buildImageGenerationMetadata(generationType, generationConfig, count, referenceImages);
             const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : isImageNode ? CanvasNodeType.Image : CanvasNodeType.Text];
