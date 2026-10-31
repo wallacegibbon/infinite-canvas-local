@@ -2553,9 +2553,12 @@ is nothing to map a second user onto — and therefore no per-user credential to
 directory, and that requires real identity (a login/session the gateway can resolve a request to) —
 not a shared secret. `GATEWAY_TOKEN` would not be that answer: it is injected into the page, so
 anyone who can open the canvas can read it. Until then, one directory, and the rule that makes it
-safe: **the config path, the skill container and the tool list are operator configuration and may
-never come from a request.** A request that could name its own `--config-path` would turn "every user
-has their own directory" into "the caller picks whose directory to read".
+safe: **the config path, the skill container and the tool list are gateway settings and never fields
+of a request.** They are the user's to change — there is no separate operator in a one-person install
+— but they are changed in the gateway's own settings, not per call: a request that could name its own
+`--config-path` would turn "every user has their own directory" into "the caller picks whose directory
+to read", and a request that could name its own tool list would let the caller undo the one switch
+that decides whether the agent can run commands.
 
 **Security posture, stated plainly** No token is required to enable the agent. `GATEWAY_HOST`
 defaults to loopback and binding anything else already emits a startup warning; `GATEWAY_TOKEN` stays
@@ -2568,14 +2571,19 @@ otherwise, and a token does not help: whoever can open the canvas has the token 
 
 **The model is visible and selectable** Everywhere the canvas uses the agent there is a model
 `<select>`, because "which model answered" is the user's first question and the only way to notice
-that the agent is still on AlayaCore's default. That makes the model the one client-supplied part of
-a spawn, which is safe only with two rules: it goes in as `--model <name>` (not `CI model_set`, which
-would rewrite the agent's persisted active model and cost a round trip), and it is **validated against
-the list the agent itself reports** — never an arbitrary string. The list comes from one probe route
-(`GET /api/agent`): spawn, read the startup frames, kill; ~30 ms, cached in the canvas's existing
-gateway sync. The payload is `{coreVersion, messageVersion, active, models:[{id, name, protocolType,
-contextLimit}]}` — `SM model_list` carries every `api_key` from `model.conf` verbatim, so those never
-leave the gateway.
+that the agent is still on AlayaCore's default.
+
+Nothing is fetched up front and no probe route exists. `SM model_list` and `SM model` are part of the
+startup broadcast of every spawn, ahead of the model call — so they arrive even when generation then
+fails — and the gateway forwards them as one `models` event with **every `api_key` stripped** (the
+frame carries them verbatim). The canvas caches that in its config store, so every select renders
+from one request's worth of data and survives a reload; the next request overwrites it.
+
+The choice travels as `--model <name>` — not `CI model_set`, which would rewrite the agent's
+persisted model and cost a round trip. There is no gateway-side allow-list: with no list in hand, the
+only check is the agent's own, and a name that no longer exists in `model.conf` comes back as its
+error. Until the first call the select shows the agent's default and nothing to choose from, which is
+also the honest state of affairs.
 
 **The event surface is a whitelist** `delta` (Ax text), `reasoning`, `step` (SM `task`), `done`,
 `error` (+ an optional one-line `tool` state). Everything else the agent emits stays on the gateway:
