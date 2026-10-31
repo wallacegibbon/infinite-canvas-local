@@ -25,13 +25,13 @@ while IFS= read -r line; do
       case "$line" in
         *'"args":"2"'*)
           printf 'SM{"type":"model","data":{"active_id":2,"active_name":"Fake / two","context_limit":2000}}\n'
-          printf 'CO{"command_id":"model","result":{"active_id":2,"active_name":"Fake / two"}}\n' ;;
+          printf 'CO{"command_id":"1","result":{"active_id":2,"active_name":"Fake / two"}}\n' ;;
         *)
-          printf 'CO{"command_id":"model","is_error":true,"result":{"code":"REQUEST_MODEL_UNKNOWN","message":"model_set: model not found: 9"}}\n' ;;
+          printf 'CO{"command_id":"1","is_error":true,"result":{"code":"REQUEST_MODEL_UNKNOWN","message":"model_set: model not found: 9"}}\n' ;;
       esac ;;
     CI*'"name":"reasoning_level_set"'*)
       printf 'SM{"type":"reasoning_level","data":{"level":2}}\n'
-      printf 'CO{"command_id":"reasoning","result":{"level":2}}\n' ;;
+      printf 'CO{"command_id":"1","result":{"level":2}}\n' ;;
     UE)
       printf 'SM{"type":"task","data":{"in_progress":true,"current_step":1,"context_tokens":5}}\n'
       printf 'Ax{"id":"2","type":"text","text":"hello "}\n'
@@ -55,7 +55,7 @@ func fakeAgentBinary(t *testing.T) (SpawnOptions, string) {
 func TestRunStreamsTheAnswerAndKeepsKeysHome(t *testing.T) {
 	opts, log := fakeAgentBinary(t)
 	var events []Event
-	if err := Run(context.Background(), opts, Request{Prompt: "hi", Reasoning: -1}, func(event Event) { events = append(events, event) }); err != nil {
+	if err := Run(context.Background(), opts, Request{Prompt: "hi"}, func(event Event) { events = append(events, event) }); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -95,38 +95,52 @@ func TestRunStreamsTheAnswerAndKeepsKeysHome(t *testing.T) {
 	}
 }
 
-// The two choices travel as the agent's own commands, ahead of the prompt on the same stream.
-func TestRunSendsTheChoicesBeforeThePrompt(t *testing.T) {
+// A change of model is its own action, and the agent's own frames are the whole result: it announces
+// the new active model, then answers the command.
+func TestSendRelaysTheAgentsOwnStatement(t *testing.T) {
 	opts, log := fakeAgentBinary(t)
 	var events []Event
-	err := Run(context.Background(), opts, Request{Prompt: "hi", ModelID: 2, Reasoning: 2}, func(event Event) { events = append(events, event) })
-	if err != nil {
-		t.Fatalf("run: %v", err)
+	if err := Send(context.Background(), opts, "model_set", "2", func(event Event) { events = append(events, event) }); err != nil {
+		t.Fatalf("send: %v", err)
 	}
 
 	frames, _ := os.ReadFile(log)
-	lines := strings.Split(strings.TrimSpace(string(frames)), "\n")
-	if len(lines) < 3 {
-		t.Fatalf("frames = %q, want the two commands and the prompt", string(frames))
-	}
-	if !strings.Contains(lines[0], `"name":"model_set"`) || !strings.Contains(lines[0], `"args":"2"`) {
-		t.Errorf("first frame = %q, want model_set with the chosen id", lines[0])
-	}
-	if !strings.Contains(lines[1], `"name":"reasoning_level_set"`) {
-		t.Errorf("second frame = %q, want reasoning_level_set", lines[1])
-	}
-	if !strings.HasSuffix(string(frames), "UE\n") {
-		t.Errorf("the prompt was not flushed with UE: %q", string(frames))
+	if !strings.Contains(string(frames), `"name":"model_set"`) || !strings.Contains(string(frames), `"args":"2"`) {
+		t.Fatalf("the command was not forwarded: %q", string(frames))
 	}
 
-	// The model list came back with the start of this very request: no separate endpoint, no cache.
-	var models *Event
-	for i := range events {
-		if events[i].Type == "models" {
-			models = &events[i]
+	var announced, answered bool
+	for _, event := range events {
+		switch event.Type {
+		case "model":
+			if event.Active != nil && event.Active.ID == 2 {
+				announced = true
+			}
+		case "command":
+			answered = event.OK
 		}
 	}
-	if models == nil || len(models.Models) != 2 || models.Active == nil || models.Active.ID != 1 {
-		t.Fatalf("models event = %v, want the agent's own list and active model", models)
+	if !announced {
+		t.Errorf("the agent's SM model was not relayed: %v", events)
+	}
+	if !answered {
+		t.Errorf("the agent's CO was not relayed: %v", events)
+	}
+}
+
+func TestSendRelaysARejection(t *testing.T) {
+	opts, _ := fakeAgentBinary(t)
+	var events []Event
+	if err := Send(context.Background(), opts, "model_set", "9", func(event Event) { events = append(events, event) }); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	var message string
+	for _, event := range events {
+		if event.Type == "command" && !event.OK {
+			message = event.Message
+		}
+	}
+	if !strings.Contains(message, "model not found: 9") {
+		t.Errorf("the agent's message was not relayed: %v", events)
 	}
 }

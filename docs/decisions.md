@@ -2578,15 +2578,14 @@ no idle agent to reap, no TTL, no "the panel is still open but the process was r
 hide, and no per-node processes for the config nodes that are always on screen. A spawn costs ~30 ms,
 which is why re-opening one for every ✨ press is the cheap end of the trade.
 
-**The model is chosen in the panel and travels with the prompt** Everywhere the canvas uses the
-agent there is a model `<select>` and a reasoning-level control, because "which model answered" is the
-user's first question and the only way to notice the agent is still on AlayaCore's default. Both are
-AlayaCore's own concerns, so the gateway adds no endpoint and no notion of its own for either: a
-prompt request carries the chosen model id and reasoning level, and the gateway writes
-`CI model_set <id>` and `CI reasoning_level_set <n>` to the agent's stdin before the prompt. The agent
-applies them as it reads them, rejects one it does not like with a `CO` error (forwarded as an
-`error` event), and persists the model itself in `runtime.conf` — which is how the next spawn starts
-on the model the user last picked.
+**The model and the level are the user's, and the gateway only shows them** Everywhere the canvas
+uses the agent there is a model `<select>` and a reasoning-level control. The gateway does not track,
+remember, re-send or validate either of them. It displays what the agent says — `SM model` and `SM
+reasoning_level`, forwarded as they arrive — and when the user changes one, that is its own request
+which forwards the agent's own command (`CI model_set`, `CI reasoning_level_set`) and returns the
+agent's answer to it. A prompt request carries the prompt and the images and nothing else. Whether a
+setting survives a session is AlayaCore's business: it persists the model in `runtime.conf` and does
+what it likes with the level, and the canvas shows whatever it reports next.
 
 **The list arrives with the answer, not before it** `SM model_list` and `SM model` are part of the
 startup broadcast of every spawn, ahead of the model call. The gateway forwards them as one `models`
