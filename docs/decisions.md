@@ -2204,9 +2204,42 @@ gateway sends (#8 already said this; the registry just had not caught up).
 **Cost** A workflow re-imported from an author's file comes back with its Chinese titles; the same
 pass has to be applied again. The registry is the part that matters, and it is machine-written.
 
-**Also found** `resources/index.json` is still Chinese-only: pack labels and descriptions render
-verbatim in the resource panel, with no key indirection. Making it English is a bigger change than
-this one — it needs the same `gateway.*` dictionary treatment the model labels just got — so it is
-left as the open question rather than half-done here.
+**Also found** `resources/index.json` was Chinese-only: pack labels and descriptions render verbatim
+in the resource panel, with no key indirection. That is #67; it could not be fixed by editing JSON
+alone.
 
 **Where** `workflows/*.json`, `workflows/registry.json`, `infinite-canvas/web/src/i18n/locales/zh-CN.ts`.
+
+## 67. The resource catalogue is English; its Chinese lives beside the app
+
+**Decision** `resources/index.json` carries no Chinese copy — pack `label`/`description`, resource
+`label`/`note`/`license` are English. The Chinese sits in
+`infinite-canvas/web/src/lib/resource-copy-zh.ts`, keyed by pack/resource id, and
+`ResourceCenterPanel` looks it up before falling back to the index text. Vendored third-party content
+under `resources/payload/**` is untouched: it is the upstream author's text, not ours.
+
+**Why the index had to change** The panel renders those fields verbatim, so the English UI was showing
+Chinese — the one place the "English data, Chinese in the dictionary" rule (#8) was still broken in a
+way a reader could see. Translating it also makes the index readable to anyone auditing what gets
+downloaded.
+
+**Why a map and not the i18n dictionary** Resource ids contain dots: `qwen3.5_9b_int8_convrot`. With
+`keySeparator: "."` such a key is read as a nested path and never resolves, so the natural home for
+"Chinese keyed by id" (`gateway.models.<id>`, which works because model ids have no dots) does not fit.
+A typed `Record<string, …>` next to it is the same idea with the id treated as an opaque string. The
+`resolvedLanguage` check is copied from `gateway-labels.ts`, so both tables switch language the same
+way.
+
+**What is still Chinese, on purpose** Two `target` paths name files the upstream authors published in
+Chinese (`loras/Qwen-功能2.1/…`, `loras/Moss_image/KOOK-MOSS-SFT-观澜.safetensors`). They are disk
+paths, not copy; translating them would break the install. A test fails the build if any *other* field
+grows Chinese again.
+
+**Tested** `tests/resource-copy-zh.test.ts`: Chinese for pack/resource/license in `zh-CN`, nothing at
+all in `en-US` (so the index text stands), nothing for an unknown id, a dotted id resolving, and the
+index itself containing Chinese only in `target`. In the browser: the Add-workflows panel reads in
+English with the language set to English and in Chinese with it set to 中文, over the same rows,
+including the LoRA whose path stays Chinese.
+
+**Where** `resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`,
+`infinite-canvas/web/src/components/settings/resource-center-panel.tsx`.

@@ -24,7 +24,8 @@ import {
     type ResourcePack,
     type ResourceStatus,
 } from "@/services/api/resources";
-import { gatewayVariantLabel } from "@/lib/gateway-labels";
+import { gatewayModelLabel, gatewayVariantLabel } from "@/lib/gateway-labels";
+import { packZh, resourceZh } from "@/lib/resource-copy-zh";
 import { isGatewayDown } from "@/services/api/gateway-status";
 
 // The copy lives in the dictionaries with the rest of the UI. Taking the type from the
@@ -114,6 +115,9 @@ function ResourceCard({
     replacing?: boolean;
 }) {
     const canReplace = Boolean(onReplace) && isReplaceableResource(item);
+    const label = resourceZh(item.id, "label") || item.label;
+    const license = resourceZh(item.id, "license") || item.license;
+    const note = resourceZh(item.id, "note") || item.note;
     return (
         <div className="rounded-lg border border-stone-200 bg-white/60 p-2 dark:border-stone-800 dark:bg-white/[.02]">
             <div className="flex items-start gap-2">
@@ -126,7 +130,7 @@ function ResourceCard({
                 )}
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="text-[11px] font-medium text-stone-700 dark:text-stone-200">{item.label}</span>
+                        <span className="text-[11px] font-medium text-stone-700 dark:text-stone-200">{label}</span>
                         {item.type === "bake" ? <Tag className="m-0">{copy.localBake}</Tag> : null}
                         {statusTag(item, copy)}
                     </div>
@@ -134,9 +138,9 @@ function ResourceCard({
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-stone-400 dark:text-stone-500">
                         <span>{sourceSummary(item, copy)}</span>
                         <span>{formatBytes(item.size)}</span>
-                        {!compact && item.license ? (
+                        {!compact && license ? (
                             <span>
-                                {copy.license}: {item.license}
+                                {copy.license}: {license}
                             </span>
                         ) : null}
                     </div>
@@ -151,9 +155,9 @@ function ResourceCard({
                             {copy.replacedBy}: {item.overriddenBy}
                         </div>
                     ) : null}
-                    {!compact && item.note ? (
+                    {!compact && note ? (
                         <div className="mt-0.5 text-[10px] leading-4 text-stone-400 dark:text-stone-500">
-                            {copy.note}: {item.note}
+                            {copy.note}: {note}
                         </div>
                     ) : null}
                     {item.manualCommand ? (
@@ -208,7 +212,7 @@ function WorkflowResourceRow({
             <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-stone-300 dark:bg-stone-600" />
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-[11px] font-medium text-stone-700 dark:text-stone-200">{item.label}</span>
+                    <span className="text-[11px] font-medium text-stone-700 dark:text-stone-200">{resourceZh(item.id, "label") || item.label}</span>
                     {item.type === "node" ? <Tag className="m-0">{copy.plugin}</Tag> : null}
                     {item.type === "bake" ? <Tag className="m-0">{copy.localBake}</Tag> : null}
                     {statusTag(item, copy)}
@@ -231,7 +235,7 @@ function WorkflowResourceRow({
                 ) : null}
                 {item.type === "bake" && requires.length ? (
                     <div className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">
-                        {copy.bakeRequires}: {requires.map((entry) => entry.label).join(" + ")}
+                        {copy.bakeRequires}: {requires.map((entry) => resourceZh(entry.id, "label") || entry.label).join(" + ")}
                     </div>
                 ) : null}
                 {item.manualCommand ? (
@@ -691,7 +695,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                         {job.items.map((item) => (
                             <div key={item.id} className="space-y-0.5">
                                 <div className="flex items-center justify-between gap-2">
-                                    <span className="min-w-0 truncate text-stone-600 dark:text-stone-300">{item.label}</span>
+                                    <span className="min-w-0 truncate text-stone-600 dark:text-stone-300">{resourceZh(item.id, "label") || item.label}</span>
                                     <span className={item.status === "error" ? "shrink-0 text-red-500" : "shrink-0 text-stone-400 dark:text-stone-500"}>
                                         {item.status === "downloading"
                                             ? `${formatBytes(item.bytes)} / ${formatBytes(item.size)}${speeds[item.id] ? ` · ${formatSpeed(speeds[item.id])}` : ""}`
@@ -728,7 +732,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                             <span className="flex min-w-0 items-center gap-1 font-medium">
                                                 <AlertTriangle className="size-3.5 shrink-0" />
                                                 <span className="truncate">
-                                                    {copy.hintTitle} · {item.label}
+                                                    {copy.hintTitle} · {resourceZh(item.id, "label") || item.label}
                                                 </span>
                                             </span>
                                             <Button size="small" onClick={() => void copyHintText(item.hint || "")}>
@@ -764,7 +768,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                     const headerBody = (
                         <>
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm font-medium">{pack.label}</span>
+                                <span className="text-sm font-medium">{packZh(pack.id, "label") || pack.label}</span>
                                 {pack.recommended ? <Tag color="blue">{copy.recommended}</Tag> : null}
                                 {pack.optional && !pack.recommended ? <Tag>{copy.optional}</Tag> : null}
                                 {packState(pack, copy)}
@@ -790,7 +794,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                         <div
                             key={pack.id}
                             className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_28px_-20px_rgba(15,23,42,0.45)] transition-colors hover:border-stone-300 dark:border-stone-700/80 dark:bg-stone-900/70 dark:shadow-[0_1px_3px_rgba(0,0,0,0.55)] dark:hover:border-stone-600"
-                            title={pack.description}
+                            title={packZh(pack.id, "description") || pack.description}
                         >
                             <div className="flex items-start gap-2 p-3">
                                 {expandable ? (
@@ -862,7 +866,9 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                             <div className="flex items-start gap-2 p-2">
                                                                 <button type="button" className="min-w-0 flex-1 text-left" onClick={() => toggleWorkflow(workflow.id)} aria-expanded={workflowExpanded}>
                                                                     <div className="flex flex-wrap items-center gap-2">
-                                                                        <span className={`text-xs font-medium ${workflow.enabled === false ? "text-stone-400 dark:text-stone-500" : "text-stone-800 dark:text-stone-100"}`}>{workflow.label}</span>
+                                                                        <span className={`text-xs font-medium ${workflow.enabled === false ? "text-stone-400 dark:text-stone-500" : "text-stone-800 dark:text-stone-100"}`}>
+                                                                            {gatewayModelLabel(workflow.id, workflow.label)}
+                                                                        </span>
                                                                         {workflow.recommended ? (
                                                                             <Tag color="blue" className="m-0">
                                                                                 {copy.recommended}
