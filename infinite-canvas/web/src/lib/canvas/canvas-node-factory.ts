@@ -17,6 +17,7 @@ export function createCanvasNode(type: CanvasNodeTypeId, position: Position, met
         id,
         type,
         title: spec.title,
+        ...("titleKey" in spec && spec.titleKey ? { titleKey: spec.titleKey } : {}),
         position: {
             x: position.x - spec.width / 2,
             y: position.y - spec.height / 2,

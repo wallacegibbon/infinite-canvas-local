@@ -24,7 +24,7 @@ import { stone } from "@/lib/design-tokens";
 import { isCardSkinLocked, verifySkinPassword } from "@/lib/canvas/skin-unlocks";
 import { persistSkinUnlock } from "@/services/api/skin-unlocks";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ConfigTabKey, type ModelCapability, type ModelChannel, type PromptCloudApi } from "@/stores/use-config-store";
+import { channelName, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ConfigTabKey, type ModelCapability, type ModelChannel, type PromptCloudApi } from "@/stores/use-config-store";
 
 type CloudApiDraft = { name: string; baseUrl: string; apiKey: string; model: string };
 
@@ -205,7 +205,7 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
                                     {config.channels.map((channel) => (
                                         <div key={channel.id} className="flex items-center justify-between gap-3 rounded-lg border border-stone-200 px-4 py-3 dark:border-stone-800">
                                             <div className="min-w-0">
-                                                <div className="truncate text-sm font-semibold">{channel.name || t("config.channels.unnamed")}</div>
+                                                <div className="truncate text-sm font-semibold">{channelName(channel) || t("config.channels.unnamed")}</div>
                                                 <div className="mt-1 truncate text-xs text-stone-500">
                                                     {t("config.channels.localGateway")} · {t("config.channels.modelCount", { count: channel.models.length })} · {channel.baseUrl || t("config.channels.missingUrl")}
                                                 </div>

@@ -1737,8 +1737,10 @@ function InfiniteCanvasPage() {
         setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, content, texts: node.metadata?.texts?.map((text) => (text.id === node.metadata?.primaryTextId ? { ...text, content } : text)) } } : node)));
     }, []);
 
+    // A hand-typed title replaces the generated one, so the key that would re-translate it goes with
+    // it: the node now says exactly what the user wrote, in every language.
     const handleNodeTitleChange = useCallback((nodeId: string, title: string) => {
-        setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, title } : node)));
+        setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, title, titleKey: undefined, titleParams: undefined } : node)));
     }, []);
 
     const toggleBatchExpanded = useCallback((nodeId: string) => {
@@ -1858,6 +1860,8 @@ function InfiniteCanvasPage() {
                     id,
                     type: CanvasNodeType.Image,
                     title: t(`canvas.videoFrames.${position}Title`, { name: node.title || t("assets.kinds.video") }),
+                    titleKey: `canvas.videoFrames.${position}Title`,
+                    titleParams: { name: node.title || t("assets.kinds.video") },
                     position: { x, y },
                     ...size,
                     metadata: imageMetadata(image),
@@ -1936,6 +1940,7 @@ function InfiniteCanvasPage() {
             const textNode = {
                 ...createCanvasNode(CanvasNodeType.Text, { x: node.position.x + node.width + gap + textSpec.width / 2, y: node.position.y + node.height / 2 }, { content: "", status: NODE_STATUS_SUCCESS, fontSize: 14 }),
                 title: t("canvas.runtime.reverseTitle"),
+                titleKey: "canvas.runtime.reverseTitle",
             };
 
             setNodes((prev) => [...prev, textNode]);

@@ -2330,3 +2330,45 @@ page load syncs its models, generates an image, and lists the workflows with no 
 `internal/server/runs.go`, `internal/server/server.go`, `internal/server/helpers.go`,
 `infinite-canvas/web/src/services/api/{image,video,audio}.ts`, `docs/protocol.md`, `docs/gateway.md`,
 `README.md`.
+
+## 70. Saved names are keys, not translations
+
+**Decision** A name the app generates is stored as a translation key, and rendered in the reader's
+language: `CanvasNodeData.titleKey` (+ `titleParams`) and `ModelChannel.nameKey`. `title` / `name` stay
+on the record as the snapshot — what a filename, an export, or a user-typed name looks like. Editing a
+title (or a channel name) clears the key: from then on the node says exactly what the user wrote.
+
+**What it fixed** Everything the app wrote down was written in the language that happened to be active.
+A canvas created in Chinese showed "图片", "音频" and "AI 超分" as node titles in the English UI, and the
+channel was called "本地 ComfyUI" there too. #66 and #67 fixed the *shipped* text; this was the other
+half — generated text that outlives its session.
+
+**Why not store only the key** Two of the three uses of a title are not UI: `${node.title}.png` names a
+reference image, and the canvas export writes it into a file. Those need a string now, in whatever
+language. So the key drives display and the snapshot drives data, and a node without a key keeps working
+as before — a user-typed title, or one from a canvas written by an older build.
+
+**The migration** `CANVAS_PERSIST_VERSION` 2 adds `titleKey` to a stored node whose `title` matches one
+of the app's own defaults **in either language**; the same idea runs over the channel list on load (no
+version bump: the config store already rebuilds channels every time it reads). The matching list lives in
+`lib/canvas/node-title.ts` and has to be extended when a new default title is added; the test fails when
+a stored default goes unrecognised.
+
+**What is deliberately still a snapshot** Titles that *compose* several translations — the multi-angle
+label (`前方 · 俯视 10° · 正面视角`), the split title's source name — store the composed string. They are
+descriptions of a particular moment, and rebuilding them would need the parameters, not just a key. The
+`Copy` suffix and asset titles (which are prompts) are the same kind of thing.
+
+**Tested** `tests/node-title.test.ts` (key wins, params pass through, a typed title is untouched, a dotted
+id, whole-title matching, `channelName` both ways) and a case in `tests/persist-migration.test.ts` (a
+stored "音频" becomes `canvas.nodeTypes.audio`, a typed title and an explicit key are untouched). In the
+browser: the existing canvas, created in Chinese, shows "Audio" and "Local ComfyUI" in English, and
+"音频" / "本地 ComfyUI" again after switching back — with nothing edited in between.
+
+**Where** `infinite-canvas/web/src/lib/canvas/node-title.ts`,
+`infinite-canvas/web/src/constant/canvas.ts`,
+`infinite-canvas/web/src/stores/canvas/canvas-persist.ts`,
+`infinite-canvas/web/src/stores/use-config-store.ts`,
+`infinite-canvas/web/src/components/canvas/canvas-node.tsx`,
+`infinite-canvas/web/src/pages/canvas/hooks/use-image-editors.ts`,
+`infinite-canvas/web/src/pages/canvas/project.tsx`.

@@ -1,5 +1,6 @@
 import type { ViewportTransform } from "@/types/canvas";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
+import { defaultTitleKeyFor } from "@/lib/canvas/node-title";
 import type { CanvasProject } from "@/stores/canvas/use-canvas-store";
 
 /**
@@ -12,7 +13,7 @@ import type { CanvasProject } from "@/stores/canvas/use-canvas-store";
  * handed to `preserveUnreadable`, which copies it aside, refuses further writes, and tells the
  * user. `version` is still set on the store so that what we *write* is labelled.
  */
-export const CANVAS_PERSIST_VERSION = 1;
+export const CANVAS_PERSIST_VERSION = 2;
 
 type PersistedCanvasState = {
     projects: CanvasProject[];
@@ -48,7 +49,7 @@ export function readCanvasPersisted(raw: string): PersistedCanvasState {
  * over the array.
  */
 function migrateCanvasState(state: unknown, from: number) {
-    if (from !== 0) throw new Error(`no migration from format version ${from}`);
+    if (from !== 0 && from !== 1) throw new Error(`no migration from format version ${from}`);
     const source = asRecord(state);
     const projects = Array.isArray(source.projects) ? source.projects : [];
     return {
@@ -68,7 +69,23 @@ function backfillProject(raw: unknown): unknown {
         backgroundMode: typeof project.backgroundMode === "string" ? (project.backgroundMode as CanvasBackgroundMode) : "lines",
         showImageInfo: typeof project.showImageInfo === "boolean" ? project.showImageInfo : false,
         viewport: backfillViewport(project.viewport),
+        nodes: Array.isArray(project.nodes) ? project.nodes.map(backfillNodeTitle) : project.nodes,
     };
+}
+
+/**
+ * Give a stored default title back its key (format 1 → 2).
+ *
+ * Titles used to be saved already translated, so a canvas written in Chinese said "图片" in the English
+ * UI. A title that matches one of the app's own defaults in either language becomes a `titleKey`, which
+ * the renderer translates; `title` keeps the stored text as the snapshot a filename or export uses.
+ * Anything a user typed matches nothing and is left exactly as it is.
+ */
+function backfillNodeTitle(raw: unknown): unknown {
+    const node = asRecord(raw);
+    if (node.titleKey || typeof node.title !== "string") return raw;
+    const key = defaultTitleKeyFor(node.title);
+    return key ? { ...node, titleKey: key } : raw;
 }
 
 /**

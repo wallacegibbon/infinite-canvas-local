@@ -9,6 +9,7 @@ import { formatBytes } from "@/lib/image-utils";
 import { pickImageSource } from "@/lib/image-thumbnail";
 import { previewUrlFor, subscribeImagePreviews, getImagePreviewRevision } from "@/services/image-storage";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
+import { nodeTitle } from "@/lib/canvas/node-title";
 import { buildNodeContext } from "@/lib/canvas/plugin-node-context";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasNodeProgressRing } from "./canvas-node-progress-ring";
@@ -145,7 +146,8 @@ export const CanvasNode = React.memo(function CanvasNode({
     const pluginContext = useMemo<CanvasNodeContext | null>(() => (pluginHost ? buildNodeContext(pluginHost, data, theme, scale, isSelected) : null), [pluginHost, data, theme, scale, isSelected]);
     const [isEditingContent, setIsEditingContent] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
-    const [titleDraft, setTitleDraft] = useState(data.title || "");
+    // Editing starts from what is on screen, which may be a translation of a stored key.
+    const [titleDraft, setTitleDraft] = useState(() => nodeTitle(data, t));
     const hasImageContent = data.type === CanvasNodeType.Image && Boolean(data.metadata?.content);
     const hasVideoContent = data.type === CanvasNodeType.Video && Boolean(data.metadata?.content);
     const hasAudioContent = data.type === CanvasNodeType.Audio && Boolean(data.metadata?.content);
@@ -179,7 +181,7 @@ export const CanvasNode = React.memo(function CanvasNode({
     });
 
     useEffect(() => {
-        setTitleDraft(data.title || "");
+        setTitleDraft(nodeTitle(data, t));
     }, [data.title]);
 
     useEffect(() => {
@@ -189,10 +191,11 @@ export const CanvasNode = React.memo(function CanvasNode({
     }, [isEditingTitle]);
 
     const finishTitleEditing = useCallback(() => {
-        const title = titleDraft.trim() || data.title || t("canvas.node.untitled");
+        const resolved = nodeTitle(data, t);
+        const title = titleDraft.trim() || resolved || t("canvas.node.untitled");
         setTitleDraft(title);
         setIsEditingTitle(false);
-        if (title !== data.title) onTitleChange(data.id, title);
+        if (title !== resolved) onTitleChange(data.id, title);
     }, [data.id, data.title, onTitleChange, t, titleDraft]);
 
     useEffect(() => {
@@ -354,7 +357,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                             onKeyDown={(event) => {
                                 if (event.key === "Enter") finishTitleEditing();
                                 if (event.key === "Escape") {
-                                    setTitleDraft(data.title || "");
+                                    setTitleDraft(nodeTitle(data, t));
                                     setIsEditingTitle(false);
                                 }
                             }}
@@ -370,7 +373,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                                 setIsEditingTitle(true);
                             }}
                         >
-                            {data.title || t("canvas.node.untitled")}
+                            {nodeTitle(data, t) || t("canvas.node.untitled")}
                         </button>
                     )}
                 </div>

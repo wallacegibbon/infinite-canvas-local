@@ -7,6 +7,11 @@ type CanvasNodeSpec = {
     width: number;
     height: number;
     title: string;
+    /**
+     * The key `title` was rendered from. A node stores it so the canvas reads in the current language
+     * instead of the one it was created in (docs/decisions.md #70).
+     */
+    titleKey?: string;
     metadata?: CanvasNodeMetadata;
 };
 
@@ -17,6 +22,7 @@ export const NODE_DEFAULT_SIZE = {
         get title() {
             return i18n.t("canvas.nodeTypes.image");
         },
+        titleKey: "canvas.nodeTypes.image",
     },
     [CanvasNodeType.Text]: {
         width: 340,
@@ -24,6 +30,7 @@ export const NODE_DEFAULT_SIZE = {
         get title() {
             return i18n.t("canvas.nodeTypes.text");
         },
+        titleKey: "canvas.nodeTypes.text",
     },
     [CanvasNodeType.Config]: {
         width: 340,
@@ -31,6 +38,7 @@ export const NODE_DEFAULT_SIZE = {
         get title() {
             return i18n.t("canvas.nodeTypes.config");
         },
+        titleKey: "canvas.nodeTypes.config",
     },
     [CanvasNodeType.Video]: {
         width: 420,
@@ -38,6 +46,7 @@ export const NODE_DEFAULT_SIZE = {
         get title() {
             return i18n.t("canvas.nodeTypes.video");
         },
+        titleKey: "canvas.nodeTypes.video",
     },
     [CanvasNodeType.Audio]: {
         width: 340,
@@ -45,6 +54,7 @@ export const NODE_DEFAULT_SIZE = {
         get title() {
             return i18n.t("canvas.nodeTypes.audio");
         },
+        titleKey: "canvas.nodeTypes.audio",
     },
     [CanvasNodeType.Group]: {
         width: 760,
@@ -52,8 +62,9 @@ export const NODE_DEFAULT_SIZE = {
         get title() {
             return i18n.t("canvas.nodeTypes.group");
         },
+        titleKey: "canvas.node.group",
     },
-} satisfies Record<CanvasNodeType, { width: number; height: number; title: string }>;
+} satisfies Record<CanvasNodeType, { width: number; height: number; title: string; titleKey: string }>;
 
 export const NODE_SPECS = {
     [CanvasNodeType.Image]: {
@@ -61,6 +72,9 @@ export const NODE_SPECS = {
         height: 240,
         get title() {
             return NODE_DEFAULT_SIZE[CanvasNodeType.Image].title;
+        },
+        get titleKey() {
+            return NODE_DEFAULT_SIZE[CanvasNodeType.Image].titleKey;
         },
         metadata: { content: "", status: "idle" },
     },
@@ -70,6 +84,9 @@ export const NODE_SPECS = {
         get title() {
             return NODE_DEFAULT_SIZE[CanvasNodeType.Text].title;
         },
+        get titleKey() {
+            return NODE_DEFAULT_SIZE[CanvasNodeType.Text].titleKey;
+        },
         metadata: { content: "", status: "idle", fontSize: 14 },
     },
     [CanvasNodeType.Config]: {
@@ -77,6 +94,9 @@ export const NODE_SPECS = {
         height: 240,
         get title() {
             return NODE_DEFAULT_SIZE[CanvasNodeType.Config].title;
+        },
+        get titleKey() {
+            return NODE_DEFAULT_SIZE[CanvasNodeType.Config].titleKey;
         },
         metadata: { content: "", status: "idle", generationMode: "image" },
     },
@@ -86,6 +106,9 @@ export const NODE_SPECS = {
         get title() {
             return NODE_DEFAULT_SIZE[CanvasNodeType.Video].title;
         },
+        get titleKey() {
+            return NODE_DEFAULT_SIZE[CanvasNodeType.Video].titleKey;
+        },
         metadata: { content: "", status: "idle" },
     },
     [CanvasNodeType.Audio]: {
@@ -94,6 +117,9 @@ export const NODE_SPECS = {
         get title() {
             return NODE_DEFAULT_SIZE[CanvasNodeType.Audio].title;
         },
+        get titleKey() {
+            return NODE_DEFAULT_SIZE[CanvasNodeType.Audio].titleKey;
+        },
         metadata: { content: "", status: "idle" },
     },
     [CanvasNodeType.Group]: {
@@ -101,6 +127,9 @@ export const NODE_SPECS = {
         height: 480,
         get title() {
             return NODE_DEFAULT_SIZE[CanvasNodeType.Group].title;
+        },
+        get titleKey() {
+            return NODE_DEFAULT_SIZE[CanvasNodeType.Group].titleKey;
         },
         metadata: { status: "idle" },
     },

@@ -136,7 +136,14 @@ export type CanvasNodeMetadata = {
 export type CanvasNodeData = {
     id: string;
     type: CanvasNodeTypeId;
+    /** The stored title: a user-typed name, or a snapshot of the translated default. */
     title: string;
+    /**
+     * The translation key a generated title came from. When present the title is rendered from it, so
+     * a canvas saved in one language reads correctly in the other (docs/decisions.md #70).
+     */
+    titleKey?: string;
+    titleParams?: Record<string, string | number>;
     position: Position;
     width: number;
     height: number;

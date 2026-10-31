@@ -44,7 +44,8 @@ export function useImageEditors(deps: NodeEditorDeps) {
         const child: CanvasNodeData = {
             id: childId,
             type: CanvasNodeType.Image,
-            title: "Cropped Image",
+            title: t("canvas.runtime.cropNodeTitle"),
+            titleKey: "canvas.runtime.cropNodeTitle",
             position: { x: node.position.x + node.width + 96, y: node.position.y },
             width,
             height: width * (image.height / image.width),
@@ -78,6 +79,8 @@ export function useImageEditors(deps: NodeEditorDeps) {
                         id,
                         type: CanvasNodeType.Image,
                         title: t("canvas.runtime.splitTitle", { name: node.title || t("assets.kinds.image"), row: piece.row + 1, column: piece.column + 1 }),
+                        titleKey: "canvas.runtime.splitTitle",
+                        titleParams: { name: node.title || t("assets.kinds.image"), row: piece.row + 1, column: piece.column + 1 },
                         position: { x: startX + piece.column * (cellWidth + gap), y: startY + piece.row * (cellHeight + gap) },
                         width: cellWidth,
                         height: cellHeight,
@@ -130,6 +133,7 @@ export function useImageEditors(deps: NodeEditorDeps) {
                     id: maskNodeId,
                     type: CanvasNodeType.Image,
                     title: t("canvas.runtime.maskNodeTitle"),
+                    titleKey: "canvas.runtime.maskNodeTitle",
                     position: { x: node.position.x, y: node.position.y + node.height + 96 },
                     width: node.width,
                     height: node.height,
@@ -139,6 +143,8 @@ export function useImageEditors(deps: NodeEditorDeps) {
                     id: childId,
                     type: CanvasNodeType.Image,
                     title: userPrompt.slice(0, 32) || t("canvas.runtime.maskResult"),
+                    // A prompt the user wrote is data; only the fallback is a translation.
+                    ...(userPrompt.slice(0, 32) ? {} : { titleKey: "canvas.runtime.maskResult" }),
                     position: { x: node.position.x + node.width + 96, y: node.position.y },
                     width: node.width,
                     height: node.height,
@@ -195,6 +201,7 @@ export function useImageEditors(deps: NodeEditorDeps) {
                     id: childId,
                     type: CanvasNodeType.Image,
                     title: payload.prompt.slice(0, 32) || t("canvas.outpaint.resultTitle"),
+                    ...(payload.prompt.slice(0, 32) ? {} : { titleKey: "canvas.outpaint.resultTitle" }),
                     position: { x: node.position.x + node.width + 96, y: node.position.y },
                     width: node.width,
                     height: node.height,
@@ -248,6 +255,7 @@ export function useImageEditors(deps: NodeEditorDeps) {
                     id: childId,
                     type: CanvasNodeType.Image,
                     title: payload.summary.slice(0, 32) || t("canvas.mossLayout.resultTitle"),
+                    ...(payload.summary.slice(0, 32) ? {} : { titleKey: "canvas.mossLayout.resultTitle" }),
                     position: { x: node.position.x + node.width + 96, y: node.position.y },
                     width: node.width,
                     height: node.height,
@@ -281,7 +289,7 @@ export function useImageEditors(deps: NodeEditorDeps) {
     );
 
     const superResolveImageNode = useCallback(
-        async (node: CanvasNodeData, params: CanvasSuperResolveParams, title: string) => {
+        async (node: CanvasNodeData, params: CanvasSuperResolveParams, titleKey: string) => {
             if (!node.metadata?.content) return;
             const childId = nanoid();
             const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
@@ -291,7 +299,8 @@ export function useImageEditors(deps: NodeEditorDeps) {
                 {
                     id: childId,
                     type: CanvasNodeType.Image,
-                    title,
+                    title: t(titleKey),
+                    titleKey,
                     position: { x: node.position.x + node.width + 96, y: node.position.y },
                     width: imageConfig.width,
                     height: imageConfig.height,
@@ -329,8 +338,8 @@ export function useImageEditors(deps: NodeEditorDeps) {
         [effectiveConfig, finishGenerationRequest, startGenerationRequest, t],
     );
 
-    const runSuperResolve = useCallback((node: CanvasNodeData, params: CanvasSuperResolveParams) => superResolveImageNode(node, params, t("canvas.superResolve.title")), [superResolveImageNode, t]);
-    const runFastUpscale = useCallback((node: CanvasNodeData, params: CanvasSuperResolveParams) => superResolveImageNode(node, params, t("canvas.superResolve.fastTitle")), [superResolveImageNode, t]);
+    const runSuperResolve = useCallback((node: CanvasNodeData, params: CanvasSuperResolveParams) => superResolveImageNode(node, params, "canvas.superResolve.title"), [superResolveImageNode]);
+    const runFastUpscale = useCallback((node: CanvasNodeData, params: CanvasSuperResolveParams) => superResolveImageNode(node, params, "canvas.superResolve.fastTitle"), [superResolveImageNode]);
     const generateAngleNode = useCallback(
         async (node: CanvasNodeData, params: CanvasImageAngleParams) => {
             if (!node.metadata?.content) return;

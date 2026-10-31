@@ -752,6 +752,7 @@ export default {
             clearDescription: "这会删除当前画布上的所有节点和连线。",
             maskPrompt: "参考{{source}}为原图，{{mask}}是在原图上用蓝色半透明标注出的待修改区域。请只修改蓝色标注覆盖的区域，其余区域与原图保持完全一致，输出与原图相同尺寸的完整图片，并且结果中不要保留任何蓝色标注。修改要求：{{prompt}}",
             maskNodeTitle: "遮罩标注",
+            cropNodeTitle: "裁剪结果",
             editTextPrompt: "请根据要求修改以下文本。\n\n原文：\n{{source}}\n\n修改要求：\n{{prompt}}",
         },
         recovery: {

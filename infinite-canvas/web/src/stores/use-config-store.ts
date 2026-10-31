@@ -25,7 +25,13 @@ export type ChannelModel = {
 
 export type ModelChannel = {
     id: string;
+    /** The stored name: a user-typed one, or a snapshot of the translated default. */
     name: string;
+    /**
+     * The translation key a generated name came from. Present only until the user renames the channel;
+     * while it is, the name is rendered in the reader's language (docs/decisions.md #70).
+     */
+    nameKey?: string;
     baseUrl: string;
     apiKey: string;
     apiFormat: ApiCallFormat;
@@ -98,6 +104,7 @@ const CHANNEL_MODEL_SEPARATOR = "::";
 const localDefaultChannel: ModelChannel = {
     id: LOCAL_GATEWAY_CHANNEL_ID,
     name: i18n.t("config.channels.localName"),
+    nameKey: "config.channels.localName",
     baseUrl: LOCAL_GATEWAY_BASE_URL,
     apiKey: "local",
     apiFormat: "openai",
@@ -522,11 +529,41 @@ export function normalizeChannelModels(models: Array<string | ChannelModel> | un
     return result;
 }
 
+/**
+ * The channel name to render.
+ *
+ * Same rule as a node title: a key wins, so a channel created in the Chinese UI is not called
+ * "本地 ComfyUI" in the English one. A name the user typed has no key and is shown as typed.
+ */
+export function channelName(channel: Pick<ModelChannel, "name" | "nameKey">) {
+    return channel.nameKey ? i18n.t(channel.nameKey) : channel.name;
+}
+
+/**
+ * The key a stored channel name was rendered from, when it was one of the app's own defaults.
+ *
+ * Read from both dictionaries: the stored snapshot came from whichever language was active when the
+ * channel was created.
+ */
+function defaultChannelNameKey(name: string): string | undefined {
+    const value = name.trim();
+    if (!value) return undefined;
+    for (const language of ["zh-CN", "en-US"] as const) {
+        // `lng` rather than `getFixedT`: the fallback dictionary is zh-CN, so a plain `t()` would answer
+        // in Chinese for both languages and never recognise an English snapshot.
+        if (i18n.t("config.channels.localName", { lng: language }) === value) return "config.channels.localName";
+    }
+    return undefined;
+}
+
 function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
     const apiFormat = normalizeApiFormat(channel?.apiFormat);
+    const name = channel?.name?.trim() || "";
     return {
         id: channel?.id?.trim() || nanoid(),
-        name: channel?.name?.trim() || i18n.t("config.channels.newName"),
+        name: name || i18n.t("config.channels.newName"),
+        // An older config stored the translated default; adopt the key so the name follows the language.
+        nameKey: channel?.nameKey || defaultChannelNameKey(name) || undefined,
         baseUrl: channel?.baseUrl?.trim() || defaultBaseUrl(),
         apiKey: channel?.apiKey || "",
         apiFormat,
@@ -618,7 +655,7 @@ export function modelOptionLabel(config: AiConfig, value: string) {
     // Chinese one, keyed by the model id, and the gateway text is the fallback.
     const label = gatewayModelLabel(decoded.model, model?.label);
     if (label !== decoded.model) return label;
-    return channel ? i18n.t("settingsPanels.model.withChannel", { model: decoded.model, channel: channel.name }) : decoded.model;
+    return channel ? i18n.t("settingsPanels.model.withChannel", { model: decoded.model, channel: channelName(channel) }) : decoded.model;
 }
 
 export function modelOptionsFromChannels(channels: ModelChannel[]) {

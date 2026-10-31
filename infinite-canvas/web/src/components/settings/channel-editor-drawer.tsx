@@ -7,7 +7,7 @@ import { Space } from "@/components/kit/display";
 import { Drawer } from "@/components/kit/drawer";
 import { Input } from "@/components/kit/input";
 import { Segmented } from "@/components/kit/segmented";
-import { guessCapability, normalizeChannelModels, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
+import { channelName, guessCapability, normalizeChannelModels, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 import { ModelSelectModal } from "./model-select-modal";
 
 export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: boolean; channel: ModelChannel | null; onSave: (channel: ModelChannel) => void; onClose: () => void }) {
@@ -22,7 +22,8 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
 
     if (!draft) return null;
 
-    const patch = (value: Partial<ModelChannel>) => setDraft((current) => (current ? { ...current, ...value } : current));
+    // Typing a name makes it the user's own: the key that would re-translate it goes away.
+    const patch = (value: Partial<ModelChannel>) => setDraft((current) => (current ? { ...current, ...value, ...(value.name !== undefined ? { nameKey: undefined } : {}) } : current));
     const setModels = (models: ChannelModel[]) => patch({ models });
 
     const applySelection = (names: string[]) => {
@@ -64,7 +65,7 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
             <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">
                     <span className="mb-1 block text-sm font-medium">{t("config.channelEditor.name")}</span>
-                    <Input value={draft.name} onChange={(event) => patch({ name: event.target.value })} />
+                    <Input value={channelName(draft)} onChange={(event) => patch({ name: event.target.value })} />
                 </label>
                 <div className="block">
                     <span className="mb-1 block text-sm font-medium">{t("config.channelEditor.protocol")}</span>

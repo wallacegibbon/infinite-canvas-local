@@ -60,6 +60,32 @@ describe("canvas store format", () => {
         expect(readCanvasPersisted(raw).projects[0].viewport.k).toBe(1);
     });
 
+    it("turns a stored translated title back into its key", () => {
+        const raw = JSON.stringify({
+            version: 1,
+            state: {
+                projects: [
+                    project({
+                        nodes: [
+                            { id: "n1", type: "audio", title: "音频", position: { x: 0, y: 0 }, width: 340, height: 120 },
+                            { id: "n2", type: "image", title: "My hero shot", position: { x: 0, y: 0 }, width: 340, height: 240 },
+                            { id: "n3", type: "image", title: "Image", titleKey: "canvas.superResolve.fastTitle", position: { x: 0, y: 0 }, width: 340, height: 240 },
+                        ],
+                    }),
+                ],
+                deletedProjects: [],
+            },
+        });
+        const [only] = readCanvasPersisted(raw).projects;
+        // A default title was saved already translated; it becomes a key so it follows the language.
+        expect(only.nodes[0]).toMatchObject({ title: "音频", titleKey: "canvas.nodeTypes.audio" });
+        // A title someone typed stays exactly as typed.
+        expect(only.nodes[1]).toMatchObject({ title: "My hero shot" });
+        expect(only.nodes[1].titleKey).toBeUndefined();
+        // An explicit key is never overwritten.
+        expect(only.nodes[2].titleKey).toBe("canvas.superResolve.fastTitle");
+    });
+
     it("refuses a blob written by a newer build rather than guessing", () => {
         const raw = JSON.stringify({ version: CANVAS_PERSIST_VERSION + 1, state: { projects: [] } });
         expect(() => readCanvasPersisted(raw)).toThrow(/newer|format version/);
