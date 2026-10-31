@@ -9,97 +9,182 @@ import type { ReferenceImage } from "@/types/image";
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
 /**
- * The agent, as one stream.
+ * The agent, as two routes with very different lifetimes.
  *
- * A prompt and a command are the same thing to AlayaCore — frames on its stdin — so there is one
- * request: what we send is written to it (`command` + `args`, or `prompt` + images), and what it says
- * comes back here. This file only transcribes; it decides nothing about the content.
+ * A conversation is a socket: one connection per canvas, both directions, open for as long as the panel
+ * is. A one-shot question — a text node's body, a rewritten prompt, a caption — is a plain POST that
+ * spawns a process of its own and releases it when the answer ends, which is why it cannot name a
+ * session and never reaches the agent a canvas is holding.
  */
-type AgentEvent = {
-    type: "models" | "delta" | "reasoning" | "model" | "reasoning_level" | "command" | "done" | "error";
+export type AgentEvent = {
+    type: "models" | "delta" | "reasoning" | "model" | "reasoning_level" | "command" | "tool_call" | "tool_result" | "done" | "error" | "closed";
     text?: string;
+    elapsedMs?: number;
     models?: AgentModel[];
     active?: AgentModel;
     level?: number;
     coreVersion?: string;
     ok?: boolean;
     message?: string;
+    callId?: string;
+    name?: string;
+    input?: string;
+    output?: string;
 };
 
-/**
- * Connect: start an agent and keep it, so the model list is on screen before anything is asked.
- *
- * `canvasId` is the name the process is filed under. It is the canvas's own id, which is what makes a
- * reload find the agent it left instead of starting a second one — the gateway holds one process per
- * name and keeps it until it is told to let go.
- */
-export async function requestAgentConnect(config: AiConfig, canvasId: string, options?: { signal?: AbortSignal }): Promise<void> {
-    // The same root every other service uses: the channel address without its legacy `/v1`.
-    const root = gatewayProtocolRoot(config.baseUrl);
-    try {
-        const formData = new FormData();
-        formData.set("session", canvasId);
-        const response = await fetch(`${root}/api/agent/connect`, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}` }, body: formData, signal: options?.signal });
-        if (!response.ok) throw new Error(apiText("requestFailed"));
-        const payload = (await response.json()) as { sessionId?: string; state?: AgentEvent };
-        if (payload.state) rememberAgentEvent(payload.state);
-        useConfigStore.getState().setAgentSession(payload.sessionId || null);
-    } catch (error) {
-        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
-    }
-}
-
-type AgentRequest = {
+/** What the canvas says on the socket. One of them per message. */
+type AgentMessage = {
     prompt?: string;
-    images?: ReferenceImage[];
-    /** One of AlayaCore's own command names, forwarded verbatim. */
+    images?: string[];
     command?: string;
     args?: string;
+    cancel?: boolean;
+    close?: boolean;
 };
 
 /**
- * Ask the agent a question that the canvas will follow up on.
+ * The one open conversation.
  *
- * Names the connected session, so the answer comes from the process that holds this canvas's history
- * and can use its tools. Only the canvas agent panel calls this.
+ * A module-level value rather than React state on purpose: the socket is a resource with a lifetime,
+ * and a re-render that closed and reopened it would drop whatever the agent said in between.
  */
-export async function requestAgentChat(config: AiConfig, request: AgentRequest, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
-    return streamAgent(config, "/api/agent/chat", request, useConfigStore.getState().agentSession, options);
+type Conversation = {
+    url: string;
+    socket: WebSocket;
+};
+
+let conversation: Conversation | null = null;
+
+/**
+ * Who is listening. Module-level and not per-connection on purpose: a panel subscribes when it mounts,
+ * which is *before* any socket exists, and a subscription that died with a connection would have to be
+ * re-made by every component at a moment it cannot know about.
+ */
+const listeners = new Set<(event: AgentEvent) => void>();
+
+/** Where a canvas's conversation lives. The canvas id is the name the gateway files the agent under. */
+function agentSocketUrl(config: AiConfig, canvasId: string): string {
+    const root = gatewayProtocolRoot(config.baseUrl);
+    return `${root.replace(/^http/i, "ws")}/api/agent/socket/${encodeURIComponent(canvasId)}`;
+}
+
+/** Subscribe to everything the agent says. Returns the unsubscribe. */
+export function onAgentEvent(listener: (event: AgentEvent) => void): () => void {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+}
+
+/**
+ * Open the conversation, or return the one already open.
+ *
+ * Resolves on the agent's startup broadcast, which is where the model list comes from, so a caller that
+ * awaits this can show the models it may ask about.
+ */
+export function connectAgentSocket(config: AiConfig, canvasId: string): Promise<void> {
+    const url = agentSocketUrl(config, canvasId);
+    if (conversation?.url === url && conversation.socket.readyState <= WebSocket.OPEN) {
+        return Promise.resolve();
+    }
+    closeAgentSocket();
+
+    return new Promise((resolve, reject) => {
+        let socket: WebSocket;
+        try {
+            socket = new WebSocket(url);
+        } catch (error) {
+            reject(new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout")));
+            return;
+        }
+        const opened: Conversation = { url, socket };
+        conversation = opened;
+
+        let greeted = false;
+        socket.onmessage = (message) => {
+            let event: AgentEvent;
+            try {
+                event = JSON.parse(message.data as string) as AgentEvent;
+            } catch {
+                return;
+            }
+            rememberAgentEvent(event);
+            for (const listener of listeners) listener(event);
+            const id = canvasId;
+            if (!greeted && event.type === "models") {
+                greeted = true;
+                useConfigStore.getState().setAgentSession(id);
+                resolve();
+            }
+            if (event.type === "error" && event.message) {
+                if (!greeted) {
+                    greeted = true;
+                    reject(new Error(event.message));
+                }
+            }
+        };
+        socket.onerror = () => {
+            if (!greeted) {
+                greeted = true;
+                reject(new Error(apiText("requestFailed")));
+            }
+        };
+        socket.onclose = () => {
+            if (conversation === opened) conversation = null;
+            useConfigStore.getState().setAgentSession(null);
+            for (const listener of listeners) listener({ type: "closed" });
+            if (!greeted) {
+                greeted = true;
+                reject(new Error(apiText("requestFailed")));
+            }
+        };
+    });
+}
+
+/** Say something on the conversation. Silently does nothing when there is none — a message with no
+ * connection is not an error to report, it is a panel that has not been opened. */
+export function sendAgentMessage(message: AgentMessage): void {
+    if (!conversation || conversation.socket.readyState !== WebSocket.OPEN) return;
+    conversation.socket.send(JSON.stringify(message));
+}
+
+/** Stop the answer that is being written. The agent keeps its history; it only stops working. */
+export function cancelAgentTurn(): void {
+    sendAgentMessage({ cancel: true });
+}
+
+/** Close the socket but keep the agent: this is the tab going away, not the user giving up. */
+export function closeAgentSocket(): void {
+    const open = conversation;
+    conversation = null;
+    if (open) {
+        open.socket.onclose = null;
+        open.socket.close();
+    }
+    useConfigStore.getState().setAgentSession(null);
+}
+
+/** End the conversation for good: the agent is released, history and all. */
+export function endAgentConversation(): void {
+    sendAgentMessage({ close: true });
+    closeAgentSocket();
 }
 
 /**
  * Ask for one answer that nothing follows: a text node's body, a rewritten prompt, a caption.
  *
- * The session is passed as a literal null, not looked up — a one-shot question has no business
- * reaching the agent a canvas is holding, whose history is the user's work. The gateway keeps the two
- * apart the same way: `/api/agent/once` spawns a process for this request and releases it.
+ * A plain POST to `/api/agent/once`. There is no session here and no way to name one, which is the
+ * whole point: this must not be able to reach the agent a canvas is holding.
  */
-export async function requestAgentOnce(config: AiConfig, request: AgentRequest, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
-    return streamAgent(config, "/api/agent/once", request, null, options);
-}
-
-/**
- * Run one agent request and read its stream.
- *
- * Returns the answer text as the deltas assembled it (empty for a command), and reports every event
- * so a caller can render the model list, the current model, or a refusal as they arrive.
- */
-async function streamAgent(config: AiConfig, path: string, request: AgentRequest, session: string | null, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
-    // The same root every other service uses: the channel address without its legacy `/v1`.
+export async function requestAgentOnce(config: AiConfig, request: { prompt: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
     const root = gatewayProtocolRoot(config.baseUrl);
-
     const formData = new FormData();
-    if (request.prompt) formData.set("prompt", request.prompt);
-    if (request.command) formData.set("command", request.command);
-    if (request.args !== undefined) formData.set("args", request.args);
-    if (session) formData.set("session", session);
+    formData.set("prompt", request.prompt);
     const files = await Promise.all((request.images || []).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file, index) => formData.append(index === 0 ? "image" : `image${index + 1}`, file));
 
     let answer = "";
     let failure = "";
     try {
-        const response = await fetch(`${root}${path}`, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}` }, body: formData, signal: options?.signal });
+        const response = await fetch(`${root}/api/agent/once`, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}` }, body: formData, signal: options?.signal });
         if (!response.ok) throw new Error(apiText("requestFailed"));
         if (!response.body) throw new Error(apiText("requestFailed"));
 

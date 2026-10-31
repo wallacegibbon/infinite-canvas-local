@@ -58,6 +58,7 @@ import { CanvasNode } from "@/components/canvas/canvas-node";
 import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
 import { AssetPickerModal, type InsertAssetPayload } from "@/components/canvas/asset-picker-modal";
+import { CanvasAgentPanel } from "@/components/canvas/canvas-agent-panel";
 import { CanvasSidePanel } from "@/components/canvas/canvas-side-panel";
 import { CanvasZoomControls } from "@/components/canvas/canvas-zoom-controls";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
@@ -2477,6 +2478,7 @@ function InfiniteCanvasPage() {
                 onInsertAsset={handleAssetInsert}
             />
             <section className="relative min-w-0 flex-1 overflow-hidden">
+                <CanvasAgentPanel canvasId={projectId} nodes={nodes} onFocusNode={focusNode} />
                 <CanvasManagerDialog />
                 <AssetsManagerDialog />
                 <CanvasTopBar

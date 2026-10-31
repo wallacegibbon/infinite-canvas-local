@@ -20,7 +20,7 @@ import { SentPromptDisclosure } from "./sent-prompt-disclosure";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { resolveCanvasReferenceImages } from "@/lib/canvas/canvas-resource-references";
-import { requestAgentConnect, requestAgentOnce } from "@/services/api/agent";
+import { connectAgentSocket, requestAgentOnce } from "@/services/api/agent";
 import type { PromptOptimizeMode } from "@/services/api/prompts";
 import { videoModelForWorkflow, videoModelModePatch, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasNodeReferenceBar } from "./canvas-node-reference-bar";
@@ -263,7 +263,7 @@ export function CanvasNodePromptPanel({
     const connectAgent = async () => {
         setConnecting(true);
         try {
-            await requestAgentConnect(config, canvasId);
+            await connectAgentSocket(config, canvasId);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
         } finally {

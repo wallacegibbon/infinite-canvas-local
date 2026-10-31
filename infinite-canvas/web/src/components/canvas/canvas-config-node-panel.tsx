@@ -9,7 +9,7 @@ import { Segmented } from "@/components/kit/segmented";
 import { BaseModelPicker, WorkflowModelPicker } from "@/components/model-picker";
 import { defaultConfig, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 
-import { requestAgentConnect } from "@/services/api/agent";
+import { connectAgentSocket } from "@/services/api/agent";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { videoModelForWorkflow, videoModelModePatch, videoWorkflowId, isNoVdnWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -48,7 +48,7 @@ export function CanvasConfigNodePanel({ node, canvasId, isRunning, inputSummary,
     const connectAgent = async () => {
         setConnecting(true);
         try {
-            await requestAgentConnect(config, canvasId);
+            await connectAgentSocket(config, canvasId);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
         } finally {

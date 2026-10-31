@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScanText } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/kit/select-primitive";
-import { requestAgentChat } from "@/services/api/agent";
-import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { sendAgentMessage } from "@/services/api/agent";
+import { useConfigStore } from "@/stores/use-config-store";
 
 /**
  * The agent's two settings, displayed and changed.
@@ -16,17 +15,11 @@ import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
  */
 export function AgentSettingsControls({ className }: { className?: string }) {
     const { t } = useTranslation();
-    const config = useEffectiveConfig();
     const agent = useConfigStore((state) => state.agent);
-    const [busy, setBusy] = useState(false);
-
-    const send = async (command: string, args: string) => {
-        setBusy(true);
-        try {
-            await requestAgentChat(config, { command, args });
-        } finally {
-            setBusy(false);
-        }
+    // A setting change is a message on the conversation, not a request of its own: the same socket
+    // that carries the answer carries the change, and the agent announces the result there.
+    const send = (command: string, args: string) => {
+        sendAgentMessage({ command, args });
     };
 
     const levels = [
@@ -37,7 +30,7 @@ export function AgentSettingsControls({ className }: { className?: string }) {
 
     return (
         <div className={className || "flex min-w-0 items-center gap-2"}>
-            <Select value={agent.active ? String(agent.active.id) : ""} onValueChange={(value) => void send("model_set", value)} disabled={busy || !agent.models.length}>
+            <Select value={agent.active ? String(agent.active.id) : ""} onValueChange={(value) => send("model_set", value)} disabled={!agent.models.length}>
                 <SelectTrigger className="canvas-compact-control !h-10 max-w-[220px] gap-2 rounded-lg px-2 text-sm">
                     <ScanText className="size-3.5 shrink-0" />
                     <SelectValue placeholder={agent.active?.name || t("canvas.agent.noModel")} />
@@ -50,7 +43,7 @@ export function AgentSettingsControls({ className }: { className?: string }) {
                     ))}
                 </SelectContent>
             </Select>
-            <Select value={typeof agent.level === "number" ? String(agent.level) : "1"} onValueChange={(value) => void send("reasoning_level_set", value)} disabled={busy || typeof agent.level !== "number"}>
+            <Select value={typeof agent.level === "number" ? String(agent.level) : "1"} onValueChange={(value) => send("reasoning_level_set", value)} disabled={typeof agent.level !== "number"}>
                 <SelectTrigger className="canvas-compact-control !h-10 w-[130px] gap-2 rounded-lg px-2 text-sm">
                     <SelectValue />
                 </SelectTrigger>
