@@ -2540,18 +2540,22 @@ itself expensive — a rawio session reaches `SM session ready` in ~30 ms on thi
 the process after each request is cheaper than keeping one warm.
 
 **Tenancy is the security model** The gateway is **single-tenant**: one instance serves one person and
-uses **one** AlayaCore config directory (`AGENT_CONFIG_PATH`), chosen by the operator. There is no
-per-request identity, so there is nothing to map a second user onto — and therefore no per-user
-credential to leak: a caller of `:8190` spends that instance's own keys, exactly as it already spends
-that instance's GPU on `POST /api/runs`.
+uses **one** AlayaCore config directory — `os.UserConfigDir()/comfyui-gateway/alayacore` by default
+(`~/.config/...` on Linux, the right place on macOS and Windows), overridable with
+`AGENT_CONFIG_PATH`. The gateway does not create or validate it: the agent creates what it needs on
+first spawn, and a fresh directory comes with AlayaCore's own Ollama default, which exists to be
+*seen* — see "The model is visible and selectable" below. There is no per-request identity, so there
+is nothing to map a second user onto — and therefore no per-user credential to leak: a caller of
+`:8190` spends that instance's own keys, exactly as it already spends that instance's GPU on
+`POST /api/runs`.
 
 **If the gateway ever serves more than one user**, each user must have their own AlayaCore config
 directory, and that requires real identity (a login/session the gateway can resolve a request to) —
 not a shared secret. `GATEWAY_TOKEN` would not be that answer: it is injected into the page, so
 anyone who can open the canvas can read it. Until then, one directory, and the rule that makes it
-safe: **the config path, the model, the skill container and the tool list are operator configuration
-and may never come from a request.** A request that could name its own `--config-path` would turn
-"every user has their own directory" into "the caller picks whose directory to read".
+safe: **the config path, the skill container and the tool list are operator configuration and may
+never come from a request.** A request that could name its own `--config-path` would turn "every user
+has their own directory" into "the caller picks whose directory to read".
 
 **Security posture, stated plainly** No token is required to enable the agent. `GATEWAY_HOST`
 defaults to loopback and binding anything else already emits a startup warning; `GATEWAY_TOKEN` stays
@@ -2561,6 +2565,17 @@ from "uses your quota" to "reads your files and runs your commands".
 
 **Required regardless of auth** A concurrency cap and a per-request timeout. Spawning is unbounded
 otherwise, and a token does not help: whoever can open the canvas has the token too.
+
+**The model is visible and selectable** Everywhere the canvas uses the agent there is a model
+`<select>`, because "which model answered" is the user's first question and the only way to notice
+that the agent is still on AlayaCore's default. That makes the model the one client-supplied part of
+a spawn, which is safe only with two rules: it goes in as `--model <name>` (not `CI model_set`, which
+would rewrite the agent's persisted active model and cost a round trip), and it is **validated against
+the list the agent itself reports** — never an arbitrary string. The list comes from one probe route
+(`GET /api/agent`): spawn, read the startup frames, kill; ~30 ms, cached in the canvas's existing
+gateway sync. The payload is `{coreVersion, messageVersion, active, models:[{id, name, protocolType,
+contextLimit}]}` — `SM model_list` carries every `api_key` from `model.conf` verbatim, so those never
+leave the gateway.
 
 **The event surface is a whitelist** `delta` (Ax text), `reasoning`, `step` (SM `task`), `done`,
 `error` (+ an optional one-line `tool` state). Everything else the agent emits stays on the gateway:
@@ -2575,3 +2590,8 @@ exists in three repos and drift between them is a real failure mode.
 **Still open** Where the H3 wording lives: (a) an Agent Skill loaded with `read_file` (one extra model
 step, and the agent gains read access), or (b) `--system` assembled by the gateway and passed at spawn
 (single step, no file access). The decision waits on a measured comparison of the two outputs.
+
+**Also noted for later** The canvas will eventually grow a settings page for the agent's models. It
+must write through the agent's command plane (`CI model_sync` with the model array, `CI model_set` to
+switch) rather than parsing `model.conf` from Go: the file format (`protocol_type`, `reasoning_0/1/2`,
+…) belongs to AlayaCore, and going through the agent is what keeps it there.
