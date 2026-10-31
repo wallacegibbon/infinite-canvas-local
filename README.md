@@ -162,7 +162,7 @@ different services**.
 **Gateway `:8190` endpoints shaped like OpenAI** — the paths look standard, ComfyUI
 workflows are behind them:
 
-`/v1/models`, `/v1/images/generations`, `/v1/images/edits`, `/v1/images/upscale`, `/v1/videos`, …
+`/v1/models`, `/v1/images/generations`, `/v1/images/edits`, `/v1/videos`, …
 
 **ComfyUI `:8188` endpoints** — only the gateway's ComfyUI client (`internal/comfy`) calls
 these, the canvas never sees them:

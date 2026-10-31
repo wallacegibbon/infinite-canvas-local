@@ -1373,9 +1373,15 @@
       "name": "video-seedvr2-upscale",
       "type": "video",
       "category": "upscale",
-      "hidden": true,
       "file": "video-seedvr2-upscale.json",
       "description": "SeedVR2 3B video upscale; target short edge, H.264, original audio preserved.",
+      "accepts": {
+        "videos": {
+          "min": 1,
+          "max": 1
+        },
+        "note": "the video upscaler takes one clip"
+      },
       "bindings": {
         "video": {
           "node": "1",
@@ -1440,9 +1446,15 @@
       "label": "ESRGAN fast upscale",
       "type": "image",
       "category": "upscale",
-      "hidden": true,
       "file": "image-esrgan-upscale.json",
       "description": "Fast upscale with the RealESRGAN / 4x models; the output scale comes from the selected model.",
+      "accepts": {
+        "images": {
+          "min": 1,
+          "max": 1
+        },
+        "note": "the upscaler takes one image and returns one; send the source alone"
+      },
       "bindings": {
         "image": {
           "node": "1",
@@ -1946,7 +1958,13 @@
       "type": "image",
       "description": "Qwen-Image 2.1 Turbo + Qwen Multiangle Camera. Local angle regeneration with 0-360 horizontal, -30-60 vertical and zoom.",
       "file": "image-qwen21-angle.json",
-      "hidden": true,
+      "accepts": {
+        "images": {
+          "min": 1,
+          "max": 1
+        },
+        "note": "the angle re-render works from one source image"
+      },
       "bindings": {
         "prompt": {
           "node": "22",
@@ -2212,17 +2230,22 @@
           "default": 1
         }
       ],
-      "label": "H3 character swap (Character Swap 1.5)",
-      "hidden": false
+      "label": "H3 character swap (Character Swap 1.5)"
     },
     {
       "id": "video-rife",
       "name": "video-rife",
       "type": "video",
       "file": "video-rife.json",
-      "hidden": true,
       "label": "RIFE 帧插值",
       "description": "RIFE frame interpolation: 2× or 3× the frame rate of an existing clip. The audio track passes through. The source is assumed to be 24fps, which is what the canvas's own clips are.",
+      "accepts": {
+        "videos": {
+          "min": 1,
+          "max": 1
+        },
+        "note": "interpolation takes one clip"
+      },
       "bindings": {
         "video": {
           "node": "1",

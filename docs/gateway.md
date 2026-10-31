@@ -177,7 +177,6 @@ Generation (multipart where media is involved):
 | --- | --- | --- |
 | `POST` | `/v1/images/generations` | Text-to-image. |
 | `POST` | `/v1/images/edits` | Reference-image editing, inpaint, outpaint. |
-| `POST` | `/v1/images/upscale` | Image upscaling. |
 | `POST` | `/v1/videos` | Video generation (returns a job id). |
 | `POST` | `/v1/videos/upscale` | Video upscaling. |
 | `GET` | `/v1/videos/{id}` | Job status, including preview and step progress. |

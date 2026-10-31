@@ -2137,3 +2137,45 @@ the setup status totals and in `missing.nodes` (models and tools alike), and a w
 **Where** `internal/workflow/entry.go`, `internal/workflow/render.go`, `internal/setup/scan.go`,
 `internal/server/routes_admin.go`, `internal/resource/status.go`, `workflows/registry.json`,
 `resources/index.json`, `infinite-canvas/web/src/lib/canvas/tool-workflows.ts`.
+
+## 65. The image upscaler is a run, and a tool workflow takes exactly one item
+
+**Decision** `POST /v1/images/upscale` is deleted. The canvas's 放大 button uploads the source image
+and submits a run of `image-esrgan-upscale` (`inputs: {upscale_model, resolution}`, `media: {image:
+[id]}`) like every other image action. `GET /api/upscale/workflows` is deleted too: `/api/workflows`
+now carries each workflow's loader-enriched `parameters`, so a client reads the whole catalogue in one
+request and decides for itself which entries are upscalers. All four tool workflows declare
+`accepts` with `min: 1, max: 1` for the media kind they consume.
+
+**Why the route had to go** It was the last image route that existed only for one button. It resolved
+a workflow by id, refused anything outside `category: "upscale"`, and parsed a multipart body — three
+things `POST /api/runs` already does, with an id that a reload can resume. The category check was the
+only thing it added, and that is a UI concern: "is this a button or a model" is a question about the
+canvas, not about the workflow.
+
+**Why `/api/upscale/workflows` went with it** It was a Go-side filter (`category == "upscale" &&
+type == "image"`) that re-rendered four fields of a workflow row plus its parameters. The parameters
+were the only thing `/api/workflows` lacked, and enriching them there costs one map copy per row, so
+the second endpoint became a worse copy of the first. The filter moved into the dialog, next to the
+button that needs it.
+
+**Why `accepts` matters here** Without it, an upscale with no image is accepted (202) and fails a
+minute later inside ComfyUI when the required binding finds nothing — the failure mode #56 exists to
+prevent. `min: 1` makes the same mistake a 400 at submission with the workflow's own note. `max: 1`
+says what the graph can honour: ESRGAN upscales one image, RIFE one clip, SeedVR2 one clip, the angle
+re-render one source.
+
+**Also cleaned** `registry.json` still carried `hidden: true` on those four entries two commits after
+the flag was deleted from the struct. Ignored fields that read like behaviour are worse than no
+fields.
+
+**Tested** `internal/server/runs_e2e_test.go:TestRunImageUpscaleTakesOneImage` (image reaches the
+graph, `upscale_model` reaches its node, no image is a 400),
+`tests/api-image-upscale.test.ts` (one upload + one run, nothing on `/v1`, a failed run surfaces its
+message). In the browser: the 放大 dialog listed the three ESRGAN models from `/api/workflows`,
+submitted a run, and produced a 4096×4096 PNG node.
+
+**Where** `internal/server/routes_generation.go`, `internal/server/routes_admin.go`,
+`workflows/registry.json`, `infinite-canvas/web/src/services/api/workflows.ts`,
+`infinite-canvas/web/src/services/api/image.ts`,
+`infinite-canvas/web/src/components/canvas/canvas-node-super-resolve-dialog.tsx`.

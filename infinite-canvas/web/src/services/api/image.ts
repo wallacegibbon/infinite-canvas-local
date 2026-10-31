@@ -1004,66 +1004,37 @@ export async function requestImageCaption(
     }
 }
 
-export type UpscaleParameter = {
-    key: string;
-    label: string;
-    type: "number" | "boolean" | "string" | "select";
-    default?: unknown;
-    min?: number;
-    max?: number;
-    step?: number;
-    options?: Array<string | { value: string; label: string }>;
-    description?: string;
-};
-
-export type UpscaleWorkflow = {
-    id: string;
-    name: string;
-    label: string;
-    description?: string;
-    available: boolean;
-    problems?: Array<{ message?: string }>;
-    parameters: UpscaleParameter[];
-};
-
 type UpscaleOptions = { workflowId: string; params?: Record<string, unknown>; signal?: AbortSignal };
 
-export async function requestUpscaleWorkflows(config: AiConfig): Promise<UpscaleWorkflow[]> {
-    const root = localGatewayRoot(config.baseUrl);
-    if (!root) return [];
-    const payload = await httpJson<{ workflows?: UpscaleWorkflow[] }>(`${root}/api/upscale/workflows`, {
-        headers: aiHeaders(config),
-        timeout: 8000,
-    });
-    return Array.isArray(payload?.workflows) ? payload.workflows : [];
-}
-
+/**
+ * Upscale one image with a tool workflow, as a run.
+ *
+ * The chosen upscaler is a workflow id, its knobs (`upscale_model`, `resolution`) are that
+ * workflow's own inputs and the source image is its media, so this is one run — the same path every
+ * other image edit takes. There is no prompt: the workflow's prompt binding carries its own
+ * default, and sending an undeclared key would be rejected by the typed input contract.
+ */
 export async function requestUpscale(config: AiConfig, image: ReferenceImage, options: UpscaleOptions) {
-    const requestConfig = resolveModelRequestConfig(config, config.imageModel || config.model);
-    const root = localGatewayRoot(requestConfig.baseUrl);
-    if (!root) throw new Error(apiText("upscaleLocalOnly"));
-    const formData = new FormData();
-    formData.set("model", options.workflowId);
-    formData.set("response_format", "b64_json");
-    if (options.params && Object.keys(options.params).length) formData.set("params", JSON.stringify(options.params));
-    formData.append("image", await dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) }));
-    const requestId = `img_${nanoid()}`;
-    const detachCancel = attachLocalCancel(requestConfig, requestId, options.signal);
-    const detachProgress = attachLocalProgress(requestConfig, requestId, options.signal);
+    if (!localGatewayRoot(config.baseUrl)) throw new Error(apiText("upscaleLocalOnly"));
+    const requestConfig = { ...resolveModelRequestConfig(config, config.imageModel || config.model), baseUrl: LOCAL_GATEWAY_BASE_URL, apiKey: "local", apiFormat: "openai" as const, model: options.workflowId };
     try {
-        const payload = await httpJson<ImageApiResponse>(`${root}/v1/images/upscale`, {
-            method: "POST",
-            headers: { ...aiHeaders(requestConfig), ...(detachCancel ? { "X-Request-Id": requestId } : {}) },
-            body: formData,
-            signal: options.signal,
-            timeout: IMAGE_REQUEST_TIMEOUT_MS,
+        const dataUrl = await imageToDataUrl(image);
+        const uploaded = await uploadMedia(requestConfig, dataUrlToFile({ ...image, dataUrl }), image.name || `${image.id}.png`, { signal: options.signal });
+        const run = await createRun(requestConfig, {
+            workflow: options.workflowId,
+            inputs: { ...(options.params ?? {}) },
+            media: { image: [uploaded.id] },
         });
-        return await parseImagePayload(payload);
+        const finished = await waitForRun(requestConfig, run.id, { signal: options.signal, cancelOnAbort: true });
+        const files = await downloadRunOutputs(requestConfig, finished, { signal: options.signal });
+        return await Promise.all(
+            files.map(async (file, index) => ({
+                id: nanoid(),
+                dataUrl: await readFileAsDataUrl(new File([file.blob], `upscaled-${index + 1}.png`, { type: file.mime || file.blob.type || "image/png" })),
+            })),
+        );
     } catch (error) {
         throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
-    } finally {
-        detachCancel?.();
-        detachProgress?.();
     }
 }
 

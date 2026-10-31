@@ -41,7 +41,6 @@ func (s *Server) routesAdmin(mux *http.ServeMux) {
 	s.route(mux, "GET /api/workflows/{id}/schema", s.handleWorkflowSchema)
 	s.route(mux, "POST /api/workflows/{id}/visibility", s.handleWorkflowVisibility)
 	s.route(mux, "DELETE /api/workflows/{id}", s.handleWorkflowDelete)
-	s.route(mux, "GET /api/upscale/workflows", s.handleUpscaleWorkflows)
 
 	s.route(mux, "GET /v1/models", s.handleModels)
 	s.route(mux, "GET /api/loras", s.handleLoras)
@@ -234,6 +233,11 @@ func (s *Server) handleWorkflows(ctx *httpx.Ctx) error {
 	}
 	rows := make([]row, 0, len(projected))
 	for _, entry := range projected {
+		// The parameters carry the loader's option lists here, so one request describes a
+		// workflow completely: a picker of upscale models or checkpoint names is data the list
+		// already has, and asking per workflow would be a second round trip for it. Clients
+		// that only want names ignore the field.
+		entry.Parameters = s.enrichParameters(entry.Parameters)
 		rows = append(rows, row{
 			PublicEntry:  entry,
 			Enabled:      !s.visibility.IsHidden(entry.ID),
@@ -301,32 +305,6 @@ func (s *Server) handleWorkflowDelete(ctx *httpx.Ctx) error {
 		return httpx.NotFound("workflow_not_found", "workflow not found")
 	}
 	okJSON(ctx.W, nil)
-	return nil
-}
-
-// handleUpscaleWorkflows implements GET /api/upscale/workflows.
-func (s *Server) handleUpscaleWorkflows(ctx *httpx.Ctx) error {
-	var rows []map[string]any
-	for _, projected := range s.registry.List() {
-		if projected.Category == nil || *projected.Category != "upscale" || projected.Type != "image" {
-			continue
-		}
-		entry := s.registry.Resolve(projected.ID)
-		if entry == nil {
-			continue
-		}
-		status := s.setup.WorkflowStatus(entry.ID)
-		rows = append(rows, map[string]any{
-			"id":          entry.ID,
-			"name":        entry.Name,
-			"label":       defaultStringOf(entry.Label, entry.Name),
-			"description": entry.Description,
-			"available":   status.Available,
-			"problems":    status.Problems,
-			"parameters":  s.enrichParameters(entry.Parameters),
-		})
-	}
-	httpx.OK(ctx.W, map[string]any{"workflows": nonNilRows(rows)})
 	return nil
 }
 
@@ -613,11 +591,4 @@ func absInt(value int) int {
 		return -value
 	}
 	return value
-}
-
-func nonNilRows(rows []map[string]any) []map[string]any {
-	if rows == nil {
-		return []map[string]any{}
-	}
-	return rows
 }

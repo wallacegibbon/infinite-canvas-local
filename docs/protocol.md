@@ -262,7 +262,7 @@ id exists to remove.
 
 | Today | Target |
 | --- | --- |
-| `/v1/images/generations`, `/v1/images/edits`, `/v1/images/upscale` | one `POST /api/runs` with `inputs` + `media` |
+| `/v1/images/generations`, `/v1/images/edits`, `/v1/images/upscale` (gone) | one `POST /api/runs` with `inputs` + `media` |
 | `/v1/videos`, `/v1/videos/{id}`, `/{id}/content`, `/{id}/cancel` | the same `run` endpoints |
 | `/v1/audio/speech` | the same `run` endpoints |
 | `/v1/videos/upscale`, `/v1/videos/interpolate` | runs of the `video-seedvr2-upscale` / `video-rife` workflows |

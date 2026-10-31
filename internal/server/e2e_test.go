@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -550,41 +549,5 @@ func TestTaskNotFoundShape(t *testing.T) {
 	errorBody, _ := payload["error"].(map[string]any)
 	if errorBody["code"] != "task_not_found" {
 		t.Errorf("code = %v", errorBody["code"])
-	}
-}
-
-func TestMultipartUploadReachesComfyUI(t *testing.T) {
-	fake := newFakeComfy(t)
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	var body bytes.Buffer
-	boundary := "test-boundary"
-	fmt.Fprintf(&body, "--%s\r\n", boundary)
-	fmt.Fprintf(&body, "Content-Disposition: form-data; name=\"model\"\r\n\r\nimage-test\r\n")
-	fmt.Fprintf(&body, "--%s\r\n", boundary)
-	fmt.Fprintf(&body, "Content-Disposition: form-data; name=\"image\"; filename=\"in.png\"\r\n")
-	fmt.Fprintf(&body, "Content-Type: image/png\r\n\r\n")
-	body.WriteString("FAKEPNG")
-	fmt.Fprintf(&body, "\r\n--%s--\r\n", boundary)
-
-	request, _ := http.NewRequest(http.MethodPost, gateway.URL+"/v1/images/upscale", &body)
-	request.Header.Set("Content-Type", "multipart/form-data; boundary="+boundary)
-
-	response, err := gateway.Client().Do(request)
-	if err != nil {
-		t.Fatalf("request: %v", err)
-	}
-	defer response.Body.Close()
-	raw, _ := io.ReadAll(response.Body)
-
-	// This workflow is not an upscale workflow, so a 400 proves the request was
-	// parsed and the model resolved before the category check rejected it.
-	if response.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status = %d, body = %s", response.StatusCode, raw)
-	}
-	if !strings.Contains(string(raw), "not_upscale_workflow") {
-		t.Errorf("unexpected body: %s", raw)
 	}
 }

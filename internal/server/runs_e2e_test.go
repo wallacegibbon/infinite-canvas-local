@@ -205,6 +205,68 @@ func TestRunResolvesUploadedMediaByRole(t *testing.T) {
 	}
 }
 
+// An image upscale is a run: the source image arrives by role and the model choice is the
+// workflow's own parameter. `POST /v1/images/upscale` is gone, so this is what keeps the
+// replacement honest — one image in, the artifact out of the run.
+func TestRunImageUpscaleTakesOneImage(t *testing.T) {
+	fake := newFakeComfy(t)
+	file, graph, entry := imageFixture()
+	graph["1"] = map[string]any{"class_type": "LoadImage", "inputs": map[string]any{"image": "placeholder.png"}}
+	graph["2"] = map[string]any{"class_type": "UpscaleModelLoader", "inputs": map[string]any{"model_name": "RealESRGAN_x2plus.pth"}}
+	entry["id"] = "image-esrgan-upscale"
+	entry["name"] = "image-esrgan-upscale"
+	entry["category"] = "upscale"
+	entry["accepts"] = map[string]any{"images": map[string]any{"min": 1, "max": 1}}
+	entry["parameters"] = []any{
+		map[string]any{"key": "upscale_model", "type": "select", "optionsFrom": "UpscaleModelLoader.model_name", "default": "RealESRGAN_x2plus.pth"},
+	}
+	entry["bindings"] = map[string]any{
+		"image":         map[string]any{"node": "1", "input": "image", "from": "image", "imageIndex": 0, "required": true},
+		"upscale_model": map[string]any{"node": "2", "input": "model_name", "from": "params.upscale_model", "default": "RealESRGAN_x2plus.pth"},
+	}
+	gateway := httptest.NewServer(newTestGatewayWith(t, fake, file, graph, entry).Handler())
+	defer gateway.Close()
+
+	imageID := uploadID(t, gateway, "source.png", "image/png", []byte("PNG"))
+
+	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/api/runs", map[string]any{
+		"workflow": "image-esrgan-upscale",
+		"inputs":   map[string]any{"upscale_model": "RealESRGAN_x4plus.pth"},
+		"media":    map[string]any{"image": []string{imageID}},
+	})
+	if status != http.StatusAccepted {
+		t.Fatalf("submit status = %d, body = %v", status, payload)
+	}
+	finished := waitForRun(t, gateway, asString(payload["id"]))
+	if finished["status"] != "succeeded" {
+		t.Fatalf("run failed: %v", finished)
+	}
+	if outputs := runOutputs(t, finished); len(outputs) != 1 {
+		t.Fatalf("outputs = %v, want the upscaled image", outputs)
+	}
+
+	loader, _ := fake.submittedGraph()["2"].(map[string]any)
+	inputs, _ := loader["inputs"].(map[string]any)
+	if inputs["model_name"] != "RealESRGAN_x4plus.pth" {
+		t.Errorf("model_name = %v, want the requested model", inputs["model_name"])
+	}
+	source, _ := fake.submittedGraph()["1"].(map[string]any)
+	sourceInputs, _ := source["inputs"].(map[string]any)
+	if sourceInputs["image"] != "uploaded.png" {
+		t.Errorf("image = %v, want the ComfyUI name from the upload", sourceInputs["image"])
+	}
+
+	// Without the image the same request is a 400 at submission, not a run that fails inside
+	// ComfyUI: the binding is required, and the contract is checked before queueing.
+	status, payload = doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/api/runs", map[string]any{
+		"workflow": "image-esrgan-upscale",
+		"inputs":   map[string]any{"upscale_model": "RealESRGAN_x4plus.pth"},
+	})
+	if status != http.StatusBadRequest || !strings.Contains(errorText(payload), "reference image") {
+		t.Errorf("missing image: status = %d, body = %v", status, payload)
+	}
+}
+
 func TestRunRejectsBadMedia(t *testing.T) {
 	fake := newFakeComfy(t)
 	gateway := httptest.NewServer(newTestGateway(t, fake).Handler())

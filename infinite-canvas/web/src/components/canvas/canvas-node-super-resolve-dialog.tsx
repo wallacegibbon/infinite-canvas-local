@@ -9,7 +9,7 @@ import { Collapse } from "@/components/kit/nav";
 import { Segmented } from "@/components/kit/segmented";
 import { Select } from "@/components/kit/select";
 import { readImageMeta } from "@/lib/image-utils";
-import { requestUpscaleWorkflows, type UpscaleParameter, type UpscaleWorkflow } from "@/services/api/image";
+import { requestWorkflows, type GatewayWorkflow, type WorkflowParameter } from "@/services/api/workflows";
 import type { AiConfig } from "@/stores/use-config-store";
 
 export type CanvasSuperResolveParams = { workflowId: string; params: Record<string, unknown> };
@@ -92,7 +92,7 @@ export function CanvasNodeSuperResolveDialog({
 }) {
     const { t } = useTranslation();
     const [image, setImage] = useState<{ width: number; height: number } | null>(null);
-    const [workflows, setWorkflows] = useState<UpscaleWorkflow[]>([]);
+    const [workflows, setWorkflows] = useState<GatewayWorkflow[]>([]);
     const [workflowId, setWorkflowId] = useState("");
     const [values, setValues] = useState<Record<string, unknown>>({});
     const [scale, setScale] = useState(2);
@@ -101,9 +101,15 @@ export function CanvasNodeSuperResolveDialog({
     const [error, setError] = useState("");
 
     const workflow = workflows.find((item) => item.id === workflowId) || null;
-    const modelParameter = workflow?.parameters.find((parameter) => parameter.key === "dit_model" || parameter.key === "upscale_model") || null;
-    const resolutionParameter = workflow?.parameters.find((parameter) => parameter.key === "resolution") || null;
-    const advancedParameters = (workflow?.parameters || []).filter((parameter) => parameter !== modelParameter && parameter !== resolutionParameter);
+    const parameters = workflow?.parameters || [];
+    const modelParameter = parameters.find((parameter) => parameter.key === "dit_model" || parameter.key === "upscale_model") || null;
+    const resolutionParameter = parameters.find((parameter) => parameter.key === "resolution") || null;
+    const advancedParameters = parameters.filter((parameter) => parameter !== modelParameter && parameter !== resolutionParameter);
+    // Whether ComfyUI can run it right now is the gateway's answer; showing the upscaler as a
+    // choice is ours. An unavailable workflow stays listed with its problems, because "the node
+    // pack is missing" is the reason the button is disabled.
+    const available = workflow?.availability?.available === true;
+    const problems = workflow?.availability?.problems || [];
     const shortEdge = image ? Math.min(image.width, image.height) : 0;
     const minResolution = Number(resolutionParameter?.min) || 512;
     const maxResolution = Number(resolutionParameter?.max) || MAX_OUTPUT_EDGE;
@@ -125,13 +131,16 @@ export function CanvasNodeSuperResolveDialog({
         setResolution(0);
         void readImageMeta(dataUrl).then(setImage);
         let alive = true;
-        requestUpscaleWorkflows(config)
+        // An upscaler is an image workflow in the "upscale" category; which ones are offered is a
+        // presentation choice, so the filter lives here rather than in the gateway.
+        requestWorkflows(config)
             .then((items) => {
                 if (!alive) return;
-                setWorkflows(items);
-                const first = items.find((item) => item.id === preferredWorkflowId) || items.find((item) => item.available) || items[0];
+                const upscalers = items.filter((item) => item.type === "image" && item.category === "upscale");
+                setWorkflows(upscalers);
+                const first = upscalers.find((item) => item.id === preferredWorkflowId) || upscalers.find((item) => item.availability?.available) || upscalers[0];
                 setWorkflowId(first?.id || "");
-                if (!items.length) setError(t("apiErrors.upscaleNoWorkflow"));
+                if (!upscalers.length) setError(t("apiErrors.upscaleNoWorkflow"));
             })
             .catch((reason) => {
                 if (alive) setError(reason instanceof Error ? reason.message : String(reason));
@@ -147,7 +156,7 @@ export function CanvasNodeSuperResolveDialog({
     useEffect(() => {
         if (!workflow) return;
         const defaults: Record<string, unknown> = {};
-        for (const parameter of workflow.parameters) {
+        for (const parameter of workflow.parameters || []) {
             if (parameter === resolutionParameter) continue;
             defaults[parameter.key] = parameter.default ?? (parameter.type === "boolean" ? false : "");
         }
@@ -159,8 +168,8 @@ export function CanvasNodeSuperResolveDialog({
         setResolution(clampResolution(shortEdge * scale, minResolution, maxResolution));
     }, [open, shortEdge, scale, resolutionParameter, minResolution, maxResolution]);
 
-    const canRun = Boolean(workflow?.available && image && (resolutionParameter ? resolution > shortEdge && resolution >= minResolution && resolution <= maxResolution : Boolean(selectedModel)));
-    const workflowOptions = workflows.map((item) => ({ value: item.id, label: `${item.label}${item.available ? "" : ` (${t("canvas.superResolve.unavailable")})`}` }));
+    const canRun = Boolean(available && image && (resolutionParameter ? resolution > shortEdge && resolution >= minResolution && resolution <= maxResolution : Boolean(selectedModel)));
+    const workflowOptions = workflows.map((item) => ({ value: item.id, label: `${item.label || item.name}${item.availability?.available ? "" : ` (${t("canvas.superResolve.unavailable")})`}` }));
 
     const confirm = () => {
         if (!workflow || !canRun) return;
@@ -196,7 +205,7 @@ export function CanvasNodeSuperResolveDialog({
                                     onChange={(value) => setWorkflowId(value)}
                                     notFoundContent={t("canvas.superResolve.noWorkflow")}
                                 />
-                                {workflow && !workflow.available ? <div className="text-xs text-[#ef4444]">{workflow.problems?.[0]?.message || t("canvas.superResolve.unavailable")}</div> : null}
+                                {workflow && !available ? <div className="text-xs text-[#ef4444]">{problems[0]?.message || t("canvas.superResolve.unavailable")}</div> : null}
                             </div>
                         ) : null}
 
@@ -265,7 +274,7 @@ export function CanvasNodeSuperResolveDialog({
     );
 }
 
-function ParameterField({ parameter, value, onChange }: { parameter: UpscaleParameter; value: unknown; onChange: (value: unknown) => void }) {
+function ParameterField({ parameter, value, onChange }: { parameter: WorkflowParameter; value: unknown; onChange: (value: unknown) => void }) {
     const { t } = useTranslation();
     if (parameter.type === "select") {
         return (

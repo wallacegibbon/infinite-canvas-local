@@ -19,7 +19,6 @@ import (
 // routesGeneration registers the endpoints that actually produce media.
 func (s *Server) routesGeneration(mux *http.ServeMux) {
 	s.route(mux, "POST /v1/images/generations", s.handleImageGenerations)
-	s.route(mux, "POST /v1/images/upscale", s.handleImageUpscale)
 	s.route(mux, "POST /v1/images/edits", s.handleImageEdits)
 	s.route(mux, "POST /api/prompts/optimize", s.handlePromptOptimize)
 	s.route(mux, "POST /api/prompts/optimize-image", s.handlePromptOptimizeImage)
@@ -141,63 +140,6 @@ func (s *Server) handleImageGenerations(ctx *httpx.Ctx) error {
 	s.logger.Info("image %s -> %s (%d file(s)) %s", entry.Name, result.PromptID, len(result.Files), ctx.RequestID)
 
 	payload, err := s.imageResponse(ctx, result.Files, strings.ToLower(defaultStringOf(httpx.String(body, "response_format"), "b64_json")), "ComfyUI")
-	if err != nil {
-		return err
-	}
-	httpx.OK(ctx.W, payload)
-	return nil
-}
-
-// handleImageUpscale implements POST /v1/images/upscale.
-func (s *Server) handleImageUpscale(ctx *httpx.Ctx) error {
-	s.registry.ReloadIfChanged()
-	body, err := bodyOrEmpty(ctx)
-	if err != nil {
-		return err
-	}
-
-	entry, err := s.requireModel(defaultStringOf(httpx.String(body, "model"), "image-esrgan-upscale"), "image")
-	if err != nil {
-		return err
-	}
-	if entry.Category != "upscale" {
-		return httpx.Errorf(http.StatusBadRequest, "not_upscale_workflow", "model %s is not an upscale workflow", entry.Name)
-	}
-
-	files := imageFiles(ctx.Files())
-	if len(files) == 0 {
-		return httpx.NewError(http.StatusBadRequest, "missing_input_image", "upscale request is missing the input image")
-	}
-
-	params, err := parseParams(body)
-	if err != nil {
-		return err
-	}
-	uploadCtx, cleanup := s.withCancel(ctx.R, ctx.RequestID)
-	defer cleanup()
-	uploaded, err := s.uploadFiles(uploadCtx, files[:1])
-	if err != nil {
-		return err
-	}
-
-	runCtx := workflow.BuildContext(workflow.BuildContextParams{
-		Prompt:         httpx.String(body, "prompt"),
-		Count:          1,
-		Images:         toUploadResults(files[:1]),
-		UploadedImages: uploaded,
-		Params:         params,
-	})
-
-	result, err := s.runImageWorkflow(ctx, entry, runCtx, ctx.RequestID)
-	if err != nil {
-		return err
-	}
-	if result == nil {
-		return nil
-	}
-	s.logger.Info("upscale %s -> %s (%d file(s)) %s", entry.Name, result.PromptID, len(result.Files), ctx.RequestID)
-
-	payload, err := s.imageResponse(ctx, result.Files, strings.ToLower(defaultStringOf(httpx.String(body, "response_format"), "b64_json")), "the upscale workflow")
 	if err != nil {
 		return err
 	}
