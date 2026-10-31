@@ -2,11 +2,16 @@ package agent
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
+	"time"
+
+	"comfyui-gateway/internal/logx"
 )
 
 // Process is one running `alayacore --rawio`, owned by one request.
@@ -21,7 +26,9 @@ type Process struct {
 	// Stderr keeps the child's last lines. A core that dies at startup says why only there: a
 	// refused session file, an unknown model, a bad config. Losing that turns "your model name is
 	// wrong" into "connection closed".
-	Stderr *stderrTail
+	Stderr    *stderrTail
+	Log       *logx.Logger
+	startedAt time.Time
 
 	stdinFile *os.File
 
@@ -40,6 +47,9 @@ type SpawnOptions struct {
 	// Tools is the `--builtin-tools` list. Read-only file access is what a skill needs in order to be
 	// activated at all (the agent loads a skill by reading its SKILL.md); no other tool is enabled.
 	Tools string
+	// Log records what happened in terms someone who knows AlayaCore can follow: the command line,
+	// every frame in both directions, and how the process ended.
+	Log *logx.Logger
 }
 
 // args builds the command line. Built-in tools are always disabled: this route asks an agent for
@@ -109,6 +119,10 @@ func Spawn(o SpawnOptions) (*Process, error) {
 	tail := &stderrTail{}
 	go tail.drain(stderrRead)
 
+	if o.Log != nil {
+		o.Log.Info("agent: spawn pid=%d binary=%s config=%s skills=%s tools=%q", cmd.Process.Pid, cmd.Path, o.ConfigPath, o.Skills, o.Tools)
+	}
+
 	in := bufio.NewWriter(stdin)
 	return &Process{
 		Cmd:       cmd,
@@ -116,16 +130,55 @@ func Spawn(o SpawnOptions) (*Process, error) {
 		Stdout:    bufio.NewReaderSize(stdout, 64<<10),
 		Stderr:    tail,
 		stdinFile: stdin.(*os.File),
+		Log:       o.Log,
+		startedAt: time.Now(),
 	}, nil
 }
 
 // Write sends one frame and flushes it. A frame that was never flushed reads as the agent going
 // quiet, so every write here is followed by one.
 func (p *Process) Write(tag, value string) error {
+	p.logFrame(">>", tag, value)
 	if err := WriteFrame(p.Stdin, tag, value); err != nil {
 		return err
 	}
 	return p.Stdin.Flush()
+}
+
+// Read returns the next frame, logging it. Everything the agent says passes through here, so the log
+// is the transcript: a reader who knows AlayaCore can see the frames in order.
+func (p *Process) Read() (*Frame, error) {
+	frame, err := ReadFrame(p.Stdout)
+	if frame != nil {
+		p.logFrame("<<", frame.Tag, frame.Value)
+	}
+	return frame, err
+}
+
+func (p *Process) logFrame(direction, tag, value string) {
+	if p.Log == nil {
+		return
+	}
+	p.Log.Info("agent %s %s %s", direction, tag, truncateFrame(redactKeys(value)))
+}
+
+// reAPIKey matches the value of an api_key field in a frame body. `SM model_list` carries every key
+// from model.conf in cleartext; the transcript is worth having, the keys in it are not.
+var reAPIKey = regexp.MustCompile(`("api_key":\s*)"(?:[^"\\]|\\.)*"`)
+
+func redactKeys(value string) string {
+	return reAPIKey.ReplaceAllString(value, `$1"***"`)
+}
+
+// truncateFrame keeps a frame's head. A rewrite of an H3 prompt is thousands of characters and is not
+// more informative for it; the shape of the beginning is what tells a reader what the frame is.
+func truncateFrame(value string) string {
+	const limit = 400
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit]) + fmt.Sprintf("… (%d runes)", len(runes))
 }
 
 // Wait reaps the child once and returns its exit error. Callers that may race (the reader's end of
@@ -143,7 +196,14 @@ func (p *Process) Release() {
 	if p.stdinFile != nil {
 		_ = p.stdinFile.Close()
 	}
-	_ = p.Wait()
+	err := p.Wait()
+	if p.Log != nil {
+		// The tail is the reason a spawn failed, so it is worth a line of its own when it exists.
+		if tail := p.Stderr.Last(); tail != "" {
+			p.Log.Warn("agent: stderr %s", truncateFrame(tail))
+		}
+		p.Log.Info("agent: exit pid=%d err=%v lived=%dms", p.Cmd.Process.Pid, err, time.Since(p.startedAt).Milliseconds())
+	}
 }
 
 // stderrTail keeps the last few lines the child wrote. Bounded: a chatty child must not grow the

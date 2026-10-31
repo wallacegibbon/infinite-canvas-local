@@ -9,7 +9,7 @@ import { isGatewayImageModel, requestEdit, requestGeneration } from "@/services/
 import { requestPromptChat } from "@/services/api/prompts";
 import { downloadRunOutput, downloadRunOutputs, waitForRun, type Run, type RunProgress } from "@/services/api/runs";
 import { isVideoTaskFailed } from "@/services/api/video";
-import { promptEndpointReady, resolveModelRequestConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { resolveModelRequestConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { readFileAsDataUrl } from "@/lib/image-utils";
 import { uploadImage } from "@/services/image-storage";
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
@@ -618,9 +618,9 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                           count: "1",
                       }
                     : { ...buildGenerationConfig(effectiveConfig, sourceNode, node.type === CanvasNodeType.Text ? "text" : node.type === CanvasNodeType.Video ? "video" : node.type === CanvasNodeType.Audio ? "audio" : "image"), count: "1" };
-            // A text node retries against the prompt endpoint, not against a workflow.
-            if (node.type === CanvasNodeType.Text ? !promptEndpointReady(generationConfig) : !isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true, node.type === CanvasNodeType.Text ? "prompt-api" : undefined);
+            // A text node retries against the agent, which needs no configuration here.
+            if (node.type !== CanvasNodeType.Text && !isAiConfigReady(generationConfig, generationConfig.model)) {
+                openConfigDialog(true);
                 return;
             }
 

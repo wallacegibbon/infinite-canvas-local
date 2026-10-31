@@ -19,7 +19,6 @@ import (
 	"comfyui-gateway/internal/generate"
 	"comfyui-gateway/internal/httpx"
 	"comfyui-gateway/internal/logx"
-	"comfyui-gateway/internal/prompt"
 	"comfyui-gateway/internal/resource"
 	"comfyui-gateway/internal/setup"
 	"comfyui-gateway/internal/store"
@@ -47,7 +46,6 @@ type Server struct {
 	uploads    *upload.Store
 	setup      *setup.Manager
 	resources  *resource.Manager
-	optimizer  *prompt.Optimizer
 
 	requests sync.Map // request id -> context.CancelFunc
 
@@ -148,10 +146,7 @@ func New(cfg *config.Config, logger *logx.Logger) (*Server, error) {
 		uploads:    uploads,
 		setup:      setupManager,
 		resources:  resources,
-		optimizer: prompt.NewOptimizer(cfg.RootDir, logger).
-			WithThinkingParam(cfg.PromptThinkingParam).
-			WithMaxTokens(cfg.PromptMaxTokens),
-		startedAt: time.Now(),
+		startedAt:  time.Now(),
 	}
 
 	if cfg.ScanOnStart {

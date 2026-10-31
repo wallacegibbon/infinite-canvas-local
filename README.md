@@ -24,7 +24,7 @@ Maintained here: the workflow graphs and `registry.json`, the resource index and
 - **Video**: MiniMax-H3 text-to-video, first/last-frame and multi-reference, with sampling preview and LoRA cards.
 - **Upscaling**: ESRGAN, SeedVR2 for images and video.
 - **Local plugins**: LoRA strength card, ComfyUI parameter card.
-- **Prompt optimization**: optional, points at any local or remote OpenAI-compatible endpoint — see [`docs/local-llm.md`](docs/local-llm.md).
+- **Prompts come from AlayaCore**: one `alayacore --rawio` process per request, its frames relayed to the canvas; the model, the skills and the wording are the agent's.
 - **System panel**: VRAM / RAM / GPU / ComfyUI status, one-click VRAM release.
 - **Local-only by construction**: there is no cloud mode and no flag to re-enable one. The image/video/prompt workbenches, cloud model channels and the prompt library are deleted, not hidden; the prompt optimizer's "prompt API" tab stays, because it accepts any OpenAI-compatible endpoint including `127.0.0.1`.
 
@@ -132,11 +132,10 @@ Four processes, all calls one-directional; the browser only talks to the gateway
 | Canvas frontend | `3000` | Prebuilt static pages (`vite preview`) | `./start.sh` |
 | Gateway | `8190` | Go static binary that runs ComfyUI workflows through its own run protocol | `./start.sh` |
 | ComfyUI | `8188` | Python, does the actual image / video work | You, wherever it runs — nothing here starts it |
-| llama-server | `8099` | Optional, the model behind prompt optimization | You, see [`docs/local-llm.md`](docs/local-llm.md) |
+| alayacore | *(spawned per request)* | The agent that answers prompts | The ecosystem's own install |
 
 ```text
 browser ─→ :8190 gateway ─┬─→ :8188 ComfyUI      images / videos
-                          └─→ :8099 llama-server  prompt optimization (optional)
 ```
 
 The frontend sources contain no reference to `8188`; the canvas never bypasses the gateway.
@@ -149,8 +148,7 @@ gateway process and one canvas process.
 
 **The gateway serves no `/v1/...` at all.** It has its own protocol — `POST /api/runs` produces every
 kind of media, `GET /api/workflows` describes what can run — and OpenAI's paths are not among its
-endpoints. `/v1/...` in this repository belongs to llama-server, which the prompt optimizer optionally
-calls.
+endpoints. `/v1/...` in this repository belongs to the model provider AlayaCore talks to.
 
 **Gateway `:8190` endpoints:**
 
@@ -158,7 +156,7 @@ calls.
 |---|---|
 | `/api/runs`, `/api/uploads` | Produce media (submit, poll, download, cancel) and stage its inputs |
 | `/api/workflows/*`, `/api/setup/*` | Workflow metadata, schemas, ComfyUI scanning |
-| `/api/prompts/{optimize,optimize-image,caption,chat}` | Prompt optimization, image captioning, plain chat |
+| `/api/agent/chat` | Prompts: one request in, the agent's frames out as SSE |
 | `/api/resources/*` | Download models, install custom nodes |
 | `/api/system/*`, `/api/loras`, `/api/tasks`, `/files/:name`, `/health` | System status and artifacts |
 
@@ -168,21 +166,20 @@ these, the canvas never sees them:
 `POST /prompt`, `GET /history/:id`, `GET /view`, `POST /upload/image`, `GET /object_info`,
 `GET /internal/folder_paths`, `GET /system_stats`, `POST /free`, `POST /interrupt`, `/queue`
 
-**llama-server `:8099` endpoints** — only the `cloud` mode of `/api/prompts/*` calls these:
-
-`POST /v1/chat/completions`, `GET /v1/models`, `GET /health`
+**AlayaCore** — spawned by the gateway, one process per prompt request
+(`alayacore --rawio --builtin-tools=read_file --skill <container> --config-path <dir>`), speaking its
+own frame protocol on stdin/stdout. Its model list, model choice and skills are its own
+`model.conf`; the gateway names the directory and never reads it.
 
 > ⚠️ A gateway "model" **is** a workflow: `image-z-image-turbo`, `video-h3-t2v`, and one id per
-> installed base model. They come from `GET /api/workflows`, not from a model endpoint of their own.
-> `GET /v1/models` on `:8099` is llama-server's and lists the **weights actually loaded** — nothing to
-> do with the workflow list.
+> installed base model. They come from `GET /api/workflows`. A **prompt** model is a different thing
+> and belongs to the agent — the two lists have nothing to do with each other.
 
 ## Documentation
 
 - [`docs/gateway.md`](docs/gateway.md): gateway endpoints, environment variables, architecture and language policy.
 - [`docs/decisions.md`](docs/decisions.md): why the code looks the way it does — one entry per decision, with its cost.
 - [`docs/known-issues.md`](docs/known-issues.md): verified open problems and the command that fixes each.
-- [`docs/local-llm.md`](docs/local-llm.md): prompt optimization / image captioning with a local llama.cpp (arguments, verification commands, pitfalls).
 - [`docs/runtime-deps.md`](docs/runtime-deps.md): SageAttention / SeedVR2 and other runtimes must be installed with `pip` by hand (the workbench no longer does it).
 - [`tools/bake-moss-preset.py`](tools/bake-moss-preset.py): bakes MOSS Base+SFT into `moss_balanced_s100.safetensors` — the `builder` behind the `type: "bake"` entry in the resource index; run it with ComfyUI's Python (it imports torch).
 

@@ -26,11 +26,9 @@ type Config struct {
 	GatewayPort int
 	GatewayHost string
 
-	ComfyURL            string
-	InstallIntoComfy    bool // INSTALL_INTO_COMFY=1; installs are refused without it (internal/resource/install_policy.go)
-	PromptThinkingParam string
-	PromptMaxTokens     int
-	ComfyFrontendDir    string
+	ComfyURL         string
+	InstallIntoComfy bool // INSTALL_INTO_COMFY=1; installs are refused without it (internal/resource/install_policy.go)
+	ComfyFrontendDir string
 
 	ScanOnStart bool
 
@@ -116,15 +114,13 @@ func Load(opts ...Option) (*Config, error) {
 	root := resolveRootDir()
 
 	cfg := &Config{
-		RootDir:             root,
-		GatewayPort:         intValue(os.Getenv("GATEWAY_PORT"), 8190),
-		GatewayHost:         stringOr(os.Getenv("GATEWAY_HOST"), "127.0.0.1"),
-		ComfyURL:            stringOr(os.Getenv("COMFY_URL"), "http://127.0.0.1:8188"),
-		InstallIntoComfy:    boolValue(os.Getenv("INSTALL_INTO_COMFY")),
-		PromptThinkingParam: stringOr(os.Getenv("PROMPT_THINKING_PARAM"), "none"),
-		PromptMaxTokens:     intValue(os.Getenv("PROMPT_MAX_TOKENS"), 8192),
-		ComfyFrontendDir:    strings.TrimSpace(os.Getenv("COMFY_FRONTEND_DIR")),
-		ScanOnStart:         os.Getenv("SCAN_ON_START") != "0",
+		RootDir:          root,
+		GatewayPort:      intValue(os.Getenv("GATEWAY_PORT"), 8190),
+		GatewayHost:      stringOr(os.Getenv("GATEWAY_HOST"), "127.0.0.1"),
+		ComfyURL:         stringOr(os.Getenv("COMFY_URL"), "http://127.0.0.1:8188"),
+		InstallIntoComfy: boolValue(os.Getenv("INSTALL_INTO_COMFY")),
+		ComfyFrontendDir: strings.TrimSpace(os.Getenv("COMFY_FRONTEND_DIR")),
+		ScanOnStart:      os.Getenv("SCAN_ON_START") != "0",
 		CorsOrigins: listValue(os.Getenv("CORS_ORIGINS"),
 			"http://localhost:3000,http://127.0.0.1:3000,http://localhost:8188,http://127.0.0.1:8188"),
 		RequestTimeoutMs:    intValue(os.Getenv("REQUEST_TIMEOUT_MS"), 10*60*1000),

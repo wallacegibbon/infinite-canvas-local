@@ -112,3 +112,15 @@ func TestReadFrameEndsTheStreamOnAMalformedLine(t *testing.T) {
 		})
 	}
 }
+
+// The transcript is worth keeping; the credentials a frame carries are not.
+func TestRedactKeysKeepsTheShape(t *testing.T) {
+	frame := `{"models":[{"id":1,"api_key":"sk-secret","name":"A"}],"api_key":"no-key-by-default"}`
+	got := redactKeys(frame)
+	if strings.Contains(got, "sk-secret") || strings.Contains(got, "no-key-by-default") {
+		t.Errorf("a key survived redaction: %s", got)
+	}
+	if !strings.Contains(got, `"api_key":"***"`) {
+		t.Errorf("the field was lost: %s", got)
+	}
+}

@@ -2617,3 +2617,33 @@ step, and the agent gains read access), or (b) `--system` assembled by the gatew
 must write through the agent's command plane (`CI model_sync` with the model array, `CI model_set` to
 switch) rather than parsing `model.conf` from Go: the file format (`protocol_type`, `reasoning_0/1/2`,
 …) belongs to AlayaCore, and going through the agent is what keeps it there.
+
+## 76. The prompt recipes are deleted; the agent route is the only one
+
+**Decision** The four `/api/prompts/*` routes, `internal/prompt`'s chat client and its recipes (the H3
+skill assembly, the two sanitisers, speaker tags, frame alignment), the prompt-endpoint settings in the
+canvas and the model/key/base-URL fields they carried are gone. What replaced them is `#75`'s one route:
+`POST /api/agent/chat`, a prompt and/or one of AlayaCore's commands in, its frames out.
+
+**Why** They had had no caller since the canvas moved to the agent, and their whole job — writing the
+wording, choosing the model, cleaning the answer — is the agent's now. Keeping them was keeping a second
+backend, a second configuration story (a base URL and a key in the browser) and 900 lines that could
+drift from the skill they duplicated.
+
+**What went with them, and where it went instead** The H3 wording was already a shipped Agent Skill
+(`prompts/skills/h3-prompt-writing/`), so it stays exactly where it was and the agent loads it with
+`read_file` — the one tool the spawn enables. The canvas now says "rewrite this into a MiniMax H3
+prompt, task type …, duration …" and nothing else. `promptOptimizeLanguage` survived: the instruction
+still has to say which language to answer in.
+
+**Logging, because the transcript is the API** Every agent operation writes a line a reader who knows
+AlayaCore can follow: the request (`command`, `args`, the prompt's head, how many images), the spawn
+(pid, binary, config dir, skills container, tools), **every frame in both directions** (`agent >> UX`,
+`agent << SM`, … with the value truncated at 400 runes), the release (exit, stderr's last line, how long
+it lived), and a closing count per event type. `api_key` values are redacted: `SM model_list` carries
+every key from `model.conf`, and a transcript is worth having without them.
+
+**Tested** `make check` (14 packages), `npx vitest run` (121), `npm run check`. Against the real agent:
+a prompt streamed `models`/`reasoning`/`delta`/`done` with the frame log, a command-only request changed
+the reasoning level and logged its `CI`/`CO` pair, and the browser generated text, switched models and
+optimised an image prompt through the one route.

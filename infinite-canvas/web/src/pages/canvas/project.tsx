@@ -10,7 +10,7 @@ import { toast } from "@/components/kit/toast";
 import { requestEdit, requestGeneration } from "@/services/api/image";
 import { bindStepProgress, unbindStepProgress } from "@/services/api/step-progress";
 import { createVideoGenerationTask, isVideoTaskFailed, storeGeneratedVideo, waitForVideoGenerationTask, type VideoPreview } from "@/services/api/video";
-import { promptEndpointReady, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { ensureImagePreview, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { nanoid } from "nanoid";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
@@ -2027,9 +2027,9 @@ function InfiniteCanvasPage() {
         async (nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => {
             const sourceNode = nodesRef.current.find((node) => node.id === nodeId);
             const generationConfig = buildGenerationConfig(effectiveConfig, sourceNode, mode);
-            // Text is answered by the prompt endpoint, so that is the setting to send the user to.
-            if (mode === "text" ? !promptEndpointReady(generationConfig) : !isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true, mode === "text" ? "prompt-api" : undefined);
+            // Text is answered by the agent, which needs nothing configured here; media needs a workflow.
+            if (mode !== "text" && !isAiConfigReady(generationConfig, generationConfig.model)) {
+                openConfigDialog(true);
                 return;
             }
 

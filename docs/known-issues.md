@@ -91,13 +91,14 @@ reintroducing 10/12-bit or H.265, but it cannot cover already-written files.
 prompt still comes back in English.
 
 **Cause** Not diagnosed. It was observed with a local `qwen3.8-27b` endpoint with thinking
-disabled (`PROMPT_THINKING_PARAM=none`), so the instruction is being sent but is not being
+disabled (thinking disabled in the model's `model.conf`), so the instruction is being sent but is not being
 followed — either the model ignores it or the system prompt in
 `prompts/skills/h3-prompt-writing/` does not carry enough weight.
 
-**Next step** Reproduce with the same prompt through `curl /api/prompts/optimize`, compare the
-raw completion against the system prompt, and decide whether the fix belongs in the skill
-files (stronger instruction) or in `internal/prompt`.
+**Next step** Reproduce through `/api/agent/chat` and read the frame log (`agent << SM`,
+`agent >> UX`): the instruction is in the prompt, so either the model ignores it or the H3 skill in
+`prompts/skills/h3-prompt-writing/` does not carry enough weight. The fix belongs in the skill, which is
+the agent's to load.
 
 ---
 

@@ -92,8 +92,8 @@ gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a *diffe
 | `MAX_STORED_TASKS` | `0` | Cap on stored tasks; `0` is unlimited. |
 | `MAX_UPLOAD_BYTES` | `52428800` | Per-file upload limit. |
 | `RESOURCE_CONCURRENCY` | `2` | Parallel downloads during a resource install. |
-| `PROMPT_MAX_TOKENS` | `8192` | Completion budget for `/api/prompts/*`. Must cover reasoning plus the answer on a thinking model. |
-| `PROMPT_THINKING_PARAM` | `none` | `none` sends only standard OpenAI fields. `auto` learns per endpoint. Or pin `chat_template_kwargs` / `enable_thinking` / `reasoning_effort`. |
+| `ALAYACORE_BIN` | *(found)* | The agent binary. Empty looks on `PATH`, then beside the gateway. |
+| `AGENT_CONFIG_PATH` | `UserConfigDir()/comfyui-gateway/alayacore` | The agent's own config directory (`model.conf`, …). The gateway names it and never reads or writes it; AlayaCore creates it on first spawn. |
 
 ### The gateway runs beside ComfyUI
 
@@ -170,23 +170,18 @@ same contract as typed `inputs`, which is what `POST /api/runs` validates a requ
 
 ## Endpoints
 
-The prompt services are the only generation-adjacent routes left; every kind of media is produced by
-`POST /api/runs` below.
+Prompts are the agent's, not the gateway's: one route carries what the canvas wants asked and streams
+back what AlayaCore says. The gateway owns no wording, no model choice and no state — see
+[`decisions.md`](decisions.md) #75 for why, and AlayaCore's own `adapter-guide` for the frames.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/prompts/optimize` | Rewrite a prompt for H3 video. |
-| `POST` | `/api/prompts/optimize-image` | Rewrite a prompt for image generation. |
-| `POST` | `/api/prompts/caption` | Reverse-engineer a prompt from an image. |
-| `POST` | `/api/prompts/chat` | Ask the configured model for words. |
+| `POST` | `/api/agent/chat` | Write one request to an agent process and stream its frames back. |
 
-All four take the endpoint's address, key and model in the request
-(`promptBaseUrl` / `promptApiKey` / `promptModel`): they are browser settings, not gateway configuration,
-and the browser never contacts the model itself. Three of them carry wording of their own (a skill, a
-template, a caption instruction). `/api/prompts/chat` does not — the caller supplies the `prompt` and,
-optionally, a `system` message and images as form files — which is what makes it usable by anything in
-the canvas that needs an answer rather than a picture. It answers once, in JSON: there is no streaming,
-and one request produces one text.
+`POST /api/agent/chat` takes `prompt` (and images), or `command` + `args` (one of AlayaCore's own
+commands, forwarded verbatim), or both, and answers with an event stream: `models`, `delta`,
+`reasoning`, `model`, `reasoning_level`, `command`, `done`, `error`. Every request spawns one
+`alayacore --rawio` process and releases it when the answer ends.
 
 A music graph needs two texts, and both are ordinary `registry.json` bindings (`prompt`, `lyrics`), so
 a run carries them as inputs like any other parameter. `response_format`-style container selection is
@@ -229,24 +224,12 @@ endpoint to show one.
 `loras` is the one input the engine applies itself rather than a binding. Everything else a run
 carries reaches a node.
 
-### Prompt endpoints and thinking models
+### Prompt models are the agent's
 
-`/api/prompts/*` rewrites text, so a chain of thought is pure overhead — and one
-specific failure. A thinking model writes its reasoning to `reasoning_content` and
-only starts `content` when it finishes; if `max_tokens` runs out first, the answer is
-empty. Measured against Qwen3.8-27B on the real H3 rewrite: ~900 reasoning tokens
-typically, with a long tail, ~8 s with thinking off and ~19 s with it on.
-
-Two independent levers, both optional:
-
-- `PROMPT_MAX_TOKENS` (default 8192) is the safety net. It is a standard field, so it
-  works everywhere; too small and the answer never starts.
-- `PROMPT_THINKING_PARAM` shortens the call by asking for a direct answer. Its values
-  are **not** part of the OpenAI API — `chat_template_kwargs` is vLLM/SGLang,
-  `enable_thinking` is the llama.cpp/Qwen convention — so the default is `none` and no
-  vendor field is ever sent. `auto` sends nothing until an endpoint proves it is a
-  thinking model, then remembers the working mechanism per endpoint and retries a
-  rejected field once without it.
+The gateway has no prompt model of its own: `/api/agent/chat` spawns AlayaCore, and every question
+about models — which exist, which is active, how hard it should think — is answered by the agent's own
+`model.conf` and its `reasoning_0/1/2` blocks. Nothing here configures a provider, negotiates a
+thinking parameter or retries a rejected field: AlayaCore does, and the gateway relays what it says.
 
 ## Architecture
 

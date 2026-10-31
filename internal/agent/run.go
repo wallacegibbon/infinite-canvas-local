@@ -49,7 +49,7 @@ func Run(ctx context.Context, opts SpawnOptions, req Request, emit func(Event)) 
 		}
 
 		for {
-			frame, err := ReadFrame(proc.Stdout)
+			frame, err := proc.Read()
 			if err != nil || frame == nil {
 				return finish(answer.String(), started, emit)
 			}

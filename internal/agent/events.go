@@ -195,7 +195,7 @@ func withAgent(ctx context.Context, opts SpawnOptions, body func(*Process, *star
 // onReady. Everything before that is the agent's own startup broadcast.
 func waitReady(proc *Process, state *startup, emit func(Event), onReady func() error) error {
 	for {
-		frame, err := ReadFrame(proc.Stdout)
+		frame, err := proc.Read()
 		if err != nil || frame == nil {
 			return nil
 		}
