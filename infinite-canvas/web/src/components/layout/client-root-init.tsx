@@ -1,40 +1,17 @@
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
-import { useTranslation } from "react-i18next";
 
-import { toast } from "@/components/kit/toast";
-import { useConfigStore } from "@/stores/use-config-store";
 import { useLocalGatewaySync } from "@/hooks/use-local-gateway-sync";
 import { useSkinUnlockPersistence } from "@/hooks/use-skin-unlock-persistence";
 
+/**
+ * The two things that have to run once, before the canvas is usable.
+ *
+ * It used to also read `?baseUrl=&apiKey=` from the address bar to import a channel. There is one
+ * channel and its address is the page's own gateway (docs/decisions.md #71), so there is nothing left
+ * to import.
+ */
 export function ClientRootInit({ children }: { children: ReactNode }) {
-    const { t } = useTranslation();
-    const handledConfigParams = useRef(false);
-    const importChannelCredentials = useConfigStore((state) => state.importChannelCredentials);
-    const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
-
     useLocalGatewaySync();
     useSkinUnlockPersistence();
-
-    useEffect(() => {
-        if (handledConfigParams.current) return;
-        const searchParams = new URLSearchParams(window.location.search);
-        const baseUrl = searchParams.get("baseUrl") || searchParams.get("baseurl");
-        const apiKey = searchParams.get("apiKey") || searchParams.get("apikey");
-        if (!baseUrl && !apiKey) return;
-        handledConfigParams.current = true;
-        searchParams.delete("baseUrl");
-        searchParams.delete("baseurl");
-        searchParams.delete("apiKey");
-        searchParams.delete("apikey");
-        window.history.replaceState(null, "", `${window.location.pathname}${searchParams.size ? `?${searchParams}` : ""}${window.location.hash}`);
-        const result = importChannelCredentials({ baseUrl, apiKey });
-        openConfigDialog(false, "channels");
-        if (result.status === "created") toast.success(t("config.importedChannelCreated", { name: result.channelName }));
-        else if (result.status === "updated") toast.success(t("config.importedChannelUpdated", { name: result.channelName }));
-        else if (result.status === "missing-base-url") toast.error(t("config.importedChannelBaseUrlRequired"));
-        else toast.error(t("config.importedChannelBaseUrlInvalid"));
-    }, [importChannelCredentials, openConfigDialog, t]);
-
     return <>{children}</>;
 }

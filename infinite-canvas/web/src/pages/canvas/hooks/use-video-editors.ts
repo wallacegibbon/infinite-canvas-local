@@ -63,9 +63,7 @@ export function useVideoEditors(deps: NodeEditorDeps) {
                     { scale: params.scale, resolution: params.resolution, fps: params.fps },
                     { signal: controller.signal },
                 );
-                setNodes((prev) =>
-                    prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, videoTaskId: task.id, videoTaskProvider: task.provider, model: task.model, params: { scale: params.scale, resolution: params.resolution } } } : item)),
-                );
+                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, videoTaskId: task.id, model: task.model, params: { scale: params.scale, resolution: params.resolution } } } : item)));
                 const video = await storeGeneratedVideo(await waitForVideoGenerationTask(effectiveConfig, task, { signal: controller.signal }));
                 setNodes((prev) =>
                     prev.map((item) =>
@@ -133,7 +131,7 @@ export function useVideoEditors(deps: NodeEditorDeps) {
                     { multiplier: 2 },
                     { signal: controller.signal },
                 );
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, videoTaskId: task.id, videoTaskProvider: task.provider, model: "video-rife", params: { multiplier: 2 } } } : item)));
+                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, videoTaskId: task.id, model: "video-rife", params: { multiplier: 2 } } } : item)));
                 const video = await storeGeneratedVideo(await waitForVideoGenerationTask(effectiveConfig, task, { signal: controller.signal }));
                 setNodes((prev) =>
                     prev.map((item) =>

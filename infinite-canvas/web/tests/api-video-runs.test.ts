@@ -25,7 +25,7 @@ vi.mock("@/services/file-storage", () => ({
     uploadMediaFile: async () => ({ url: "", storageKey: "", bytes: 0, mimeType: "video/mp4" }),
 }));
 
-const { createVideoGenerationTask, createVideoInterpolateTask, createVideoUpscaleTask, isGatewayVideoModel, videoTaskProviderOf, waitForVideoGenerationTask } = await import("@/services/api/video");
+const { createVideoGenerationTask, createVideoInterpolateTask, createVideoUpscaleTask, waitForVideoGenerationTask } = await import("@/services/api/video");
 
 type Config = Parameters<typeof createVideoGenerationTask>[0];
 const gateway = (overrides: Record<string, unknown> = {}) =>
@@ -92,24 +92,12 @@ beforeEach(() => {
     vi.unstubAllGlobals();
 });
 
-describe("isGatewayVideoModel", () => {
-    it("is decided by the channel, not by the model's name", () => {
-        expect(isGatewayVideoModel({ baseUrl: "http://127.0.0.1:8190/v1", model: "video-h3-frames" })).toBe(true);
-        expect(isGatewayVideoModel({ baseUrl: "http://127.0.0.1:8190/v1", model: "local-gateway::video-h3-t2v" })).toBe(true);
-        // A workflow id has no fixed prefix: a base-model variant is `img-zit-int8`. Requiring one
-        // sent such a selection to a `/v1` route that no longer exists.
-        expect(isGatewayVideoModel({ baseUrl: "http://127.0.0.1:8190/v1", model: "img-zit-int8" })).toBe(true);
-        expect(isGatewayVideoModel({ baseUrl: "https://api.example.com/v1", model: "video-h3-frames" })).toBe(false);
-    });
-});
-
 describe("createVideoGenerationTask", () => {
     it("submits one run with the frame uploaded by role", async () => {
         const { calls } = stubGateway({});
 
         const task = await createVideoGenerationTask(gateway(), "a cat walks", [image("first.png")]);
 
-        expect(task.provider).toBe("run");
         expect(task.id).toBe("task_video_1");
         const body = runBody(calls);
         expect(body.workflow).toBe("video-h3-frames");
@@ -173,7 +161,7 @@ describe("createVideoUpscaleTask", () => {
 
         const task = await createVideoUpscaleTask(gateway(), { name: "clip.mp4", type: "video/mp4", storageKey: "k1" }, { scale: 2, resolution: 1104, fps: 24, seed: 7, batchSize: 5 });
 
-        expect(task).toMatchObject({ provider: "run", model: "video-seedvr2-upscale" });
+        expect(task).toMatchObject({ model: "video-seedvr2-upscale" });
         const body = runBody(calls);
         expect(body.workflow).toBe("video-seedvr2-upscale");
         expect(body.media).toEqual({ video: "upl_video" });
@@ -192,7 +180,7 @@ describe("createVideoInterpolateTask", () => {
 
         const task = await createVideoInterpolateTask(gateway(), { name: "clip.mp4", type: "video/mp4", storageKey: "k1" }, { multiplier: 2 });
 
-        expect(task).toMatchObject({ provider: "run", model: "video-rife" });
+        expect(task).toMatchObject({ model: "video-rife" });
         const body = runBody(calls);
         expect(body.workflow).toBe("video-rife");
         expect(body.inputs).toEqual({ multiplier: 2 });
@@ -259,14 +247,5 @@ describe("waitForVideoGenerationTask", () => {
 
         await expect(watching).rejects.toMatchObject({ name: "AbortError" });
         expect(calls.some((call) => call.method === "DELETE")).toBe(false);
-    });
-});
-
-describe("videoTaskProviderOf", () => {
-    it("keeps the stored provider and defaults to the /v1 contract", () => {
-        expect(videoTaskProviderOf("run")).toBe("run");
-        expect(videoTaskProviderOf("gemini")).toBe("gemini");
-        expect(videoTaskProviderOf("openai")).toBe("openai");
-        expect(videoTaskProviderOf(undefined)).toBe("openai");
     });
 });

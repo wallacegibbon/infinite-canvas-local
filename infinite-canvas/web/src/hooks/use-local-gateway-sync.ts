@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL } from "@/constant/app-mode";
-import { gatewayModels, modelSignature } from "@/lib/gateway-models";
+import { gatewayModels, modelSignature, pickModelOption } from "@/lib/gateway-models";
 import { markGatewayUp, noteGatewayError } from "@/services/api/gateway-status";
 import { requestWorkflows } from "@/services/api/workflows";
 import { encodeChannelModel, modelOptionsFromChannels, useConfigStore, type ChannelModel, type ModelCapability } from "@/stores/use-config-store";
@@ -32,18 +32,17 @@ export function useLocalGatewaySync() {
 
             const channels = config.channels.map((item) => (item.id === channel.id ? { ...item, apiKey: item.apiKey || "local", baseUrl: LOCAL_GATEWAY_BASE_URL, models: nextModels } : item));
             const optionsFor = (capability: ModelCapability) => channels.flatMap((item) => item.models.filter((model) => model.capability === capability).map((model) => encodeChannelModel(item.id, model.name)));
-            const pick = (current: string, options: string[]) => (options.includes(current) ? current : options[0] || "");
             const imageOptions = optionsFor("image");
             useConfigStore.setState({
                 config: {
                     ...config,
                     channels,
                     models: modelOptionsFromChannels(channels),
-                    imageModel: pick(config.imageModel, imageOptions),
-                    videoModel: pick(config.videoModel, optionsFor("video")),
-                    audioModel: pick(config.audioModel, optionsFor("audio")),
+                    imageModel: pickModelOption("image", config.imageModel, imageOptions),
+                    videoModel: pickModelOption("video", config.videoModel, optionsFor("video")),
+                    audioModel: pickModelOption("audio", config.audioModel, optionsFor("audio")),
                     // The image model is also the general one: text-to-image is the default action.
-                    model: pick(config.model, imageOptions),
+                    model: pickModelOption("image", config.model, imageOptions),
                     baseUrl: LOCAL_GATEWAY_BASE_URL,
                     apiKey: channel.apiKey || "local",
                 },

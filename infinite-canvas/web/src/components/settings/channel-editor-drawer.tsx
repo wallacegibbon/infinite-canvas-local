@@ -1,4 +1,4 @@
-import { ListPlus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,14 +7,20 @@ import { Space } from "@/components/kit/display";
 import { Drawer } from "@/components/kit/drawer";
 import { Input } from "@/components/kit/input";
 import { Segmented } from "@/components/kit/segmented";
-import { channelName, guessCapability, normalizeChannelModels, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
-import { ModelSelectModal } from "./model-select-modal";
+import { channelName, normalizeChannelModels, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 
+/**
+ * Rename the gateway channel, and override a model's media kind.
+ *
+ * There is nothing else to edit: the channel is the local gateway, its address comes from the page
+ * (docs/decisions.md #71), and its model list is whatever `GET /api/workflows` reports. The one thing
+ * worth keeping is the capability override — the sync preserves a value the user set here, so a
+ * workflow whose `type` is not what you want it to be can be re-tagged without editing the registry.
+ */
 export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: boolean; channel: ModelChannel | null; onSave: (channel: ModelChannel) => void; onClose: () => void }) {
     const { t } = useTranslation();
     const [draft, setDraft] = useState<ModelChannel | null>(channel);
-    const [selectOpen, setSelectOpen] = useState(false);
-    const capabilityOptions: Array<{ label: string; value: ModelCapability }> = (["image", "video"] as ModelCapability[]).map((value) => ({ label: t(`config.channelEditor.capabilities.${value}`), value }));
+    const capabilityOptions: Array<{ label: string; value: ModelCapability }> = (["image", "video", "audio"] as ModelCapability[]).map((value) => ({ label: t(`config.channelEditor.capabilities.${value}`), value }));
 
     useEffect(() => {
         if (open && channel) setDraft(channel);
@@ -26,12 +32,6 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
     const patch = (value: Partial<ModelChannel>) => setDraft((current) => (current ? { ...current, ...value, ...(value.name !== undefined ? { nameKey: undefined } : {}) } : current));
     const setModels = (models: ChannelModel[]) => patch({ models });
 
-    const applySelection = (names: string[]) => {
-        const map = new Map(draft.models.map((model) => [model.name, model]));
-        const next = names.map((name) => map.get(name) || { name, capability: guessCapability(name) });
-        setModels(next.filter((model) => model.capability === "image" || model.capability === "video"));
-    };
-
     const setCapability = (name: string, capability: ModelCapability) => setModels(draft.models.map((model) => (model.name === name ? { ...model, capability } : model)));
     const removeModel = (name: string) => setModels(draft.models.filter((model) => model.name !== name));
 
@@ -39,7 +39,6 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
         onSave({
             ...draft,
             name: draft.name.trim() || t("config.channels.unnamed"),
-            apiFormat: "openai",
             apiKey: "local",
             models: normalizeChannelModels(draft.models),
         });
@@ -71,20 +70,15 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
                     <span className="mb-1 block text-sm font-medium">{t("config.channelEditor.protocol")}</span>
                     <div className="flex h-8 items-center text-sm text-stone-500">{t("config.channelEditor.localProtocol")}</div>
                 </div>
-                <label className="block md:col-span-2">
+                <div className="block md:col-span-2">
                     <span className="mb-1 block text-sm font-medium">{t("config.channelEditor.baseUrl")}</span>
-                    <Input value={draft.baseUrl} onChange={(event) => patch({ baseUrl: event.target.value })} placeholder="https://api.example.com" />
-                </label>
+                    <div className="flex h-8 items-center font-mono text-sm text-stone-500">{draft.baseUrl}</div>
+                </div>
             </div>
 
-            <div className="mt-6 mb-3 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                    <div className="text-sm font-semibold">{t("config.channelEditor.models")}</div>
-                    <div className="mt-0.5 text-xs text-stone-500">{t("config.channelEditor.localModelDescription", { count: draft.models.length })}</div>
-                </div>
-                <Button type="primary" icon={<ListPlus className="size-4" />} onClick={() => setSelectOpen(true)}>
-                    {t("config.channelEditor.selectModels")}
-                </Button>
+            <div className="mt-6 mb-3">
+                <div className="text-sm font-semibold">{t("config.channelEditor.models")}</div>
+                <div className="mt-0.5 text-xs text-stone-500">{t("config.channelEditor.localModelDescription", { count: draft.models.length })}</div>
             </div>
 
             <div className="space-y-2 rounded-lg border border-stone-200 p-2 dark:border-stone-800">
@@ -104,8 +98,6 @@ export function ChannelEditorDrawer({ open, channel, onSave, onClose }: { open: 
                     <div className="px-2 py-8 text-center text-sm text-stone-500">{t("config.channelEditor.empty")}</div>
                 )}
             </div>
-
-            <ModelSelectModal open={selectOpen} channel={draft} selectedNames={draft.models.map((model) => model.name)} onConfirm={applySelection} onClose={() => setSelectOpen(false)} />
         </Drawer>
     );
 }

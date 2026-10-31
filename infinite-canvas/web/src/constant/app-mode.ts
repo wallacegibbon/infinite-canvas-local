@@ -27,24 +27,10 @@ export const LOCAL_GATEWAY_ORIGIN = (() => {
 })();
 export const LOCAL_GATEWAY_CHANNEL_ID = "local-gateway";
 
-export const LOCAL_GATEWAY_MODELS = [
-    { name: "image-z-image-turbo", capability: "image" as const, imageInputs: 0 },
-    { name: "image-krea2-turbo", capability: "image" as const, imageInputs: 0 },
-    { name: "image-qwen21", capability: "image" as const, imageInputs: 4 },
-    { name: "image-moss-sft-8step", capability: "image" as const, imageInputs: 0 },
-    { name: "image-moss-sft-50step", capability: "image" as const, imageInputs: 0 },
-    { name: "video-h3-t2v", capability: "video" as const, imageInputs: 0 },
-    { name: "video-h3-frames", capability: "video" as const, imageInputs: 2 },
-    { name: "video-h3-fast", capability: "video" as const, imageInputs: 2 },
-    { name: "video-h3-ref2va", capability: "video" as const, imageInputs: 6 },
-    { name: "video-h3-character-swap", capability: "video" as const, imageInputs: 6 },
-    { name: "video-h3-t2v-novdn", capability: "video" as const, imageInputs: 0 },
-    { name: "video-h3-frames-novdn", capability: "video" as const, imageInputs: 2 },
-    { name: "video-h3-ref2va-novdn", capability: "video" as const, imageInputs: 6 },
-    { name: "audio-minimax-music-3", capability: "audio" as const, imageInputs: 0 },
-];
-
-export const LOCAL_GATEWAY_MODEL_VALUES = LOCAL_GATEWAY_MODELS.map((model) => `${LOCAL_GATEWAY_CHANNEL_ID}::${model.name}`);
+// There is no hardcoded model list. A model is a workflow, and the gateway reports which ones it has
+// (`GET /api/workflows`); a list in the bundle drifted from the registry every time a workflow was
+// added or removed — it still named two that no longer exist. The channel starts empty and the sync
+// fills it (hooks/use-local-gateway-sync.ts).
 
 export function isLocalGatewayUrl(url: string) {
     try {

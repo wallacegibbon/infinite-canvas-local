@@ -46,3 +46,27 @@ export function gatewayModels(workflows: GatewayWorkflow[]) {
 export function modelSignature(models: ChannelModel[]) {
     return JSON.stringify(models.map((model) => [model.name, model.capability, model.label || "", model.workflowId || "", model.baseModel || "", model.baseModelLabel || "", model.imageInputs ?? -1, model.variantModes || [], model.variantLabels || {}]));
 }
+
+/**
+ * Which workflow a fresh canvas starts on, per media kind.
+ *
+ * Not a model list — the gateway still decides what exists. This is the same kind of choice as
+ * `tool-workflows.ts`: the canvas is the only client, so which of several available workflows is the
+ * sensible starting point is ours. The gateway's order is alphabetical, which puts
+ * `video-h3-character-swap` first — a workflow that needs a source clip and a reference image, a poor
+ * answer to "make me a video". A preferred id the gateway does not offer is ignored, so removing or
+ * renaming a workflow cannot leave the canvas pointing at nothing.
+ */
+const PREFERRED_WORKFLOW: Partial<Record<ModelCapability, string>> = {
+    image: "image-z-image-turbo",
+    video: "video-h3-t2v",
+    audio: "audio-minimax-music-3",
+};
+
+/** The option to keep: the current one, else the preferred workflow, else whatever comes first. */
+export function pickModelOption(capability: ModelCapability, current: string, options: string[]) {
+    if (current && options.includes(current)) return current;
+    const preferred = PREFERRED_WORKFLOW[capability];
+    const match = preferred ? options.find((option) => option === preferred || option.endsWith(`::${preferred}`)) : undefined;
+    return match || options[0] || "";
+}

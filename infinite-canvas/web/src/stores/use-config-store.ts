@@ -4,10 +4,9 @@ import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
 import { gatewayModelLabel } from "@/lib/gateway-labels";
-import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_GATEWAY_CHANNEL_ID, LOCAL_GATEWAY_MODELS, LOCAL_GATEWAY_MODEL_VALUES } from "@/constant/app-mode";
+import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_GATEWAY_CHANNEL_ID } from "@/constant/app-mode";
 import { normalizeProgressRingSkin, type ProgressRingSkinId } from "@/lib/canvas/progress-ring-skins";
 
-type ApiCallFormat = "openai" | "gemini";
 export type ModelCapability = "image" | "video" | "text" | "audio";
 export type ReasoningEffort = "auto" | "low" | "medium" | "high" | "xhigh";
 
@@ -34,7 +33,6 @@ export type ModelChannel = {
     nameKey?: string;
     baseUrl: string;
     apiKey: string;
-    apiFormat: ApiCallFormat;
     models: ChannelModel[];
 };
 
@@ -49,7 +47,6 @@ export type PromptCloudApi = {
 export type AiConfig = {
     baseUrl: string;
     apiKey: string;
-    apiFormat: ApiCallFormat;
     channels: ModelChannel[];
     model: string;
     imageModel: string;
@@ -94,11 +91,6 @@ export type AiConfig = {
 
 export type ConfigTabKey = "channels" | "preferences" | "cloud-api" | "prompt-sources" | "local-storage" | "resources";
 
-type ChannelCredentialsImportResult = {
-    status: "created" | "updated" | "missing-base-url" | "invalid-base-url";
-    channelName?: string;
-};
-
 const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
 const CHANNEL_MODEL_SEPARATOR = "::";
 const localDefaultChannel: ModelChannel = {
@@ -107,12 +99,8 @@ const localDefaultChannel: ModelChannel = {
     nameKey: "config.channels.localName",
     baseUrl: LOCAL_GATEWAY_BASE_URL,
     apiKey: "local",
-    apiFormat: "openai",
-    models: LOCAL_GATEWAY_MODELS.map((model) => ({ name: model.name, capability: model.capability })),
+    models: [],
 };
-
-const localImageModel = `${LOCAL_GATEWAY_CHANNEL_ID}::image-z-image-turbo`;
-const localVideoModel = `${LOCAL_GATEWAY_CHANNEL_ID}::video-h3-t2v`;
 
 // One literal, no shared "cloud" base to override: this build only ever talks to the
 // local gateway, so a second default config would be dead weight that has to be kept
@@ -120,11 +108,13 @@ const localVideoModel = `${LOCAL_GATEWAY_CHANNEL_ID}::video-h3-t2v`;
 export const defaultConfig: AiConfig = {
     baseUrl: LOCAL_GATEWAY_BASE_URL,
     apiKey: "local",
-    apiFormat: "openai",
     channels: [localDefaultChannel],
-    model: localImageModel,
-    imageModel: localImageModel,
-    videoModel: localVideoModel,
+    // No workflow id is baked in as the default: the first image/video workflow the gateway reports
+    // becomes the selection (see `pickModel` below), so adding or renaming a workflow in the registry
+    // never leaves the canvas pointing at a model that is gone.
+    model: "",
+    imageModel: "",
+    videoModel: "",
     textModel: "",
     audioModel: "",
     audioVoice: "alloy",
@@ -146,7 +136,7 @@ export const defaultConfig: AiConfig = {
     promptCloudApiId: "",
     systemPrompt: "",
     reasoningEffort: "auto",
-    models: LOCAL_GATEWAY_MODEL_VALUES,
+    models: [],
     quality: "auto",
     size: "1:1",
     background: "",
@@ -167,7 +157,6 @@ type ConfigStore = {
     updatePromptCloudApi: (id: string, patch: Partial<Omit<PromptCloudApi, "id">>) => void;
     removePromptCloudApi: (id: string) => void;
     selectPromptCloudApi: (id: string) => void;
-    importChannelCredentials: (input: { baseUrl?: string | null; apiKey?: string | null }) => ChannelCredentialsImportResult;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean, tab?: ConfigTabKey) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
@@ -182,8 +171,14 @@ export function boolConfig(value: string, fallback: boolean) {
 const AUDIO_KEYWORDS = ["audio", "tts", "speech", "voice", "music", "sound"];
 const IMAGE_KEYWORDS = ["seedream", "gpt-image", "image", "dall-e", "dalle", "imagen", "flux", "sdxl", "stable-diffusion", "midjourney"];
 
-/** Best-effort default capability for a freshly fetched model name; user can override in the channel editor. */
-export function guessCapability(name: string): ModelCapability {
+/**
+ * Best-effort capability for a bare model name.
+ *
+ * Only a stored config that predates `ChannelModel` can contain one: everything the canvas writes
+ * today is an object with a capability, and the gateway reports the kind itself (`type`). It stays as
+ * the fallback for that legacy shape rather than dropping the model.
+ */
+function guessCapability(name: string): ModelCapability {
     const value = name.toLowerCase();
     if (VIDEO_KEYWORDS.some((keyword) => value.includes(keyword))) return "video";
     if (AUDIO_KEYWORDS.some((keyword) => value.includes(keyword))) return "audio";
@@ -399,12 +394,6 @@ export const useConfigStore = create<ConfigStore>()(
                     if (!apis.some((api) => api.id === id)) return {};
                     return { config: { ...state.config, ...promptCloudMirror(apis, id) } };
                 }),
-            importChannelCredentials: (input) => {
-                const currentConfig = get().config;
-                const result = upsertChannelCredentials(currentConfig, input);
-                if (result.config !== currentConfig) set({ config: result.config });
-                return { status: result.status, channelName: result.channelName };
-            },
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
             openConfigDialog: (shouldPromptContinue = false, configTab = "channels") => set({ isConfigOpen: true, shouldPromptContinue, configTab }),
             setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
@@ -431,22 +420,17 @@ export const useConfigStore = create<ConfigStore>()(
                     const localChannels = existingChannels.filter((channel) => isLocalGatewayUrl(channel.baseUrl));
                     const candidate = localChannels[0] || createModelChannel({ ...localDefaultChannel });
                     const keptModels = normalizeChannelModels((candidate.models || []).filter((model) => !/mock/i.test(model.name)));
-                    const fallbackModels = normalizeChannelModels(LOCAL_GATEWAY_MODELS.map((model) => ({ name: model.name, capability: model.capability })));
-                    const keptNames = new Set(keptModels.map((model) => model.name));
-                    const mergedModels = [...keptModels, ...fallbackModels.filter((model) => !keptNames.has(model.name))];
                     config.channels = [
                         {
                             ...candidate,
                             name: candidate.name || i18n.t("config.channels.localName"),
                             baseUrl: candidate.baseUrl || LOCAL_GATEWAY_BASE_URL,
                             apiKey: candidate.apiKey || "local",
-                            apiFormat: "openai",
-                            models: mergedModels.length ? mergedModels : fallbackModels,
+                            models: keptModels,
                         },
                     ];
                     config.baseUrl = config.channels[0].baseUrl;
                     config.apiKey = config.channels[0].apiKey;
-                    config.apiFormat = "openai";
                 }
                 const channels = normalizeChannels(config);
                 const models = modelOptionsFromChannels(channels);
@@ -463,7 +447,6 @@ export const useConfigStore = create<ConfigStore>()(
                     config: {
                         ...config,
                         model: pickModel(config.model || config.imageModel, imageOptions),
-                        apiFormat: "openai",
                         channels,
                         models,
                         imageModel,
@@ -557,7 +540,6 @@ function defaultChannelNameKey(name: string): string | undefined {
 }
 
 function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
-    const apiFormat = normalizeApiFormat(channel?.apiFormat);
     const name = channel?.name?.trim() || "";
     return {
         id: channel?.id?.trim() || nanoid(),
@@ -566,70 +548,8 @@ function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
         nameKey: channel?.nameKey || defaultChannelNameKey(name) || undefined,
         baseUrl: channel?.baseUrl?.trim() || defaultBaseUrl(),
         apiKey: channel?.apiKey || "",
-        apiFormat,
         models: normalizeChannelModels(channel?.models),
     };
-}
-
-function upsertChannelCredentials(config: AiConfig, input: { baseUrl?: string | null; apiKey?: string | null }): ChannelCredentialsImportResult & { config: AiConfig } {
-    const rawBaseUrl = input.baseUrl?.trim() || "";
-    if (!rawBaseUrl) return { status: "missing-base-url", config };
-    if (!isHttpBaseUrl(rawBaseUrl)) return { status: "invalid-base-url", config };
-
-    const baseUrl = normalizeImportedBaseUrl(rawBaseUrl);
-    const apiKey = input.apiKey?.trim() || "";
-    const matchingIndex = config.channels.findIndex((channel) => normalizedBaseUrlKey(channel.baseUrl) === normalizedBaseUrlKey(baseUrl));
-
-    if (matchingIndex >= 0) {
-        const existing = config.channels[matchingIndex];
-        if (existing.baseUrl === baseUrl && (!apiKey || existing.apiKey === apiKey)) {
-            return { status: "updated", channelName: existing.name, config };
-        }
-        const updated = { ...existing, baseUrl, ...(apiKey ? { apiKey } : {}) };
-        const channels = config.channels.map((channel, index) => (index === matchingIndex ? updated : channel));
-        return { status: "updated", channelName: existing.name, config: { ...config, channels } };
-    }
-
-    const channel = createModelChannel({
-        name: importedChannelName(baseUrl),
-        baseUrl,
-        apiKey,
-        apiFormat: "openai",
-        models: [],
-    });
-    return { status: "created", channelName: channel.name, config: { ...config, channels: [...config.channels, channel] } };
-}
-
-function isHttpBaseUrl(baseUrl: string) {
-    try {
-        const url = new URL(baseUrl);
-        return (url.protocol === "http:" || url.protocol === "https:") && Boolean(url.hostname);
-    } catch {
-        return false;
-    }
-}
-
-function normalizedBaseUrlKey(baseUrl: string) {
-    try {
-        return stripTrailingApiVersion(normalizeImportedBaseUrl(baseUrl));
-    } catch {
-        return stripTrailingApiVersion(baseUrl.trim().replace(/\/+$/, ""));
-    }
-}
-
-function normalizeImportedBaseUrl(baseUrl: string) {
-    const url = new URL(baseUrl.trim());
-    url.hash = "";
-    return url.toString().replace(/\/+$/, "");
-}
-
-function stripTrailingApiVersion(baseUrl: string) {
-    return baseUrl.replace(/\/v1$/i, "");
-}
-
-function importedChannelName(baseUrl: string) {
-    const hostname = new URL(baseUrl).hostname;
-    return hostname.replace(/^(?:www|api)\./i, "") || i18n.t("config.channels.newName");
 }
 
 export function encodeChannelModel(channelId: string, model: string) {
@@ -686,7 +606,6 @@ function resolveModelChannel(config: AiConfig, value: string) {
             name: i18n.t("config.channels.defaultName"),
             baseUrl: config.baseUrl,
             apiKey: config.apiKey,
-            apiFormat: config.apiFormat,
             models: config.models.map(modelOptionName).map((name) => ({ name, capability: guessCapability(name) })),
         })
     );
@@ -699,7 +618,6 @@ export function resolveModelRequestConfig(config: AiConfig, value: string) {
         model: modelOptionName(value || config.model),
         baseUrl: channel.baseUrl,
         apiKey: channel.apiKey,
-        apiFormat: channel.apiFormat,
     };
 }
 
@@ -720,7 +638,6 @@ function normalizeChannels(config: AiConfig) {
                 name: i18n.t("config.channels.defaultName"),
                 baseUrl: config.baseUrl || defaultConfig.baseUrl,
                 apiKey: config.apiKey || "",
-                apiFormat: config.apiFormat || defaultConfig.apiFormat,
                 models: normalizeChannelModels([config.model, config.imageModel, config.videoModel, config.textModel, config.audioModel].map(modelOptionName)),
             }),
         );
@@ -731,10 +648,6 @@ function normalizeChannels(config: AiConfig) {
 /** Every channel in this build points at the local gateway; there is no cloud default. */
 function defaultBaseUrl() {
     return LOCAL_GATEWAY_BASE_URL;
-}
-
-function normalizeApiFormat(apiFormat: unknown): ApiCallFormat {
-    return apiFormat === "gemini" ? apiFormat : "openai";
 }
 
 function uniqueModelOptions(models: string[]) {
