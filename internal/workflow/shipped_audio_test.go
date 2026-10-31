@@ -43,14 +43,22 @@ func loadShippedEntry(t *testing.T, id string) (*Entry, Graph) {
 			t.Errorf("%s inferred as %q without a hint, want audio", decoded.File, got)
 		}
 		entry := &Entry{
-			ID:          decoded.ID,
-			Name:        decoded.Name,
-			Type:        InferType(graph, decoded.Type),
-			File:        decoded.File,
-			Workflow:    graph,
-			Defaults:    decoded.Defaults,
-			Presets:     decoded.Presets,
-			RawBindings: decoded.Bindings,
+			ID:                decoded.ID,
+			Name:              decoded.Name,
+			Type:              InferType(graph, decoded.Type),
+			File:              decoded.File,
+			Workflow:          graph,
+			Defaults:          decoded.Defaults,
+			Presets:           decoded.Presets,
+			RawBindings:       decoded.Bindings,
+			Accepts:           decoded.Accepts,
+			Mode:              decoded.Mode,
+			FrameMode:         decoded.FrameMode,
+			PromptInject:      decoded.PromptInject,
+			PromptReorder:     decoded.PromptReorder,
+			SourceVideoFrames: decoded.SourceVideoFrames,
+			Outputs:           decoded.Outputs,
+			Parameters:        decoded.Parameters,
 		}
 		return entry, graph
 	}

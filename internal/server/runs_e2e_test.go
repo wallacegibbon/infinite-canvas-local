@@ -355,3 +355,56 @@ func TestWorkflowSchemaListsInputs(t *testing.T) {
 		t.Errorf("prompt is missing from the schema: %v", inputs)
 	}
 }
+
+// An encoder writes a fixed set of containers. A request for another one must fail at submission,
+// with the accepted set in the message, rather than inside ComfyUI a minute later.
+func TestRunRejectsUndeclaredOutputContainer(t *testing.T) {
+	fake := newFakeComfy(t)
+	file, graph, entry := imageFixture()
+	// A container is only meaningful when a binding carries it into the graph.
+	save, _ := graph["9"].(map[string]any)
+	saveInputs, _ := save["inputs"].(map[string]any)
+	saveInputs["format"] = "png"
+	bindings, _ := entry["bindings"].(map[string]any)
+	bindings["format"] = map[string]any{"node": "9", "input": "format", "default": "png"}
+	entry["outputs"] = map[string]any{
+		"kind":        "image",
+		"formatParam": "format",
+		"formats":     map[string]any{"png": map[string]any{}},
+	}
+	gateway := httptest.NewServer(newTestGatewayWith(t, fake, file, graph, entry).Handler())
+	defer gateway.Close()
+
+	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/api/runs", map[string]any{
+		"workflow": "image-test",
+		"inputs":   map[string]any{"prompt": "x", "format": "jpg"},
+	})
+	if status != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (%v)", status, payload)
+	}
+	problem, _ := payload["error"].(map[string]any)
+	if problem["code"] != "unsupported_output_format" {
+		t.Errorf("code = %v", problem["code"])
+	}
+	if !strings.Contains(asString(problem["message"]), "writes png") {
+		t.Errorf("message = %v", problem["message"])
+	}
+
+	status, payload = doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/api/runs", map[string]any{
+		"workflow": "image-test",
+		"inputs":   map[string]any{"prompt": "x", "format": "png"},
+	})
+	if status != http.StatusAccepted {
+		t.Fatalf("declared container rejected: %d %v", status, payload)
+	}
+	// Let the run finish before the temporary data directory is removed: the queue persists its
+	// record asynchronously and would otherwise write into a directory that is already gone.
+	if finished := waitForRun(t, gateway, asString(payload["id"])); finished["status"] != "succeeded" {
+		t.Fatalf("run did not succeed: %v", finished)
+	}
+}
+
+func asString(value any) string {
+	text, _ := value.(string)
+	return text
+}

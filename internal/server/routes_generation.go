@@ -399,44 +399,6 @@ func (s *Server) handlePromptCaption(ctx *httpx.Ctx) error {
 	return nil
 }
 
-// applyAudioFormatParams fills the encoder bindings for the requested container.
-//
-// The accepted containers and the quality value each one requires come from the workflow's
-// `outputs.formats` declaration: SaveAudioAdvanced validates quality against the selected format
-// (V0/128k/320k for mp3, 64k-320k for opus, nothing for flac), so the two inputs have to move
-// together and a mismatched pair is rejected by ComfyUI, not by us. A container the encoder cannot
-// write is refused rather than silently answered with a different one — the canvas names the saved
-// file after the response Content-Type, so a lie would surface as a mismatched extension. Values
-// the caller supplied win, and a workflow that declares no containers passes the request through.
-func applyAudioFormatParams(entry *workflow.Entry, format string, params map[string]any) error {
-	if format == "" {
-		return nil
-	}
-	if entry == nil || entry.Outputs == nil || len(entry.Outputs.Formats) == 0 {
-		if _, exists := params["format"]; !exists {
-			params["format"] = format
-		}
-		return nil
-	}
-	spec, ok := entry.Outputs.Formats[format]
-	if !ok {
-		return httpx.Errorf(http.StatusBadRequest, "unsupported_audio_format",
-			"workflow %s writes %s, not %s", entry.Name,
-			strings.Join(entry.Outputs.FormatNames(), ", "), format)
-	}
-	if entry.Outputs.FormatParam != "" {
-		if _, exists := params[entry.Outputs.FormatParam]; !exists {
-			params[entry.Outputs.FormatParam] = format
-		}
-	}
-	if spec.Quality != "" && entry.Outputs.QualityParam != "" {
-		if _, exists := params[entry.Outputs.QualityParam]; !exists {
-			params[entry.Outputs.QualityParam] = spec.Quality
-		}
-	}
-	return nil
-}
-
 // handleAudioSpeech implements POST /v1/audio/speech.
 //
 // The canvas audio node speaks the OpenAI speech contract: one text in, audio bytes out.
@@ -470,7 +432,16 @@ func (s *Server) handleAudioSpeech(ctx *httpx.Ctx) error {
 			params["lyrics"] = lyrics
 		}
 	}
-	if err := applyAudioFormatParams(entry, strings.ToLower(strings.TrimSpace(httpx.String(body, "response_format"))), params); err != nil {
+	formatParam := "format"
+	if entry.Outputs != nil && entry.Outputs.FormatParam != "" {
+		formatParam = entry.Outputs.FormatParam
+	}
+	if format := strings.ToLower(strings.TrimSpace(httpx.String(body, "response_format"))); format != "" {
+		if _, exists := params[formatParam]; !exists {
+			params[formatParam] = format
+		}
+	}
+	if err := entry.ApplyOutputFormat(params); err != nil {
 		return err
 	}
 

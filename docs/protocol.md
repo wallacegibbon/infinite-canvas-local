@@ -173,6 +173,10 @@ Rules worth knowing:
   that vocabulary.
 - **Other `select` options are advisory.** A sampler list in `registry.json` is a UI suggestion;
   ComfyUI has more valid samplers than the canvas offers, and rejecting one would be wrong.
+- **The output container is checked too.** A workflow declares which containers its encoder writes
+  (`outputs.formats`), and requesting another one is a `400` at submission — not a run that fails in
+  ComfyUI a minute later. The quality value the selected container requires is filled in from the
+  same declaration.
 - Values reach the bindings unchanged, which is why a new workflow becomes runnable without a new
   route or a new struct.
 

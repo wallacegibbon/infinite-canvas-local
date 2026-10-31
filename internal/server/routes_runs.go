@@ -172,6 +172,11 @@ func (s *Server) handleRunCreate(ctx *httpx.Ctx) error {
 	for key, value := range inputs {
 		params[key] = value
 	}
+	// A container the encoder cannot write is a submission error, not a run that fails inside
+	// ComfyUI a minute later. The same declaration is applied by the `/v1` audio adapter.
+	if err := entry.ApplyOutputFormat(params); err != nil {
+		return err
+	}
 	plan, err := workflow.PlanMedia(entry, media.counts, mode, params)
 	if err != nil {
 		return err
