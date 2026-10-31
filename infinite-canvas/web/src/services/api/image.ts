@@ -283,7 +283,6 @@ type UpscaleOptions = { workflowId: string; params?: Record<string, unknown>; si
  * default, and sending an undeclared key would be rejected by the typed input contract.
  */
 export async function requestUpscale(config: AiConfig, image: ReferenceImage, options: UpscaleOptions) {
-    if (!localGatewayRoot(config.baseUrl)) throw new Error(apiText("upscaleLocalOnly"));
     const requestConfig = { ...resolveModelRequestConfig(config, config.imageModel || config.model), baseUrl: LOCAL_GATEWAY_BASE_URL, apiKey: "local", model: options.workflowId };
     try {
         const dataUrl = await imageToDataUrl(image);

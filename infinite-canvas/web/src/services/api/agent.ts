@@ -1,6 +1,6 @@
 import i18n from "@/i18n";
 import { dataUrlToFile } from "@/lib/image-utils";
-import { localGatewayRoot } from "@/services/api/image";
+import { gatewayProtocolRoot } from "@/services/api/runs";
 import { apiErrorMessage } from "@/services/api/http";
 import { imageToDataUrl } from "@/services/image-storage";
 import { useConfigStore, type AgentModel, type AiConfig } from "@/stores/use-config-store";
@@ -33,9 +33,8 @@ type AgentEvent = {
  * this session and the same process answers it, then it is gone.
  */
 export async function requestAgentConnect(config: AiConfig, options?: { signal?: AbortSignal }): Promise<void> {
-    const baseUrl = String(config.baseUrl || "").trim();
-    const root = localGatewayRoot(baseUrl);
-    if (!root) throw new Error(apiText("promptOptimizeLocalOnly"));
+    // The same root every other service uses: the channel address without its legacy `/v1`.
+    const root = gatewayProtocolRoot(config.baseUrl);
     try {
         const response = await fetch(`${root}/api/agent/connect`, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}` }, signal: options?.signal });
         if (!response.ok) throw new Error(apiText("requestFailed"));
@@ -62,9 +61,8 @@ type AgentRequest = {
  * so a caller can render the model list, the current model, or a refusal as they arrive.
  */
 export async function requestAgentStream(config: AiConfig, request: AgentRequest, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
-    const baseUrl = String(config.baseUrl || "").trim();
-    const root = localGatewayRoot(baseUrl);
-    if (!root) throw new Error(apiText("promptOptimizeLocalOnly"));
+    // The same root every other service uses: the channel address without its legacy `/v1`.
+    const root = gatewayProtocolRoot(config.baseUrl);
 
     const formData = new FormData();
     if (request.prompt) formData.set("prompt", request.prompt);
