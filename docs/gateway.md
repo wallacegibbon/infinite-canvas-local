@@ -265,7 +265,8 @@ internal/comfy           ComfyUI HTTP client + minimal WebSocket client
 internal/workflow        registry, graph model, bindings, base-model variants
 internal/generate        runner, LoRA injection, step planning, previews, RIFE
 internal/setup           availability scan, model aliases, model path resolution
-internal/task            async job queue for video work
+internal/task            the run queue: persistence, progress, cancel, multi-output records
+internal/upload          uploaded media: bytes on disk, index, cached ComfyUI reference
 internal/resource        resources/index.json, install jobs, main-model override
 internal/prompt          H3 prompt rewriting, speaker tags, MOSS layout prompts
 internal/store           sessions, skins, workflow visibility, main models
@@ -284,6 +285,77 @@ Three design notes worth knowing before changing anything:
 - **Request-scoped copies only.** `ApplyBindings` and `ApplyLoraChain` always clone.
   The graphs loaded from disk are immutable, so concurrent requests cannot see each
   other's parameters.
+
+## Relationship to ComfyUI's HTTP API
+
+The gateway sits on top of ComfyUI, so the job skeleton is ComfyUI's: submit, get a prompt id, poll
+until done, fetch the artifact. `internal/comfy/client.go` speaks exactly that set of endpoints —
+`POST /prompt`, `GET /history/{prompt_id}`, `GET /view`, `POST /upload/image`, `POST /interrupt`,
+`GET /queue`, `GET /object_info`, and a WebSocket for progress. What is ours is the abstraction above
+it: a caller names a **workflow** and its inputs and never sees a node graph.
+
+| ComfyUI | Gateway |
+| --- | --- |
+| `POST /prompt` with a full API-format graph | `POST /api/runs` with `{workflow, inputs, media}` |
+| `prompt_id` | `run.id` |
+| `POST /upload/image` → file name | `POST /api/uploads` → upload id, referenced by role |
+| `GET /queue` (running/pending) | `GET /api/runs?status=`, `GET /api/tasks` |
+| `GET /history/{prompt_id}` | `GET /api/runs/{id}` |
+| `GET /view?filename=&subfolder=&type=` | `GET /api/runs/{id}/outputs/{index}` |
+| `POST /interrupt` + queue deletion | `DELETE /api/runs/{id}` (idempotent, reports `cancelled` at once) |
+| WebSocket `executing` / `progress` / binary preview | `GET /api/runs/{id}` progress + `GET /api/runs/{id}/preview` (polled; the socket stays internal) |
+| `GET /object_info` (node classes and their file options) | `GET /api/workflows[/{id}/schema]` (runnable capabilities, availability, typed inputs) |
+
+Where the two differ, and why:
+
+- **What is submitted.** ComfyUI takes a graph: node ids, classes, every link. The gateway takes
+  `{workflow, inputs, media}`; the graph lives in `workflows/*.json` and bindings translate inputs
+  into it (`internal/workflow/bindings.go`). This is the difference that produces all the others: the
+  client that knows a workflow id does not need to know `"37:13"` exists. Raw graphs are refused on
+  purpose — the exposed surface is the registered capability set, not the executor.
+- **When a request is judged.** ComfyUI validates a graph when it executes. The gateway validates at
+  submission against the schema: closed key set, types, ranges, `required`, media counts and roles
+  (`internal/workflow/inputs.go`, `media.go`). A `400` now instead of a failed run later.
+- **How media is referenced.** In ComfyUI an upload returns a filename that the graph has to place in
+  the right socket, which means the client must understand the wiring. Here an upload returns an id
+  and the run references it by **role** (`source`, `mask`, `first_frame`, `last_frame`, `reference`,
+  `video`, `audio`); the workflow's bindings decide which socket it lands on.
+- **Where artifacts live.** `/view` needs the filename and subfolder from ComfyUI's own history and
+  serves from its output directory. The gateway copies results into `data/outputs` and addresses them
+  by index with their MIME type and size, so a finished run stays fetchable after ComfyUI cleans up or
+  restarts.
+- **State.** ComfyUI's queue and history are in memory. Runs are persisted to `data/tasks.json` and
+  reconciled on boot (file present → completed, in flight → failed with an explanation); uploads have
+  their own index and retention.
+- **Progress.** ComfyUI pushes it over the WebSocket. The gateway consumes that socket and exposes
+  polling, so a browser needs no long-lived connection and a reload loses nothing.
+- **Cancellation.** ComfyUI has a global interrupt plus queue deletion. A run has its own idempotent
+  `DELETE`, which maps to both and is reflected immediately.
+- **Discovery.** `/object_info` describes node classes and their file options. `/api/workflows`
+  describes *runnable capabilities*: whether the models and nodes are installed, the modes/variants,
+  and the typed inputs — it is computed from `object_info`, but it answers a different question.
+- **Trust boundary.** ComfyUI is single-user and unauthenticated. The gateway has an origin allow
+  list and an optional token, and it is the only surface meant to be reachable from a browser.
+
+The same request, both ways — one image:
+
+```jsonc
+// ComfyUI POST /prompt
+{"prompt": {
+  "4": {"class_type": "CLIPTextEncode", "inputs": {"text": "a cat", "clip": ["1", 1]}},
+  "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "x.safetensors"}},
+  "7": {"class_type": "KSampler", "inputs": {"seed": 42, "steps": 8, "model": ["1", 0], "positive": ["4", 0]}},
+  "9": {"class_type": "SaveImage", "inputs": {"images": ["7", 0], "filename_prefix": "out"}}
+}, "client_id": "..."}
+
+// Gateway POST /api/runs
+{"workflow": "image-z-image-turbo",
+ "inputs": {"prompt": "a cat", "size": "1024x1024", "count": 1, "quality": "medium"}}
+```
+
+The resemblance is deliberate where it is: single queue, single GPU, submit → id → poll → fetch is
+what ComfyUI actually offers and there is nothing to gain from inventing a different lifecycle. The
+difference is the unit of exchange — ComfyUI exchanges graphs, the gateway exchanges workflow runs.
 
 ## Language policy
 

@@ -1833,3 +1833,35 @@ and a valid audio run still completes.
 
 **Where** `internal/workflow/inputs.go`, `internal/workflow/render.go`,
 `internal/server/routes_runs.go`, `internal/task/task.go`, `workflows/registry.json`.
+
+## 57. The protocol exchanges workflow runs, not graphs
+
+**Decision** The gateway's unit of exchange is a *run of a registered workflow*: `{workflow, inputs,
+media}` in, a run id out. It does not accept a ComfyUI graph from a client, and it does not hand out
+node ids. The graph is server-side data (`workflows/*.json` + `bindings`). The job skeleton — submit,
+id, poll, fetch, cancel — is ComfyUI's, because that is what the executor actually offers; the
+abstraction above it is ours.
+
+**Why** A graph API makes the client responsible for wiring it can only learn by reading the
+workflow: which node takes the prompt, which socket takes a mask, what `"37:13"` means today. Every
+client then re-implements that knowledge, and the gateway cannot validate anything until ComfyUI
+fails minutes later. Naming a workflow moves that knowledge to the one place that already has it —
+`registry.json` — and makes submission-time validation possible (`inputs`, `accepts`). It is also
+what the canvas needs: a node stores a workflow id, not a graph.
+
+**What follows from it**
+
+- Media is referenced by *role*, not by filename-in-a-socket, because the binding decides the socket.
+- Artifacts and run state belong to the gateway (`data/outputs`, `data/tasks.json`), not to ComfyUI's
+  in-memory history, so a result outlives a ComfyUI restart.
+- Progress is exposed as polling even though ComfyUI pushes it over a WebSocket: the socket stays an
+  implementation detail, and a browser that reloads loses nothing.
+- Raw graph submission stays refused (`ui_workflow_not_supported`, `invalid_api_workflow`). The
+  exposed surface is the capability set, not the executor.
+
+**The comparison to keep** `docs/gateway.md` → "Relationship to ComfyUI's HTTP API": endpoint
+mapping, the eight differences, and the same request written both ways. Read it before changing the
+protocol; it is the shortest description of what we are and are not.
+
+**Where** `docs/gateway.md`, `docs/protocol.md`, `internal/comfy/client.go` (the endpoints we borrow),
+`internal/workflow/bindings.go` (the translation), `internal/server/routes_runs.go`.

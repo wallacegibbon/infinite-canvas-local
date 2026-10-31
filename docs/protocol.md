@@ -28,6 +28,11 @@ The canvas is the only client. A protocol aimed at one known caller can describe
 instead of imitating someone else's API, and every compatibility branch we do not need is code
 we would maintain forever.
 
+This is not ComfyUI's graph API with renamed fields. ComfyUI exchanges *graphs* (node ids, classes,
+every link); the gateway exchanges *workflow runs* (a workflow id, typed inputs, media roles). The
+two share the job skeleton — submit, id, poll, fetch — because the executor underneath is ComfyUI;
+the comparison, endpoint by endpoint, is in [`gateway.md`](gateway.md#relationship-to-comfyuis-http-api).
+
 ## Four resources
 
 ```
