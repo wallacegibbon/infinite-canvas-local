@@ -148,8 +148,20 @@ export const defaultConfig: AiConfig = {
     progressRingSkin: "cyan",
 };
 
+/**
+ * What the agent last said about itself (`SM model_list`, `SM model`, `SM reasoning_level`).
+ *
+ * The gateway keeps no state, so this is the canvas's memory of the last stream it read: the list a
+ * select offers, which entry is in effect, and the reasoning level. It is display data — changing a
+ * setting sends the agent's own command and this fills in again from what it answers.
+ */
+export type AgentModel = { id: number; name: string; protocolType?: string; contextLimit?: number };
+type AgentState = { models: AgentModel[]; active?: AgentModel; level?: number; coreVersion?: string };
+
 type ConfigStore = {
     config: AiConfig;
+    agent: AgentState;
+    updateAgent: (patch: Partial<AgentState>) => void;
     isConfigOpen: boolean;
     configTab: ConfigTabKey;
     shouldPromptContinue: boolean;
@@ -352,6 +364,8 @@ export const useConfigStore = create<ConfigStore>()(
     persist(
         (set, get) => ({
             config: defaultConfig,
+            agent: { models: [] },
+            updateAgent: (patch) => set((state) => ({ agent: { ...state.agent, ...patch } })),
             isConfigOpen: false,
             configTab: "channels",
             shouldPromptContinue: false,

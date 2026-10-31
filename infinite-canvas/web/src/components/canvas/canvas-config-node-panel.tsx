@@ -13,7 +13,7 @@ import { videoModelForWorkflow, videoModelModePatch, videoWorkflowId, isNoVdnWor
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
-import { CanvasPromptEndpointChip } from "./canvas-prompt-endpoint-chip";
+import { AgentSettingsControls } from "./agent-settings-controls";
 import { CanvasTextSettingsPopover } from "./canvas-text-settings-popover";
 import type { CanvasGenerationMode, CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 
@@ -106,7 +106,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
                     {/* Text is answered by the prompt endpoint, not by a workflow: there is no text
                         model to pick, only that endpoint's model to go and configure. */}
                     {mode === "text" ? (
-                        <CanvasPromptEndpointChip config={config} className="canvas-compact-control h-10 w-full min-w-0 justify-start rounded-lg px-2 text-sm" onClick={() => openConfigDialog(true, "prompt-api")} />
+                        <AgentSettingsControls className="flex min-w-0 flex-col gap-1" />
                     ) : (
                         <>
                             <WorkflowModelPicker

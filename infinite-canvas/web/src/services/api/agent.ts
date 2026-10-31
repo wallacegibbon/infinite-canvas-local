@@ -3,7 +3,7 @@ import { dataUrlToFile } from "@/lib/image-utils";
 import { localGatewayRoot } from "@/services/api/image";
 import { apiErrorMessage } from "@/services/api/http";
 import { imageToDataUrl } from "@/services/image-storage";
-import type { AiConfig } from "@/stores/use-config-store";
+import { useConfigStore, type AgentModel, type AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -15,8 +15,6 @@ const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiE
  * request: what we send is written to it (`command` + `args`, or `prompt` + images), and what it says
  * comes back here. This file only transcribes; it decides nothing about the content.
  */
-type AgentModel = { id: number; name: string; protocolType?: string; contextLimit?: number };
-
 type AgentEvent = {
     type: "models" | "delta" | "reasoning" | "model" | "reasoning_level" | "command" | "done" | "error";
     text?: string;
@@ -77,6 +75,7 @@ export async function requestAgentStream(config: AiConfig, request: AgentRequest
                 const payload = block.replace(/^data: /, "").trim();
                 if (!payload) continue;
                 const event = JSON.parse(payload) as AgentEvent;
+                rememberAgentEvent(event);
                 if (event.type === "delta") answer += event.text || "";
                 // The agent's own sentence is the failure: relaying it is all this layer does.
                 if (event.type === "error" && event.message) failure = event.message;
@@ -87,5 +86,26 @@ export async function requestAgentStream(config: AiConfig, request: AgentRequest
         return answer;
     } catch (error) {
         throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
+    }
+}
+
+/**
+ * Keep the canvas's picture of the agent current: the list, the active model, the level.
+ *
+ * The agent announces these itself, so there is nothing to fetch and nothing to cache on the gateway;
+ * whatever it last said is what the selects show.
+ */
+function rememberAgentEvent(event: AgentEvent) {
+    const { updateAgent } = useConfigStore.getState();
+    switch (event.type) {
+        case "models":
+            updateAgent({ models: event.models || [], active: event.active, level: event.level, coreVersion: event.coreVersion });
+            break;
+        case "model":
+            if (event.active) updateAgent({ active: event.active });
+            break;
+        case "reasoning_level":
+            if (typeof event.level === "number") updateAgent({ level: event.level });
+            break;
     }
 }

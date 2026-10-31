@@ -15,7 +15,7 @@ import { isPlainEnterKey } from "@/lib/keyboard-event";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
-import { CanvasPromptEndpointChip } from "./canvas-prompt-endpoint-chip";
+import { AgentSettingsControls } from "./agent-settings-controls";
 import { CanvasTextSettingsPopover } from "./canvas-text-settings-popover";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
@@ -507,7 +507,7 @@ export function CanvasNodePromptPanel({
                         </>
                     ) : (
                         <>
-                            <CanvasPromptEndpointChip config={config} className="!h-10 !max-w-[190px] !justify-start !rounded-full !px-3" onClick={() => openConfigDialog(true, "prompt-api")} />
+                            <AgentSettingsControls className="flex min-w-0 items-center gap-2" />
                             <CanvasTextSettingsPopover
                                 config={config}
                                 count={node.metadata?.textCount || 1}

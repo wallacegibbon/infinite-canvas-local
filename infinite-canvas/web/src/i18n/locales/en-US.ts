@@ -837,9 +837,11 @@ export default {
             move: "Move",
             interact: "Interact",
         },
-        promptEndpoint: {
-            title: "Prompt endpoint: the model in the settings answers here",
-            missing: "No prompt endpoint",
+        agent: {
+            noModel: "No model yet — run it once",
+            reasoningOff: "No thinking",
+            reasoningNormal: "Normal",
+            reasoningMax: "Deep",
         },
         promptPanel: {
             captionShort: "Caption",

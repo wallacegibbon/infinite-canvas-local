@@ -845,9 +845,11 @@ export default {
             move: "移动",
             interact: "交互",
         },
-        promptEndpoint: {
-            title: "提示词接口（设置里的提示词接口决定由谁作答）",
-            missing: "未配置提示词接口",
+        agent: {
+            noModel: "还没有模型信息，先生成一次",
+            reasoningOff: "不思考",
+            reasoningNormal: "普通思考",
+            reasoningMax: "深度思考",
         },
         promptPanel: {
             captionShort: "反推",
