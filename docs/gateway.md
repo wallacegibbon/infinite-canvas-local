@@ -205,8 +205,9 @@ it. If the connection dies mid-song, the run finishes anyway and stays readable 
 like any other run. The blocking shape is what the canvas sends today; [`protocol.md`](protocol.md)
 describes the run protocol that replaces it for every media type.
 
-Runs (the protocol in [`protocol.md`](protocol.md); the canvas's image, video and audio nodes all use
-them, and only the video *editor* tools and the prompt-angle edit still reach for `/v1/*`):
+Runs (the protocol in [`protocol.md`](protocol.md); every canvas node and tool uses them — the only
+generation adapter left is `/v1/videos/interpolate`, because RIFE is a post-step of a run rather than
+a workflow):
 
 | Method | Path | Purpose |
 | --- | --- | --- |

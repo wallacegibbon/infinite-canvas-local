@@ -27,8 +27,12 @@ criterion.
   an input, and the two video-only knobs the gateway itself honours — `interpolation` — are applied
   to the artifact inside the same run. The live preview frame is part of the run payload, so a
   generating node no longer reads a second endpoint to show one.
-- Next: the two video *editor* tools (upscale, interpolate) and the prompt-angle edit still call
-  `/v1/*`; when they are on runs, the adapters are deleted.
+- Done: the canvas's *tool* actions that produce media are runs too — video upscale (a registered
+  workflow with a `video` role) and the multi-angle re-render (a hidden workflow with angle inputs).
+- Next: `/v1/videos/interpolate` is the last generation adapter, because RIFE is an engine post-step
+  of a run rather than a workflow of its own (`interpolation` on a run, above). Either the tool
+  becomes a run over a registered RIFE workflow — and the engine's interpolator goes away — or it
+  goes away with the adapter. Then `/v1/*` is deleted.
 
 The routes below are the contract to build against; where a route already exists with the same
 name (`/api/workflows`, `/api/tasks`), it is the real thing.
@@ -251,7 +255,7 @@ id exists to remove.
 | `/v1/images/generations`, `/v1/images/edits`, `/v1/images/upscale` | one `POST /api/runs` with `inputs` + `media` |
 | `/v1/videos`, `/v1/videos/{id}`, `/{id}/content`, `/{id}/cancel` | the same `run` endpoints |
 | `/v1/audio/speech` | the same `run` endpoints |
-| `/v1/videos/upscale`, `/v1/videos/interpolate` | workflows whose `inputs`/`media` say so |
+| `/v1/videos/upscale`, `/v1/videos/interpolate` | `video-seedvr2-upscale` as a run; RIFE as a run input (`interpolation`) or a registered workflow |
 | `mode`, `vquality`, `resolution_name`, `params` (JSON string) | declared `inputs` in the schema |
 | field names that must contain `image`/`frame` | explicit media roles |
 | `entry.ID == "video-h3-…"`, `image-qwen21`, `image-moss-*` branches in handlers | `accepts` / `inputs` / `outputs` in `registry.json` |
@@ -268,8 +272,8 @@ last node is on `/api/runs`, the adapters and their file are deleted.
 2. **Registry as data**: `accepts` / `inputs` / `outputs` + one validator; delete every hardcoded
    workflow-id branch from the handlers.
 3. **`/api/runs` + `/api/uploads`**: the target routes land next to the adapters; the canvas moves
-   node type by node type — audio, then image, then video (all three are on runs now). What is left
-   is the video editor tools (upscale, interpolate) and the prompt-angle edit.
+   node type by node type — audio, then image, then video, then the tool actions (upscale, angle).
+   All of them are on runs now; only the interpolate tool is still an adapter call.
 4. **Deletion**: adapters, `/v1/*`, dead fields, dead tests, and the docs that described them.
 
 Every phase leaves the repository runnable and `make check` green. Nothing in a later phase

@@ -1983,3 +1983,39 @@ exercised against the real gateway during the image migration.
 
 **Where** `infinite-canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`,
 `lib/canvas/canvas-generation-helpers.ts`, `pages/canvas/project.tsx`, `types/canvas.ts`.
+
+## 61. The last generation adapters, and why one of them is not a run
+
+**Decision** Video upscale and the multi-angle re-render submit runs. Video upscale is the registered
+workflow `video-seedvr2-upscale` with the clip in the `video` role; the angle tool is the hidden
+workflow `image-qwen21-angle` with its three camera inputs and the source in the `reference` role. One
+adapter is left: `/v1/videos/interpolate`.
+
+**Why upscale was free** It was never an endpoint-shaped operation — it already had a graph, bindings
+and declared parameters. The adapter was a form that renamed `batchSize` to `batch_size` and posted
+the file as `video`. Deleting it removed that translation and nothing else. Two dialog values
+(`scale`, `fps`) are not sent any more because the graph derives them itself (the target short edge
+and the source frame rate); sending them as inputs would be a `400`, which is the validator doing its
+job on a field that never reached the graph.
+
+**Why the angle tool fits the same shape** `image-qwen21-angle` is a hidden workflow like the others:
+a prompt, three angle inputs and one reference image. `wideAngle` is a UI toggle with no counterpart
+in the graph, so it is not sent — inventing a binding that reaches nothing would be worse than
+leaving the knob out, and the gateway rejects inputs a workflow does not declare, which is how that
+stayed visible.
+
+**Why interpolate is different** RIFE is not a workflow the registry knows: it is `_internal/video-rife.json`
+applied by the engine as a post-step. "Interpolate this clip" therefore has no workflow to name, and
+the honest options are (a) register RIFE as a workflow and delete the engine's interpolator, or
+(b) drop the tool. Option (a) means the post-step of a generation run and the standalone tool share
+one graph but not one mechanism, so the choice is deferred to the deletion phase instead of being made
+in a hurry — the adapter stays until then, and `docs/protocol.md` says so.
+
+**Tested** `tests/api-video-runs.test.ts`: an upscale request is one run whose media is the uploaded
+clip and whose inputs are only the declared ones (`scale`/`fps` are absent). Against the real gateway
+the request was accepted, the graph was built with the clip wired into `LoadVideo`, and ComfyUI's own
+`missing_node_type` error came back on the run — the same failure the adapter produced on that
+machine, since the SeedVR2 custom node is not installed there.
+
+**Where** `infinite-canvas/web/src/services/api/video.ts`, `services/api/image.ts`,
+`pages/canvas/hooks/use-video-editors.ts`, `docs/protocol.md`, `docs/gateway.md`.

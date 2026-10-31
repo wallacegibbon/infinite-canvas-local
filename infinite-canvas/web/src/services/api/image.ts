@@ -864,37 +864,32 @@ type ImageAngleParams = {
     wideAngle: boolean;
 };
 
-export async function requestImageAngle(config: AiConfig, prompt: string, params: ImageAngleParams, references: ReferenceImage[], options?: RequestOptions): Promise<Array<{ id: string; dataUrl: string }>> {
-    const baseConfig = resolveModelRequestConfig(config, config.imageModel || config.model);
-    const requestConfig = { ...baseConfig, baseUrl: LOCAL_GATEWAY_BASE_URL, apiKey: "local", apiFormat: "openai" as const, model: "image-qwen21-angle" };
-    const formData = new FormData();
-    formData.set("model", "image-qwen21-angle");
-    formData.set("prompt", prompt);
-    formData.set("n", "1");
-    formData.set("response_format", "b64_json");
-    formData.set("output_format", IMAGE_OUTPUT_FORMAT);
-    formData.set("params", JSON.stringify(params));
-    const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
-    files.forEach((file) => formData.append(files.length > 1 ? "image[]" : "image", file));
+/** The multi-angle workflow is a gateway workflow like any other; only its id is fixed. */
+const IMAGE_ANGLE_WORKFLOW = "image-qwen21-angle";
 
-    const requestId = `img_${nanoid()}`;
-    const detachCancel = attachLocalCancel(requestConfig, requestId, options?.signal);
-    const detachProgress = attachLocalProgress(requestConfig, requestId, options?.signal);
-    try {
-        const payload = await httpJson<ImageApiResponse>(aiApiUrl(requestConfig, "/images/edits"), {
-            method: "POST",
-            headers: { ...aiHeaders(requestConfig), ...(detachCancel ? { "X-Request-Id": requestId } : {}) },
-            body: formData,
-            signal: options?.signal,
-            timeout: IMAGE_REQUEST_TIMEOUT_MS,
-        });
-        return await parseImagePayload(payload);
-    } catch (error) {
-        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
-    } finally {
-        detachCancel?.();
-        detachProgress?.();
-    }
+/**
+ * Re-render one image from a new camera angle.
+ *
+ * The angle knobs are the workflow's own inputs (`horizontalAngle`, `pitchAngle`, `cameraDistance`),
+ * so this is one run with the source image as its reference — the same path every other image edit
+ * takes. `wideAngle` is a UI toggle the graph has no counterpart for, so it is not sent: the gateway
+ * rejects inputs a workflow does not declare, and a binding that reaches nothing would be worse than
+ * leaving the knob out until the model can honour it.
+ */
+export async function requestImageAngle(config: AiConfig, prompt: string, params: ImageAngleParams, references: ReferenceImage[], options?: RequestOptions): Promise<Array<{ id: string; dataUrl: string }>> {
+    const requestConfig = { ...resolveModelRequestConfig(config, config.imageModel || config.model), baseUrl: LOCAL_GATEWAY_BASE_URL, apiKey: "local", apiFormat: "openai" as const, model: IMAGE_ANGLE_WORKFLOW };
+    return requestGatewayImages({
+        config: requestConfig,
+        prompt,
+        references,
+        count: 1,
+        params: {
+            horizontalAngle: params.horizontalAngle,
+            pitchAngle: params.pitchAngle,
+            cameraDistance: params.cameraDistance,
+        },
+        options,
+    });
 }
 
 type PromptOptimizeResult = { prompt: string; mode: string; duration: number };

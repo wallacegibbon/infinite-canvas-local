@@ -144,33 +144,26 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     return createOpenAIVideoTask(requestConfig, selectedModel, prompt, references, options);
 }
 
+/** The upscale workflow; the canvas offers it as a toolbar action rather than as a model. */
+const VIDEO_UPSCALE_WORKFLOW = "video-seedvr2-upscale";
+
+/**
+ * Upscale a clip: one uploaded video, one run, one artifact.
+ *
+ * `scale` and `fps` are dialog values the graph derives itself (the target short edge and the source
+ * frame rate), so only the inputs the workflow declares are sent — the gateway rejects the rest.
+ */
 export async function createVideoUpscaleTask(config: AiConfig, source: VideoUpscaleSource, params: VideoUpscaleParams, options?: RequestOptions): Promise<VideoGenerationTask> {
+    const requestConfig = resolveModelRequestConfig(config, VIDEO_UPSCALE_WORKFLOW);
     const file = await referenceMediaToFile(source, "source.mp4", "invalidReferenceVideo", options);
-    const formData = new FormData();
-    formData.append("video", file, file.name);
-    formData.append(
-        "params",
-        JSON.stringify({
-            scale: params.scale,
-            resolution: params.resolution,
-            fps: params.fps ?? 24,
-            seed: params.seed,
-            batch_size: params.batchSize ?? 5,
-            color_correction: params.colorCorrection || "wavelet",
-        }),
-    );
-    const requestConfig = resolveModelRequestConfig(config, "video-seedvr2-upscale");
+    const inputs: Record<string, unknown> = { resolution: params.resolution };
+    if (params.seed !== undefined) inputs.seed = params.seed;
+    if (params.batchSize !== undefined) inputs.batch_size = params.batchSize;
+    if (params.colorCorrection) inputs.color_correction = params.colorCorrection;
     try {
-        const created = unwrapVideoResponse(
-            await httpJson<ApiVideoResponse>(aiApiUrl(requestConfig, "/videos/upscale"), {
-                method: "POST",
-                headers: aiHeaders(requestConfig),
-                body: formData,
-                signal: options?.signal,
-            }),
-        );
-        if (!created.id) throw new Error(apiText("noVideoTaskId"));
-        return { id: created.id, provider: "openai", model: "video-seedvr2-upscale" };
+        const uploaded = await uploadMedia(requestConfig, file, file.name, { signal: options?.signal });
+        const run = await createRun(requestConfig, { workflow: VIDEO_UPSCALE_WORKFLOW, inputs, media: { video: uploaded.id } });
+        return { id: run.id, provider: "run", model: VIDEO_UPSCALE_WORKFLOW };
     } catch (error) {
         throw new Error(apiErrorMessage(error, apiText("videoTaskCreateFailed")));
     }
