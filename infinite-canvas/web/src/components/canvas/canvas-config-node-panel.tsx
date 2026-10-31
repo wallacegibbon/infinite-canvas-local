@@ -153,6 +153,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
                         config={config}
                         placement="topRight"
                         autoAdjustOverflow={false}
+                        hasReferences={inputSummary.imageCount > 0}
                         buttonClassName="canvas-compact-control !h-10 !w-full !justify-start !rounded-lg !px-2"
                         onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })}
                         onParamsChange={(params) => onConfigChange(node.id, { params: { ...node.metadata?.params, ...params } })}

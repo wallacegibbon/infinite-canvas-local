@@ -200,13 +200,16 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
     const runImageGeneration = useCallback(
         async (run: GenerationRun) => {
             const { nodeId, prompt, sourceNode, effectivePrompt, generationConfig, generationContext, runController } = run;
-            const count = getGenerationCount(generationConfig.count);
             const isConfigNode = sourceNode?.type === CanvasNodeType.Config;
             const isImageNode = sourceNode?.type === CanvasNodeType.Image;
             // An image node answers in place. A variant is a new node fed with this one through the
             // reference bar — whatever is connected here is what conditions the request, nothing else.
             let referenceImages = [...new Map(generationContext.referenceImages.map((image) => [image.id, image])).values()];
             if (generationConfig.imageMode === "inpaint") referenceImages = await withBoundMasks(referenceImages, nodesRef.current);
+            // A reference makes the request specific, so one press is one answer: re-rolling a
+            // conditioned edit is the same button again, and the node it replaces is the one being
+            // looked at. Only text-to-image is a draw worth repeating inside a single run.
+            const count = referenceImages.length ? 1 : getGenerationCount(generationConfig.count);
             const generationType = referenceImages.length ? ("edit" as const) : ("generation" as const);
             const generationMetadata = buildImageGenerationMetadata(generationType, generationConfig, count, referenceImages);
             const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : isImageNode ? CanvasNodeType.Image : CanvasNodeType.Text];

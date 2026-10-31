@@ -2721,3 +2721,26 @@ sending a picture where a mask belongs: one honest re-mark, and that node is fix
 `7b985050…` (31,835 B). Re-running on the build that resolved saved references sent the tint instead
 (`81e7d561…`, 1.48 MB) — the bug, reproduced. With the mask bound to the node, re-running pressed
 generate, opened no editor, kept the node count at 30, and uploaded `7b985050…` again, byte-identical.
+
+## 79. A reference makes it one answer per press; only text-to-image draws
+
+**Decision** An image run with references generates exactly one image, whatever 画布生图张数 says. Only
+a run with nothing to condition on uses that setting. The settings chip stops showing a count it will
+not use when the node has references.
+
+**Why** A reference is the user being specific — this picture, this mask, this region. Asking for three
+answers to a specific question turns the node into a batch that looks exactly like a text-to-image batch
+while meaning something else, and the three are stacked in a node nobody asked to be a batch. Without a
+reference there is no提问 to be specific about: that is the draw, and repeating it inside one run is
+what the count is for. Dissatisfied with an edit? Press again — the node it overwrites is the one being
+looked at (docs/decisions.md #77).
+
+**What this fixes** The mask editor has always forced `count: "1"`, so the same inpaint made 1 image
+through the editor and 3 through a hand-wired node. Now both are 1, and the rule is one sentence instead
+of two paths.
+
+**Tested** `image-qwen21` inpaint with two references on `:8191`: the run fetched only `outputs/0`, one
+artifact, with the bound mask (`7b985050…`). The count could not be observed on the other side of the
+rule in this environment — a Z-Image text-to-image run with 画布生图张数 = 3 also fetched only
+`outputs/0`, so the workflows here return a single artifact per run regardless of `count`. The
+no-reference path is the same expression it was before this change.
