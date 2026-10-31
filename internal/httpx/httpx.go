@@ -77,8 +77,14 @@ type payload struct {
 
 // JSON writes a JSON response. A write failure is unrecoverable for the caller,
 // so there is nothing to do beyond returning.
+//
+// Every JSON answer is `no-store`. These are live inventories — the workflow list, run status,
+// resource availability — and a browser is allowed to cache a 200 without cache headers
+// heuristically. That is not hypothetical: Chrome served a stale `/v1/models` after a workflow was
+// added, so the canvas never saw the new model.
 func JSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }
