@@ -162,7 +162,7 @@ const withoutRetiredKeys = (config: Partial<AiConfig>): Partial<AiConfig> => Obj
 export type AgentModel = { id: number; name: string; protocolType?: string; contextLimit?: number };
 type AgentState = { models: AgentModel[]; active?: AgentModel; level?: number; coreVersion?: string };
 
-/** A connected agent waiting for its one prompt. The gateway keeps the process; this names it. */
+/** The canvas whose agent is connected. The gateway keeps the process; this names it. */
 type AgentSession = string | null;
 
 type ConfigStore = {

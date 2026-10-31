@@ -162,10 +162,14 @@ export function closeAgentSocket(): void {
     useConfigStore.getState().setAgentSession(null);
 }
 
-/** End the conversation for good: the agent is released, history and all. */
+/**
+ * End the conversation for good: the agent is released, history and all.
+ *
+ * The socket is not closed here — the gateway closes it after releasing the process, and closing it
+ * locally first would race the message out of the buffer, leaving an agent with nothing to end it.
+ */
 export function endAgentConversation(): void {
     sendAgentMessage({ close: true });
-    closeAgentSocket();
 }
 
 /**
