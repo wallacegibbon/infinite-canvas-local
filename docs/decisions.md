@@ -2514,3 +2514,64 @@ caption route returned a prompt with no `engine` field.
 `infinite-canvas/web/src/components/canvas/canvas-config-node-panel.tsx`,
 `infinite-canvas/web/src/components/settings/app-config-modal.tsx`,
 `infinite-canvas/web/src/types/canvas.ts`.
+
+## 75. Prompts are served by AlayaCore, and one instance belongs to one person
+
+**Status** decided, not implemented. Today the four `/api/prompts/*` recipes and their in-process
+chat client are still what runs; this entry records the target so the code that replaces them does
+not have to re-litigate it.
+
+**Decision** The gateway stops calling a chat-completion endpoint and starts **spawning the agent**:
+one request → one `alayacore --rawio` process → one event stream → process released. The prompt
+surface collapses to a single route (`POST /api/prompts/chat`), and `internal/prompt` (the chat
+client, the four recipes, the H3 skill assembly, the sanitisers, the speaker tags) goes away. No dual
+backend and no fallback: a second path would be two configuration stories and two code paths for one
+feature.
+
+**Why this is not over-engineering here** This repository is part of the AlayaCore ecosystem, so the
+binary is a prerequisite the way ComfyUI already is: nothing to install, nothing to version by hand.
+What it buys: the canvas no longer has to be told a base URL, key and model (they are in the agent's
+`model.conf`, which the user already has); the gateway's guessing at "which thinking parameter does
+this endpoint want" is replaced by the agent's per-model `reasoning_0/1/2`; and four routes, four
+response shapes and four error vocabularies become one. What it costs: process-level failures (spawn,
+crash, hang, stderr-only errors), a protocol dependency with a `message_version`, and more tokens per
+request (the agent's own system prompt, and one extra step if a skill has to be read). Spawning is not
+itself expensive — a rawio session reaches `SM session ready` in ~30 ms on this machine, so releasing
+the process after each request is cheaper than keeping one warm.
+
+**Tenancy is the security model** The gateway is **single-tenant**: one instance serves one person and
+uses **one** AlayaCore config directory (`AGENT_CONFIG_PATH`), chosen by the operator. There is no
+per-request identity, so there is nothing to map a second user onto — and therefore no per-user
+credential to leak: a caller of `:8190` spends that instance's own keys, exactly as it already spends
+that instance's GPU on `POST /api/runs`.
+
+**If the gateway ever serves more than one user**, each user must have their own AlayaCore config
+directory, and that requires real identity (a login/session the gateway can resolve a request to) —
+not a shared secret. `GATEWAY_TOKEN` would not be that answer: it is injected into the page, so
+anyone who can open the canvas can read it. Until then, one directory, and the rule that makes it
+safe: **the config path, the model, the skill container and the tool list are operator configuration
+and may never come from a request.** A request that could name its own `--config-path` would turn
+"every user has their own directory" into "the caller picks whose directory to read".
+
+**Security posture, stated plainly** No token is required to enable the agent. `GATEWAY_HOST`
+defaults to loopback and binding anything else already emits a startup warning; `GATEWAY_TOKEN` stays
+the optional, existing knob for an exposed deployment. Built-in tools are off (`--builtin-tools=`)
+unless the operator turns them on — that switch, not the agent itself, is what changes the risk class
+from "uses your quota" to "reads your files and runs your commands".
+
+**Required regardless of auth** A concurrency cap and a per-request timeout. Spawning is unbounded
+otherwise, and a token does not help: whoever can open the canvas has the token too.
+
+**The event surface is a whitelist** `delta` (Ax text), `reasoning`, `step` (SM `task`), `done`,
+`error` (+ an optional one-line `tool` state). Everything else the agent emits stays on the gateway:
+`SM model_list` carries every `api_key` from `model.conf` verbatim, and `mcp`/`theme`/`video_config`/
+`CO` have no meaning for a canvas node. The gateway is an adapter, not a pipe.
+
+**Borrowed, not invented** `internal/wire` (frame codec, tests) and `internal/core` (spawn, stderr
+tail, kill order, binary discovery) come from the Go backend of the AlayaFace project, which is the
+same adapter for a different client. `message_version` is validated at startup, because the codec now
+exists in three repos and drift between them is a real failure mode.
+
+**Still open** Where the H3 wording lives: (a) an Agent Skill loaded with `read_file` (one extra model
+step, and the agent gains read access), or (b) `--system` assembled by the gateway and passed at spawn
+(single step, no file access). The decision waits on a measured comparison of the two outputs.
