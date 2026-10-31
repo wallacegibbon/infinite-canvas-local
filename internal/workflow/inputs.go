@@ -45,22 +45,6 @@ type InputSpec struct {
 // semanticInputs are the keys that drive the request itself rather than a binding.
 var semanticInputs = []string{"prompt", "negative", "size", "count", "n", "quality", "seconds", "duration", "mode", "background", "editCanvasSize", "layout", "layoutEnabled"}
 
-// InterpolationOptions are the frame-rate multipliers the gateway can apply to a finished video.
-// The engine owns the set (it is a post-step of the run, not a workflow binding), which is why the
-// canvas may only ask for one of these.
-var InterpolationOptions = []string{"off", "2x", "3x"}
-
-// InterpolationFactor turns a request value into a RIFE multiplier; 0 means "leave it alone".
-func InterpolationFactor(value string) int {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "2x":
-		return 2
-	case "3x":
-		return 3
-	}
-	return 0
-}
-
 // InputSpecs is the typed contract of a workflow, assembled from three sources: the request-level
 // keys above, the workflow's declared `parameters`, and its non-media binding keys.
 func (e *Entry) InputSpecs(limits InputLimits) []InputSpec {
@@ -109,8 +93,6 @@ func (e *Entry) InputSpecs(limits InputLimits) []InputSpec {
 		// those needs is the workflow's own declaration, so `frameMode` is accepted here and
 		// judged by PlanMedia — one owner for the rule, one message for the caller.
 		add(InputSpec{Key: "frameMode", Type: "string", Label: "Frame mode"})
-		// The gateway owns this one: it is applied to the finished artifact, not to a binding.
-		add(InputSpec{Key: "interpolation", Type: "string", Options: InterpolationOptions, StrictOptions: true, Label: "Interpolation"})
 	}
 	add(InputSpec{Key: "background", Type: "string", Label: "Background"})
 	add(InputSpec{Key: "editCanvasSize", Type: "size", Label: "Edit canvas size"})
@@ -149,6 +131,13 @@ func (e *Entry) InputSpecs(limits InputLimits) []InputSpec {
 	for _, key := range keys {
 		binding := bindings[key]
 		if binding.IsMedia() {
+			continue
+		}
+		// A binding whose value is derived from somewhere else (`size.width`, `seconds`,
+		// `quality.steps`, another parameter) is not something a caller may set: naming it would be
+		// accepted and then ignored, because the binding reads its source, not `params.<key>`. Only
+		// a binding addressed by its own name — or one with no `from` at all — is an input.
+		if from := binding.String(keyFrom); from != "" && from != "params."+key {
 			continue
 		}
 		add(InputSpec{Key: key, Type: bindingInputType(binding), Label: key})

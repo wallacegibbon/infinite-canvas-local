@@ -6,11 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"comfyui-gateway/internal/generate"
 	"comfyui-gateway/internal/httpx"
 	"comfyui-gateway/internal/prompt"
 	"comfyui-gateway/internal/task"
-	"comfyui-gateway/internal/util"
 	"comfyui-gateway/internal/workflow"
 )
 
@@ -43,16 +41,6 @@ func (s *Server) handleVideoCreate(ctx *httpx.Ctx) error {
 	mergedParams := map[string]any{}
 	for key, value := range params {
 		mergedParams[key] = value
-	}
-
-	interpolation := strings.TrimSpace(util.StringField(params, "interpolation"))
-	if interpolation == "" {
-		interpolation = "off"
-	}
-	switch interpolation {
-	case "off", "2x", "3x":
-	default:
-		return httpx.NewError(http.StatusBadRequest, "invalid_interpolation", "interpolation must be off, 2x or 3x")
 	}
 
 	// Every per-workflow media rule (text-to-video takes none, frames take one or two images,
@@ -125,7 +113,6 @@ func (s *Server) handleVideoCreate(ctx *httpx.Ctx) error {
 		"images":          mediaNames(uploadedImages),
 		"videos":          mediaNames(uploadedVideos),
 		"audios":          mediaNames(uploadedAudios),
-		"interpolation":   interpolation,
 	}
 
 	stored := s.submitRun(runSpec{
@@ -135,7 +122,7 @@ func (s *Server) handleVideoCreate(ctx *httpx.Ctx) error {
 		TimeoutMs: s.cfg.VideoTimeoutMs,
 		RequestID: ctx.RequestID,
 		Request:   request,
-	}, s.videoPostProcess(task.ObjectVideo, ctx.RequestID, interpolation))
+	}, nil)
 
 	s.logger.Info("video %s queued %s %s", entry.Name, stored.ID, ctx.RequestID)
 	httpx.OK(ctx.W, queuedPayload(s.tasks.Get(stored.ID)))
@@ -199,60 +186,6 @@ func (s *Server) handleVideoUpscale(ctx *httpx.Ctx) error {
 	}, nil)
 
 	s.logger.Info("video upscale %s queued %s %s", entry.Name, stored.ID, ctx.RequestID)
-	httpx.OK(ctx.W, queuedPayload(s.tasks.Get(stored.ID)))
-	return nil
-}
-
-// handleVideoInterpolate implements POST /v1/videos/interpolate.
-func (s *Server) handleVideoInterpolate(ctx *httpx.Ctx) error {
-	body, err := bodyOrEmpty(ctx)
-	if err != nil {
-		return err
-	}
-	videoFiles := orderedVideoRefs(ctx.Files())
-	if len(videoFiles) == 0 {
-		return httpx.NewError(http.StatusBadRequest, "missing_input_video", "interpolation request is missing the input video")
-	}
-
-	multiplier := strings.ToLower(strings.TrimSpace(defaultStringOf(httpx.String(body, "multiplier"), "2x")))
-	if multiplier != "2x" && multiplier != "3x" {
-		return httpx.NewError(http.StatusBadRequest, "invalid_interpolation", "interpolation supports only 2x or 3x")
-	}
-
-	source := videoFiles[0]
-	factor := 2
-	if multiplier == "3x" {
-		factor = 3
-	}
-	originalName := defaultStringOf(source.Filename, "input.mp4")
-
-	stored := s.tasks.Create(task.ObjectVideo, "video-rife", map[string]any{
-		"mode":       "interpolate",
-		"multiplier": multiplier,
-		"video":      originalName,
-	})
-
-	interpolator := generate.NewInterpolator(s.cfg.WorkflowDir, s.comfy, s.logger)
-	s.tasks.Enqueue(stored, func(job *task.Task, progress func(task.Update), jobCtx context.Context) (*task.Result, error) {
-		progress(task.Update{Progress: 0.1})
-		timeout := s.cfg.VideoTimeoutMs
-		if timeout <= 0 {
-			timeout = 10 * 60 * 1000
-		}
-		result, err := interpolator.Interpolate(jobCtx, source.Bytes, originalName, factor, ctx.RequestID, timeout)
-		if err != nil {
-			return nil, err
-		}
-		return &task.Result{
-			Outputs: []task.ResultFile{{
-				Buffer:   result.Buffer,
-				Ext:      util.ExtFromMime(result.MimeType, result.Filename, "mp4"),
-				MimeType: result.MimeType,
-			}},
-		}, nil
-	})
-
-	s.logger.Info("video interpolate %s queued %s %s", multiplier, stored.ID, ctx.RequestID)
 	httpx.OK(ctx.W, queuedPayload(s.tasks.Get(stored.ID)))
 	return nil
 }

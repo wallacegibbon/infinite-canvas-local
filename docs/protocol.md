@@ -23,16 +23,18 @@ criterion.
   one artifact list instead of N parallel requests — and a reload fills the batch's placeholders from
   that run instead of asking for the images again.
 - Done: **the canvas's video nodes use this protocol too.** The workflow's mode decides which media
-  a request carries (`first_frame` / `last_frame` / `reference` + `video` + `audio`), `frameMode` is
-  an input, and the two video-only knobs the gateway itself honours — `interpolation` — are applied
-  to the artifact inside the same run. The live preview frame is part of the run payload, so a
+  a request carries (`first_frame` / `last_frame` / `reference` + `video` + `audio`) and `frameMode`
+  says which frames a request supplies. The live preview frame is part of the run payload, so a
   generating node no longer reads a second endpoint to show one.
-- Done: the canvas's *tool* actions that produce media are runs too — video upscale (a registered
-  workflow with a `video` role) and the multi-angle re-render (a hidden workflow with angle inputs).
-- Next: `/v1/videos/interpolate` is the last generation adapter, because RIFE is an engine post-step
-  of a run rather than a workflow of its own (`interpolation` on a run, above). Either the tool
-  becomes a run over a registered RIFE workflow — and the engine's interpolator goes away — or it
-  goes away with the adapter. Then `/v1/*` is deleted.
+- Done: the canvas's *tool* actions that produce media are runs too — video upscale, the multi-angle
+  re-render and frame interpolation (`video-rife`: one clip in, one clip out).
+- Next: nothing generation-shaped is left on `/v1`; the remaining adapters are the old image, video
+  and audio routes, which are deleted once the last caller is gone.
+
+**One user action may be several runs.** Raising a clip's frame rate is two GPU jobs (generate, then
+interpolate), so it is two runs — the canvas chains them, exactly as its "interpolate" button always
+did. A run stays "one workflow, one job", which is what keeps `status`, `progress`, `error` and
+`outputs` honest; chaining is the client's business.
 
 The routes below are the contract to build against; where a route already exists with the same
 name (`/api/workflows`, `/api/tasks`), it is the real thing.
@@ -191,11 +193,13 @@ The list is assembled from three sources, so no workflow has to restate it:
    `size`, `count`/`n`, `quality`, `seconds`/`duration`, `mode`.
 2. The workflow's declared `parameters` (`seed`, `steps`, `cfg`, `sampler`, …), whose ranges are
    authoritative.
-3. Every remaining non-media binding key (`unet`, `format`, `lyrics`, a LoRA list …), typed from
-   the binding when its intent is obvious.
-4. The gateway-owned inputs that reach no binding: `background`, `layout`/`layoutEnabled` (the MOSS
-   prompt), `loras` (applied by the engine), and — for video workflows — `frameMode` (which frames a
-   request supplies) and `interpolation` (raise the produced video's frame rate, `off|2x|3x`).
+3. Every remaining non-media binding key that a caller can actually set — one addressed by its own
+   name (`params.` + the key) or one with no source at all. A binding that derives its value from
+   somewhere else (`size.width`, `seconds`, `quality.steps`) is not an input: it used to be
+   advertised and silently ignored, which is the same failure as a typo that does not error.
+4. The request-level inputs the gateway itself reads: `background`, `layout`/`layoutEnabled` (the
+   MOSS prompt), `loras` (applied by the engine), and — for video workflows — `frameMode` (which
+   frames a request supplies).
 
 Rules worth knowing:
 
@@ -211,11 +215,9 @@ Rules worth knowing:
   (`outputs.formats`), and requesting another one is a `400` at submission — not a run that fails in
   ComfyUI a minute later. The quality value the selected container requires is filled in from the
   same declaration.
-- **A gateway-owned input is executed, never bound.** `interpolation` is the only one that changes
-  the artifact: the frame-rate pass runs on the produced video inside the same run, so one request
-  is still one artifact. Chaining a second run over the first one's output would have been the other
-  way to express it, and it would have made the client responsible for two ids, two failures and an
-  intermediate file nobody asked for.
+- **A workflow may be a step, not a model.** `video-rife` has no prompt: it takes a clip and a
+  multiplier. The gateway does not care — it runs any registered workflow — but it also does not
+  pretend such a step is a model a client picks from a list.
 - Values reach the bindings unchanged, which is why a new workflow becomes runnable without a new
   route or a new struct.
 
@@ -231,6 +233,10 @@ hangs off it. Consequences:
 - A task longer than any HTTP timeout is fine.
 - A browser reload, a closed tab, a dropped tunnel: the run keeps going and can be collected later.
 - There is exactly one success shape (`202` + run), so a client has exactly one code path.
+
+One user action may be several runs (generate, then raise the frame rate). Each run stays one
+workflow and one job, so its `status`, `progress`, `error` and `outputs` describe exactly one thing;
+chaining is the client's business, and the canvas already models it as a second node.
 
 This is why there is no `wait` parameter. A blocking variant would return two different success
 shapes (`200` with outputs, `202` with a run), so every client would still have to implement
@@ -255,7 +261,7 @@ id exists to remove.
 | `/v1/images/generations`, `/v1/images/edits`, `/v1/images/upscale` | one `POST /api/runs` with `inputs` + `media` |
 | `/v1/videos`, `/v1/videos/{id}`, `/{id}/content`, `/{id}/cancel` | the same `run` endpoints |
 | `/v1/audio/speech` | the same `run` endpoints |
-| `/v1/videos/upscale`, `/v1/videos/interpolate` | `video-seedvr2-upscale` as a run; RIFE as a run input (`interpolation`) or a registered workflow |
+| `/v1/videos/upscale`, `/v1/videos/interpolate` | runs of the `video-seedvr2-upscale` / `video-rife` workflows |
 | `mode`, `vquality`, `resolution_name`, `params` (JSON string) | declared `inputs` in the schema |
 | field names that must contain `image`/`frame` | explicit media roles |
 | `entry.ID == "video-h3-…"`, `image-qwen21`, `image-moss-*` branches in handlers | `accepts` / `inputs` / `outputs` in `registry.json` |
@@ -272,8 +278,8 @@ last node is on `/api/runs`, the adapters and their file are deleted.
 2. **Registry as data**: `accepts` / `inputs` / `outputs` + one validator; delete every hardcoded
    workflow-id branch from the handlers.
 3. **`/api/runs` + `/api/uploads`**: the target routes land next to the adapters; the canvas moves
-   node type by node type — audio, then image, then video, then the tool actions (upscale, angle).
-   All of them are on runs now; only the interpolate tool is still an adapter call.
+   node type by node type — audio, then image, then video, then the tool actions (upscale, angle,
+   interpolate). All of them are on runs now.
 4. **Deletion**: adapters, `/v1/*`, dead fields, dead tests, and the docs that described them.
 
 Every phase leaves the repository runnable and `make check` green. Nothing in a later phase

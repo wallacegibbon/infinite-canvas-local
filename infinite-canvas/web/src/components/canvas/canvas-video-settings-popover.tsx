@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Settings2 } from "lucide-react";
 
 import { Button } from "@/components/kit/button";
-import { VideoSettingsPanel, videoInterpolationLabel, videoModeLabel, videoResolutionLabel, videoSecondsLabel, videoSelfLiftLabel, videoSizeLabel } from "@/components/video-settings-panel";
+import { VideoSettingsPanel, videoModeLabel, videoResolutionLabel, videoSecondsLabel, videoSelfLiftLabel, videoSizeLabel } from "@/components/video-settings-panel";
 import i18n from "@/i18n";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
@@ -80,7 +80,6 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
                 >
                     <span className="truncate">
                         {videoResolutionLabel(config.vquality)} · {videoSizeLabel(config.size)} · {durationSummary} · {videoModeLabel(config.videoMode)}
-                        {videoInterpolationLabel(config.videoInterpolation) ? ` · ${videoInterpolationLabel(config.videoInterpolation)}` : ""}
                         {videoSelfLiftLabel(config.videoSelfLiftMode) ? ` · ${videoSelfLiftLabel(config.videoSelfLiftMode)}` : ""}
                     </span>
                 </Button>

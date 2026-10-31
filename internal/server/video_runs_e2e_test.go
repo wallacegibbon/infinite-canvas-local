@@ -8,8 +8,6 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -60,7 +58,7 @@ func TestRunVideoTakesFramesByRole(t *testing.T) {
 		"workflow": "video-test",
 		"inputs": map[string]any{
 			"prompt": "a cat", "mode": "frames", "frameMode": "last",
-			"seconds": 5, "size": "1024x576", "interpolation": "off",
+			"seconds": 5, "size": "1024x576",
 		},
 		"media": map[string]any{"last_frame": last},
 	})
@@ -121,53 +119,79 @@ func TestRunVideoRejectsBadMediaMix(t *testing.T) {
 	}
 }
 
-func TestRunVideoValidatesTypedInputs(t *testing.T) {
+func TestRunVideoRejectsUndeclaredInputs(t *testing.T) {
 	_, gateway, _ := videoRunGateway(t)
 
 	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/api/runs", map[string]any{
 		"workflow": "video-test",
-		"inputs":   map[string]any{"prompt": "a cat", "interpolation": "4x"},
+		"inputs":   map[string]any{"prompt": "a cat", "interpolation": "2x"},
 	})
 	if status != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400: %v", status, payload)
 	}
 	message, _ := payload["error"].(map[string]any)["message"].(string)
-	if !strings.Contains(message, "off, 2x, 3x") {
-		t.Errorf("message does not name the accepted multipliers: %s", message)
+	// Frame-rate raising is a workflow of its own now; the key must be refused rather than ignored,
+	// so a client still sending it learns immediately.
+	if !strings.Contains(message, `unknown input "interpolation"`) {
+		t.Errorf("message = %s", message)
 	}
 }
 
-// `interpolation` is the gateway's own step: the run is one request and one artifact, and the
-// frame-rate pass happens inside it rather than as a second run over the first one's output.
-func TestRunVideoInterpolatesWhenAsked(t *testing.T) {
-	fake, gateway, srv := videoRunGateway(t)
-	template := filepath.Join(srv.cfg.WorkflowDir, "_internal", "video-rife.json")
-	if err := os.MkdirAll(filepath.Dir(template), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
+// Raising a clip's frame rate is a workflow like any other: one video in, one video out, no
+// special case in the engine. The output frame rate is derived from the multiplier by a binding.
+func TestRunRifeInterpolationWorkflow(t *testing.T) {
+	fake := newFakeComfy(t)
+	fake.outputs = map[string]any{
+		"3": map[string]any{"gifs": []any{map[string]any{"filename": "rife.mp4", "subfolder": "rife", "type": "output"}}},
 	}
-	writeFixture(t, template, map[string]any{
+	fake.viewMime = "video/mp4"
+	fake.viewBody = "RIFE"
+	graph := map[string]any{
 		"1": map[string]any{"class_type": "VHS_LoadVideo", "inputs": map[string]any{"video": "input.mp4"}},
-		"2": map[string]any{"class_type": "RIFE VFI", "inputs": map[string]any{"multiplier": 2}},
-		"3": map[string]any{"class_type": "VHS_VideoCombine", "inputs": map[string]any{"frame_rate": 48}},
-	})
+		"2": map[string]any{"class_type": "RIFE VFI", "inputs": map[string]any{"frames": []any{"1", 0}, "multiplier": 2.0}},
+		"3": map[string]any{"class_type": "VHS_VideoCombine", "inputs": map[string]any{"images": []any{"2", 0}, "frame_rate": 48.0}},
+	}
+	entry := map[string]any{
+		"id":         "video-rife-test",
+		"name":       "video-rife-test",
+		"type":       "video",
+		"file":       "test-rife.json",
+		"parameters": []any{map[string]any{"key": "multiplier", "type": "number", "min": 2, "max": 3, "default": 2}},
+		"bindings": map[string]any{
+			"video":      map[string]any{"node": "1", "input": "video", "from": "video", "videoIndex": 0, "required": true},
+			"multiplier": map[string]any{"node": "2", "input": "multiplier", "from": "params.multiplier", "transform": "int", "default": 2},
+			"frame_rate": map[string]any{"node": "3", "input": "frame_rate", "from": "params.multiplier", "transform": "multiply", "factor": 24, "default": 48},
+		},
+	}
+	srv := newTestGatewayWith(t, fake, "test-rife.json", graph, entry)
+	gateway := httptest.NewServer(srv.Handler())
+	defer gateway.Close()
 
-	frame := uploadID(t, gateway, "frame.png", "image/png", []byte("PNG"))
 	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/api/runs", map[string]any{
-		"workflow": "video-test",
-		"inputs":   map[string]any{"prompt": "a cat", "frameMode": "first", "interpolation": "2x"},
-		"media":    map[string]any{"first_frame": frame},
+		"workflow": "video-rife-test",
+		"inputs":   map[string]any{"multiplier": 3},
+		"media":    map[string]any{"video": uploadID(t, gateway, "clip.mp4", "video/mp4", []byte("ftyp"))},
 	})
 	if status != http.StatusAccepted {
 		t.Fatalf("status = %d, want 202: %v", status, payload)
 	}
-
 	run := waitForTerminalRun(t, gateway, payload["id"].(string))
 	if run["status"] != "succeeded" {
 		t.Fatalf("run = %v", run)
 	}
-	// The generation graph and then the RIFE graph: two submissions, one run.
-	if hits := fake.hits.Load(); hits < 2 {
-		t.Errorf("ComfyUI received %d submissions, want the generation and the interpolation", hits)
+
+	submitted := fake.submittedGraph()
+	loader, _ := submitted["1"].(map[string]any)
+	if inputs, _ := loader["inputs"].(map[string]any); inputs["video"] != "uploaded.png" {
+		t.Errorf("the clip was not wired into the loader: %v", inputs)
+	}
+	vfi, _ := submitted["2"].(map[string]any)
+	if inputs, _ := vfi["inputs"].(map[string]any); inputs["multiplier"] != 3.0 {
+		t.Errorf("multiplier = %v, want 3", inputs["multiplier"])
+	}
+	combine, _ := submitted["3"].(map[string]any)
+	if inputs, _ := combine["inputs"].(map[string]any); inputs["frame_rate"] != 72.0 {
+		t.Errorf("frame_rate = %v, want 72 (24 x 3)", inputs["frame_rate"])
 	}
 }
 

@@ -180,7 +180,6 @@ Generation (multipart where media is involved):
 | `POST` | `/v1/images/upscale` | Image upscaling. |
 | `POST` | `/v1/videos` | Video generation (returns a job id). |
 | `POST` | `/v1/videos/upscale` | Video upscaling. |
-| `POST` | `/v1/videos/interpolate` | RIFE frame interpolation (2x / 3x). |
 | `GET` | `/v1/videos/{id}` | Job status, including preview and step progress. |
 | `GET` | `/v1/videos/{id}/content` | Finished video bytes. |
 | `POST` | `/v1/videos/{id}/cancel` | Cancel a job. |
@@ -205,9 +204,8 @@ it. If the connection dies mid-song, the run finishes anyway and stays readable 
 like any other run. The blocking shape is what the canvas sends today; [`protocol.md`](protocol.md)
 describes the run protocol that replaces it for every media type.
 
-Runs (the protocol in [`protocol.md`](protocol.md); every canvas node and tool uses them — the only
-generation adapter left is `/v1/videos/interpolate`, because RIFE is a post-step of a run rather than
-a workflow):
+Runs (the protocol in [`protocol.md`](protocol.md); every canvas node and tool uses them — frame
+interpolation included, as a run of the `video-rife` workflow):
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -240,9 +238,8 @@ frames and step counts; both are best-effort and never fail a generation. A run 
 `preview` (`{url, mime}` with a timestamp) in the payload, so a client polling a run needs no second
 endpoint to show one.
 
-Two inputs reach no binding: `loras` is applied by the engine, and `interpolation` (video workflows,
-`off|2x|3x`) is applied to the produced video inside the same run — the same code path `/v1/videos`
-uses, so the two routes cannot render differently.
+`loras` is the one input the engine applies itself rather than a binding. Everything else a run
+carries reaches a node.
 
 ### Prompt endpoints and thinking models
 
@@ -271,7 +268,7 @@ internal/config          environment -> immutable Config
 internal/httpx           error type, JSON responses, middleware, multipart
 internal/comfy           ComfyUI HTTP client + minimal WebSocket client
 internal/workflow        registry, graph model, bindings, base-model variants
-internal/generate        runner, LoRA injection, step planning, previews, RIFE
+internal/generate        runner, LoRA injection, step planning, previews
 internal/setup           availability scan, model aliases, model path resolution
 internal/task            the run queue: persistence, progress, cancel, multi-output records
 internal/upload          uploaded media: bytes on disk, index, cached ComfyUI reference

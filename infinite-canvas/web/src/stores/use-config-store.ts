@@ -59,7 +59,6 @@ export type AiConfig = {
     videoGenerateAudio: string;
     videoWatermark: string;
     videoMode: string;
-    videoInterpolation?: string;
     videoSelfLiftMode?: string;
     promptOptimizeLanguage?: "zh" | "en";
     promptCloudBaseUrl?: string;
@@ -131,7 +130,6 @@ export const defaultConfig: AiConfig = {
     videoWatermark: "false",
     // Local workflows are driven by a start frame, not by free text.
     videoMode: "text",
-    videoInterpolation: "off",
     videoSelfLiftMode: "fast",
     promptOptimizeLanguage: "zh",
     promptCloudBaseUrl: "",
@@ -475,7 +473,6 @@ export const useConfigStore = create<ConfigStore>()(
                         videoGenerateAudio: config.videoGenerateAudio || "true",
                         videoWatermark: config.videoWatermark || "false",
                         videoMode: config.videoMode === "reference" || config.videoMode === "text" ? config.videoMode : "frames",
-                        videoInterpolation: config.videoInterpolation === "2x" || config.videoInterpolation === "3x" ? config.videoInterpolation : "off",
                         videoSelfLiftMode: config.videoSelfLiftMode === "quality" ? "quality" : "fast",
                         promptCloudApis: normalizedCloud.promptCloudApis,
                         promptCloudApiId: normalizedCloud.promptCloudApiId,

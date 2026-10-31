@@ -169,23 +169,26 @@ export async function createVideoUpscaleTask(config: AiConfig, source: VideoUpsc
     }
 }
 
+/** The interpolation workflow; raising a clip's frame rate is one run, like any other. */
+const VIDEO_INTERPOLATE_WORKFLOW = "video-rife";
+
+/**
+ * Interpolate a clip: the RIFE workflow with the clip in the `video` role.
+ *
+ * The output frame rate is derived inside the workflow (source rate × multiplier), so the only input
+ * is the multiplier the caller asked for.
+ */
 export async function createVideoInterpolateTask(config: AiConfig, source: VideoInterpolateSource, params: VideoInterpolateParams, options?: RequestOptions): Promise<VideoGenerationTask> {
+    const requestConfig = resolveModelRequestConfig(config, VIDEO_INTERPOLATE_WORKFLOW);
     const file = await referenceMediaToFile(source, "source.mp4", "invalidReferenceVideo", options);
-    const formData = new FormData();
-    formData.append("video", file, file.name);
-    formData.append("multiplier", `${params.multiplier}x`);
-    const requestConfig = resolveModelRequestConfig(config, config.videoModel || config.model);
     try {
-        const created = unwrapVideoResponse(
-            await httpJson<ApiVideoResponse>(aiApiUrl(requestConfig, "/videos/interpolate"), {
-                method: "POST",
-                headers: aiHeaders(requestConfig),
-                body: formData,
-                signal: options?.signal,
-            }),
-        );
-        if (!created.id) throw new Error(apiText("noVideoTaskId"));
-        return { id: created.id, provider: "openai", model: modelOptionName(config.videoModel || config.model) };
+        const uploaded = await uploadMedia(requestConfig, file, file.name, { signal: options?.signal });
+        const run = await createRun(requestConfig, {
+            workflow: VIDEO_INTERPOLATE_WORKFLOW,
+            inputs: { multiplier: params.multiplier },
+            media: { video: uploaded.id },
+        });
+        return { id: run.id, provider: "run", model: VIDEO_INTERPOLATE_WORKFLOW };
     } catch (error) {
         throw new Error(apiErrorMessage(error, apiText("videoTaskCreateFailed")));
     }
@@ -234,7 +237,6 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
     body.append("mode", mode);
     const requestParams = {
         ...(options?.params || config.params || {}),
-        ...(config.videoInterpolation && config.videoInterpolation !== "off" ? { interpolation: config.videoInterpolation } : {}),
         transition_step: config.videoSelfLiftMode === "quality" ? 5 : 6,
         ...(mode === "frames" ? { frameMode } : {}),
     };
@@ -339,9 +341,6 @@ async function createGatewayVideoTask(config: AiConfig, prompt: string, referenc
     const size = normalizeVideoSize(config.size, config.vquality);
     if (size) inputs.size = size;
     if (plan.mode === "frames") inputs.frameMode = plan.frameMode;
-    // Interpolation is applied by the gateway to the artifact, not by a workflow binding: asking
-    // for it here keeps "one request, one video" true instead of chaining a second run.
-    if (config.videoInterpolation && config.videoInterpolation !== "off") inputs.interpolation = config.videoInterpolation;
     Object.assign(inputs, { transition_step: config.videoSelfLiftMode === "quality" ? 5 : 6 }, options?.params || config.params || {});
 
     try {

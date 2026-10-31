@@ -27,7 +27,6 @@ func (s *Server) routesGeneration(mux *http.ServeMux) {
 	s.route(mux, "POST /v1/audio/speech", s.handleAudioSpeech)
 	s.route(mux, "POST /v1/videos", s.handleVideoCreate)
 	s.route(mux, "POST /v1/videos/upscale", s.handleVideoUpscale)
-	s.route(mux, "POST /v1/videos/interpolate", s.handleVideoInterpolate)
 	s.route(mux, "GET /v1/videos/{id}", s.handleVideoGet)
 	s.route(mux, "GET /v1/videos/{id}/content", s.handleVideoContent)
 	s.route(mux, "POST /v1/videos/{id}/cancel", s.handleVideoCancel)

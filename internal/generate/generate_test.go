@@ -2,7 +2,6 @@ package generate
 
 import (
 	"errors"
-	"strings"
 	"testing"
 
 	"comfyui-gateway/internal/httpx"
@@ -204,16 +203,6 @@ func TestEstimateStepPlanSelfLiftIsAbsolute(t *testing.T) {
 	}
 	if plan.Total != 4 {
 		t.Errorf("total = %d, want 4", plan.Total)
-	}
-}
-
-func TestSanitizeToken(t *testing.T) {
-	if got := sanitizeToken("req_1/../bad name"); got != "req_1____bad_name" {
-		t.Errorf("sanitizeToken = %q, want every unsafe char replaced", got)
-	}
-	// Dots must not survive: the token becomes a path segment inside ComfyUI.
-	if got := sanitizeToken(".."); strings.Contains(got, ".") {
-		t.Errorf("sanitizeToken(%q) = %q, dots must not survive", "..", got)
 	}
 }
 

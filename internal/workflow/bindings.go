@@ -603,6 +603,10 @@ func applyTransform(value any, binding *Binding) any {
 		return int(math.Trunc(toFloat(value)))
 	case "invert10":
 		return 10 - toFloat(value)
+	case "multiply":
+		// A derived value written into another node (RIFE's output frame rate is the source
+		// rate times the multiplier). `fps` is the same idea: a scalar config on the binding.
+		return toFloat(value) * binding.Float("factor", 1)
 	case "boolean":
 		return toBool(value)
 	}

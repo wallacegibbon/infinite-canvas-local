@@ -25,7 +25,7 @@ vi.mock("@/services/file-storage", () => ({
     uploadMediaFile: async () => ({ url: "", storageKey: "", bytes: 0, mimeType: "video/mp4" }),
 }));
 
-const { createVideoGenerationTask, createVideoUpscaleTask, isGatewayVideoModel, videoTaskProviderOf, waitForVideoGenerationTask } = await import("@/services/api/video");
+const { createVideoGenerationTask, createVideoInterpolateTask, createVideoUpscaleTask, isGatewayVideoModel, videoTaskProviderOf, waitForVideoGenerationTask } = await import("@/services/api/video");
 
 type Config = Parameters<typeof createVideoGenerationTask>[0];
 const gateway = (overrides: Record<string, unknown> = {}) =>
@@ -141,12 +141,12 @@ describe("createVideoGenerationTask", () => {
         expect(body.media.reference).toEqual(["upl_1"]);
     });
 
-    it("asks for interpolation on the same run", async () => {
+    it("sends no interpolation: raising the frame rate is a run of its own", async () => {
         const { calls } = stubGateway({});
 
-        await createVideoGenerationTask(gateway({ videoInterpolation: "2x" }), "a cat", [image("a.png")]);
+        await createVideoGenerationTask(gateway(), "a cat", [image("a.png")]);
 
-        expect(runBody(calls).inputs.interpolation).toBe("2x");
+        expect(runBody(calls).inputs.interpolation).toBeUndefined();
     });
 
     it("sends no media for a text-to-video workflow", async () => {
@@ -177,6 +177,24 @@ describe("createVideoUpscaleTask", () => {
         expect(body.media).toEqual({ video: "upl_video" });
         // `scale` and `fps` are dialog values the graph derives itself; sending them would be a 400.
         expect(body.inputs).toEqual({ resolution: 1104, seed: 7, batch_size: 5 });
+    });
+});
+
+describe("createVideoInterpolateTask", () => {
+    it("is one run of the RIFE workflow with the clip and the multiplier", async () => {
+        const { calls, fetchMock } = stubGateway({});
+        fetchMock.mockImplementationOnce(async (url: string, init: RequestInit = {}) => {
+            calls.push({ url, method: String(init.method || "GET"), body: init.body });
+            return json({ upload: { id: "upl_video", kind: "video", mime: "video/mp4", bytes: 3, filename: "source.mp4" } });
+        });
+
+        const task = await createVideoInterpolateTask(gateway(), { name: "clip.mp4", type: "video/mp4", storageKey: "k1" }, { multiplier: 2 });
+
+        expect(task).toMatchObject({ provider: "run", model: "video-rife" });
+        const body = runBody(calls);
+        expect(body.workflow).toBe("video-rife");
+        expect(body.inputs).toEqual({ multiplier: 2 });
+        expect(body.media).toEqual({ video: "upl_video" });
     });
 });
 

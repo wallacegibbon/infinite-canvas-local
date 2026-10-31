@@ -2019,3 +2019,87 @@ machine, since the SeedVR2 custom node is not installed there.
 
 **Where** `infinite-canvas/web/src/services/api/video.ts`, `services/api/image.ts`,
 `pages/canvas/hooks/use-video-editors.ts`, `docs/protocol.md`, `docs/gateway.md`.
+
+## 62. Frame interpolation is a workflow, not a run input
+
+**Decision** `video-rife` is a registered workflow: one clip in the `video` role, `multiplier` (2 or
+3) as an input, its output frame rate derived by a binding (`multiply`, 24 × multiplier). The
+`interpolation` run input, its post-step (`internal/server/postprocess.go`), the hand-written
+interpolator (`internal/generate/interpolate.go`, 163 lines of its own upload/submit/poll/cancel),
+the private `workflows/_internal/` directory and the `/v1/videos/interpolate` adapter are all gone.
+Choosing "2×" is now two runs: generate, then interpolate over the result. The canvas chains them.
+
+**This reverses part of #59** That entry kept interpolation inside the run so that "one request is one
+artifact" stayed true. The reasoning was half right: the produced bytes are already in the gateway's
+hand, so interpolating before storage avoids a download-and-re-upload. Everything else it bought was
+worse than it looked:
+
+- It needed **three exceptions** to the rule "a run is one workflow": a private graph directory the
+  scanner must ignore, a second executor, and an input that changes what a run means.
+- It made **failure lossy**. The artifact is only stored when the run ends, so a missing RIFE node or
+  a cancel during interpolation threw away the clip the user had already paid GPU time for. That is a
+  correctness bug, not a simplification.
+- It made the **missing dependency invisible**: no scan, no resource entry, no way for the canvas to
+  warn. (Same root cause as the `hidden` bug reported in the same session.)
+
+The intermediate 24fps clip is not "an artifact nobody asked for" — it is the thing the GPU time
+bought. Keeping it is worth two ids.
+
+**What stays** A run is still **one workflow, one job**, so `status`, `progress`, `error` and
+`outputs` keep describing exactly one thing. What is dropped is the *user action = one run*
+equation: the canvas may chain runs to achieve one effect, and it already had that pattern (its
+"interpolate" button was always download → upload → second task → child node).
+
+**Two small engine additions it needed**
+
+- `multiply` in `applyTransform`, with a `factor` on the binding: a derived value written into
+  another node, the same shape as `fps` on `secondsToFrames`. Generic numeric coercion, not a special
+  case for one workflow.
+- `RIFE VFI.ckpt_name` in `ModelLoaderSpecs`. That list is the only thing that makes a model file's
+  absence visible; omitting the entry would have kept `rife49.pth` invisible, which is the trap its
+  own comment warns about.
+
+**Tested** `internal/workflow/bindings_test.go` (`multiply`: 2 → 48, 3 → 72),
+`internal/server/video_runs_e2e_test.go` (a `video-rife` run wires the clip into `LoadVideo`, writes
+`multiplier` 3 and `frame_rate` 72 into the RIFE/VHS nodes, and stores one output), plus the shipped
+registry still validating. `tests/api-video-runs.test.ts` pins the canvas side: an interpolate request
+is one run with `{multiplier}` and `media.video`, and a generation run no longer carries an
+`interpolation` input.
+
+**Still open** RIFE's node pack and `rife49.pth` are not declared in `resources/index.json`, so a
+clean machine can now *report* the missing node (it is a registered workflow) but cannot install it
+from the panel. Declaring them is the follow-up, and it needs the real folder name the node pack
+reports.
+
+**Where** `workflows/video-rife.json`, `workflows/registry.json`, `internal/workflow/bindings.go`,
+`internal/workflow/loaders.go`, `internal/server/routes_video.go`, `internal/server/routes_runs.go`,
+`infinite-canvas/web/src/services/api/video.ts`.
+
+## 63. An input is a key that reaches something
+
+**Decision** A binding key becomes an accepted input only when a caller can actually set it: either
+the binding is addressed by its own name (`from: "params.<key>"`) or it has no `from` at all. A
+binding that derives its value elsewhere (`size.width`, `seconds`, `quality.steps`, `params.steps`
+under a different name) is no longer advertised.
+
+**Why** Those keys were accepted and then ignored, because the binding reads its own source. That is
+the same failure as a typo that does not error — the shape #56 set out to remove — except it looked
+like a feature: the schema listed `width` on a text-to-video workflow, `steps` on z-image (which only
+takes it through a quality preset), and `frame_rate` on RIFE (derived from the multiplier). Sending
+any of them did nothing, silently.
+
+**What it caught** The schema now shows what a workflow really takes: H3 loses `width`/`height`/
+`length`/`task_type`, z-image loses `steps`/`cfg`/`width`/`height`/`batch`, audio loses
+`formatQuality`/`stepsOverride` (both were the *binding* name of a value written under another key),
+RIFE keeps only `multiplier`.
+
+**What still wins** A workflow's declared `parameters` are authoritative and are registered before
+bindings, so a declared key stays accepted even when a same-named binding reads elsewhere. That
+combination is a registry mistake, not a supported case; it is why `steps` (declared for audio) still
+works while feeding the `stepsOverride` binding.
+
+**Tested** `internal/workflow/inputs_test.go`: `width` (from `size.width`) and `batch` (from `count`)
+are rejected as unknown inputs, while the self-named `seed` is still accepted. Every shipped
+workflow's schema was re-read through the live gateway.
+
+**Where** `internal/workflow/inputs.go`, `docs/protocol.md`.

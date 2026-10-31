@@ -25,7 +25,7 @@ export const videoResolutionOptions = resolutionOptions.map((item) => ({ value: 
 
 type VideoSettingsPanelProps = {
     config: AiConfig;
-    onConfigChange: (key: "vquality" | "size" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark" | "videoMode" | "videoInterpolation" | "videoSelfLiftMode" | "seedFixed" | "seed", value: string) => void;
+    onConfigChange: (key: "vquality" | "size" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark" | "videoMode" | "videoSelfLiftMode" | "seedFixed" | "seed", value: string) => void;
     theme: CanvasTheme;
     showTitle?: boolean;
     className?: string;
@@ -144,19 +144,6 @@ export function VideoSettingsPanel({
                     )}
                 </SettingGroup>
                 <SeedSetting fixed={config.seedFixed === "true"} seed={config.seed || ""} theme={theme} onChange={onConfigChange} />
-                <SettingGroup title={t("settingsPanels.video.interpolation")} color={theme.node.muted}>
-                    <div className="grid grid-cols-3 gap-2.5">
-                        {[
-                            { value: "off", labelKey: "interpolationOff" },
-                            { value: "2x", labelKey: "interpolation2x" },
-                            { value: "3x", labelKey: "interpolation3x" },
-                        ].map((item) => (
-                            <OptionPill key={item.value} selected={(config.videoInterpolation || "off") === item.value} theme={theme} onClick={() => onConfigChange("videoInterpolation", item.value)}>
-                                {t(`settingsPanels.video.${item.labelKey}`)}
-                            </OptionPill>
-                        ))}
-                    </div>
-                </SettingGroup>
                 {isH3 ? (
                     <SettingGroup title={t("settingsPanels.video.selfLiftMode")} color={theme.node.muted}>
                         <div className="grid grid-cols-2 gap-2.5">
@@ -228,12 +215,6 @@ export function videoSecondsLabel(value: string) {
 
 export function videoModeLabel(value: string) {
     return i18n.t(`settingsPanels.video.modes.${normalizeVideoModeValue(value)}`);
-}
-
-export function videoInterpolationLabel(value: string | undefined) {
-    if (value === "2x") return i18n.t("settingsPanels.video.interpolation2x");
-    if (value === "3x") return i18n.t("settingsPanels.video.interpolation3x");
-    return "";
 }
 
 export function videoSelfLiftLabel(value: string | undefined) {

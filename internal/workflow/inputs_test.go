@@ -124,23 +124,13 @@ func TestVideoOnlyInputs(t *testing.T) {
 
 	video := inputEntry()
 	video.Type = "video"
-	if err := ValidateInputs(video, map[string]any{"prompt": "x", "frameMode": "last", "interpolation": "3x"}, InputLimits{}); err != nil {
+	if err := ValidateInputs(video, map[string]any{"prompt": "x", "frameMode": "last"}, InputLimits{}); err != nil {
 		t.Errorf("video inputs rejected: %v", err)
 	}
-	// The frame rule itself is the workflow's declaration (PlanMedia judges it), so a value is only
-	// rejected when a workflow declares one.
-	err := ValidateInputs(video, map[string]any{"prompt": "x", "interpolation": "4x"}, InputLimits{})
-	if err == nil || !strings.Contains(err.Error(), "off, 2x, 3x") {
-		t.Errorf("interpolation 4x: %v", err)
-	}
-}
-
-func TestInterpolationFactor(t *testing.T) {
-	cases := map[string]int{"": 0, "off": 0, "OFF": 0, "2x": 2, "3x": 3, "4x": 0, " two": 0}
-	for value, want := range cases {
-		if got := InterpolationFactor(value); got != want {
-			t.Errorf("InterpolationFactor(%q) = %d, want %d", value, got, want)
-		}
+	// `interpolation` used to be accepted here as a gateway-executed input; raising a clip's frame
+	// rate is now a run of its own workflow, so the key must be gone rather than silently ignored.
+	if err := ValidateInputs(video, map[string]any{"prompt": "x", "interpolation": "2x"}, InputLimits{}); err == nil {
+		t.Error("interpolation is still accepted as an input")
 	}
 }
 
@@ -194,5 +184,32 @@ func TestShippedWorkflowsValidateTheirInputs(t *testing.T) {
 		if err := ValidateInputs(entry, map[string]any{"prompt": "a cat", "nonsense": 1}, InputLimits{MaxCount: 15}); err == nil {
 			t.Errorf("%s accepted an unknown input", entry.ID)
 		}
+	}
+}
+
+// A binding that reads its value from somewhere else is not a knob: accepting the key would mean
+// accepting a value that reaches nothing. `size.width` and `count` are the usual culprits.
+func TestDerivedBindingsAreNotInputs(t *testing.T) {
+	entry := inputEntry()
+	entry.RawBindings = bindings(
+		"prompt", map[string]any{"node": "4", "input": "text", "required": true},
+		"width", map[string]any{"node": "8", "input": "width", "from": "size.width"},
+		"batch", map[string]any{"node": "8", "input": "batch_size", "from": "count"},
+		"seed", map[string]any{"node": "8", "input": "seed", "from": "params.seed", "random": true},
+	)
+
+	for _, key := range []string{"width", "batch"} {
+		err := ValidateInputs(entry, map[string]any{"prompt": "x", key: 1024}, InputLimits{})
+		if err == nil {
+			t.Errorf("%s was accepted although its binding ignores it", key)
+			continue
+		}
+		if !strings.Contains(err.Error(), "unknown input") {
+			t.Errorf("%s: message = %q", key, err.Error())
+		}
+	}
+	// The self-named binding is still the way to set it.
+	if err := ValidateInputs(entry, map[string]any{"prompt": "x", "seed": 7}, InputLimits{}); err != nil {
+		t.Errorf("seed rejected: %v", err)
 	}
 }

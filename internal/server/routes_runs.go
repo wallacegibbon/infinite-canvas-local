@@ -228,7 +228,7 @@ func (s *Server) handleRunCreate(ctx *httpx.Ctx) error {
 		TimeoutMs: s.runTimeout(object),
 		RequestID: ctx.RequestID,
 		Request:   map[string]any{"inputs": inputs, "media": media.summary},
-	}, s.videoPostProcess(object, ctx.RequestID, httpx.String(inputs, "interpolation")))
+	}, nil)
 	s.logger.Info("run %s queued %s (%s) %s", object, stored.ID, entry.Name, ctx.RequestID)
 
 	// Snapshot: the queue may already be running this record, and serialising the live one races

@@ -412,3 +412,19 @@ func TestInferBindingsFindsCommonNodes(t *testing.T) {
 		}
 	}
 }
+
+// multiply derives a second value from the same parameter, which is what RIFE's output frame rate
+// needs (source rate × multiplier) without the client computing it.
+func TestMultiplyTransform(t *testing.T) {
+	multiplier := func() *Binding {
+		return NewBinding(map[string]any{
+			keyFrom: "params.multiplier", keyTransform: "multiply", "factor": 24.0, keyDefault: 2.0,
+		})
+	}
+	if got := applyTransform(2.0, multiplier()); got != 48.0 {
+		t.Errorf("2× = %v, want 48", got)
+	}
+	if got := applyTransform(3, multiplier()); got != 72.0 {
+		t.Errorf("3× = %v, want 72", got)
+	}
+}

@@ -106,8 +106,10 @@ func TestRunImageProducesEveryOutput(t *testing.T) {
 	if status != http.StatusAccepted {
 		t.Fatalf("submit status = %d, body = %v", status, payload)
 	}
-	if payload["status"] != "queued" {
-		t.Errorf("status = %v, want queued", payload["status"])
+	// The queue may pick the run up before the response is written, so both states are correct:
+	// `status` is the state at that moment, never a promise about the past.
+	if status := payload["status"]; status != "queued" && status != "running" {
+		t.Errorf("status = %v, want queued or running", status)
 	}
 	if payload["workflow"] != "image-test" {
 		t.Errorf("workflow = %v", payload["workflow"])

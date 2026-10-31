@@ -122,7 +122,6 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
         videoGenerateAudio: node?.metadata?.generateAudio || config.videoGenerateAudio || defaultConfig.videoGenerateAudio,
         videoWatermark: node?.metadata?.watermark || config.videoWatermark || defaultConfig.videoWatermark,
         videoMode: node?.metadata?.videoMode || config.videoMode || defaultConfig.videoMode,
-        videoInterpolation: node?.metadata?.videoInterpolation || config.videoInterpolation || defaultConfig.videoInterpolation,
         videoSelfLiftMode: node?.metadata?.videoSelfLiftMode || config.videoSelfLiftMode || defaultConfig.videoSelfLiftMode,
         frameMode: node?.metadata?.frameMode || config.frameMode,
         imageMode: node?.metadata?.imageMode || config.imageMode || "",

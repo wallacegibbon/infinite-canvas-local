@@ -29,6 +29,10 @@ var ModelLoaderSpecs = []struct {
 	{ClassType: "SelfLiftH3Sampler", Input: "upscaler_model", Key: "latentUpscalers", Dirs: []string{"latent_upscale_models"}},
 	{ClassType: "ModelPreviewOverrideKJ", Input: "tiny_vae", Key: "vaeApprox", Dirs: []string{"vae_approx"}},
 	{ClassType: "ApplyVDNH3Advanced", Input: "vdn_checkpoint", Key: "vdn", Dirs: []string{"vdn"}},
+	// RIFE names its checkpoint the same way a loader does. The folder ComfyUI reports for it
+	// depends on the node pack, so no Dirs entry is claimed here; missing checkpoints are still
+	// reported, because that check reads the options ComfyUI itself lists.
+	{ClassType: "RIFE VFI", Input: "ckpt_name", Key: "rife"},
 }
 
 // SpecFor returns the spec matching a class/input pair.
