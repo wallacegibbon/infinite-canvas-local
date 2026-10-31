@@ -21,9 +21,9 @@ func (s *Server) routesGeneration(mux *http.ServeMux) {
 	s.route(mux, "POST /v1/images/generations", s.handleImageGenerations)
 	s.route(mux, "POST /v1/images/upscale", s.handleImageUpscale)
 	s.route(mux, "POST /v1/images/edits", s.handleImageEdits)
-	s.route(mux, "POST /v1/prompts/optimize", s.handlePromptOptimize)
-	s.route(mux, "POST /v1/prompts/optimize-image", s.handlePromptOptimizeImage)
-	s.route(mux, "POST /v1/prompts/caption", s.handlePromptCaption)
+	s.route(mux, "POST /api/prompts/optimize", s.handlePromptOptimize)
+	s.route(mux, "POST /api/prompts/optimize-image", s.handlePromptOptimizeImage)
+	s.route(mux, "POST /api/prompts/caption", s.handlePromptCaption)
 	s.route(mux, "POST /v1/audio/speech", s.handleAudioSpeech)
 	s.route(mux, "POST /v1/videos", s.handleVideoCreate)
 	s.route(mux, "POST /v1/videos/upscale", s.handleVideoUpscale)
@@ -299,12 +299,12 @@ func (s *Server) handleImageEdits(ctx *httpx.Ctx) error {
 	return nil
 }
 
-// handlePromptOptimize implements POST /v1/prompts/optimize.
+// handlePromptOptimize implements POST /api/prompts/optimize.
 func (s *Server) handlePromptOptimize(ctx *httpx.Ctx) error {
 	return s.runPromptRoute(ctx, false)
 }
 
-// handlePromptOptimizeImage implements POST /v1/prompts/optimize-image.
+// handlePromptOptimizeImage implements POST /api/prompts/optimize-image.
 func (s *Server) handlePromptOptimizeImage(ctx *httpx.Ctx) error {
 	return s.runPromptRoute(ctx, true)
 }
@@ -361,7 +361,7 @@ func (s *Server) runPromptRoute(ctx *httpx.Ctx, imageOnly bool) error {
 	return nil
 }
 
-// handlePromptCaption implements POST /v1/prompts/caption.
+// handlePromptCaption implements POST /api/prompts/caption.
 func (s *Server) handlePromptCaption(ctx *httpx.Ctx) error {
 	body, err := bodyOrEmpty(ctx)
 	if err != nil {

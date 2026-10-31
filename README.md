@@ -154,7 +154,7 @@ different services**.
 
 | Endpoint | Purpose |
 |---|---|
-| `/v1/prompts/optimize`, `/v1/prompts/optimize-image`, `/v1/prompts/caption` | Prompt optimization, image captioning |
+| `/api/prompts/optimize`, `/api/prompts/optimize-image`, `/api/prompts/caption` | Prompt optimization, image captioning |
 | `/api/resources/*` | Download models, install custom nodes |
 | `/api/workflows/*`, `/api/setup/*` | Workflow metadata, ComfyUI scanning |
 | `/api/system/*`, `/api/loras`, `/api/tasks`, `/files/:name`, `/health` | System status and artifacts |
@@ -170,7 +170,7 @@ these, the canvas never sees them:
 `POST /prompt`, `GET /history/:id`, `GET /view`, `POST /upload/image`, `GET /object_info`,
 `GET /internal/folder_paths`, `GET /system_stats`, `POST /free`, `POST /interrupt`, `/queue`
 
-**llama-server `:8099` endpoints** — only the `cloud` mode of `/v1/prompts/*` calls these:
+**llama-server `:8099` endpoints** — only the `cloud` mode of `/api/prompts/*` calls these:
 
 `POST /v1/chat/completions`, `GET /v1/models`, `GET /health`
 

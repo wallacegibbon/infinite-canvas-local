@@ -14,7 +14,7 @@ the whole thing offline.
 
 ```text
 browser (canvas :3000)
-   └─→ gateway :8190   /v1/prompts/*
+   └─→ gateway :8190   /api/prompts/*
           └─→ llama-server :8099   POST /v1/chat/completions
 ```
 
@@ -27,7 +27,7 @@ root [`../README.md`](../README.md).
 
 ---
 
-## All three `/v1/prompts/*` endpoints are `/chat/completions`
+## All three `/api/prompts/*` endpoints are `/chat/completions`
 
 The names invite confusion: the "image" in `optimize-image` means **a prompt for an image
 model**, not "optimize an image". All three are **gateway-specific** (OpenAI has none of
@@ -37,15 +37,15 @@ an image is attached:
 
 | Gateway endpoint | Purpose | System prompt | Attaches image |
 |---|---|---|---|
-| `/v1/prompts/optimize` | Video (H3) prompts | `prompts/skills/h3-prompt-writing/`, **≈ 4500 tokens** | Optional, up to 8 |
-| `/v1/prompts/optimize-image` | Image prompts | `CLOUD_IMAGE_SYSTEM_PROMPT`, ≈ 200 tokens | **No, text only** |
-| `/v1/prompts/caption` | Image → text (captioning) | Caption template | **Always exactly 1** |
+| `/api/prompts/optimize` | Video (H3) prompts | `prompts/skills/h3-prompt-writing/`, **≈ 4500 tokens** | Optional, up to 8 |
+| `/api/prompts/optimize-image` | Image prompts | `CLOUD_IMAGE_SYSTEM_PROMPT`, ≈ 200 tokens | **No, text only** |
+| `/api/prompts/caption` | Image → text (captioning) | Caption template | **Always exactly 1** |
 
 Mapping to the canvas: the "optimize" button on an H3 node uses the first, the "optimize"
 button on an image node uses the second, and the "caption" button on an image node uses the third.
 
 So `optimize-image` is the easiest smoke test (text only, short prompt, instant answer),
-while `/v1/prompts/optimize` needs a large `-c` because of that 4500-token system prompt.
+while `/api/prompts/optimize` needs a large `-c` because of that 4500-token system prompt.
 
 ---
 
@@ -135,15 +135,15 @@ means success:
 C='-F cloudBaseUrl=http://127.0.0.1:8099/v1 -F cloudApiKey=sk-local -F cloudModel=local-model'
 
 # Image prompt expansion
-curl -s -X POST http://127.0.0.1:8190/v1/prompts/optimize-image $C \
+curl -s -X POST http://127.0.0.1:8190/api/prompts/optimize-image $C \
   -F 'prompt=a cat' -F 'language=zh'        # omitting mode means text-to-image
 
 # Captioning (needs --mmproj)
-curl -s -X POST http://127.0.0.1:8190/v1/prompts/caption $C \
+curl -s -X POST http://127.0.0.1:8190/api/prompts/caption $C \
   -F 'language=zh' -F 'image=@/path/to/photo.png;type=image/png'
 
 # H3 video prompt (system prompt ≈ 4500 tokens, the context must be big enough)
-curl -s -X POST http://127.0.0.1:8190/v1/prompts/optimize $C \
+curl -s -X POST http://127.0.0.1:8190/api/prompts/optimize $C \
   -F 'prompt=a black cat on a windowsill watching the rain' -F 'mode=文生视频(T2VA)' -F 'language=zh' -F 'duration=5'
 ```
 

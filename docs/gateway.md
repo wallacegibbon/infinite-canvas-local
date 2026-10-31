@@ -93,7 +93,7 @@ gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a *diffe
 | `MAX_STORED_TASKS` | `0` | Cap on stored tasks; `0` is unlimited. |
 | `MAX_UPLOAD_BYTES` | `52428800` | Per-file upload limit. |
 | `RESOURCE_CONCURRENCY` | `2` | Parallel downloads during a resource install. |
-| `PROMPT_MAX_TOKENS` | `8192` | Completion budget for `/v1/prompts/*`. Must cover reasoning plus the answer on a thinking model. |
+| `PROMPT_MAX_TOKENS` | `8192` | Completion budget for `/api/prompts/*`. Must cover reasoning plus the answer on a thinking model. |
 | `PROMPT_THINKING_PARAM` | `none` | `none` sends only standard OpenAI fields. `auto` learns per endpoint. Or pin `chat_template_kwargs` / `enable_thinking` / `reasoning_effort`. |
 
 ### The gateway runs beside ComfyUI
@@ -184,9 +184,9 @@ Generation (multipart where media is involved):
 | `GET` | `/v1/videos/{id}/content` | Finished video bytes. |
 | `POST` | `/v1/videos/{id}/cancel` | Cancel a job. |
 | `POST` | `/v1/audio/speech` | Text-to-music (and speech-style) workflows: audio bytes out. `input` is the style caption, optional `instructions` is the lyrics. |
-| `POST` | `/v1/prompts/optimize` | Rewrite a prompt for H3 video. |
-| `POST` | `/v1/prompts/optimize-image` | Rewrite a prompt for image generation. |
-| `POST` | `/v1/prompts/caption` | Reverse-engineer a prompt from an image. |
+| `POST` | `/api/prompts/optimize` | Rewrite a prompt for H3 video. |
+| `POST` | `/api/prompts/optimize-image` | Rewrite a prompt for image generation. |
+| `POST` | `/api/prompts/caption` | Reverse-engineer a prompt from an image. |
 
 Audio requests speak the OpenAI speech shape (`model`, `input`, `response_format`, …) because
 that is what the canvas audio node already sends. A music graph needs two texts, so `input`
@@ -243,7 +243,7 @@ carries reaches a node.
 
 ### Prompt endpoints and thinking models
 
-`/v1/prompts/*` rewrites text, so a chain of thought is pure overhead — and one
+`/api/prompts/*` rewrites text, so a chain of thought is pure overhead — and one
 specific failure. A thinking model writes its reasoning to `reasoning_content` and
 only starts `content` when it finishes; if `max_tokens` runs out first, the answer is
 empty. Measured against Qwen3.8-27B on the real H3 rewrite: ~900 reasoning tokens

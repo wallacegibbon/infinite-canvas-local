@@ -20,7 +20,7 @@ import (
 	"comfyui-gateway/internal/util"
 )
 
-// Task modes accepted by /v1/prompts/optimize. These are H3 task types, and the
+// Task modes accepted by /api/prompts/optimize. These are H3 task types, and the
 // prompt template differs per mode, so the set is closed.
 var taskModes = map[string]bool{
 	"全参考模式(Reference to Video)": true,

@@ -6,30 +6,53 @@ written out as commands.
 
 ---
 
-## 1. SeedVR2 workflows cannot load (missing Python packages)
+## 1. SeedVR2 node pack does not import (incomplete tree, after a fixed pip conflict)
 
-**Symptom** `image-seedvr2-upscale` and `video-seedvr2-upscale` never become available.
-ComfyUI's log shows `IMPORT FAILED` for `ComfyUI-SeedVR2_VideoUpscaler`; the canvas reports
-"missing node SeedVR2LoadDiTModel".
+**Symptom** `video-seedvr2-upscale` is unavailable; ComfyUI's log shows `IMPORT FAILED` for
+`ComfyUI-SeedVR2_VideoUpscaler` and the canvas reports `missing node SeedVR2LoadDiTModel`.
+`/api/resources/status` now names the classes it never got (`missingClasses`), which is the
+fastest way to see it.
 
-**Cause** The node is present in ComfyUI's `custom_nodes`, but three of its imports are
-missing from the ComfyUI venv. Measured on the reference machine:
+**State on the reference machine (2026-10-31)**
 
-```
-MISSING diffusers
-MISSING omegaconf
-MISSING rotary_embedding_torch
-OK      cv2
-OK      einops
-```
+1. The Python packages the node needs were missing and are now installed:
 
-**Fix** See [`runtime-deps.md`](runtime-deps.md):
+   ```
+   diffusers 0.42.1  omegaconf 2.4.0  rotary_embedding_torch 0.9.1
+   opencv-python 5.0.0.93  einops 0.8.2
+   ```
 
-```bash
-"<ComfyUI's python>" -m pip install diffusers omegaconf rotary_embedding_torch opencv-python einops
-```
+2. That install pulled `huggingface-hub 2.4.0`, which **breaks the whole environment**: both
+   `transformers 5.15.0` and `tokenizers 0.22.2` require `<2.0`. Fixed by pinning it back —
+   `diffusers` itself only needs `>=1.32,<3`, so the two ranges meet:
 
-Restart ComfyUI afterwards.
+   ```bash
+   "<ComfyUI's python>" -m pip install "huggingface-hub>=1.32,<2"   # -> 1.33.0
+   "<ComfyUI's python>" -m pip check                                 # No broken requirements found
+   ```
+
+3. The node still fails, for a different and unrelated reason: the **installed pack is
+   incomplete**. `src/` holds `common core interfaces models optimization utils` but no
+   `data/`, so its own import of `.data` cannot resolve:
+
+   ```
+   ModuleNotFoundError: No module named
+     '/home/wallace/comfy/ComfyUI/custom_nodes/ComfyUI-SeedVR2_VideoUpscaler.src.data'
+   ```
+
+**Fix** Reinstall the node pack so `src/data/` exists (re-download; do not hand-patch), then
+restart ComfyUI. Note the pack was extracted as `ComfyUI-Frame-Interpolation-main`-style
+folders elsewhere — ComfyUI loads those fine, and the resource panel no longer cares about the
+folder name (it asks ComfyUI which classes are loaded).
+
+**Not affected** H3 generation, RIFE interpolation (`video-rife`, verified end to end:
+24fps/24 frames → 47 frames at 48fps with audio), image and audio workflows. Only the upscale
+button is down.
+
+**Follow-up worth deciding** Interpolating a clip with **no audio track** fails inside VHS
+(`VHS failed to extract audio`). Clips the canvas produces always carry audio; an imported
+silent clip does not. Detaching the audio input when the source has none would fix it at the
+cost of never carrying audio through.
 
 ---
 
@@ -72,7 +95,7 @@ disabled (`PROMPT_THINKING_PARAM=none`), so the instruction is being sent but is
 followed — either the model ignores it or the system prompt in
 `prompts/skills/h3-prompt-writing/` does not carry enough weight.
 
-**Next step** Reproduce with the same prompt through `curl /v1/prompts/optimize`, compare the
+**Next step** Reproduce with the same prompt through `curl /api/prompts/optimize`, compare the
 raw completion against the system prompt, and decide whether the fix belongs in the skill
 files (stronger instruction) or in `internal/prompt`.
 

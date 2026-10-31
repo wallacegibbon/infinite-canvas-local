@@ -914,7 +914,7 @@ export async function requestPromptOptimize(
     const files = await Promise.all(images.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file, index) => formData.append(index === 0 ? "image" : `image${index + 1}`, file));
     try {
-        const payload = await httpJson<PromptOptimizeResult>(`${root}/v1/prompts/optimize`, {
+        const payload = await httpJson<PromptOptimizeResult>(`${root}/api/prompts/optimize`, {
             method: "POST",
             headers: aiHeaders(requestConfig),
             body: formData,
@@ -953,7 +953,7 @@ export async function requestImagePromptOptimize(
         files.forEach((file, index) => formData.append(index === 0 ? "image" : `image${index + 1}`, file));
     }
     try {
-        const payload = await httpJson<ImagePromptOptimizeResult>(`${root}/v1/prompts/optimize-image`, {
+        const payload = await httpJson<ImagePromptOptimizeResult>(`${root}/api/prompts/optimize-image`, {
             method: "POST",
             headers: aiHeaders(requestConfig),
             body: formData,
@@ -990,7 +990,7 @@ export async function requestImageCaption(
     const file = await dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) });
     formData.append("image", file);
     try {
-        const payload = await httpJson<ImageCaptionResult>(`${root}/v1/prompts/caption`, {
+        const payload = await httpJson<ImageCaptionResult>(`${root}/api/prompts/caption`, {
             method: "POST",
             headers: aiHeaders(requestConfig),
             body: formData,
