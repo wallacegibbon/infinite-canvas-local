@@ -85,6 +85,7 @@ import {
     getGenerationCount,
     getInputSummary,
     hasResumableAudioRun,
+    hasResumableImageRun,
     hasResumableVideoTask,
     hydrateAssistantImages,
     hydrateCanvasImages,
@@ -2005,16 +2006,17 @@ function InfiniteCanvasPage() {
         }),
         [completeVideoNodeTask, finishGenerationRequest, pollVideoNodeTask, setConnections, setDialogNodeId, setExpandedBatchNodeIds, setNodes, setSelectedConnectionId, setSelectedNodeIds, startGenerationRequest],
     );
-    const { runImageGeneration, runVideoGeneration, runAudioGeneration, runTextGeneration, retryNode, pollAudioRun } = useGenerationRuns(generationRunDeps);
+    const { runImageGeneration, runVideoGeneration, runAudioGeneration, runTextGeneration, retryNode, pollAudioRun, pollImageRun } = useGenerationRuns(generationRunDeps);
 
-    // Audio runs live on the gateway, so a reload reattaches instead of losing the song. The effect
-    // runs once per opened project, like the video one above, and never cancels the run.
-    const audioResumeProjectRef = useRef<string | null>(null);
+    // Audio and image runs live on the gateway, so a reload reattaches instead of losing the work.
+    // The effect runs once per opened project, like the video one above, and never cancels the run.
+    const runResumeProjectRef = useRef<string | null>(null);
     useEffect(() => {
-        if (!projectLoaded || audioResumeProjectRef.current === projectId) return;
-        audioResumeProjectRef.current = projectId;
+        if (!projectLoaded || runResumeProjectRef.current === projectId) return;
+        runResumeProjectRef.current = projectId;
         nodesRef.current.filter(hasResumableAudioRun).forEach((node) => void pollAudioRun(node, true));
-    }, [projectLoaded, projectId, pollAudioRun]);
+        nodesRef.current.filter(hasResumableImageRun).forEach((node) => void pollImageRun(node, true));
+    }, [projectLoaded, projectId, pollAudioRun, pollImageRun]);
 
     const handleGenerateNode = useCallback(
         async (nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => {

@@ -1958,3 +1958,28 @@ user stop.
 `internal/server/routes_video.go`, `internal/workflow/inputs.go`,
 `infinite-canvas/web/src/services/api/video.ts`, `services/api/runs.ts`, `pages/canvas/project.tsx`,
 `docs/protocol.md`.
+
+## 60. An interrupted image batch reattaches to its run
+
+**Decision** An image node keeps the id of the batch run that is producing it (`metadata.imageRunId`,
+the same shape audio uses). A reload finds the node `loading` with its placeholder slots still in
+place, and one poll fills them from the run instead of asking the gateway for the images a second
+time.
+
+**Why it needed more than the audio pattern** Audio has one artifact and one field to write; an image
+batch has N placeholders, N uploads to canvas storage and a node that resizes to its first image. So
+the fill step moved out of the live request into `fillImageSlot`, and both paths call it: the live
+batch keeps its behaviour, and the resume path is the same code reading the same artifacts in the
+same order. That is the property worth having — a reloaded batch must be indistinguishable from one
+that never stopped, or the two paths will drift.
+
+**What stays unwritten** A single-image retry (the "regenerate this slot" action) does not record a
+run id, because the node it repairs usually already has content and would not qualify as resumable
+anyway. Retrying is a deliberate, short action; the batch is the one that can quietly outlive a page.
+
+**Tested** `tests/canvas-resumable-runs.test.ts`: a `loading` image node with `imageRunId` survives
+the restore pass (and one with content, or of another type, does not). The fill-and-resume path was
+exercised against the real gateway during the image migration.
+
+**Where** `infinite-canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`,
+`lib/canvas/canvas-generation-helpers.ts`, `pages/canvas/project.tsx`, `types/canvas.ts`.

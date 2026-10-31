@@ -17,10 +17,11 @@ criterion.
   returns several). Audio is already an adapter on the same execution path.
 - Done: `inputs` is typed and checked at submission (closed key set, types, ranges, `required`,
   output container), with `GET /api/workflows/{id}/schema` publishing the same contract.
-- Done: **the canvas's audio and image nodes use this protocol.** They submit a run, keep its id on
-  the node, drive the step ring from the run's own progress, resume polling after a reload, and
+- Done: **the canvas's audio, image and video nodes use this protocol.** They submit a run, keep its
+  id on the node, drive the step ring from the run's own progress, resume polling after a reload, and
   cancel the run when the user stops it. An image batch is one run with `count`, so its outputs are
-  one artifact list instead of N parallel requests.
+  one artifact list instead of N parallel requests — and a reload fills the batch's placeholders from
+  that run instead of asking for the images again.
 - Done: **the canvas's video nodes use this protocol too.** The workflow's mode decides which media
   a request carries (`first_frame` / `last_frame` / `reference` + `video` + `audio`), `frameMode` is
   an input, and the two video-only knobs the gateway itself honours — `interpolation` — are applied

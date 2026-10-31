@@ -119,6 +119,8 @@ export type CanvasNodeMetadata = {
     videoTaskProvider?: "openai" | "gemini" | "run";
     /** The gateway run that is producing this node's audio, kept so a reload can resume polling. */
     audioRunId?: string;
+    /** The gateway run that is producing this node's images, kept so a reload can resume polling. */
+    imageRunId?: string;
     previewUrl?: string;
     previewMime?: string;
     previewStep?: number;

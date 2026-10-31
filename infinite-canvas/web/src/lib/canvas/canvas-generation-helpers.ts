@@ -150,10 +150,21 @@ export function hasResumableAudioRun(node: CanvasNodeData) {
     return node.type === CanvasNodeType.Audio && node.metadata?.status === "loading" && Boolean(node.metadata?.audioRunId) && !node.metadata?.content;
 }
 
+/**
+ * An image node whose batch run is still in flight.
+ *
+ * The slots (`metadata.images`) are written before the run is submitted, so a reload finds the same
+ * placeholders the live request would have filled: resuming is one poll and a fill per slot, not a
+ * second batch.
+ */
+export function hasResumableImageRun(node: CanvasNodeData) {
+    return node.type === CanvasNodeType.Image && node.metadata?.status === "loading" && Boolean(node.metadata?.imageRunId) && !node.metadata?.content;
+}
+
 export function resetInterruptedGeneration(nodes: CanvasNodeData[]) {
     return nodes.map((node) =>
         node.metadata?.status === "loading"
-            ? hasResumableVideoTask(node) || hasResumableAudioRun(node)
+            ? hasResumableVideoTask(node) || hasResumableAudioRun(node) || hasResumableImageRun(node)
                 ? node
                 : {
                       ...node,

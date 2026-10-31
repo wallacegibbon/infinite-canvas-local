@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
  */
 vi.mock("@/i18n", () => ({ default: { t: (key: string) => key } }));
 
-const { hasResumableAudioRun, hasResumableVideoTask, resetInterruptedGeneration } = await import("@/lib/canvas/canvas-generation-helpers");
+const { hasResumableAudioRun, hasResumableImageRun, hasResumableVideoTask, resetInterruptedGeneration } = await import("@/lib/canvas/canvas-generation-helpers");
 
 type Node = Parameters<typeof hasResumableAudioRun>[0];
 const node = (overrides: Record<string, unknown>): Node =>
@@ -41,6 +41,19 @@ describe("hasResumableAudioRun", () => {
     });
 });
 
+describe("hasResumableImageRun", () => {
+    it("is true for a loading image node whose batch run is still going", () => {
+        const slot = { id: "slot_1", status: "loading", content: "" };
+        expect(hasResumableImageRun(node({ type: "image", metadata: { status: "loading", imageRunId: "task_4", images: [slot] } }))).toBe(true);
+    });
+
+    it("is false once an image has landed, and for other node types", () => {
+        expect(hasResumableImageRun(node({ type: "image", metadata: { status: "loading", imageRunId: "task_4", content: "blob:1" } }))).toBe(false);
+        expect(hasResumableImageRun(node({ type: "video", metadata: { status: "loading", imageRunId: "task_4" } }))).toBe(false);
+        expect(hasResumableImageRun(node({ type: "image", metadata: { status: "loading" } }))).toBe(false);
+    });
+});
+
 describe("resetInterruptedGeneration", () => {
     it("keeps a loading node whose audio run can be resumed", () => {
         const input = [node({ metadata: { status: "loading", audioRunId: "task_1" } })];
@@ -59,6 +72,11 @@ describe("resetInterruptedGeneration", () => {
         const input = [node({ type: "video", metadata: { status: "loading", videoTaskId: "task_3", videoTaskProvider: "run" } })];
         expect(hasResumableVideoTask(input[0])).toBe(true);
         expect(resetInterruptedGeneration(input)[0].metadata).toMatchObject({ status: "loading", videoTaskProvider: "run" });
+    });
+
+    it("keeps a loading image node whose batch run can be resumed", () => {
+        const input = [node({ type: "image", metadata: { status: "loading", imageRunId: "task_4" } })];
+        expect(resetInterruptedGeneration(input)[0].metadata?.status).toBe("loading");
     });
 
     it("marks a loading node with no run as interrupted", () => {
