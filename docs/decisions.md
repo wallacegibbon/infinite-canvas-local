@@ -1907,3 +1907,54 @@ sends: a run reached `succeeded` 30/30 and the downloaded mp3 played; `opus` cam
 **Where** `infinite-canvas/web/src/services/api/runs.ts`, `services/api/audio.ts`,
 `pages/canvas/hooks/use-generation-runs.ts`, `pages/canvas/project.tsx`,
 `lib/canvas/canvas-generation-helpers.ts`.
+
+## 59. A video run carries roles, frames and its own post-step
+
+**Decision** Video nodes submit `POST /api/runs` like every other node, and the request is the
+workflow's own contract: `mode` picks the media mix, the frames arrive as `first_frame` /
+`last_frame`, multi-reference arrives as `reference` + `video` + `audio`, and `frameMode` says which
+frames the request supplies. `interpolation` is a run input the gateway executes: the frame-rate pass
+runs on the produced video inside the same run. The task id the node stores is a run id, and the
+in-flight preview frame is part of the run payload.
+
+**Why the old shape had to go** `/v1/videos` was the most branch-heavy endpoint in the gateway: one
+multipart form whose field names (`image[]`, `images`, `first_frame`, `video[]`, `audio[]`) had to be
+resolved against the workflow, a `params` JSON string carrying `frameMode` and `interpolation`, and
+task polling split across `/{id}`, `/{id}/content`, `/{id}/cancel` and `/api/previews/{promptId}`. A
+video took minutes, so the interesting case — the page reloaded mid-render — was the one the shape
+handled worst: the id lived on a task nobody could reattach to, and the preview came from an endpoint
+keyed by a ComfyUI prompt id the client never saw.
+
+**Why `interpolation` is an input and not a second run** The alternatives were a client-side chain
+(submit, download, re-upload, submit again) or a hidden second run inside the gateway. Both leak the
+same thing: two ids, two failure modes and an intermediate artifact nobody asked for. The canvas
+wants "a 60fps version of this clip", which is one request and one artifact, so the post-step lives
+inside the run — the same code `/v1/videos` uses, which is why the two routes cannot drift. It is also
+declared: `interpolation` accepts `off|2x|3x` and nothing else, because unlike a sampler name this
+set belongs to the gateway.
+
+**Why `frameMode` is an input when the roles could imply it** A single uploaded `last_frame` cannot
+be told apart from a single `first_frame` by counting: the default rule (`byCount`) would call it a
+first frame and quietly wire the wrong socket. The workflow already declares which frame modes it
+accepts and how many images each needs (`frameMode.images`), so the caller states the mode and the
+gateway judges it — one owner for the rule, one message when it is violated.
+
+**What the canvas sends now** `prompt`, `mode`, `seconds`, the pixel `size` the settings imply
+(`resolution_name` and `ratio` are derived into it, not sent), `frameMode`, `interpolation`, and the
+node's own workflow parameters (`seed`, `steps`, `cfg`, `transition_step`, …). Nothing is renamed on
+the way in, so a rejected request names the offending key.
+
+**Tested** `internal/server/video_runs_e2e_test.go`: a last-frame request wires `last_frame` and not
+`first_frame`; `both` with one image is `missing_reference_image`; an unknown frame mode is
+`invalid_frame_mode`; `interpolation: "4x"` is rejected with the accepted set; a `2x` run submits the
+generation *and* the RIFE graph and still stores one artifact; `frameMode` on an image workflow is
+`unknown input`. `internal/workflow/inputs_test.go` covers the video-only input surface and
+`InterpolationFactor`. `tests/api-video-runs.test.ts` pins the canvas side: one run per generation,
+media by role (frames, references, no media for text-to-video), `interpolation` on the same request,
+step and preview reporting, failure named as a video task failure, and cancel only on an explicit
+user stop.
+
+**Where** `internal/server/postprocess.go`, `internal/server/routes_runs.go`,
+`internal/server/routes_video.go`, `internal/workflow/inputs.go`,
+`infinite-canvas/web/src/services/api/video.ts`, `services/api/runs.ts`, `pages/canvas/project.tsx`,
+`docs/protocol.md`.

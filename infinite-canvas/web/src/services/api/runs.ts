@@ -13,6 +13,9 @@ type RunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
 export type RunProgress = { phase?: string; step?: number; total?: number; percent?: number };
 
+/** A live frame from a run that is still rendering, with a `t` stamp so a poll can replace it. */
+type RunPreview = { url: string; mime?: string };
+
 type RunOutput = {
     index: number;
     kind: string;
@@ -27,6 +30,7 @@ export type Run = {
     workflow: string;
     status: RunStatus;
     progress?: RunProgress;
+    preview?: RunPreview | null;
     outputs?: RunOutput[];
     error?: { code?: string; message?: string; details?: unknown } | null;
     created_at?: string;
@@ -143,7 +147,7 @@ async function getRun(config: AiConfig, id: string): Promise<Run> {
 }
 
 /** Cancel a run. Idempotent on the gateway. */
-async function cancelRun(config: AiConfig, id: string): Promise<Run> {
+export async function cancelRun(config: AiConfig, id: string): Promise<Run> {
     return httpJson<Run>(runUrl(config, `/api/runs/${encodeURIComponent(id)}`), {
         method: "DELETE",
         headers: jsonHeaders(config),

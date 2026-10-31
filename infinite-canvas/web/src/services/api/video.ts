@@ -1,9 +1,11 @@
 import i18n from "@/i18n";
+import { isLocalGatewayUrl } from "@/constant/app-mode";
 import { apiErrorMessage, httpBlob, httpJson, httpVoid, isCancelled, readApiErrorMessage } from "@/services/api/http";
 import { dataUrlToFile, readFileAsDataUrl } from "@/lib/image-utils";
 import { clampVideoSeconds, computeVideoSize, inferVideoRatio } from "@/lib/media-size";
 import { getMediaBlob, resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
+import { cancelRun, createRun, downloadRunOutput, uploadMedia, waitForRun, RunFailedError, type Run } from "@/services/api/runs";
 import { boolConfig, buildApiUrl, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -26,7 +28,11 @@ type VideoMediaOptions = RequestOptions & { videos?: ReferenceVideo[]; audios?: 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
 type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
-type VideoGenerationTask = { id: string; provider: "openai" | "gemini"; model: string };
+/**
+ * A generation in flight. `provider` says how to watch it: `run` is the gateway's run protocol (the
+ * id is a run id), the other two are the `/v1` task contracts those channels expose.
+ */
+type VideoGenerationTask = { id: string; provider: "openai" | "gemini" | "run"; model: string };
 type VideoUpscaleSource = { name: string; type?: string; url?: string; storageKey?: string };
 type VideoUpscaleParams = { scale: number; resolution: number; fps?: number; seed?: number; batchSize?: number; colorCorrection?: string };
 type VideoInterpolateSource = VideoUpscaleSource;
@@ -41,6 +47,30 @@ type GeminiVideoOperation = {
     response?: { generateVideoResponse?: { generatedSamples?: Array<{ video?: { uri?: string } }> } };
 };
 type VideoGenerationTaskState = { status: "pending"; preview?: VideoPreview; steps?: { step: number; total: number } } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
+
+/** Gateway video workflow ids are `video-<slug>` (the registry's naming rule). */
+const GATEWAY_VIDEO_WORKFLOW = /^video-/;
+
+/**
+ * A video run renders for minutes, so it is polled slower than an image: the step count and the
+ * preview frame are the only things a poll adds, and both change slowly.
+ */
+const VIDEO_RUN_INTERVAL_MS = 1500;
+
+/** Whether this channel+model is served by the local gateway, and therefore runs on the run protocol. */
+export function isGatewayVideoModel(config: Pick<AiConfig, "baseUrl" | "model">) {
+    return isLocalGatewayUrl(config.baseUrl) && GATEWAY_VIDEO_WORKFLOW.test(modelOptionName(config.model));
+}
+
+/**
+ * The provider a node stored, in the vocabulary the task API uses.
+ *
+ * A resumed watch has to read the id the same way the original request did, so the provider travels
+ * with the node instead of being guessed from the model when polling.
+ */
+export function videoTaskProviderOf(value: string | undefined): VideoGenerationTask["provider"] {
+    return value === "gemini" || value === "run" ? value : "openai";
+}
 
 function aiApiUrl(config: AiConfig, path: string) {
     return buildApiUrl(config.baseUrl, path);
@@ -58,6 +88,7 @@ export async function requestVideoGeneration(config: AiConfig, prompt: string, r
 }
 
 export async function waitForVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, options?: WaitOptions): Promise<VideoGenerationResult> {
+    if (task.provider === "run") return waitForVideoRun(config, task, options);
     try {
         for (;;) {
             if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -109,6 +140,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
     assertVideoConfig(requestConfig, requestConfig.model);
     if (requestConfig.apiFormat === "gemini") return createGeminiVideoTask(requestConfig, selectedModel, prompt, references, options);
+    if (isGatewayVideoModel(requestConfig)) return createGatewayVideoTask(requestConfig, prompt, references, options);
     return createOpenAIVideoTask(requestConfig, selectedModel, prompt, references, options);
 }
 
@@ -272,6 +304,139 @@ async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, 
     }
 }
 
+/**
+ * What one gateway video request carries, resolved before anything is uploaded.
+ *
+ * The mode decides which media a workflow even looks at (a text-to-video run takes none, a
+ * first/last-frame run takes frames, a multi-reference run takes references), so it is settled once
+ * and then used for both the uploads and the run's inputs.
+ */
+type GatewayVideoPlan = {
+    mode: string;
+    frameMode: string;
+    images: ReferenceImage[];
+    videos: ReferenceVideo[];
+    audios: ReferenceAudio[];
+};
+
+function planGatewayVideo(config: AiConfig, references: ReferenceImage[], options?: VideoMediaOptions): GatewayVideoPlan {
+    const mode = resolveVideoMode(config.videoMode, references.length);
+    return {
+        mode,
+        frameMode: config.frameMode || (references.length >= 2 ? "both" : "first"),
+        images: mode === "text" ? [] : references,
+        videos: mode === "reference" ? options?.videos || [] : [],
+        audios: mode === "reference" ? options?.audios || [] : [],
+    };
+}
+
+/**
+ * Submit one video run.
+ *
+ * Media goes in by role — `first_frame`/`last_frame` for a frame workflow, `reference` plus `video`
+ * and `audio` for multi-reference — and the knobs are the workflow's own declared inputs. Nothing
+ * here renames a field to a legacy multipart name, so a request that the gateway would reject is
+ * rejected at submission rather than minutes into the render.
+ */
+async function createGatewayVideoTask(config: AiConfig, prompt: string, references: ReferenceImage[], options?: VideoMediaOptions): Promise<VideoGenerationTask> {
+    const plan = planGatewayVideo(config, references, options);
+    const inputs: Record<string, unknown> = { prompt, mode: plan.mode };
+    const seconds = normalizeVideoSeconds(config.videoSeconds);
+    if (Number(seconds) > 0) inputs.seconds = Number(seconds);
+    const size = normalizeVideoSize(config.size, config.vquality);
+    if (size) inputs.size = size;
+    if (plan.mode === "frames") inputs.frameMode = plan.frameMode;
+    // Interpolation is applied by the gateway to the artifact, not by a workflow binding: asking
+    // for it here keeps "one request, one video" true instead of chaining a second run.
+    if (config.videoInterpolation && config.videoInterpolation !== "off") inputs.interpolation = config.videoInterpolation;
+    Object.assign(inputs, { transition_step: config.videoSelfLiftMode === "quality" ? 5 : 6 }, options?.params || config.params || {});
+
+    try {
+        const media = await gatewayVideoMedia(config, plan, options);
+        const run = await createRun(config, {
+            workflow: config.model,
+            inputs,
+            ...(Object.keys(media).length ? { media } : {}),
+        });
+        return { id: run.id, provider: "run", model: config.model };
+    } catch (error) {
+        throw new Error(apiErrorMessage(error, apiText("videoTaskCreateFailed")));
+    }
+}
+
+/** Upload the planned media and return the role → upload id map a run request takes. */
+async function gatewayVideoMedia(config: AiConfig, plan: GatewayVideoPlan, options?: VideoMediaOptions): Promise<Record<string, string | string[]>> {
+    const signal = options?.signal;
+    const media: Record<string, string | string[]> = {};
+    const uploadImage = async (image: ReferenceImage, index: number) => {
+        const dataUrl = await imageToDataUrl(image, { signal });
+        if (!dataUrl) throw new Error(apiText("referenceImageReadFailed"));
+        return (await uploadMedia(config, dataUrlToFile({ ...image, dataUrl }), image.name || `reference-${index + 1}.png`, { signal })).id;
+    };
+    const uploadClip = async (item: ReferenceVideo | ReferenceAudio, name: string, errorKey: "invalidReferenceVideo" | "invalidReferenceAudio") => {
+        const file = await referenceMediaToFile(item, name, errorKey, options);
+        return (await uploadMedia(config, file, file.name, { signal })).id;
+    };
+
+    if (plan.mode === "frames") {
+        const first = plan.frameMode === "first" || plan.frameMode === "both" ? plan.images[0] : undefined;
+        const last = plan.frameMode === "last" ? plan.images[0] : plan.frameMode === "both" ? plan.images[1] : undefined;
+        if (first) media.first_frame = await uploadImage(first, 0);
+        if (last) media.last_frame = await uploadImage(last, first ? 1 : 0);
+        return media;
+    }
+    if (plan.mode !== "reference") return media;
+
+    if (plan.images.length) media.reference = await Promise.all(plan.images.map((image, index) => uploadImage(image, index)));
+    if (plan.videos.length) media.video = await Promise.all(plan.videos.map((video, index) => uploadClip(video, `reference-${index + 1}.mp4`, "invalidReferenceVideo")));
+    if (plan.audios.length) media.audio = await Promise.all(plan.audios.map((audio, index) => uploadClip(audio, `reference-${index + 1}.mp3`, "invalidReferenceAudio")));
+    return media;
+}
+
+/**
+ * Watch the run that is producing this video.
+ *
+ * The run belongs to the gateway, so its id survives a reload: nothing is submitted again here, and
+ * the step count and preview frames come from the run itself. Starting the request and watching it
+ * are separate calls for exactly this reason.
+ */
+async function waitForVideoRun(config: AiConfig, task: VideoGenerationTask, options?: WaitOptions): Promise<VideoGenerationResult> {
+    const requestConfig = resolveModelRequestConfig(config, task.model);
+    try {
+        const run: Run = await waitForRun(requestConfig, task.id, {
+            signal: options?.signal,
+            intervalMs: VIDEO_RUN_INTERVAL_MS,
+            onProgress: (current) => {
+                const preview = current.preview;
+                if (preview?.url) {
+                    options?.onPreview?.({
+                        url: resolvePreviewUrl(requestConfig, preview.url),
+                        mime: preview.mime,
+                        step: current.progress?.step,
+                        total: current.progress?.total,
+                    });
+                }
+            },
+            onSteps: options?.onSteps,
+        });
+        options?.onPreview?.(null);
+        const blob = await downloadRunOutput(requestConfig, run, 0, { signal: options?.signal });
+        return { blob };
+    } catch (error) {
+        // Only an explicit stop cancels the run; a reload or a node switch leaves it rendering so
+        // the node can reattach to it later.
+        if (options?.signal?.aborted && options.signal.reason === "user-stop") {
+            await cancelRun(requestConfig, task.id).catch(() => undefined);
+        }
+        options?.onPreview?.(null);
+        if (isCancelled(error) || options?.signal?.aborted) throw error;
+        // The canvas clears a failed task id from this error, which is what stops it polling a run
+        // that will never answer differently.
+        if (error instanceof RunFailedError) throw videoTaskFailed(error.message);
+        throw new Error(apiErrorMessage(error, apiText("videoTaskQueryFailed")));
+    }
+}
+
 function resolvePreviewUrl(config: AiConfig, url: string) {
     try {
         return new URL(url, config.baseUrl).toString();
@@ -279,7 +444,6 @@ function resolvePreviewUrl(config: AiConfig, url: string) {
         return url;
     }
 }
-
 async function videoResultFromUrl(url: string, options?: RequestOptions): Promise<VideoGenerationResult> {
     try {
         const blob = await httpBlob(url, { signal: options?.signal });

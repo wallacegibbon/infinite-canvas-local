@@ -205,7 +205,8 @@ it. If the connection dies mid-song, the run finishes anyway and stays readable 
 like any other run. The blocking shape is what the canvas sends today; [`protocol.md`](protocol.md)
 describes the run protocol that replaces it for every media type.
 
-Runs (the protocol in [`protocol.md`](protocol.md); the canvas still uses the `/v1/*` adapters):
+Runs (the protocol in [`protocol.md`](protocol.md); the canvas's image, video and audio nodes all use
+them, and only the video *editor* tools and the prompt-angle edit still reach for `/v1/*`):
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -213,7 +214,7 @@ Runs (the protocol in [`protocol.md`](protocol.md); the canvas still uses the `/
 | `GET` | `/api/uploads` | Uploads that have not expired, newest first. |
 | `POST` | `/api/runs` | Submit a run. Always `202` with the run, never blocks. |
 | `GET` | `/api/runs` | Runs, newest first; `?status=` and `?workflow=` filter. |
-| `GET` | `/api/runs/{id}` | Status, progress, outputs, error. |
+| `GET` | `/api/runs/{id}` | Status, progress, preview frame, outputs, error. |
 | `GET` | `/api/runs/{id}/outputs/{index}` | One artifact. |
 | `GET` | `/api/runs/{id}/preview` | In-flight preview frame, when one exists. |
 | `DELETE` | `/api/runs/{id}` | Cancel (idempotent; also interrupts ComfyUI). |
@@ -234,7 +235,13 @@ Metadata and management:
 | `GET` | `/api/system/stats` | GPU and RAM, plus the last OOM. |
 
 `/api/previews/{promptId}` and `/api/progress/{requestId}` serve in-flight preview
-frames and step counts; both are best-effort and never fail a generation.
+frames and step counts; both are best-effort and never fail a generation. A run also carries its own
+`preview` (`{url, mime}` with a timestamp) in the payload, so a client polling a run needs no second
+endpoint to show one.
+
+Two inputs reach no binding: `loras` is applied by the engine, and `interpolation` (video workflows,
+`off|2x|3x`) is applied to the produced video inside the same run — the same code path `/v1/videos`
+uses, so the two routes cannot render differently.
 
 ### Prompt endpoints and thinking models
 

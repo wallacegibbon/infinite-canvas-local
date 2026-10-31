@@ -45,6 +45,22 @@ type InputSpec struct {
 // semanticInputs are the keys that drive the request itself rather than a binding.
 var semanticInputs = []string{"prompt", "negative", "size", "count", "n", "quality", "seconds", "duration", "mode", "background", "editCanvasSize", "layout", "layoutEnabled"}
 
+// InterpolationOptions are the frame-rate multipliers the gateway can apply to a finished video.
+// The engine owns the set (it is a post-step of the run, not a workflow binding), which is why the
+// canvas may only ask for one of these.
+var InterpolationOptions = []string{"off", "2x", "3x"}
+
+// InterpolationFactor turns a request value into a RIFE multiplier; 0 means "leave it alone".
+func InterpolationFactor(value string) int {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "2x":
+		return 2
+	case "3x":
+		return 3
+	}
+	return 0
+}
+
 // InputSpecs is the typed contract of a workflow, assembled from three sources: the request-level
 // keys above, the workflow's declared `parameters`, and its non-media binding keys.
 func (e *Entry) InputSpecs(limits InputLimits) []InputSpec {
@@ -88,6 +104,14 @@ func (e *Entry) InputSpecs(limits InputLimits) []InputSpec {
 	add(InputSpec{Key: "seconds", Type: "number", Min: &minimumSeconds, Label: "Seconds"})
 	add(InputSpec{Key: "duration", Type: "number", Min: &minimumSeconds, Label: "Duration"})
 	add(InputSpec{Key: "mode", Type: "string", Options: e.VariantModes(), Label: "Mode"})
+	if strings.EqualFold(e.Type, "video") {
+		// Which frames a request supplies (first, last or both) and how many images each of
+		// those needs is the workflow's own declaration, so `frameMode` is accepted here and
+		// judged by PlanMedia — one owner for the rule, one message for the caller.
+		add(InputSpec{Key: "frameMode", Type: "string", Label: "Frame mode"})
+		// The gateway owns this one: it is applied to the finished artifact, not to a binding.
+		add(InputSpec{Key: "interpolation", Type: "string", Options: InterpolationOptions, StrictOptions: true, Label: "Interpolation"})
+	}
 	add(InputSpec{Key: "background", Type: "string", Label: "Background"})
 	add(InputSpec{Key: "editCanvasSize", Type: "size", Label: "Edit canvas size"})
 	// The structured layout a MOSS workflow renders into its prompt; the gateway owns its shape, so

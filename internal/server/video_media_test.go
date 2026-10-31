@@ -35,6 +35,11 @@ func videoFixture() (string, map[string]any, map[string]any) {
 		},
 		"bindings": map[string]any{
 			"prompt": map[string]any{"node": "76", "input": "prompt"},
+			// The first/last wiring is a binding, so a test can see which socket a role reached.
+			"frames": map[string]any{
+				"node": "76", "input": "first_frame", "from": "image", "frameMode": true,
+				"firstInput": "first_frame", "lastInput": "last_frame", "max": 2,
+			},
 		},
 	}
 	return "test-video.json", graph, entry

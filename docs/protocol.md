@@ -17,10 +17,17 @@ criterion.
   returns several). Audio is already an adapter on the same execution path.
 - Done: `inputs` is typed and checked at submission (closed key set, types, ranges, `required`,
   output container), with `GET /api/workflows/{id}/schema` publishing the same contract.
-- Done: **the canvas's audio nodes use this protocol.** They submit a run, keep its id on the node,
-  drive the step ring from the run's progress, resume polling after a reload, and cancel the run
-  when the user stops it. Image and video nodes still use the `/v1` adapters.
-- Next: image nodes (uploads + multi-output), then video nodes; then delete `/v1/*`.
+- Done: **the canvas's audio and image nodes use this protocol.** They submit a run, keep its id on
+  the node, drive the step ring from the run's own progress, resume polling after a reload, and
+  cancel the run when the user stops it. An image batch is one run with `count`, so its outputs are
+  one artifact list instead of N parallel requests.
+- Done: **the canvas's video nodes use this protocol too.** The workflow's mode decides which media
+  a request carries (`first_frame` / `last_frame` / `reference` + `video` + `audio`), `frameMode` is
+  an input, and the two video-only knobs the gateway itself honours — `interpolation` — are applied
+  to the artifact inside the same run. The live preview frame is part of the run payload, so a
+  generating node no longer reads a second endpoint to show one.
+- Next: the two video *editor* tools (upscale, interpolate) and the prompt-angle edit still call
+  `/v1/*`; when they are on runs, the adapters are deleted.
 
 The routes below are the contract to build against; where a route already exists with the same
 name (`/api/workflows`, `/api/tasks`), it is the real thing.
@@ -102,6 +109,7 @@ the moment the response is written, so a queue that picks the run up immediately
   "workflow": "audio-minimax-music-3",
   "status": "queued",
   "progress": { "phase": "queued", "step": 0, "total": 30 },
+  "preview": null,
   "outputs": [],
   "error": null,
   "created_at": "2026-10-31T06:00:00Z",
@@ -114,6 +122,23 @@ the moment the response is written, so a queue that picks the run up immediately
 
 `status` is one of `queued`, `running`, `succeeded`, `failed`, `cancelled`. Terminal statuses never
 change again. `GET /api/runs/{id}`:
+
+```json
+{
+  "id": "run_6f2c",
+  "status": "running",
+  "progress": { "phase": "executing", "step": 12, "total": 30 },
+  "preview": { "url": "/api/runs/run_6f2c/preview?t=1761889200123", "mime": "image/jpeg" },
+  "outputs": [],
+  "error": null
+}
+```
+
+`preview` is the in-flight frame while a run renders and `null` otherwise. Its `url` carries the
+frame's timestamp, so a poll loop can swap the image it is already showing without a second
+endpoint or a cache-busting guess by the client.
+
+And once it is done:
 
 ```json
 {
@@ -163,6 +188,9 @@ The list is assembled from three sources, so no workflow has to restate it:
    authoritative.
 3. Every remaining non-media binding key (`unet`, `format`, `lyrics`, a LoRA list …), typed from
    the binding when its intent is obvious.
+4. The gateway-owned inputs that reach no binding: `background`, `layout`/`layoutEnabled` (the MOSS
+   prompt), `loras` (applied by the engine), and — for video workflows — `frameMode` (which frames a
+   request supplies) and `interpolation` (raise the produced video's frame rate, `off|2x|3x`).
 
 Rules worth knowing:
 
@@ -178,6 +206,11 @@ Rules worth knowing:
   (`outputs.formats`), and requesting another one is a `400` at submission — not a run that fails in
   ComfyUI a minute later. The quality value the selected container requires is filled in from the
   same declaration.
+- **A gateway-owned input is executed, never bound.** `interpolation` is the only one that changes
+  the artifact: the frame-rate pass runs on the produced video inside the same run, so one request
+  is still one artifact. Chaining a second run over the first one's output would have been the other
+  way to express it, and it would have made the client responsible for two ids, two failures and an
+  intermediate file nobody asked for.
 - Values reach the bindings unchanged, which is why a new workflow becomes runnable without a new
   route or a new struct.
 
@@ -234,7 +267,8 @@ last node is on `/api/runs`, the adapters and their file are deleted.
 2. **Registry as data**: `accepts` / `inputs` / `outputs` + one validator; delete every hardcoded
    workflow-id branch from the handlers.
 3. **`/api/runs` + `/api/uploads`**: the target routes land next to the adapters; the canvas moves
-   node type by node type (audio first, then image, then video).
+   node type by node type — audio, then image, then video (all three are on runs now). What is left
+   is the video editor tools (upscale, interpolate) and the prompt-angle edit.
 4. **Deletion**: adapters, `/v1/*`, dead fields, dead tests, and the docs that described them.
 
 Every phase leaves the repository runnable and `make check` green. Nothing in a later phase

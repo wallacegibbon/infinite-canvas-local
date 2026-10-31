@@ -228,7 +228,7 @@ func (s *Server) handleRunCreate(ctx *httpx.Ctx) error {
 		TimeoutMs: s.runTimeout(object),
 		RequestID: ctx.RequestID,
 		Request:   map[string]any{"inputs": inputs, "media": media.summary},
-	}, nil)
+	}, s.videoPostProcess(object, ctx.RequestID, httpx.String(inputs, "interpolation")))
 	s.logger.Info("run %s queued %s (%s) %s", object, stored.ID, entry.Name, ctx.RequestID)
 
 	// Snapshot: the queue may already be running this record, and serialising the live one races
@@ -493,6 +493,7 @@ func (s *Server) runPayload(stored *task.Task) map[string]any {
 		"workflow":    stored.Model,
 		"status":      runStatus(stored.Status),
 		"progress":    s.runProgress(stored),
+		"preview":     s.runPreview(stored),
 		"outputs":     s.runOutputs(stored),
 		"error":       runErrorPayload(stored),
 		"request":     stored.Request,
@@ -504,6 +505,24 @@ func (s *Server) runPayload(stored *task.Task) map[string]any {
 		payload["prompt_id"] = *stored.PromptID
 	}
 	return payload
+}
+
+// runPreview renders the in-flight frame a run may have produced, if any.
+//
+// The url carries the frame's timestamp so a poll loop can replace the image it is already showing;
+// without it the browser would keep the first preview for the whole run.
+func (s *Server) runPreview(stored *task.Task) any {
+	if stored.PromptID == nil {
+		return nil
+	}
+	preview := s.hub.Get(*stored.PromptID)
+	if preview == nil {
+		return nil
+	}
+	return map[string]any{
+		"url":  "/api/runs/" + stored.ID + "/preview?t=" + util.Itoa(preview.UpdatedAt.UnixMilli()),
+		"mime": defaultStringOf(preview.Mime, "image/jpeg"),
+	}
 }
 
 // runProgress prefers the live step count from the preview hub and falls back to the fraction the

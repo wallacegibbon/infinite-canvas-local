@@ -135,34 +135,7 @@ func (s *Server) handleVideoCreate(ctx *httpx.Ctx) error {
 		TimeoutMs: s.cfg.VideoTimeoutMs,
 		RequestID: ctx.RequestID,
 		Request:   request,
-	}, func(jobCtx context.Context, result *generate.RunResult, progress func(task.Update)) (*task.Result, error) {
-		file := result.Files[0]
-		if interpolation != "off" {
-			progress(task.Update{Progress: 0.97})
-			factor := 2
-			if interpolation == "3x" {
-				factor = 3
-			}
-			interpolator := generate.NewInterpolator(s.cfg.WorkflowDir, s.comfy, s.logger)
-			interpolated, err := interpolator.Interpolate(jobCtx, file.Buffer, file.Filename, factor, ctx.RequestID, s.cfg.VideoTimeoutMs)
-			if err != nil {
-				return nil, err
-			}
-			file = generate.OutputFile{
-				Buffer:   interpolated.Buffer,
-				MimeType: interpolated.MimeType,
-				Filename: interpolated.Filename,
-			}
-		}
-		return &task.Result{
-			Outputs: []task.ResultFile{{
-				Buffer:   file.Buffer,
-				Ext:      util.ExtFromMime(file.MimeType, file.Filename, "mp4"),
-				MimeType: file.MimeType,
-			}},
-			PromptID: result.PromptID,
-		}, nil
-	})
+	}, s.videoPostProcess(task.ObjectVideo, ctx.RequestID, interpolation))
 
 	s.logger.Info("video %s queued %s %s", entry.Name, stored.ID, ctx.RequestID)
 	httpx.OK(ctx.W, queuedPayload(s.tasks.Get(stored.ID)))

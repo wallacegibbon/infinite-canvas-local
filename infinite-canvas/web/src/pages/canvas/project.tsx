@@ -9,7 +9,7 @@ import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { requestEdit, requestGeneration } from "@/services/api/image";
 import { bindStepProgress, unbindStepProgress } from "@/services/api/step-progress";
-import { createVideoGenerationTask, isVideoTaskFailed, storeGeneratedVideo, waitForVideoGenerationTask, type VideoPreview } from "@/services/api/video";
+import { createVideoGenerationTask, isVideoTaskFailed, storeGeneratedVideo, videoTaskProviderOf, waitForVideoGenerationTask, type VideoPreview } from "@/services/api/video";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { ensureImagePreview, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { nanoid } from "nanoid";
@@ -400,7 +400,7 @@ function InfiniteCanvasPage() {
                               metadata: {
                                   ...item.metadata,
                                   videoTaskId: task.id,
-                                  videoTaskProvider: task.provider === "gemini" ? "gemini" : "openai",
+                                  videoTaskProvider: task.provider,
                                   model: config.model,
                                   params: config.params,
                                   previewUrl: undefined,
@@ -440,7 +440,7 @@ function InfiniteCanvasPage() {
                 const video = await storeGeneratedVideo(
                     await waitForVideoGenerationTask(
                         generationConfig,
-                        { id: taskId, provider: node.metadata?.videoTaskProvider === "gemini" ? "gemini" : "openai", model: generationConfig.model },
+                        { id: taskId, provider: videoTaskProviderOf(node.metadata?.videoTaskProvider), model: generationConfig.model },
                         { signal: controller.signal, onPreview: (preview) => updateVideoPreview(node.id, preview), onSteps: (steps) => updateVideoSteps(node.id, steps) },
                     ),
                 );

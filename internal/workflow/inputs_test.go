@@ -114,6 +114,36 @@ func TestValidateInputsPointsMediaAtTheMediaMap(t *testing.T) {
 	}
 }
 
+// The two video-only inputs belong to video workflows and nowhere else: on an image workflow they are
+// typos, and `interpolation` is a value the gateway itself executes, so its set is closed.
+func TestVideoOnlyInputs(t *testing.T) {
+	image := inputEntry()
+	if err := ValidateInputs(image, map[string]any{"prompt": "x", "frameMode": "first"}, InputLimits{}); err == nil {
+		t.Error("frameMode was accepted on an image workflow")
+	}
+
+	video := inputEntry()
+	video.Type = "video"
+	if err := ValidateInputs(video, map[string]any{"prompt": "x", "frameMode": "last", "interpolation": "3x"}, InputLimits{}); err != nil {
+		t.Errorf("video inputs rejected: %v", err)
+	}
+	// The frame rule itself is the workflow's declaration (PlanMedia judges it), so a value is only
+	// rejected when a workflow declares one.
+	err := ValidateInputs(video, map[string]any{"prompt": "x", "interpolation": "4x"}, InputLimits{})
+	if err == nil || !strings.Contains(err.Error(), "off, 2x, 3x") {
+		t.Errorf("interpolation 4x: %v", err)
+	}
+}
+
+func TestInterpolationFactor(t *testing.T) {
+	cases := map[string]int{"": 0, "off": 0, "OFF": 0, "2x": 2, "3x": 3, "4x": 0, " two": 0}
+	for value, want := range cases {
+		if got := InterpolationFactor(value); got != want {
+			t.Errorf("InterpolationFactor(%q) = %d, want %d", value, got, want)
+		}
+	}
+}
+
 // The schema served by /api/workflows/{id}/schema describes exactly what a run accepts.
 func TestSchemaListsTypedInputs(t *testing.T) {
 	entry := inputEntry()

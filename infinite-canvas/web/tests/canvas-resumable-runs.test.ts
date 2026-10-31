@@ -53,6 +53,14 @@ describe("resetInterruptedGeneration", () => {
         expect(resetInterruptedGeneration(input)[0].metadata?.status).toBe("loading");
     });
 
+    it("keeps a video node whose id is a gateway run", () => {
+        // A video node no longer distinguishes "task" from "run": the id on the node is a run id,
+        // and the stored provider is what tells the resumed poll which contract to read it with.
+        const input = [node({ type: "video", metadata: { status: "loading", videoTaskId: "task_3", videoTaskProvider: "run" } })];
+        expect(hasResumableVideoTask(input[0])).toBe(true);
+        expect(resetInterruptedGeneration(input)[0].metadata).toMatchObject({ status: "loading", videoTaskProvider: "run" });
+    });
+
     it("marks a loading node with no run as interrupted", () => {
         const input = [node({ metadata: { status: "loading" } })];
         const [restored] = resetInterruptedGeneration(input);
