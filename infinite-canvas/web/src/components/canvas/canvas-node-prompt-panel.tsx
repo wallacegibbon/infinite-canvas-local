@@ -16,6 +16,7 @@ import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
 import { AgentSettingsControls } from "./agent-settings-controls";
+import { SentPromptDisclosure } from "./sent-prompt-disclosure";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { resolveCanvasReferenceImages } from "@/lib/canvas/canvas-resource-references";
@@ -562,6 +563,7 @@ export function CanvasNodePromptPanel({
                     </span>
                 </Button>
             </div>
+            <SentPromptDisclosure sent={node.metadata?.sentPrompt} current={draft} />
             {(() => {
                 const previewRunning = mode === "text" ? captionRunning : optimizeRunning;
                 const previewPrompt = mode === "text" ? captionResult : optimizeResult;

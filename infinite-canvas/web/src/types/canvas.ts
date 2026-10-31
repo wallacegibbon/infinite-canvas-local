@@ -90,6 +90,8 @@ export type CanvasNodeMetadata = {
     captionStatus?: "running" | "done" | "error";
     captionPrompt?: string;
     captionError?: string;
+    /** The prompt that was actually sent, when it is not the text the user typed (context appended). */
+    sentPrompt?: string;
     promptOptimizeStatus?: "running" | "done" | "error";
     promptOptimizeKind?: "h3" | "image";
     promptOptimizePrompt?: string;

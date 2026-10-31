@@ -2074,9 +2074,9 @@ function InfiniteCanvasPage() {
             setRunningNodeId(nodeId);
             const overwriteExisting = effectiveConfig.nodeRegenerateBehavior === "overwrite";
             const runController = startGenerationRequest(nodeId, nodeId, nodeId);
-            const sourceTextContent = sourceNode?.type === CanvasNodeType.Text ? sourceNode.metadata?.content?.trim() || "" : "";
-            const editingTextNode = mode === "text" && Boolean(sourceTextContent);
-            const generationContext = await hydrateNodeGenerationContext(buildNodeGenerationContext(nodeId, nodesRef.current, connectionsRef.current, editingTextNode ? t("canvas.runtime.editTextPrompt", { source: sourceTextContent, prompt }) : prompt));
+            // The prompt is the prompt. A text node that already holds an answer is not a document to
+            // revise — regenerating asks the same question again, and refining means editing the prompt.
+            const generationContext = await hydrateNodeGenerationContext(buildNodeGenerationContext(nodeId, nodesRef.current, connectionsRef.current, prompt));
             if (generationContext.loras.length) generationConfig.params = { ...(generationConfig.params || {}), loras: generationContext.loras };
             const effectivePrompt = generationContext.prompt.trim();
             if (runController.signal.aborted) {
@@ -2084,7 +2084,7 @@ function InfiniteCanvasPage() {
                 setRunningNodeId(null);
                 return;
             }
-            const markSourceStatus = sourceNode?.type !== CanvasNodeType.Image && !editingTextNode;
+            const markSourceStatus = sourceNode?.type !== CanvasNodeType.Image;
             if (!effectivePrompt && (mode === "text" || mode === "audio")) {
                 finishGenerationRequest(nodeId, runController);
                 setRunningNodeId(null);
@@ -2098,7 +2098,6 @@ function InfiniteCanvasPage() {
                 generationConfig,
                 generationContext,
                 overwriteExisting,
-                sourceTextContent,
                 runController,
                 pendingChildIds: [],
             };

@@ -36,8 +36,6 @@ export type GenerationRun = {
     generationConfig: ReturnType<typeof import("@/lib/canvas/canvas-generation-helpers").buildGenerationConfig>;
     generationContext: Awaited<ReturnType<typeof hydrateNodeGenerationContext>>;
     overwriteExisting: boolean;
-    /** The text a Text node already held, so the text mode can tell "edit this" from "write new". */
-    sourceTextContent: string;
     runController: AbortController;
     /**
      * Filled in by whichever mode ran, so the caller's `catch` can put the nodes it created into the
@@ -513,6 +511,9 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             setDialogNodeId(nodeId);
 
             const controller = rootId === nodeId ? runController : startGenerationRequest(rootId, nodeId, nodeId, runController);
+            // What actually went out goes on the node the user pressed, because that is the node whose
+            // prompt the panel shows: the composition happened to *that* draft, not to the answer's.
+            setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, sentPrompt: effectivePrompt } } : node)));
             const results = await Promise.all(
                 textIds.map(async (textId): Promise<CanvasNodeText | null> => {
                     try {
@@ -727,8 +728,14 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                 }
 
                 const image = useReferenceImages
-                    ? await requestEdit(generationConfig, prompt, retryImages, { signal: controller.signal }).then((items) => items[0])
-                    : await requestGeneration(generationConfig, prompt, { signal: controller.signal }).then((items) => items[0]);
+                    ? await requestEdit(generationConfig, prompt, retryImages, {
+                          signal: controller.signal,
+                          onPrompt: (sent) => setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, sentPrompt: sent } } : item))),
+                      }).then((items) => items[0])
+                    : await requestGeneration(generationConfig, prompt, {
+                          signal: controller.signal,
+                          onPrompt: (sent) => setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, sentPrompt: sent } } : item))),
+                      }).then((items) => items[0]);
                 const uploadedImage = await uploadImage(image.dataUrl, { signal: controller.signal });
                 const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
                 const retryImage: CanvasNodeImage = {

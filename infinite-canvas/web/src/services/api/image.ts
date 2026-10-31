@@ -17,6 +17,8 @@ const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiE
 
 type RequestOptions = {
     signal?: AbortSignal;
+    /** The exact prompt that was sent, once it is composed: the panel shows it back to the user. */
+    onPrompt?: (prompt: string) => void;
     params?: Record<string, unknown>;
     /** Reported as soon as the gateway accepts a run, so the node can resume it after a reload. */
     onRun?: (runId: string) => void;
@@ -190,9 +192,11 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
         requestParams.layout = config.layout;
         requestParams.layoutEnabled = true;
     }
+    const finalPrompt = withSystemPrompt(requestConfig, prompt);
+    options?.onPrompt?.(finalPrompt);
     return requestGatewayImages({
         config: requestConfig,
-        prompt: withSystemPrompt(requestConfig, prompt),
+        prompt: finalPrompt,
         references: [],
         count: n,
         size: requestSize,
@@ -221,9 +225,11 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         requestParams.layout = config.layout;
         requestParams.layoutEnabled = true;
     }
+    const finalPrompt = withSystemPrompt(requestConfig, requestPrompt);
+    options?.onPrompt?.(finalPrompt);
     return requestGatewayImages({
         config: requestConfig,
-        prompt: withSystemPrompt(requestConfig, requestPrompt),
+        prompt: finalPrompt,
         references,
         count: n,
         size: requestSize,

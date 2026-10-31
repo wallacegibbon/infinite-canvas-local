@@ -743,7 +743,6 @@ export default {
                 "{{source}} is the original image. {{mask}} marks the area to edit with a translucent blue overlay on the original image. Only modify the area covered by the blue overlay, keep everything else identical to the original, output a full image with the same size as the original, and do not keep any blue overlay in the result. Edit request: {{prompt}}",
             maskNodeTitle: "Mask annotation",
             cropNodeTitle: "Cropped image",
-            editTextPrompt: "Revise the text according to the instructions.\n\nOriginal:\n{{source}}\n\nInstructions:\n{{prompt}}",
         },
         recovery: {
             title: "Saved canvas data could not be read",
@@ -887,6 +886,8 @@ export default {
             captionTitle: "Image prompt reverse",
             captionHint: "Ask the configured prompt endpoint to infer a prompt from the reference image",
             captionNeedsImage: "Reverse prompt needs a connected reference image",
+            sentPrompt: "Sent {{count}} chars · show",
+            sentPromptHide: "Sent · hide",
             captionNoImage: "Connect a reference image first",
             captionStop: "Stop",
             captioning: "Reversing prompt…",

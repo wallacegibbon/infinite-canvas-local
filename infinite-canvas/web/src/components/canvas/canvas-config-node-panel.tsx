@@ -16,6 +16,7 @@ import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
 import { AgentSettingsControls } from "./agent-settings-controls";
+import { SentPromptDisclosure } from "./sent-prompt-disclosure";
 import type { CanvasGenerationMode, CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 
 type CanvasConfigNodePanelProps = {
@@ -115,6 +116,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
                 </button>
             </div>
 
+            <SentPromptDisclosure sent={node.metadata?.sentPrompt} current={node.metadata?.composerContent ?? node.metadata?.prompt ?? ""} className="mb-1 text-[11px] opacity-70" />
             <div className="mb-2 grid min-w-0 cursor-default grid-cols-[minmax(0,1fr)_148px] items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
                 <div className="flex min-w-0 flex-col gap-1">
                     {/* Text is answered by the prompt endpoint, not by a workflow: there is no text

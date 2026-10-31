@@ -751,7 +751,6 @@ export default {
             maskPrompt: "参考{{source}}为原图，{{mask}}是在原图上用蓝色半透明标注出的待修改区域。请只修改蓝色标注覆盖的区域，其余区域与原图保持完全一致，输出与原图相同尺寸的完整图片，并且结果中不要保留任何蓝色标注。修改要求：{{prompt}}",
             maskNodeTitle: "遮罩标注",
             cropNodeTitle: "裁剪结果",
-            editTextPrompt: "请根据要求修改以下文本。\n\n原文：\n{{source}}\n\n修改要求：\n{{prompt}}",
         },
         recovery: {
             title: "画布数据读取失败",
@@ -895,6 +894,8 @@ export default {
             captionTitle: "图片反推提示词",
             captionHint: "用已配置的提示词接口，从参考图反推一段提示词",
             captionNeedsImage: "反推需要连接一张参考图",
+            sentPrompt: "实际发送 {{count}} 字 · 展开",
+            sentPromptHide: "实际发送 · 收起",
             captionNoImage: "先连接一张参考图",
             captionStop: "停止反推",
             captioning: "正在反推…",
