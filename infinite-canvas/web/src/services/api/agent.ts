@@ -112,8 +112,9 @@ export async function requestAgentStream(config: AiConfig, request: AgentRequest
     } catch (error) {
         throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
     } finally {
-        // The session answered exactly one prompt: whatever happened, the button goes back to Connect.
-        if (useConfigStore.getState().agentSession) useConfigStore.getState().setAgentSession(null);
+        // Only a question spends the connection. A setting change leaves the agent connected, so the
+        // button stays on Send; this is the one place that decides it.
+        if (request.prompt && useConfigStore.getState().agentSession) useConfigStore.getState().setAgentSession(null);
     }
 }
 

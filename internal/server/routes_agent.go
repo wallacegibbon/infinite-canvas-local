@@ -78,15 +78,13 @@ func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 	started := time.Now()
 	s.logger.Info("agent: request command=%q args=%q prompt=%q images=%d", request.Command, request.Args, truncateText(request.Prompt, 120), len(files))
 
-	// The send half of the connect/send button takes the process a connect left behind. A session that
-	// is gone has to be answered before the stream starts: once the headers are out, an error can only
-	// be a broken event.
-	var proc *agent.Process
-	connected := false
-	var state agent.Startup
+	// A session that is gone has to be reported before the stream starts: once the headers are out, an
+	// error can only be a broken event.
+	var session *agent.Session
 	if sessionID != "" {
-		proc, state, connected = s.agentSessions.Take(sessionID)
-		if !connected {
+		var ok bool
+		session, ok = s.agentSessions.Peek(sessionID)
+		if !ok {
 			s.logger.Warn("agent: session %s is not connected", sessionID)
 			return httpx.NewError(http.StatusConflict, "session_not_connected", "this agent session is no longer connected")
 		}
@@ -98,10 +96,21 @@ func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 		counts[event.Type]++
 		emit(event)
 	}
-	if connected {
+	switch {
+	case session != nil && hasPrompt(request):
+		// The send half of the button: the question spends the connection, and the process with it.
+		proc, state, connected := s.agentSessions.Take(sessionID)
+		if !connected {
+			return httpx.NewError(http.StatusConflict, "session_not_connected", "this agent session is no longer connected")
+		}
 		err = agent.Continue(ctx.R.Context(), proc, state, request, relay)
 		s.logger.Info("agent: session=%s answered and released", sessionID)
-	} else {
+	case session != nil:
+		// A setting change: the same connection answers it and stays connected.
+		err = session.Command(ctx.R.Context(), request, relay)
+		s.agentSessions.Touch(sessionID)
+		s.logger.Info("agent: session=%s command=%q stayed connected", sessionID, request.Command)
+	default:
 		err = agent.Run(ctx.R.Context(), s.agentOptions(), request, relay)
 	}
 	if err != nil {
@@ -114,6 +123,11 @@ func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 	}
 	s.logger.Info("agent: request done in %dms (events: %s)", time.Since(started).Milliseconds(), eventCounts(counts))
 	return nil
+}
+
+// hasPrompt reports whether this request asks a question rather than only changing a setting.
+func hasPrompt(request agent.Request) bool {
+	return strings.TrimSpace(request.Prompt) != "" || len(request.Images) > 0
 }
 
 // eventCounts renders what was relayed, which is what a reader needs to tell a finished answer from a

@@ -67,6 +67,32 @@ func (s *Sessions) Connect(ctx context.Context, opts SpawnOptions) (*Session, er
 // State is what the connect response carries: the agent's own startup broadcast.
 func (s *Session) State() Event { return s.state.event() }
 
+// Peek returns the session without consuming it, so a request can be refused before its stream starts.
+func (s *Sessions) Peek(id string) (*Session, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.list[id]
+	return session, ok
+}
+
+// Touch restarts the idle window: the connection is still in use, just not for a question.
+func (s *Sessions) Touch(id string) {
+	s.mu.Lock()
+	session, ok := s.list[id]
+	s.mu.Unlock()
+	if ok && session.expires != nil {
+		session.expires.Reset(idleSession)
+	}
+}
+
+// Command runs one command on a connected agent and leaves it connected. Changing a setting is not
+// asking a question, so it must not spend the connection the way a prompt does.
+func (s *Session) Command(ctx context.Context, req Request, emit func(Event)) error {
+	// The session's own state is updated by what the agent announces (SM model, SM reasoning_level),
+	// so the next prompt's re-emitted model list is the current one.
+	return converse(ctx, s.proc, &s.state, req, emit, true)
+}
+
 // Take removes the session and hands over its process: one connect answers exactly one prompt. The
 // caller owns the process afterwards and must release it.
 func (s *Sessions) Take(id string) (*Process, Startup, bool) {
