@@ -93,10 +93,12 @@ beforeEach(() => {
 });
 
 describe("isGatewayVideoModel", () => {
-    it("is true only for a gateway channel serving a video workflow", () => {
+    it("is decided by the channel, not by the model's name", () => {
         expect(isGatewayVideoModel({ baseUrl: "http://127.0.0.1:8190/v1", model: "video-h3-frames" })).toBe(true);
         expect(isGatewayVideoModel({ baseUrl: "http://127.0.0.1:8190/v1", model: "local-gateway::video-h3-t2v" })).toBe(true);
-        expect(isGatewayVideoModel({ baseUrl: "http://127.0.0.1:8190/v1", model: "image-qwen21" })).toBe(false);
+        // A workflow id has no fixed prefix: a base-model variant is `img-zit-int8`. Requiring one
+        // sent such a selection to a `/v1` route that no longer exists.
+        expect(isGatewayVideoModel({ baseUrl: "http://127.0.0.1:8190/v1", model: "img-zit-int8" })).toBe(true);
         expect(isGatewayVideoModel({ baseUrl: "https://api.example.com/v1", model: "video-h3-frames" })).toBe(false);
     });
 });

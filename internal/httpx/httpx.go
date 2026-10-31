@@ -80,7 +80,7 @@ type payload struct {
 //
 // Every JSON answer is `no-store`. These are live inventories — the workflow list, run status,
 // resource availability — and a browser is allowed to cache a 200 without cache headers
-// heuristically. That is not hypothetical: Chrome served a stale `/v1/models` after a workflow was
+// heuristically. That is not hypothetical: Chrome served a stale workflow list after a workflow was
 // added, so the canvas never saw the new model.
 func JSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

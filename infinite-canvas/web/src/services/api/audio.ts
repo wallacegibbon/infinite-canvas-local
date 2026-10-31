@@ -19,12 +19,6 @@ type AudioRunHooks = {
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
-/**
- * Gateway workflow ids follow `<type>-<slug>` (the registry's naming rule), so an audio workflow can
- * be recognised from its id. Anything else — a TTS channel, a proxy — keeps the speech contract.
- */
-const GATEWAY_AUDIO_WORKFLOW = /^audio-/;
-
 function aiApiUrl(config: AiConfig, path: string) {
     return buildApiUrl(config.baseUrl, path);
 }
@@ -45,7 +39,7 @@ export async function requestAudioGeneration(config: AiConfig, prompt: string, o
 
     // The local gateway exposes runs, not a speech endpoint: submit the workflow and collect the
     // artifact by run id. The synchronous speech call stays for every other channel.
-    if (isLocalGatewayUrl(requestConfig.baseUrl) && GATEWAY_AUDIO_WORKFLOW.test(model)) {
+    if (isLocalGatewayUrl(requestConfig.baseUrl)) {
         return requestAudioRun(requestConfig, model, prompt, instructions, format, options);
     }
 

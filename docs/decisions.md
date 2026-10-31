@@ -2286,3 +2286,47 @@ returned three images.
 `infinite-canvas/web/src/hooks/use-local-gateway-sync.ts`,
 `infinite-canvas/web/src/lib/gateway-models.ts`, `infinite-canvas/web/src/services/api/image.ts`
 (`fetchChannelModels`).
+
+## 69. `/v1` is gone
+
+**Decision** The gateway has no `/v1/...` route. `POST /api/runs` is the only way to produce media;
+`GET /api/workflows` describes what can run; the prompt services and the two in-flight helpers
+(`/api/previews/{id}`, `/api/progress/{id}`) are everything else.
+
+**What was deleted** Nine routes and the code that existed to translate into them:
+`POST /v1/images/generations`, `POST /v1/images/edits`, `POST /v1/videos`, `POST /v1/videos/upscale`,
+`GET /v1/videos/{id}`, `GET /v1/videos/{id}/content`, `POST /v1/videos/{id}/cancel`,
+`POST /v1/audio/speech`, `GET /v1/tasks/{id}`. With them went the request readers nothing else used:
+`requireModel`, `parseParams`, `imageFiles`, `matchesImageField`'s multipart role, `uploadFiles`,
+`orderedVideoFiles`, `orderedVideoRefs`, `orderedAudioRefs`, `toUploadResults`, `mediaNames`,
+`firstMediaName`, `queuedPayload`, `imageResponse`, `runImageWorkflow`, `waitRun`, `runFailure`,
+`runResultBuilder` (no caller ever passed one), and three files of adapter tests.
+
+**What replaced each of them** Nothing: every caller was already moved. The canvas's image, video,
+audio, upscale, interpolate and angle actions all submit runs, and the audio "blocking call" contract
+was the last thing that needed an adapter — the run id answers it.
+
+**The bug the deletion flushed out** All three media modules decided "is this the gateway?" by the
+model's *name*: `<type>_WORKFLOW` regexes (`image-`, `video-`, `audio-`). A base-model variant is
+`img-zit-int8`, which matches none of them, so selecting the int8 base model would have sent the
+request to `/v1/images/generations` — a route that no longer exists. The channel is the only thing that
+decides which contract a request speaks, so the three predicates are now `isLocalGatewayUrl(baseUrl)`.
+
+**What the canvas still has** The `/v1`-shaped request builders (`/images/generations`,
+`/v1/videos/{id}`, `/audio/speech`) stay: they are the OpenAI contract for *other* channels, and the
+channel editor allows a base URL that is not this gateway. They are unreachable for the local gateway,
+which is the point.
+
+**Cost** The gateway can no longer serve a client that speaks OpenAI. That was the goal: it never spoke
+it honestly — one route was `/v1/images/upscale`, another took a `params` JSON string, and every media
+rule was a branch keyed to a workflow id.
+
+**Tested** `make check` and `make test-race`; the two audio adapter tests became
+`audio_runs_e2e_test.go` (caption + lyrics as ordinary inputs, ComfyUI's own error code on failure);
+`video_fixture_test.go` kept only the shared fixture and multipart helper. In the browser: a fresh
+page load syncs its models, generates an image, and lists the workflows with no request to `/v1`.
+
+**Where** `internal/server/routes_generation.go`, `internal/server/routes_video.go` (deleted),
+`internal/server/runs.go`, `internal/server/server.go`, `internal/server/helpers.go`,
+`infinite-canvas/web/src/services/api/{image,video,audio}.ts`, `docs/protocol.md`, `docs/gateway.md`,
+`README.md`.

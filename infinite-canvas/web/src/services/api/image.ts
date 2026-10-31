@@ -80,13 +80,15 @@ type RequestOptions = {
     onProgress?: (run: Run) => void;
 };
 
-/** Gateway image workflow ids are `image-<slug>` (the registry's naming rule). */
-const GATEWAY_IMAGE_WORKFLOW = /^image-/;
-
-/** Whether this channel+model is served by the local gateway and therefore uses runs. */
-export function isGatewayImageModel(config: Pick<AiConfig, "baseUrl" | "model">) {
-    // The selection may be the encoded `channel::model` form; the workflow id is the bare name.
-    return isLocalGatewayUrl(config.baseUrl) && GATEWAY_IMAGE_WORKFLOW.test(modelOptionName(config.model));
+/**
+ * Whether this channel is the local gateway, and therefore uses runs.
+ *
+ * It used to also require an `image-` prefix, on the theory that workflow ids follow the registry's
+ * naming rule. They do not all: a base-model variant is `img-zit-int8`, and a run's id is the workflow
+ * whatever it is called. The channel is the only thing that decides which contract a request speaks.
+ */
+export function isGatewayImageModel(config: Pick<AiConfig, "baseUrl">) {
+    return isLocalGatewayUrl(config.baseUrl);
 }
 
 const DEFAULT_IMAGE_SHORT_SIDE = 1024;

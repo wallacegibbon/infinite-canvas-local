@@ -516,6 +516,16 @@ func (s *Server) handleRequestCancel(ctx *httpx.Ctx) error {
 	return nil
 }
 
+// handleTaskGet implements GET /api/tasks/{id}.
+func (s *Server) handleTaskGet(ctx *httpx.Ctx) error {
+	stored := s.tasks.Get(ctx.R.PathValue("id"))
+	if stored == nil {
+		return httpx.NewError(http.StatusNotFound, "task_not_found", "task not found")
+	}
+	httpx.OK(ctx.W, task.PublicTask(stored))
+	return nil
+}
+
 // handleTasks implements GET /api/tasks.
 func (s *Server) handleTasks(ctx *httpx.Ctx) error {
 	list := s.tasks.List()

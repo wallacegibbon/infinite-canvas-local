@@ -268,92 +268,10 @@ func (s *Server) cancelRequest(id string) bool {
 	return false
 }
 
-// requireModel resolves a model id, rejecting unknown or wrong-typed models.
-func (s *Server) requireModel(model, expectedType string) (*workflow.Entry, error) {
-	name := strings.TrimSpace(model)
-	if name == "" {
-		return nil, httpx.NewError(http.StatusBadRequest, "missing_model", "missing model parameter")
-	}
-	found := s.registry.ResolveModel(name, s.setup.LoaderOptions())
-	if found == nil {
-		return nil, httpx.NewError(http.StatusNotFound, "model_not_found",
-			"model not found: "+name+". Register a workflow in the gateway first, or refresh the model list from the canvas channel.")
-	}
-	if expectedType != "" && found.Entry.Type != expectedType {
-		return nil, httpx.Errorf(http.StatusBadRequest, "model_type_mismatch",
-			"model %s has type %s, not %s", name, found.Entry.Type, expectedType)
-	}
-	return found.Entry, nil
-}
-
-// parseParams accepts params as an object or a JSON string.
-func parseParams(body map[string]any) (map[string]any, error) {
-	value, ok := body["params"]
-	if !ok || value == nil || value == "" {
-		return map[string]any{}, nil
-	}
-	if object, ok := value.(map[string]any); ok {
-		return object, nil
-	}
-	if text, ok := value.(string); ok {
-		var decoded map[string]any
-		if err := json.Unmarshal([]byte(text), &decoded); err == nil && decoded != nil {
-			return decoded, nil
-		}
-	}
-	return nil, httpx.BadRequest("invalid_params", "params must be a JSON object")
-}
-
 // matchesImageField reports whether a form field carries an image or a video frame.
 func matchesImageField(field string) bool {
 	lowered := strings.ToLower(field)
 	return strings.Contains(lowered, "image") || strings.Contains(lowered, "frame")
-}
-
-// imageFiles returns the uploads whose field name marks them as images.
-func imageFiles(files []httpx.File) []httpx.File {
-	var out []httpx.File
-	for _, file := range files {
-		if matchesImageField(file.Field) {
-			out = append(out, file)
-		}
-	}
-	return out
-}
-
-// orderedVideoFiles collects reference frames in a stable, de-duplicated order.
-func orderedVideoFiles(files []httpx.File) []httpx.File {
-	groups := []string{"first_frame", "last_frame", "image", "image[]", "images"}
-	var ordered []httpx.File
-	seen := map[string]bool{}
-
-	push := func(file httpx.File) {
-		if len(file.Bytes) == 0 {
-			return
-		}
-		key := strconv.Itoa(len(file.Bytes)) + ":" + file.Filename
-		if seen[key] {
-			return
-		}
-		seen[key] = true
-		ordered = append(ordered, file)
-	}
-	for _, group := range groups {
-		for _, file := range files {
-			if file.Field == group {
-				push(file)
-			}
-		}
-	}
-	for _, file := range files {
-		if matchesImageField(file.Field) {
-			push(file)
-		}
-	}
-	if len(ordered) > 8 {
-		ordered = ordered[:8]
-	}
-	return ordered
 }
 
 // orderedPromptImages puts prompt images into a deterministic order.
@@ -404,62 +322,6 @@ func orderedPromptImages(files []httpx.File) []httpx.File {
 		ordered = ordered[:15]
 	}
 	return ordered
-}
-
-// orderedVideoRefs returns the single reference video, if any.
-func orderedVideoRefs(files []httpx.File) []httpx.File {
-	var out []httpx.File
-	for _, file := range files {
-		field := strings.ToLower(file.Field)
-		if len(file.Bytes) == 0 {
-			continue
-		}
-		switch field {
-		case "video", "videos", "video[]", "videos[]":
-			out = append(out, file)
-		}
-	}
-	if len(out) > 1 {
-		out = out[:1]
-	}
-	return out
-}
-
-// orderedAudioRefs returns up to two reference audio clips.
-func orderedAudioRefs(files []httpx.File) []httpx.File {
-	var out []httpx.File
-	for _, file := range files {
-		field := strings.ToLower(file.Field)
-		if len(file.Bytes) == 0 {
-			continue
-		}
-		switch field {
-		case "audio", "audios", "audio[]", "audios[]":
-			out = append(out, file)
-		}
-	}
-	if len(out) > 2 {
-		out = out[:2]
-	}
-	return out
-}
-
-// uploadFiles pushes files into ComfyUI and returns their references.
-func (s *Server) uploadFiles(ctx context.Context, files []httpx.File) ([]workflow.Media, error) {
-	uploaded := make([]workflow.Media, 0, len(files))
-	for index, file := range files {
-		name := file.Filename
-		if name == "" {
-			name = "input-" + strconv.Itoa(index+1) + ".png"
-		}
-		unique := util.UniqueFileName(name, "")
-		result, err := s.comfy.UploadImage(ctx, file.Bytes, unique, defaultMime(file.Mimetype))
-		if err != nil {
-			return nil, err
-		}
-		uploaded = append(uploaded, workflow.Media{Name: result.Name, Subfolder: result.Subfolder})
-	}
-	return uploaded, nil
 }
 
 func defaultMime(value string) string {

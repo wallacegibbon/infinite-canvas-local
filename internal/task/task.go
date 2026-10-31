@@ -456,7 +456,7 @@ func (s *Store) pump(run RunFunc) {
 
 // snapshot copies a task so callers can read it without racing the worker.
 //
-// Handing out the live pointer was a data race: /v1/tasks and the video status
+// Handing out the live pointer was a data race: /api/tasks and the run status
 // endpoints serialise task fields while the queue goroutine updates progress.
 func (t *Task) snapshot() *Task {
 	if t == nil {

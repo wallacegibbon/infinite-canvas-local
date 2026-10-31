@@ -147,22 +147,20 @@ gateway process and one canvas process.
 
 ### Where each endpoint lives
 
-The `/v1/...` prefix appears on both the gateway and llama-server, but they **belong to
-different services**.
+**The gateway serves no `/v1/...` at all.** It has its own protocol — `POST /api/runs` produces every
+kind of media, `GET /api/workflows` describes what can run — and OpenAI's paths are not among its
+endpoints. `/v1/...` in this repository belongs to llama-server, which the prompt optimizer optionally
+calls.
 
-**Gateway `:8190` endpoints of its own** — OpenAI has none of these:
+**Gateway `:8190` endpoints:**
 
 | Endpoint | Purpose |
 |---|---|
+| `/api/runs`, `/api/uploads` | Produce media (submit, poll, download, cancel) and stage its inputs |
+| `/api/workflows/*`, `/api/setup/*` | Workflow metadata, schemas, ComfyUI scanning |
 | `/api/prompts/optimize`, `/api/prompts/optimize-image`, `/api/prompts/caption` | Prompt optimization, image captioning |
 | `/api/resources/*` | Download models, install custom nodes |
-| `/api/workflows/*`, `/api/setup/*` | Workflow metadata, ComfyUI scanning |
 | `/api/system/*`, `/api/loras`, `/api/tasks`, `/files/:name`, `/health` | System status and artifacts |
-
-**Gateway `:8190` endpoints shaped like OpenAI** — the paths look standard, ComfyUI
-workflows are behind them:
-
-`/v1/images/generations`, `/v1/images/edits`, `/v1/videos`, …
 
 **ComfyUI `:8188` endpoints** — only the gateway's ComfyUI client (`internal/comfy`) calls
 these, the canvas never sees them:
@@ -174,11 +172,10 @@ these, the canvas never sees them:
 
 `POST /v1/chat/completions`, `GET /v1/models`, `GET /health`
 
-> ⚠️ The gateway has **no model list**: a model id is a workflow id (`image-z-image-turbo`,
-> `video-h3-t2v`…), and the workflows come from `GET /api/workflows`, which `:8190` serves in
-> its own shape. `GET /v1/models` on `:8099` is llama-server's, and lists the **weights
-> actually loaded**. The same path used to answer on the gateway with workflows dressed as
-> models; it does not any more.
+> ⚠️ A gateway "model" **is** a workflow: `image-z-image-turbo`, `video-h3-t2v`, and one id per
+> installed base model. They come from `GET /api/workflows`, not from a model endpoint of their own.
+> `GET /v1/models` on `:8099` is llama-server's and lists the **weights actually loaded** — nothing to
+> do with the workflow list.
 
 ## Documentation
 

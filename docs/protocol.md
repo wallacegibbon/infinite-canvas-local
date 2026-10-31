@@ -1,7 +1,8 @@
 # The gateway protocol
 
-Status: **target, step 1 landed.** Written before the code so every step has an acceptance
-criterion.
+Status: **landed.** Every media type, every canvas node and every tool action is on this protocol, and
+`/v1/*` is gone from the gateway. What is left of the migration notes below is the record of why the
+shape looks like this.
 
 - Done: one execution core (`internal/server/runs.go`) over the task store. Video and audio both
   submit through it; an audio request is now a queued run that the `/v1/audio/speech` adapter waits
@@ -36,8 +37,9 @@ criterion.
   (`models: [{id, label, baseModel, baseModelLabel, imageInputs}]`), because an id like `img-zit-int8`
   is a spelling the gateway builds and resolves. The canvas builds its picker from that list and
   filters it itself (buttons vs models, enabled, available).
-- Next: nothing generation-shaped is left on `/v1`; the remaining adapters are the old image, video
-  and audio routes, which are deleted once the last caller is gone.
+- Done: **`/v1/*` is empty — the adapters are deleted**, with their request shapes, their helpers and
+  their tests. `POST /api/runs` is the only way to produce media; the prompt services and the two
+  in-flight helpers (`previews`, `progress`) are what remains beside it.
 
 **One user action may be several runs.** Raising a clip's frame rate is two GPU jobs (generate, then
 interpolate), so it is two runs — the canvas chains them, exactly as its "interpolate" button always
@@ -228,10 +230,9 @@ Rules worth knowing:
   pretend such a step is a model a client picks from a list.
 - Values reach the bindings unchanged, which is why a new workflow becomes runnable without a new
   route or a new struct.
-
-`/v1/*` adapters stay lenient until the canvas has migrated: they keep their old field mapping and
-their old clamping, because changing what an existing client gets is a separate decision from adding
-the protocol.
+- **A request is validated once.** `POST /api/runs` rejects an unknown key, a wrong type, a media mix
+  the workflow does not accept, and an output container the encoder cannot write — all before the run
+  is queued. The adapters it replaced each had their own idea of leniency; there is only one idea now.
 
 ## The id is the contract
 
@@ -268,16 +269,18 @@ id exists to remove.
 | --- | --- |
 | `/v1/images/generations`, `/v1/images/edits`, `/v1/images/upscale` (gone) | one `POST /api/runs` with `inputs` + `media` |
 | `/v1/models` (gone) | `GET /api/workflows`, then the client decides what to offer |
-| `/v1/videos`, `/v1/videos/{id}`, `/{id}/content`, `/{id}/cancel` | the same `run` endpoints |
-| `/v1/audio/speech` | the same `run` endpoints |
-| `/v1/videos/upscale`, `/v1/videos/interpolate` | runs of the `video-seedvr2-upscale` / `video-rife` workflows |
+| `/v1/videos`, `/v1/videos/{id}`, `/{id}/content`, `/{id}/cancel` (gone) | the same `run` endpoints |
+| `/v1/audio/speech` (gone) | the same `run` endpoints |
+| `/v1/videos/upscale`, `/v1/videos/interpolate` (gone) | runs of the `video-seedvr2-upscale` / `video-rife` workflows |
 | `mode`, `vquality`, `resolution_name`, `params` (JSON string) | declared `inputs` in the schema |
 | field names that must contain `image`/`frame` | explicit media roles |
 | `entry.ID == "video-h3-…"`, `image-qwen21`, `image-moss-*` branches in handlers | `accepts` / `inputs` / `outputs` in `registry.json` |
 | base64 bodies, `/files/{name}`, `/{id}/content` | one output download route |
 
-`/v1/*` survives only as an adapter while the canvas migrates, one node type at a time. When the
-last node is on `/api/runs`, the adapters and their file are deleted.
+The adapters were deleted one node type at a time, so no step left the canvas without a working path.
+What is worth keeping from them is the shape of the request they accepted: a caller who knew
+`/v1/videos`'s `params` JSON string now sends `inputs`, and a caller who knew a form field named
+`image[]` now sends `media: {reference: [id]}`.
 
 ## Migration order
 
@@ -289,7 +292,8 @@ last node is on `/api/runs`, the adapters and their file are deleted.
 3. **`/api/runs` + `/api/uploads`**: the target routes land next to the adapters; the canvas moves
    node type by node type — audio, then image, then video, then the tool actions (upscale, angle,
    interpolate). All of them are on runs now.
-4. **Deletion**: adapters, `/v1/*`, dead fields, dead tests, and the docs that described them.
+4. **Deletion**: adapters, `/v1/*`, dead fields, dead tests, and the docs that described them. Done —
+   see decisions #69.
 
 Every phase leaves the repository runnable and `make check` green. Nothing in a later phase
 depends on a half-finished earlier one.

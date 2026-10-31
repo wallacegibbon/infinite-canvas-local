@@ -49,18 +49,20 @@ type GeminiVideoOperation = {
 };
 type VideoGenerationTaskState = { status: "pending"; preview?: VideoPreview; steps?: { step: number; total: number } } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
-/** Gateway video workflow ids are `video-<slug>` (the registry's naming rule). */
-const GATEWAY_VIDEO_WORKFLOW = /^video-/;
-
 /**
  * A video run renders for minutes, so it is polled slower than an image: the step count and the
  * preview frame are the only things a poll adds, and both change slowly.
  */
 const VIDEO_RUN_INTERVAL_MS = 1500;
 
-/** Whether this channel+model is served by the local gateway, and therefore runs on the run protocol. */
-export function isGatewayVideoModel(config: Pick<AiConfig, "baseUrl" | "model">) {
-    return isLocalGatewayUrl(config.baseUrl) && GATEWAY_VIDEO_WORKFLOW.test(modelOptionName(config.model));
+/**
+ * Whether this channel is the local gateway, and therefore runs on the run protocol.
+ *
+ * The channel decides this, not the model's name: a workflow id has no fixed prefix (a base-model
+ * variant is `img-zit-int8`), and the gateway is the only endpoint that answers with run ids.
+ */
+export function isGatewayVideoModel(config: Pick<AiConfig, "baseUrl">) {
+    return isLocalGatewayUrl(config.baseUrl);
 }
 
 /**

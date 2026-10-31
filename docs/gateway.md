@@ -82,7 +82,7 @@ reachable from the network and no `GATEWAY_TOKEN` is set. Browser access is allo
 canvas is served from the same host name as the gateway — the usual `:3000` canvas and `:8190`
 gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a *different* host does.
 
-| `GATEWAY_TOKEN` | *(empty)* | When set, `/api/*` requires the `X-Gateway-Token` header. `/v1/*` never does. |
+| `GATEWAY_TOKEN` | *(empty)* | When set, `/api/*` requires the `X-Gateway-Token` header. |
 | `REQUEST_TIMEOUT_MS` | `600000` | Image generation timeout. |
 | `VIDEO_TIMEOUT_MS` | `0` | Video timeout; `0` means no limit. |
 | `AUDIO_TIMEOUT_MS` | `0` | Audio/music timeout; `0` means no limit. A song is the same order of work as a short video, so it gets the same default. |
@@ -170,37 +170,19 @@ same contract as typed `inputs`, which is what `POST /api/runs` validates a requ
 
 ## Endpoints
 
-Generation (multipart where media is involved):
+The prompt services are the only generation-adjacent routes left; every kind of media is produced by
+`POST /api/runs` below.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/v1/images/generations` | Text-to-image. |
-| `POST` | `/v1/images/edits` | Reference-image editing, inpaint, outpaint. |
-| `POST` | `/v1/videos` | Video generation (returns a job id). |
-| `POST` | `/v1/videos/upscale` | Video upscaling. |
-| `GET` | `/v1/videos/{id}` | Job status, including preview and step progress. |
-| `GET` | `/v1/videos/{id}/content` | Finished video bytes. |
-| `POST` | `/v1/videos/{id}/cancel` | Cancel a job. |
-| `POST` | `/v1/audio/speech` | Text-to-music (and speech-style) workflows: audio bytes out. `input` is the style caption, optional `instructions` is the lyrics. |
 | `POST` | `/api/prompts/optimize` | Rewrite a prompt for H3 video. |
 | `POST` | `/api/prompts/optimize-image` | Rewrite a prompt for image generation. |
 | `POST` | `/api/prompts/caption` | Reverse-engineer a prompt from an image. |
 
-Audio requests speak the OpenAI speech shape (`model`, `input`, `response_format`, …) because
-that is what the canvas audio node already sends. A music graph needs two texts, so `input`
-becomes the style caption and the optional `instructions` field becomes the lyrics; both are
-ordinary `registry.json` bindings (`prompt`, `lyrics`), so a prompt-only speech workflow needs no
-special case. `response_format` is honoured for the containers the encoder writes itself —
-`mp3`, `flac`, `opus` — and anything else is refused with `unsupported_audio_format` instead of
-being silently converted. `speed` and `voice` mean nothing for music and are dropped. An optional
-`duration` (or `seconds`) caps the song length, which the speech contract has no field for.
-
-This route is an **adapter**: it submits a run to the same queue video uses, then waits for that
-run. The HTTP call still blocks — that is the client's contract — but the work no longer depends on
-it. If the connection dies mid-song, the run finishes anyway and stays readable through
-`GET /api/tasks/{id}` (with its file under `data/outputs/`), and a gateway restart reconciles it
-like any other run. The blocking shape is what the canvas sends today; [`protocol.md`](protocol.md)
-describes the run protocol that replaces it for every media type.
+A music graph needs two texts, and both are ordinary `registry.json` bindings (`prompt`, `lyrics`), so
+a run carries them as inputs like any other parameter. `response_format`-style container selection is
+`outputs.formats` in the registry: the encoder writes `mp3`, `flac` or `opus`, and anything else is
+refused with `unsupported_audio_format` at submission instead of being silently converted.
 
 Runs (the protocol in [`protocol.md`](protocol.md); every canvas node and tool uses them — frame
 interpolation included, as a run of the `video-rife` workflow):
@@ -226,7 +208,7 @@ Metadata and management:
 | `POST` | `/api/resources/install` | Start an install job. |
 | `POST` | `/api/resources/refresh` | The only rescan: reloads the resource index, re-scans ComfyUI (nodes, models, availability, new workflow graphs) and returns the resource status. This is the panel's refresh button. |
 | `GET` | `/api/tasks` | Every run the gateway has queued or finished, newest first. |
-| `GET` | `/api/tasks/{id}` | One run by id (also reachable as `/v1/tasks/{id}`). |
+| `GET` | `/api/tasks/{id}` | One run by id. |
 | `GET` | `/api/setup/status` | Last scan result. |
 | `GET` | `/api/system/stats` | GPU and RAM, plus the last OOM. |
 

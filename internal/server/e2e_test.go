@@ -411,7 +411,7 @@ func TestTaskNotFoundShape(t *testing.T) {
 	gateway := httptest.NewServer(srv.Handler())
 	defer gateway.Close()
 
-	status, payload := doJSON(t, gateway.Client(), http.MethodGet, gateway.URL+"/v1/tasks/nope", nil)
+	status, payload := doJSON(t, gateway.Client(), http.MethodGet, gateway.URL+"/api/tasks/nope", nil)
 	if status != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", status)
 	}

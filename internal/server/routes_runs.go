@@ -10,7 +10,7 @@ package server
 //   DELETE /api/runs/{id}                 cancel (also interrupts ComfyUI)
 //
 // Media goes in as upload ids (POST /api/uploads), so a role is explicit and the same file can be
-// reused by several runs. The `/v1/*` routes stay as adapters until the canvas has migrated.
+// reused by the run route. There are no other routes that produce media.
 
 import (
 	"context"
@@ -228,7 +228,7 @@ func (s *Server) handleRunCreate(ctx *httpx.Ctx) error {
 		TimeoutMs: s.runTimeout(object),
 		RequestID: ctx.RequestID,
 		Request:   map[string]any{"inputs": inputs, "media": media.summary},
-	}, nil)
+	})
 	s.logger.Info("run %s queued %s (%s) %s", object, stored.ID, entry.Name, ctx.RequestID)
 
 	// Snapshot: the queue may already be running this record, and serialising the live one races

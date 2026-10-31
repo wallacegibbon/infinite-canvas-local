@@ -7,7 +7,6 @@ package server
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"comfyui-gateway/internal/generate"
 	"comfyui-gateway/internal/httpx"
@@ -29,12 +28,8 @@ type runSpec struct {
 	Request   map[string]any
 }
 
-// runResultBuilder turns the runner's output into the run's stored artifact. Most runs take
-// the default (one file); video interpolation uses it to post-process before storage.
-type runResultBuilder func(ctx context.Context, result *generate.RunResult, progress func(task.Update)) (*task.Result, error)
-
 // submitRun queues one run and returns its record. The record's id is the caller's handle.
-func (s *Server) submitRun(spec runSpec, build runResultBuilder) *task.Task {
+func (s *Server) submitRun(spec runSpec) *task.Task {
 	stored := s.tasks.Create(spec.Object, spec.Entry.Name, spec.Request)
 	s.tasks.Enqueue(stored, func(_ *task.Task, progress func(task.Update), jobCtx context.Context) (*task.Result, error) {
 		opts := generate.RunOptions{
@@ -68,9 +63,6 @@ func (s *Server) submitRun(spec runSpec, build runResultBuilder) *task.Task {
 		if err != nil {
 			return nil, err
 		}
-		if build != nil {
-			return build(jobCtx, result, progress)
-		}
 		return filesResult(spec.Object, result)
 	})
 	return stored
@@ -88,52 +80,4 @@ func defaultObjectExt(object string) string {
 	default:
 		return "mp4"
 	}
-}
-
-// waitRun blocks until the run reaches a terminal status.
-//
-// The run is untouched by the wait: if the caller disconnects, the queue keeps working and the
-// record stays readable through GET /api/tasks/{id}. That is the whole point of the split — the
-// adapter may block, the run may not depend on it.
-func (s *Server) waitRun(ctx context.Context, id string) (*task.Task, error) {
-	interval := time.Duration(s.cfg.PollIntervalMs) * time.Millisecond
-	if interval <= 0 {
-		interval = 750 * time.Millisecond
-	}
-	for {
-		stored := s.tasks.Get(id)
-		if stored == nil {
-			return nil, httpx.NewError(http.StatusNotFound, "run_not_found", "run not found")
-		}
-		switch stored.Status {
-		case "completed", "failed", "cancelled":
-			return stored, nil
-		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(interval):
-		}
-	}
-}
-
-// runFailure rebuilds the structured error of a failed run, so an adapter can answer with the
-// same code and details ComfyUI reported instead of a flattened message.
-func runFailure(stored *task.Task) error {
-	if stored == nil {
-		return httpx.NewError(http.StatusBadGateway, "run_failed", "the run failed")
-	}
-	message := "the run failed"
-	if stored.Error != nil && *stored.Error != "" {
-		message = *stored.Error
-	}
-	code := "run_failed"
-	if stored.ErrorCode != nil && *stored.ErrorCode != "" {
-		code = *stored.ErrorCode
-	}
-	status := stored.ErrorStatus
-	if status == 0 {
-		status = http.StatusBadGateway
-	}
-	return &httpx.Error{Status: status, Code: code, Message: message, Details: stored.ErrorDetails}
 }
