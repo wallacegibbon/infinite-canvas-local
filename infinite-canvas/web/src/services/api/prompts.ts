@@ -1,5 +1,6 @@
 import i18n from "@/i18n";
 import { dataUrlToFile } from "@/lib/image-utils";
+import { requestAgentStream } from "@/services/api/agent";
 import { localGatewayRoot } from "@/services/api/image";
 import { apiErrorMessage, httpJson } from "@/services/api/http";
 import { imageToDataUrl } from "@/services/image-storage";
@@ -118,26 +119,24 @@ export async function requestImageCaption(config: AiConfig, params: { images: Re
 }
 
 /**
- * Ask the configured model for words: one prompt in, one answer out.
+ * Ask the agent for words: one prompt in, one answer out, read as it arrives.
  *
- * The gateway contributes no wording of its own here (there is no skill and no sanitiser), so the
- * `system` message is the caller's. The settings' system prompt always applies, as it does for image
- * requests; a caller that has its own is appended after it. Images are attached when the caller has
- * them, which is what makes a vision model usable from a text node.
+ * The model and the reasoning level are the agent's own settings, not fields of a prompt — they are
+ * changed with `command` (see requestAgentStream), never attached to a question.
  */
-export async function requestPromptChat(config: AiConfig, params: { prompt: string; system?: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal }): Promise<string> {
-    const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
-    const system = [config.systemPrompt, params.system]
-        .map((part) => (part || "").trim())
-        .filter(Boolean)
-        .join("\n\n");
-
-    const formData = new FormData();
-    formData.set("prompt", params.prompt);
-    if (system) formData.set("system", system);
-    await appendImages(formData, params.images || []);
-
-    const payload = await postPrompt<{ text?: string }>(`${promptRoot(requestConfig)}/api/prompts/chat`, requestConfig, formData, options?.signal);
-    if (!payload.text) throw new Error(apiText("promptOptimizeEmpty"));
-    return payload.text;
+export async function requestPromptChat(config: AiConfig, params: { prompt: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal; onDelta?: (text: string) => void }): Promise<string> {
+    let streamed = "";
+    const answer = await requestAgentStream(
+        config,
+        { prompt: params.prompt, images: params.images },
+        {
+            signal: options?.signal,
+            onEvent: (event) => {
+                if (event.type !== "delta" || !event.text) return;
+                streamed += event.text;
+                options?.onDelta?.(streamed);
+            },
+        },
+    );
+    return answer || streamed;
 }

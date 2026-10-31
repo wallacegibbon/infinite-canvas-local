@@ -7,7 +7,7 @@ import { requestPromptChat } from "@/services/api/prompts";
 import { resolveMediaUrl } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
 import { requestVideoGeneration, storeGeneratedVideo } from "@/services/api/video";
-import { decodeChannelModel, promptEndpointReady, selectableModelsByCapability, type AiConfig, type ConfigTabKey, type ModelCapability } from "@/stores/use-config-store";
+import { decodeChannelModel, selectableModelsByCapability, type AiConfig, type ConfigTabKey, type ModelCapability } from "@/stores/use-config-store";
 import { buildGenerationConfig } from "@/lib/canvas/canvas-generation-helpers";
 import { buildNodeContext } from "@/lib/canvas/plugin-node-context";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
@@ -80,15 +80,9 @@ export function usePluginHost(params: PluginHostParams) {
                 return { url: file.url, storageKey: file.storageKey, mimeType: file.mimeType, width: file.width, height: file.height, durationMs: file.durationMs };
             },
             generateText: async (prompt, options) => {
-                const config = { ...buildGenerationConfig(effectiveConfig, undefined, "text"), ...(options?.model ? { model: options.model } : {}) };
-                // Words come from the prompt endpoint; no workflow stands behind them.
-                if (!promptEndpointReady(config)) {
-                    openConfigDialog(true, "prompt-api");
-                    throw new Error(t("canvas.plugins.aiConfigRequired"));
-                }
-                const text = await requestPromptChat(config, { prompt, system: options?.system }, { signal: options?.signal });
-                // The gateway answers whole, so a plugin that asked for deltas gets the answer once.
-                options?.onDelta?.(text);
+                // Words come from the agent; no workflow stands behind them and the canvas has nothing
+                // to configure for it.
+                const text = await requestPromptChat(buildGenerationConfig(effectiveConfig, undefined, "text"), { prompt }, { signal: options?.signal, onDelta: options?.onDelta });
                 return { text };
             },
             // List configured models for a capability; labels use the model name without the channel prefix.

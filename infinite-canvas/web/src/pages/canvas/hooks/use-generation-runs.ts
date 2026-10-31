@@ -513,8 +513,29 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             const results = await Promise.all(
                 textIds.map(async (textId): Promise<CanvasNodeText | null> => {
                     try {
-                        // One prompt, one answer: the gateway answers whole, so the node is written when it does.
-                        const content = await requestPromptChat(generationConfig, { prompt: effectivePrompt, images: generationContext.referenceImages }, { signal: controller.signal });
+                        // The agent answers as it goes, so the node fills in while it talks.
+                        const content = await requestPromptChat(
+                            generationConfig,
+                            { prompt: effectivePrompt, images: generationContext.referenceImages },
+                            {
+                                signal: controller.signal,
+                                onDelta: (text) =>
+                                    setNodes((prev) =>
+                                        prev.map((node) =>
+                                            node.id === rootId
+                                                ? {
+                                                      ...node,
+                                                      metadata: {
+                                                          ...node.metadata,
+                                                          ...(node.metadata?.primaryTextId === textId ? { content: text } : {}),
+                                                          texts: node.metadata?.texts?.map((item) => (item.id === textId ? { ...item, content: text } : item)),
+                                                      },
+                                                  }
+                                                : node,
+                                        ),
+                                    ),
+                            },
+                        );
                         setNodes((prev) =>
                             prev.map((node) =>
                                 node.id === rootId
@@ -656,7 +677,14 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             try {
                 if (node.type === CanvasNodeType.Text) {
                     if (!context) return;
-                    const answer = await requestPromptChat(generationConfig, { prompt, images: context.referenceImages }, { signal: controller.signal });
+                    const answer = await requestPromptChat(
+                        generationConfig,
+                        { prompt, images: context.referenceImages },
+                        {
+                            signal: controller.signal,
+                            onDelta: (text) => setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, type: CanvasNodeType.Text, metadata: { ...item.metadata, content: text, status: NODE_STATUS_LOADING } } : item))),
+                        },
+                    );
                     setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, type: CanvasNodeType.Text, metadata: { ...item.metadata, content: answer, prompt, status: NODE_STATUS_SUCCESS } } : item)));
                     return;
                 }

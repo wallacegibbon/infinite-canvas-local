@@ -39,13 +39,16 @@ const reference = (name: string) => ({ id: name, name, dataUrl: "data:image/png;
 
 type Call = { url: string; method: string; body: unknown; headers: Record<string, string> };
 
-function stubGateway(body: unknown = { ok: true, text: "an answer" }, status = 200) {
+/** The agent answers with an event stream, so a stub that speaks that framing is what these need. */
+function stubGateway(input: { body?: string; json?: unknown; status?: number } = {}) {
+    const status = input.status ?? 200;
     const calls: Call[] = [];
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string, init: RequestInit = {}) => {
             calls.push({ url, method: String(init.method || "GET"), body: init.body, headers: (init.headers || {}) as Record<string, string> });
-            return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+            if (input.body !== undefined) return new Response(input.body, { status, headers: { "Content-Type": "text/event-stream" } });
+            return new Response(JSON.stringify(input.json ?? {}), { status, headers: { "Content-Type": "application/json" } });
         }),
     );
     return calls;
@@ -63,68 +66,39 @@ beforeEach(() => {
 });
 
 describe("requestPromptChat", () => {
-    it("posts the prompt to the gateway's prompt route, not to /v1", async () => {
-        const calls = stubGateway();
+    it("asks the agent's one route, and does not carry an endpoint of its own", async () => {
+        const calls = stubGateway({ body: 'data: {"type":"delta","text":"an "}\n\ndata: {"type":"delta","text":"answer"}\n\ndata: {"type":"done","text":"an answer"}\n\n' });
 
         await expect(requestPromptChat(config(), { prompt: "describe a teapot" })).resolves.toBe("an answer");
 
         const { call, form } = formOf(calls);
-        // The gateway has no /v1; the address in the settings has none either.
-        expect(call.url).toBe("http://127.0.0.1:8190/api/prompts/chat");
+        expect(call.url).toBe("http://127.0.0.1:8190/api/agent/chat");
         expect(form.get("prompt")).toBe("describe a teapot");
-        expect(call.headers.Authorization).toBe("Bearer local");
+        // The model, the key and the base URL are the agent's own configuration now: a question
+        // carries a question.
+        for (const field of ["promptBaseUrl", "promptApiKey", "promptModel", "system", "command"]) {
+            expect(form.get(field)).toBeNull();
+        }
     });
 
-    it("carries the prompt endpoint's address, key and model from the settings", async () => {
-        const calls = stubGateway();
+    it("reports the answer as it arrives", async () => {
+        stubGateway({ body: 'data: {"type":"delta","text":"half "}\n\ndata: {"type":"delta","text":"way"}\n\n' });
 
-        await requestPromptChat(config(), { prompt: "hi" });
+        const seen: string[] = [];
+        await requestPromptChat(config(), { prompt: "hi" }, { onDelta: (text) => seen.push(text) });
 
-        const { form } = formOf(calls);
-        expect(form.get("promptBaseUrl")).toBe("http://127.0.0.1:8099/v1");
-        expect(form.get("promptApiKey")).toBe("nokey");
-        expect(form.get("promptModel")).toBe("qwen3.8-27b");
+        expect(seen).toEqual(["half ", "half way"]);
     });
 
-    it("sends no system message when neither the settings nor the caller has one", async () => {
-        const calls = stubGateway();
+    it("relays the agent's own error", async () => {
+        stubGateway({ body: 'data: {"type":"error","message":"model_set: model not found: 9"}\n\ndata: {"type":"done"}\n\n' });
 
-        await requestPromptChat(config(), { prompt: "hi" });
-
-        // An empty system turn is not the same request as no system turn: the gateway omits it, and
-        // the canvas does not ask for it.
-        expect(formOf(calls).form.get("system")).toBeNull();
-    });
-
-    it("puts the settings' system prompt before the caller's own", async () => {
-        const calls = stubGateway();
-
-        await requestPromptChat(config({ systemPrompt: "You are terse." }), { prompt: "hi", system: "Answer in Chinese." });
-
-        expect(formOf(calls).form.get("system")).toBe("You are terse.\n\nAnswer in Chinese.");
-    });
-
-    it("attaches caller images as form files, in order", async () => {
-        const calls = stubGateway();
-
-        await requestPromptChat(config(), { prompt: "how many chairs?", images: [reference("a.png"), reference("b.png")] });
-
-        const { form } = formOf(calls);
-        const first = form.get("image") as File;
-        const second = form.get("image2") as File;
-        expect(first.name).toBe("a.png");
-        expect(second.name).toBe("b.png");
+        await expect(requestPromptChat(config(), { prompt: "hi" })).rejects.toThrow("model_set: model not found: 9");
     });
 
     it("refuses a channel that is not the gateway", async () => {
-        stubGateway();
+        stubGateway({ body: "" });
 
         await expect(requestPromptChat(config({ baseUrl: "https://api.example.com/v1" }), { prompt: "hi" })).rejects.toThrow("promptOptimizeLocalOnly");
-    });
-
-    it("reports a reply without text as a failure", async () => {
-        stubGateway({ ok: true, text: "" });
-
-        await expect(requestPromptChat(config(), { prompt: "hi" })).rejects.toThrow("promptOptimizeEmpty");
     });
 });
