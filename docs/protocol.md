@@ -30,8 +30,12 @@ criterion.
   a request carries (`first_frame` / `last_frame` / `reference` + `video` + `audio`) and `frameMode`
   says which frames a request supplies. The live preview frame is part of the run payload, so a
   generating node no longer reads a second endpoint to show one.
-- Done: the canvas's *tool* actions that produce media are runs too — video upscale, the multi-angle
-  re-render and frame interpolation (`video-rife`: one clip in, one clip out).
+- Done: the canvas's *tool* actions that produce media are runs too — video upscale, image upscale,
+  the multi-angle re-render and frame interpolation (`video-rife`: one clip in, one clip out).
+- Done: **`/v1/models` is gone.** `GET /api/workflows` carries the model ids each workflow answers to
+  (`models: [{id, label, baseModel, baseModelLabel, imageInputs}]`), because an id like `img-zit-int8`
+  is a spelling the gateway builds and resolves. The canvas builds its picker from that list and
+  filters it itself (buttons vs models, enabled, available).
 - Next: nothing generation-shaped is left on `/v1`; the remaining adapters are the old image, video
   and audio routes, which are deleted once the last caller is gone.
 
@@ -263,6 +267,7 @@ id exists to remove.
 | Today | Target |
 | --- | --- |
 | `/v1/images/generations`, `/v1/images/edits`, `/v1/images/upscale` (gone) | one `POST /api/runs` with `inputs` + `media` |
+| `/v1/models` (gone) | `GET /api/workflows`, then the client decides what to offer |
 | `/v1/videos`, `/v1/videos/{id}`, `/{id}/content`, `/{id}/cancel` | the same `run` endpoints |
 | `/v1/audio/speech` | the same `run` endpoints |
 | `/v1/videos/upscale`, `/v1/videos/interpolate` | runs of the `video-seedvr2-upscale` / `video-rife` workflows |

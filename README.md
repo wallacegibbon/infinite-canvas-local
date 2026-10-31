@@ -19,7 +19,7 @@ Maintained here: the workflow graphs and `registry.json`, the resource index and
 ## What it does
 
 - **Infinite canvas**: text / image / video / group nodes; wiring, box selection, export, autosave.
-- **Workflows as models**: the local gateway wraps ComfyUI workflows as OpenAI-compatible models, so the canvas only changes its base URL.
+- **Workflows are the unit**: the gateway runs ComfyUI workflows (`GET /api/workflows`, `POST /api/runs`) and reports what each accepts; the canvas decides which of them the picker offers.
 - **Images**: Z-Image Turbo, Krea2 Aesthetics, MOSS SFT (8-step, regional layout), Qwen Image 2.1 (multi-image edit, masked inpaint, outpaint).
 - **Video**: MiniMax-H3 text-to-video, first/last-frame and multi-reference, with sampling preview and LoRA cards.
 - **Upscaling**: ESRGAN, SeedVR2 for images and video.
@@ -130,7 +130,7 @@ Four processes, all calls one-directional; the browser only talks to the gateway
 | Process | Port | What it is | Started by |
 |---|---|---|---|
 | Canvas frontend | `3000` | Prebuilt static pages (`vite preview`) | `./start.sh` |
-| Gateway | `8190` | Go static binary that wraps ComfyUI workflows as OpenAI-compatible models | `./start.sh` |
+| Gateway | `8190` | Go static binary that runs ComfyUI workflows through its own run protocol | `./start.sh` |
 | ComfyUI | `8188` | Python, does the actual image / video work | You, wherever it runs — nothing here starts it |
 | llama-server | `8099` | Optional, the model behind prompt optimization | You, see [`docs/local-llm.md`](docs/local-llm.md) |
 
@@ -162,7 +162,7 @@ different services**.
 **Gateway `:8190` endpoints shaped like OpenAI** — the paths look standard, ComfyUI
 workflows are behind them:
 
-`/v1/models`, `/v1/images/generations`, `/v1/images/edits`, `/v1/videos`, …
+`/v1/images/generations`, `/v1/images/edits`, `/v1/videos`, …
 
 **ComfyUI `:8188` endpoints** — only the gateway's ComfyUI client (`internal/comfy`) calls
 these, the canvas never sees them:
@@ -174,10 +174,11 @@ these, the canvas never sees them:
 
 `POST /v1/chat/completions`, `GET /v1/models`, `GET /health`
 
-> ⚠️ `/v1/models` means different things on the two services: `:8190` returns **workflows
-> wrapped as models** (`image-z-image-turbo`, `video-h3-t2v`…), `:8099` returns the **weights
-> actually loaded**. Both satisfy the OpenAI schema, but one is a "fake model" and the other
-> is real.
+> ⚠️ The gateway has **no model list**: a model id is a workflow id (`image-z-image-turbo`,
+> `video-h3-t2v`…), and the workflows come from `GET /api/workflows`, which `:8190` serves in
+> its own shape. `GET /v1/models` on `:8099` is llama-server's, and lists the **weights
+> actually loaded**. The same path used to answer on the gateway with workflows dressed as
+> models; it does not any more.
 
 ## Documentation
 

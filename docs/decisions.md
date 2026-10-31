@@ -2243,3 +2243,46 @@ including the LoRA whose path stays Chinese.
 
 **Where** `resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`,
 `infinite-canvas/web/src/components/settings/resource-center-panel.tsx`.
+
+## 68. There is no `/v1/models`; a workflow reports the ids it answers to
+
+**Decision** `GET /v1/models` is deleted. `GET /api/workflows` gained a `models` array per row —
+`{id, label, baseModel, baseModelLabel, imageInputs}` — built by the same expansion `ResolveModel`
+accepts. The canvas syncs from it (`hooks/use-local-gateway-sync.ts` → `lib/gateway-models.ts`) and
+decides what the picker offers.
+
+**Why the endpoint had to go** It was the last route whose only job was to present, and it presented
+the wrong shape: an OpenAI envelope around a *workflow* list, with `object: "model"`, `owned_by` and a
+`metadata` bag holding what the workflow really is. Everything in it was a fact about a workflow, so it
+belongs on the workflow row.
+
+**Why the ids could not just be dropped** The tempting simplification — "a model id is just the
+workflow id" — is wrong for two graphs. Z-Image and Krea2 have selectable base models, each combination
+has its own spelling (`img-zit-int8`, `img-k2t-int8`), and only `ModelIDFor` knows how to build it and
+only `ResolveModel` knows how to read it back. A client that invented the spelling would be guessing at
+a gateway rule. So the list moved, it did not disappear: `models` is the gateway reporting the names it
+will answer to.
+
+**What stayed in the client** Three decisions, none of which is a fact about a workflow: a workflow
+whose `type` the canvas cannot render is not a model; a workflow the canvas drives from a button
+(`lib/canvas/tool-workflows.ts`) is not a model; a disabled (`enabled: false`) or unavailable workflow
+is not offered. `lib/gateway-capability.ts` went with the endpoint — it existed to guess a capability
+from a name or a metadata field, and the workflow's own `type` is the answer.
+
+**Cost** One more request than a list of names would need, and the client has to do the flattening. In
+exchange there is one endpoint describing workflows, and the picker is testable without a browser: the
+mapping is a pure function (`tests/gateway-models.test.ts`, 11 cases).
+
+**Tested** Go: `TestWorkflowsReportTheirModelIds` (a row carries `models`, `enabled`, `availability`),
+`TestWorkflowsReportOneIdPerBaseModel` (two installed base models → three ids, each naming its file),
+`TestWorkflowVisibilityToggles` (a hidden workflow stays in the list as `enabled: false`; filtering is
+the client's). Canvas: `tests/gateway-models.test.ts`. In the browser: `/v1/models` answers 404, the
+channel holds the same 17 models as before with their `workflowId` / `baseModel` / `imageInputs`, the
+base-model sub-dropdown still lists `默认底模 / z_image_bf16 / int8`, and a generation run through it
+returned three images.
+
+**Where** `internal/server/routes_admin.go`, `internal/server/e2e_test.go`,
+`infinite-canvas/web/src/services/api/workflows.ts`,
+`infinite-canvas/web/src/hooks/use-local-gateway-sync.ts`,
+`infinite-canvas/web/src/lib/gateway-models.ts`, `infinite-canvas/web/src/services/api/image.ts`
+(`fetchChannelModels`).

@@ -29,7 +29,7 @@ type UnetLoader struct {
 	File   string
 }
 
-// ModelDescriptor is one entry in the /v1/models list.
+// ModelDescriptor is one model id a workflow answers to.
 type ModelDescriptor struct {
 	ModelID     string
 	BaseID      string
@@ -277,7 +277,7 @@ func ModelIDFor(entry *Entry, variant *BaseModelVariant) string {
 	return entry.Name + "__" + variant.ID
 }
 
-// ListModelDescriptors expands entries into the rows /v1/models exposes.
+// ListModelDescriptors expands entries into the model ids a workflow answers to.
 func ListModelDescriptors(entries []*Entry, loaderOptions LoaderOptions) []*ModelDescriptor {
 	var descriptors []*ModelDescriptor
 	for _, entry := range entries {

@@ -1,19 +1,54 @@
 import { useEffect } from "react";
 
 import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL } from "@/constant/app-mode";
-import { gatewayModelCapability } from "@/lib/gateway-capability";
-import { isToolWorkflow } from "@/lib/canvas/tool-workflows";
+import { gatewayModels, modelSignature } from "@/lib/gateway-models";
 import { markGatewayUp, noteGatewayError } from "@/services/api/gateway-status";
-import { encodeChannelModel, modelOptionsFromChannels, useConfigStore, type ModelCapability } from "@/stores/use-config-store";
+import { requestWorkflows } from "@/services/api/workflows";
+import { encodeChannelModel, modelOptionsFromChannels, useConfigStore, type ChannelModel, type ModelCapability } from "@/stores/use-config-store";
 
 const SYNC_INTERVAL_MS = 8000;
 const REQUEST_TIMEOUT_MS = 4000;
+
+const SYNC_CONFIG = { baseUrl: LOCAL_GATEWAY_BASE_URL, apiKey: "local" };
 
 /** Sync models from the gateway automatically, so adding or removing a workflow needs no manual channel refresh. */
 export function useLocalGatewaySync() {
     useEffect(() => {
         let stopped = false;
         let timer: number | undefined;
+
+        const applyModels = (models: ChannelModel[]) => {
+            const state = useConfigStore.getState();
+            const config = state.config;
+            const channel = config.channels.find((item) => isLocalGatewayUrl(item.baseUrl)) || config.channels[0];
+            if (!channel) return;
+            if (!models.length && !channel.models.length) return;
+
+            const nextModels = models.map((model) => {
+                const previous = channel.models.find((item) => item.name === model.name);
+                return { ...model, capability: previous?.capability || model.capability };
+            });
+            if (modelSignature(channel.models) === modelSignature(nextModels)) return;
+
+            const channels = config.channels.map((item) => (item.id === channel.id ? { ...item, apiKey: item.apiKey || "local", baseUrl: LOCAL_GATEWAY_BASE_URL, models: nextModels } : item));
+            const optionsFor = (capability: ModelCapability) => channels.flatMap((item) => item.models.filter((model) => model.capability === capability).map((model) => encodeChannelModel(item.id, model.name)));
+            const pick = (current: string, options: string[]) => (options.includes(current) ? current : options[0] || "");
+            const imageOptions = optionsFor("image");
+            useConfigStore.setState({
+                config: {
+                    ...config,
+                    channels,
+                    models: modelOptionsFromChannels(channels),
+                    imageModel: pick(config.imageModel, imageOptions),
+                    videoModel: pick(config.videoModel, optionsFor("video")),
+                    audioModel: pick(config.audioModel, optionsFor("audio")),
+                    // The image model is also the general one: text-to-image is the default action.
+                    model: pick(config.model, imageOptions),
+                    baseUrl: LOCAL_GATEWAY_BASE_URL,
+                    apiKey: channel.apiKey || "local",
+                },
+            });
+        };
 
         const sync = async () => {
             if (timer) {
@@ -23,111 +58,12 @@ export function useLocalGatewaySync() {
             try {
                 const controller = new AbortController();
                 const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-                const response = await fetch(`${LOCAL_GATEWAY_BASE_URL.replace(/\/+$/, "")}/models`, {
-                    cache: "no-store",
-                    signal: controller.signal,
-                });
-                window.clearTimeout(timeout);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const workflows = await requestWorkflows(SYNC_CONFIG, { signal: controller.signal }).finally(() => window.clearTimeout(timeout));
                 markGatewayUp();
-                const payload = (await response.json()) as {
-                    data?: Array<{
-                        id?: string;
-                        metadata?: { type?: string; workflowId?: string; label?: string; baseModel?: string; baseModelLabel?: string; imageInputs?: number; variantModes?: string[]; variantLabels?: Record<string, string> };
-                    }>;
-                };
-                const synced = (payload.data || [])
-                    .map((item) => {
-                        const name = String(item.id || "").trim();
-                        const meta = item.metadata || {};
-                        const capability = gatewayModelCapability(name, meta.type);
-                        return {
-                            name,
-                            capability,
-                            label: meta.label?.trim() || undefined,
-                            workflowId: meta.workflowId?.trim() || undefined,
-                            baseModel: meta.baseModel?.trim() || undefined,
-                            baseModelLabel: meta.baseModelLabel?.trim() || undefined,
-                            imageInputs: typeof meta.imageInputs === "number" ? meta.imageInputs : undefined,
-                            variantModes: Array.isArray(meta.variantModes) ? meta.variantModes.map(String) : undefined,
-                            variantLabels: meta.variantLabels && typeof meta.variantLabels === "object" ? meta.variantLabels : undefined,
-                        };
-                    })
-                    // The gateway reports every registered workflow; which of them are models is a
-                    // presentation choice, and the ones the canvas drives from a button are not.
-                    .filter((model) => Boolean(model.name) && Boolean(model.capability) && !isToolWorkflow(model.name));
-                if (synced.length) {
-                    const state = useConfigStore.getState();
-                    const config = state.config;
-                    const channel = config.channels.find((item) => isLocalGatewayUrl(item.baseUrl)) || config.channels[0];
-                    if (channel) {
-                        const nextModels = synced.map((model) => {
-                            const previous = channel.models.find((item) => item.name === model.name);
-                            return { ...model, capability: previous?.capability || (model.capability as ModelCapability) };
-                        });
-                        const signature = (
-                            models: Array<{ name: string; capability: string; label?: string; workflowId?: string; baseModel?: string; baseModelLabel?: string; imageInputs?: number; variantModes?: string[]; variantLabels?: Record<string, string> }>,
-                        ) =>
-                            JSON.stringify(
-                                models.map((model) => [
-                                    model.name,
-                                    model.capability,
-                                    model.label || "",
-                                    model.workflowId || "",
-                                    model.baseModel || "",
-                                    model.baseModelLabel || "",
-                                    model.imageInputs ?? -1,
-                                    model.variantModes || [],
-                                    model.variantLabels || {},
-                                ]),
-                            );
-                        if (signature(channel.models) !== signature(nextModels)) {
-                            // After a gateway port change the stale baseUrl saved in the browser must follow the runtime address, or every request fails with "Failed to fetch".
-                            const channels = config.channels.map((item) => (item.id === channel.id ? { ...item, apiKey: item.apiKey || "local", baseUrl: LOCAL_GATEWAY_BASE_URL, models: nextModels } : item));
-                            const imageOptions = channels.flatMap((item) => item.models.filter((model) => model.capability === "image").map((model) => encodeChannelModel(item.id, model.name)));
-                            const videoOptions = channels.flatMap((item) => item.models.filter((model) => model.capability === "video").map((model) => encodeChannelModel(item.id, model.name)));
-                            const audioOptions = channels.flatMap((item) => item.models.filter((model) => model.capability === "audio").map((model) => encodeChannelModel(item.id, model.name)));
-                            const pick = (current: string, options: string[]) => (options.includes(current) ? current : options[0] || "");
-                            const pickImage = (current: string) => pick(current, imageOptions);
-                            useConfigStore.setState({
-                                config: {
-                                    ...config,
-                                    channels,
-                                    models: modelOptionsFromChannels(channels),
-                                    imageModel: pickImage(config.imageModel),
-                                    videoModel: pick(config.videoModel, videoOptions),
-                                    audioModel: pick(config.audioModel, audioOptions),
-                                    model: pickImage(config.model),
-                                    baseUrl: LOCAL_GATEWAY_BASE_URL,
-                                    apiKey: channel.apiKey || "local",
-                                },
-                            });
-                        }
-                    }
-                } else {
-                    const state = useConfigStore.getState();
-                    const config = state.config;
-                    const channel = config.channels.find((item) => isLocalGatewayUrl(item.baseUrl)) || config.channels[0];
-                    if (channel && channel.models.length) {
-                        const channels = config.channels.map((item) => (item.id === channel.id ? { ...item, apiKey: item.apiKey || "local", baseUrl: LOCAL_GATEWAY_BASE_URL, models: [] } : item));
-                        useConfigStore.setState({
-                            config: {
-                                ...config,
-                                channels,
-                                models: modelOptionsFromChannels(channels),
-                                imageModel: "",
-                                videoModel: "",
-                                audioModel: "",
-                                model: "",
-                                baseUrl: LOCAL_GATEWAY_BASE_URL,
-                                apiKey: channel.apiKey || "local",
-                            },
-                        });
-                    }
-                }
+                applyModels(gatewayModels(workflows));
             } catch (error) {
                 // Retry silently while the gateway is still starting so the canvas stays usable; the shared banner reports disconnects.
-                noteGatewayError(error, `${LOCAL_GATEWAY_BASE_URL.replace(/\/+$/, "")}/models`);
+                noteGatewayError(error, `${LOCAL_GATEWAY_BASE_URL.replace(/\/+$/, "")}/api/workflows`);
             }
             if (!stopped) timer = window.setTimeout(sync, SYNC_INTERVAL_MS);
         };

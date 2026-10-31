@@ -9,6 +9,7 @@ import { imageToDataUrl } from "@/services/image-storage";
 import { imageSizePresets } from "@/lib/media-size";
 import { apiErrorMessage, httpJson } from "@/services/api/http";
 import { createRun, downloadRunOutputs, uploadMedia, waitForRun, type Run } from "@/services/api/runs";
+import { requestWorkflows } from "@/services/api/workflows";
 import { publishStepProgress } from "@/services/api/step-progress";
 import type { ReferenceImage } from "@/types/image";
 
@@ -1090,7 +1091,17 @@ async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKey" | "a
     }
 }
 
+/**
+ * The model names a channel offers, for the manual refresh in the channel editor.
+ *
+ * The local gateway has no `/models` anymore: its model ids are the ones its workflows answer to, so
+ * they come from the workflow list. Any other channel keeps the OpenAI-shaped call.
+ */
 export async function fetchChannelModels(channel: ModelChannel) {
+    if (isLocalGatewayUrl(channel.baseUrl)) {
+        const workflows = await requestWorkflows(channel);
+        return workflows.flatMap((workflow) => (workflow.models || []).map((model) => model.id)).sort((a, b) => a.localeCompare(b));
+    }
     return fetchImageModels({ baseUrl: channel.baseUrl, apiKey: channel.apiKey, apiFormat: channel.apiFormat });
 }
 

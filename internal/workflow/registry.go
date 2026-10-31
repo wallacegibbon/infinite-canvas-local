@@ -490,7 +490,7 @@ func (r *Registry) decorateWithMainModel(entry *Entry, variant *BaseModelVariant
 	return decorated
 }
 
-// ListModels expands the registry into the model list served by /v1/models.
+// ListModels expands the registry into the model ids GET /api/workflows reports.
 func (r *Registry) ListModels(loaderOptions LoaderOptions) []*ModelDescriptor {
 	entries := r.Entries()
 	var descriptors []*ModelDescriptor
@@ -543,7 +543,7 @@ func (r *Registry) ListModels(loaderOptions LoaderOptions) []*ModelDescriptor {
 // ResolveModel maps an incoming model id onto an entry plus optional variant.
 //
 // A client may address a workflow by its base name, by an id, or by a
-// "<workflow>__<variant>" id produced by /v1/models; all three must work.
+// "<workflow>__<variant>" id that the workflow list reports; all three must work.
 func (r *Registry) ResolveModel(idOrName string, loaderOptions LoaderOptions) *Resolved {
 	if direct := r.Resolve(idOrName); direct != nil {
 		if override := r.mainModelFile(direct.ID); override != "" {

@@ -1,7 +1,6 @@
 # comfyui-gateway (Go)
 
-A local, OpenAI-compatible gateway that exposes ComfyUI workflows as models for the
-Infinite Canvas. It is the repository root: `main.go`, `internal/`, and the runtime
+A local gateway that runs ComfyUI workflows for the Infinite Canvas. It is the repository root: `main.go`, `internal/`, and the runtime
 assets (`workflows/`, `resources/`, `prompts/`) live at the top level, while the canvas
 frontend sits beside them in `infinite-canvas/`.
 
@@ -222,8 +221,7 @@ Metadata and management:
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/health` | Liveness, ComfyUI reachability, counts. |
-| `GET` | `/v1/models` | Registered workflows as OpenAI models. |
-| `GET` | `/api/workflows` | Full workflow list with availability. Every registered workflow, tool or model. |
+| `GET` | `/api/workflows` | Full workflow list: availability, typed parameters, and the model ids each workflow answers to (`models`). Every registered workflow, tool or model. |
 | `GET` | `/api/resources/status` | Model and node install status. |
 | `POST` | `/api/resources/install` | Start an install job. |
 | `POST` | `/api/resources/refresh` | The only rescan: reloads the resource index, re-scans ComfyUI (nodes, models, availability, new workflow graphs) and returns the resource status. This is the panel's refresh button. |

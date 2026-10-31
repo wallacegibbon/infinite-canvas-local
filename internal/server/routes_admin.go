@@ -42,7 +42,6 @@ func (s *Server) routesAdmin(mux *http.ServeMux) {
 	s.route(mux, "POST /api/workflows/{id}/visibility", s.handleWorkflowVisibility)
 	s.route(mux, "DELETE /api/workflows/{id}", s.handleWorkflowDelete)
 
-	s.route(mux, "GET /v1/models", s.handleModels)
 	s.route(mux, "GET /api/loras", s.handleLoras)
 	s.route(mux, "GET /api/skin-unlocks", s.handleSkinUnlocksGet)
 	s.route(mux, "POST /api/skin-unlocks", s.handleSkinUnlocksPost)
@@ -222,14 +221,22 @@ func (s *Server) handlePackMainModel(ctx *httpx.Ctx) error {
 }
 
 // handleWorkflows implements GET /api/workflows.
+//
+// One row per workflow, carrying everything a client needs to offer it: the media kind, the typed
+// inputs, whether ComfyUI can run it, and the model ids it answers to. Those ids are not a second
+// concept — a workflow is the thing that runs, and a base model is one of its inputs — but the id
+// *spelling* (`img-zit-int8`) is built by the gateway and resolved by the gateway, so the gateway has
+// to report it. `/v1/models` used to be the only place that happened, wrapped in an OpenAI envelope.
 func (s *Server) handleWorkflows(ctx *httpx.Ctx) error {
 	s.registry.ReloadIfChanged()
 	projected := s.registry.List()
+	models := s.workflowModels()
 
 	type row struct {
 		workflow.PublicEntry
-		Enabled      bool        `json:"enabled"`
-		Availability interface{} `json:"availability"`
+		Enabled      bool             `json:"enabled"`
+		Availability interface{}      `json:"availability"`
+		Models       []map[string]any `json:"models"`
 	}
 	rows := make([]row, 0, len(projected))
 	for _, entry := range projected {
@@ -242,10 +249,38 @@ func (s *Server) handleWorkflows(ctx *httpx.Ctx) error {
 			PublicEntry:  entry,
 			Enabled:      !s.visibility.IsHidden(entry.ID),
 			Availability: s.setup.WorkflowStatus(entry.ID),
+			Models:       models[entry.ID],
 		})
 	}
 	httpx.OK(ctx.W, map[string]any{"workflows": rows})
 	return nil
+}
+
+// workflowModels lists the model ids each workflow answers to, keyed by workflow id.
+//
+// The set is the workflow itself plus one id per base model installed here, produced by the same
+// expansion `ResolveModel` accepts, so a client can send back exactly what it was handed. A workflow
+// whose default base model is not installed contributes nothing: it cannot run, and offering it would
+// only fail later.
+func (s *Server) workflowModels() map[string][]map[string]any {
+	rows := make(map[string][]map[string]any)
+	for _, descriptor := range s.registry.ListModels(s.setup.LoaderOptions()) {
+		entry := descriptor.Entry
+		model := map[string]any{
+			"id":             descriptor.ModelID,
+			"label":          defaultStringOf(entry.Label, entry.Name),
+			"imageInputs":    workflow.ImageInputCapacity(entry),
+			"baseModel":      nil,
+			"baseModelLabel": nil,
+		}
+		if entry.BaseModel != "" {
+			model["baseModel"] = entry.BaseModel
+			model["baseModelLabel"] = defaultStringOf(entry.BaseModelLabel, "variant")
+			model["label"] = defaultStringOf(entry.Label, entry.Name) + " · " + defaultStringOf(entry.BaseModelLabel, "variant")
+		}
+		rows[descriptor.BaseID] = append(rows[descriptor.BaseID], model)
+	}
+	return rows
 }
 
 // handleWorkflowGet implements GET /api/workflows/{id}.
@@ -305,60 +340,6 @@ func (s *Server) handleWorkflowDelete(ctx *httpx.Ctx) error {
 		return httpx.NotFound("workflow_not_found", "workflow not found")
 	}
 	okJSON(ctx.W, nil)
-	return nil
-}
-
-// handleModels implements GET /v1/models.
-func (s *Server) handleModels(ctx *httpx.Ctx) error {
-	s.registry.ReloadIfChanged()
-	loaderOptions := s.setup.LoaderOptions()
-
-	data := make([]map[string]any, 0)
-	for _, descriptor := range s.registry.ListModels(loaderOptions) {
-		entry := descriptor.Entry
-		if !s.setup.IsAvailable(descriptor.BaseID) {
-			continue
-		}
-		if s.visibility.IsHidden(entry.ID) {
-			continue
-		}
-
-		label := defaultStringOf(entry.Label, entry.Name)
-		if entry.BaseModel != "" {
-			label = defaultStringOf(entry.Label, entry.Name) + " · " + defaultStringOf(entry.BaseModelLabel, "variant")
-		}
-
-		metadata := map[string]any{
-			"type":          entry.Type,
-			"workflowId":    entry.ID,
-			"label":         label,
-			"imageInputs":   workflow.ImageInputCapacity(entry),
-			"description":   entry.Description,
-			"variantModes":  entry.VariantModes(),
-			"variantLabels": entry.VariantLabelsMap(),
-			"parameters":    s.enrichParameters(entry.Parameters),
-			"availability":  s.setup.WorkflowStatus(descriptor.BaseID),
-		}
-		// Present but null when unset: the canvas distinguishes "no base model
-		// concept" from "field missing" when deciding whether to show the picker.
-		metadata["baseModel"] = nil
-		metadata["baseModelLabel"] = nil
-		if entry.BaseModel != "" {
-			metadata["baseModel"] = entry.BaseModel
-		}
-		if entry.BaseModelLabel != "" {
-			metadata["baseModelLabel"] = entry.BaseModelLabel
-		}
-
-		data = append(data, map[string]any{
-			"id":       descriptor.ModelID,
-			"object":   "model",
-			"created":  0,
-			"owned_by": "local-comfyui",
-			"metadata": metadata,
-		})
-	}
-	httpx.OK(ctx.W, map[string]any{"object": "list", "data": data})
 	return nil
 }
 

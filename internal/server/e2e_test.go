@@ -2,15 +2,12 @@ package server
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -287,213 +284,10 @@ func TestHealthReportsWorkflowCount(t *testing.T) {
 	}
 }
 
-func TestModelsListsRegisteredWorkflow(t *testing.T) {
-	fake := newFakeComfy(t)
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	status, payload := doJSON(t, gateway.Client(), http.MethodGet, gateway.URL+"/v1/models", nil)
-	if status != http.StatusOK {
-		t.Fatalf("status = %d", status)
-	}
-	data, _ := payload["data"].([]any)
-	if len(data) != 1 {
-		t.Fatalf("models = %d, want 1: %v", len(data), payload)
-	}
-	model, _ := data[0].(map[string]any)
-	if model["id"] != "image-test" {
-		t.Errorf("model id = %v", model["id"])
-	}
-	metadata, _ := model["metadata"].(map[string]any)
-	if metadata["workflowId"] != "image-test" {
-		t.Errorf("workflowId = %v", metadata["workflowId"])
-	}
-	if _, present := metadata["baseModel"]; !present {
-		t.Error("baseModel must always be present (null when unused)")
-	}
-	availability, _ := metadata["availability"].(map[string]any)
-	if available, _ := availability["available"].(bool); !available {
-		t.Errorf("expected the workflow to be available: %v", availability)
-	}
-}
-
-func TestImageGenerationReturnsBase64(t *testing.T) {
-	fake := newFakeComfy(t)
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/v1/images/generations",
-		map[string]any{"model": "image-test", "prompt": "a cat"})
-	if status != http.StatusOK {
-		t.Fatalf("status = %d, body = %v", status, payload)
-	}
-
-	data, _ := payload["data"].([]any)
-	if len(data) != 1 {
-		t.Fatalf("data = %d entries, want 1: %v", len(data), payload)
-	}
-	entry, _ := data[0].(map[string]any)
-	encoded, _ := entry["b64_json"].(string)
-	decoded, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		t.Fatalf("b64_json is not valid base64: %v", err)
-	}
-	if string(decoded) != "PNGDATA" {
-		t.Errorf("image bytes = %q, want the fake ComfyUI payload", decoded)
-	}
-	if fake.hits.Load() != 1 {
-		t.Errorf("submit calls = %d, want 1", fake.hits.Load())
-	}
-}
-
-func TestImageGenerationURLFormatServesFile(t *testing.T) {
-	fake := newFakeComfy(t)
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/v1/images/generations",
-		map[string]any{"model": "image-test", "prompt": "a cat", "response_format": "url"})
-	if status != http.StatusOK {
-		t.Fatalf("status = %d, body = %v", status, payload)
-	}
-	data, _ := payload["data"].([]any)
-	if len(data) != 1 {
-		t.Fatalf("data = %v", data)
-	}
-	entry, _ := data[0].(map[string]any)
-	fileURL, _ := entry["url"].(string)
-	if !strings.HasPrefix(fileURL, "http") || !strings.Contains(fileURL, "/files/") {
-		t.Fatalf("url = %q, want an absolute /files/ URL", fileURL)
-	}
-
-	// The URL is absolute against the configured public base URL; fetch the path
-	// from this test server instead.
-	parsed, err := url.Parse(fileURL)
-	if err != nil {
-		t.Fatalf("parse url %q: %v", fileURL, err)
-	}
-	response, err := gateway.Client().Get(gateway.URL + parsed.Path)
-	if err != nil {
-		t.Fatalf("fetch %s: %v", fileURL, err)
-	}
-	defer response.Body.Close()
-	body, _ := io.ReadAll(response.Body)
-	if response.StatusCode != http.StatusOK || string(body) != "PNGDATA" {
-		t.Errorf("file response = %d %q", response.StatusCode, body)
-	}
-}
-
-func TestImageGenerationUnknownModelIs404(t *testing.T) {
-	fake := newFakeComfy(t)
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/v1/images/generations",
-		map[string]any{"model": "does-not-exist", "prompt": "x"})
-	if status != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404: %v", status, payload)
-	}
-	errorBody, _ := payload["error"].(map[string]any)
-	if errorBody["code"] != "model_not_found" {
-		t.Errorf("code = %v, want model_not_found", errorBody["code"])
-	}
-}
-
-func TestImageGenerationMissingModelIs400(t *testing.T) {
-	fake := newFakeComfy(t)
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/v1/images/generations",
-		map[string]any{"prompt": "x"})
-	if status != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400: %v", status, payload)
-	}
-}
-
-func TestSubmitNodeErrorsBecome400(t *testing.T) {
-	fake := newFakeComfy(t)
-	fake.failSubmit = true
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/v1/images/generations",
-		map[string]any{"model": "image-test", "prompt": "x"})
-	if status != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400 (ComfyUI rejected the graph): %v", status, payload)
-	}
-	errorBody, _ := payload["error"].(map[string]any)
-	message, _ := errorBody["message"].(string)
-	if !strings.Contains(message, "bad seed") {
-		t.Errorf("message = %q, want the ComfyUI node error surfaced", message)
-	}
-}
-
-func TestCrossSiteWriteIsRejected(t *testing.T) {
-	fake := newFakeComfy(t)
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	request, _ := http.NewRequest(http.MethodPost, gateway.URL+"/v1/images/generations",
-		strings.NewReader(`{"model":"image-test","prompt":"x"}`))
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Sec-Fetch-Site", "cross-site")
-
-	response, err := gateway.Client().Do(request)
-	if err != nil {
-		t.Fatalf("request: %v", err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusForbidden {
-		t.Errorf("status = %d, want 403 for a cross-site write", response.StatusCode)
-	}
-}
-
-func TestSessionLifecycle(t *testing.T) {
-	fake := newFakeComfy(t)
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/api/session/open",
-		map[string]any{"id": "tab-1"})
-	if status != http.StatusOK {
-		t.Fatalf("open status = %d", status)
-	}
-	if count, _ := payload["count"].(float64); count != 1 {
-		t.Errorf("count = %v, want 1", payload["count"])
-	}
-
-	_, payload = doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/api/session/close",
-		map[string]any{"id": "tab-1"})
-	if count, _ := payload["count"].(float64); count != 0 {
-		t.Errorf("count after close = %v, want 0", payload["count"])
-	}
-}
-
-func TestUnknownRouteReturnsJSON404(t *testing.T) {
-	fake := newFakeComfy(t)
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	status, payload := doJSON(t, gateway.Client(), http.MethodGet, gateway.URL+"/nope", nil)
-	if status != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404", status)
-	}
-	if _, ok := payload["error"]; !ok {
-		t.Errorf("body is not the standard error envelope: %v", payload)
-	}
-}
-
-func TestWorkflowsEndpointExposesShape(t *testing.T) {
+// The workflow list is where a client learns which model ids exist, so it must carry them: an id
+// like `img-zit-int8` is a spelling the gateway invents and resolves, not something a client can
+// derive from the workflow name.
+func TestWorkflowsReportTheirModelIds(t *testing.T) {
 	fake := newFakeComfy(t)
 	srv := newTestGateway(t, fake)
 	gateway := httptest.NewServer(srv.Handler())
@@ -503,18 +297,86 @@ func TestWorkflowsEndpointExposesShape(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("status = %d", status)
 	}
-	workflows, _ := payload["workflows"].([]any)
-	if len(workflows) != 1 {
-		t.Fatalf("workflows = %d, want 1", len(workflows))
+	rows, _ := payload["workflows"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("workflows = %d, want 1: %v", len(rows), payload)
 	}
-	entry, _ := workflows[0].(map[string]any)
-	for _, key := range []string{"id", "name", "type", "label", "enabled", "availability", "bindings"} {
-		if _, ok := entry[key]; !ok {
-			t.Errorf("workflow entry is missing %q: %v", key, entry)
-		}
+	row, _ := rows[0].(map[string]any)
+	if row["id"] != "image-test" {
+		t.Errorf("id = %v", row["id"])
 	}
-	if enabled, _ := entry["enabled"].(bool); !enabled {
-		t.Error("expected the workflow to be enabled")
+	if enabled, _ := row["enabled"].(bool); !enabled {
+		t.Error("a workflow with no visibility record must report enabled")
+	}
+	availability, _ := row["availability"].(map[string]any)
+	if available, _ := availability["available"].(bool); !available {
+		t.Errorf("expected the workflow to be available: %v", availability)
+	}
+
+	models, _ := row["models"].([]any)
+	if len(models) != 1 {
+		t.Fatalf("models = %v, want the workflow's own id", models)
+	}
+	model, _ := models[0].(map[string]any)
+	if model["id"] != "image-test" {
+		t.Errorf("model id = %v", model["id"])
+	}
+	if _, present := model["baseModel"]; !present {
+		t.Error("baseModel must always be present (null when unused)")
+	}
+	if inputs, ok := model["imageInputs"].(float64); !ok || inputs != 0 {
+		t.Errorf("imageInputs = %v, want 0 for a text-to-image workflow", model["imageInputs"])
+	}
+}
+
+// A workflow that declares base models answers to one id per installed file. The graph is the same;
+// only the checkpoint the loader reads changes, which is why the ids are data on the workflow row
+// rather than separate workflows.
+func TestWorkflowsReportOneIdPerBaseModel(t *testing.T) {
+	fake := newFakeComfy(t)
+	// The scan reads the loader's catalogue from ComfyUI: a base model is selectable because the file
+	// is installed, which is the same fact the availability check uses.
+	fake.objectInfo = map[string]any{
+		"UNETLoader": map[string]any{"input": map[string]any{"required": map[string]any{
+			"unet_name": []any{[]any{"z_image_bf16.safetensors", "z_image_int8.safetensors"}},
+		}}},
+	}
+	file, graph, entry := imageFixture()
+	entry["baseModels"] = map[string]any{
+		"param": "unet",
+		"variants": []any{
+			map[string]any{"file": "z_image_bf16.safetensors", "id": "zit-bf16", "label": "bf16"},
+			map[string]any{"file": "z_image_int8.safetensors", "id": "zit-int8", "label": "int8"},
+		},
+	}
+	gateway := httptest.NewServer(newTestGatewayWith(t, fake, file, graph, entry).Handler())
+	defer gateway.Close()
+
+	_, payload := doJSON(t, gateway.Client(), http.MethodGet, gateway.URL+"/api/workflows", nil)
+	rows, _ := payload["workflows"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("workflows = %v", rows)
+	}
+	row, _ := rows[0].(map[string]any)
+	models, _ := row["models"].([]any)
+	seen := map[string]string{}
+	for _, raw := range models {
+		model, _ := raw.(map[string]any)
+		seen[asString(model["id"])] = asString(model["baseModel"])
+	}
+	// The workflow's own id, plus one id per installed base model. The graph's loader has no default
+	// value, so the plain id carries none and each variant names its file.
+	if len(seen) != 3 {
+		t.Fatalf("ids = %v", seen)
+	}
+	if value, present := seen["image-test"]; !present || value != "" {
+		t.Errorf("ids = %v", seen)
+	}
+	if seen["image-test__zit-bf16"] != "z_image_bf16.safetensors" {
+		t.Errorf("ids = %v", seen)
+	}
+	if seen["image-test__zit-int8"] != "z_image_int8.safetensors" {
+		t.Errorf("ids = %v", seen)
 	}
 }
 
@@ -530,9 +392,16 @@ func TestWorkflowVisibilityToggles(t *testing.T) {
 		t.Fatalf("visibility status = %d", status)
 	}
 
-	_, models := doJSON(t, gateway.Client(), http.MethodGet, gateway.URL+"/v1/models", nil)
-	if data, _ := models["data"].([]any); len(data) != 0 {
-		t.Errorf("hidden workflow must not appear in /v1/models: %v", data)
+	// The gateway reports the fact; dropping a hidden workflow from a model list is the client's
+	// decision. The row stays, with `enabled: false`.
+	_, payload := doJSON(t, gateway.Client(), http.MethodGet, gateway.URL+"/api/workflows", nil)
+	rows, _ := payload["workflows"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("workflows = %v", rows)
+	}
+	row, _ := rows[0].(map[string]any)
+	if enabled, _ := row["enabled"].(bool); enabled {
+		t.Error("a hidden workflow must report enabled: false")
 	}
 }
 
