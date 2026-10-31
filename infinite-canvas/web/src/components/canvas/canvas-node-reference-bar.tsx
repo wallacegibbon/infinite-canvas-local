@@ -14,7 +14,6 @@ export function CanvasNodeReferenceBar({
     nodeId,
     nodes,
     connectedNodes,
-    leadingNode,
     onDisconnect,
     onStartSelection,
     addDisabled = false,
@@ -23,7 +22,6 @@ export function CanvasNodeReferenceBar({
     nodeId: string;
     nodes: CanvasNodeData[];
     connectedNodes: CanvasNodeData[];
-    leadingNode?: CanvasNodeData;
     onDisconnect?: (fromNodeId: string, toNodeId: string) => void;
     onStartSelection?: (nodeId: string) => void;
     addDisabled?: boolean;
@@ -31,18 +29,15 @@ export function CanvasNodeReferenceBar({
 }) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
-    const references = [
-        ...(leadingNode ? [{ node: leadingNode, sourceNodeId: "", leading: true }] : []),
-        ...connectedNodes.flatMap((sourceNode) => (sourceNode.type === CanvasNodeType.Group ? getGroupResourceNodes(sourceNode.id, nodes) : [sourceNode]).map((node) => ({ node, sourceNodeId: sourceNode.id, leading: false }))),
-    ];
+    const references = connectedNodes.flatMap((sourceNode) => (sourceNode.type === CanvasNodeType.Group ? getGroupResourceNodes(sourceNode.id, nodes) : [sourceNode]).map((node) => ({ node, sourceNodeId: sourceNode.id })));
     return (
         <div className="mb-2">
             <div className="mb-1.5 text-[11px] font-medium" style={{ color: theme.node.muted }}>
                 {t("canvas.references.title")}
             </div>
             <div className="thin-scrollbar flex min-h-12 gap-2 overflow-x-auto pb-1">
-                {references.map(({ node, sourceNodeId, leading }, index) => (
-                    <ReferenceItem key={`${sourceNodeId}:${node.id}`} node={node} leading={leading} index={index + 1} onRemove={() => onDisconnect?.(sourceNodeId, nodeId)} />
+                {references.map(({ node, sourceNodeId }, index) => (
+                    <ReferenceItem key={`${sourceNodeId}:${node.id}`} node={node} index={index + 1} onRemove={() => onDisconnect?.(sourceNodeId, nodeId)} />
                 ))}
                 <button
                     type="button"
@@ -61,7 +56,7 @@ export function CanvasNodeReferenceBar({
     );
 }
 
-function ReferenceItem({ node, onRemove, leading = false, index }: { node: CanvasNodeData; onRemove: () => void; leading?: boolean; index: number }) {
+function ReferenceItem({ node, onRemove, index }: { node: CanvasNodeData; onRemove: () => void; index: number }) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     useSyncExternalStore(subscribeImagePreviews, getImagePreviewRevision);
@@ -93,23 +88,20 @@ function ReferenceItem({ node, onRemove, leading = false, index }: { node: Canva
                     )}
                 </span>
                 <span className="absolute left-0.5 top-0.5 grid size-4 place-items-center rounded-full bg-black/65 text-[9px] font-semibold leading-none text-white">{index}</span>
-                {leading ? <span className="absolute bottom-0.5 left-0.5 rounded bg-black/65 px-1 py-0.5 text-[9px] leading-none text-white">{t("canvas.references.source")}</span> : null}
-                {leading ? null : (
-                    <button
-                        type="button"
-                        className="absolute right-0 top-0 grid size-5 place-items-center rounded-full border opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                        style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border }}
-                        aria-label={t("canvas.references.disconnect")}
-                        title={t("canvas.references.disconnect")}
-                        onMouseDown={(event) => event.stopPropagation()}
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onRemove();
-                        }}
-                    >
-                        <X className="size-3" />
-                    </button>
-                )}
+                <button
+                    type="button"
+                    className="absolute right-0 top-0 grid size-5 place-items-center rounded-full border opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                    style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border }}
+                    aria-label={t("canvas.references.disconnect")}
+                    title={t("canvas.references.disconnect")}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onRemove();
+                    }}
+                >
+                    <X className="size-3" />
+                </button>
             </div>
         </Popover>
     );

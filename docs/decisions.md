@@ -2647,3 +2647,39 @@ every key from `model.conf`, and a transcript is worth having without them.
 a prompt streamed `models`/`reasoning`/`delta`/`done` with the frame log, a command-only request changed
 the reasoning level and logged its `CI`/`CO` pair, and the browser generated text, switched models and
 optimised an image prompt through the one route.
+
+## 77. Regenerating an image answers in that node; a variant is a node you make
+
+**Decision** `nodeRegenerateBehavior` is gone. Pressing generate on a node that already holds a result
+replaces that result, always. Nothing is created beside it, and the old image is not quietly fed back in
+as a reference. The "原图" leading reference (`canvas.references.source`, `leadingNode`) went with it,
+and so did `Radio` in `components/kit/choice.tsx`, which had no caller left.
+
+**Why** The setting offered two answers to one button: *overwrite* meant "re-roll this one", *new node*
+meant "keep this, and make another one conditioned on it" — it created the sibling **and** inserted the
+old image into the request as a reference. So the same press meant two different things depending on a
+preferences toggle, and the meaning leaked into the result: with the default, pressing generate twice
+gave you two images, the second one not a re-roll but an edit of the first.
+
+**Both real intents already have explicit routes.** A variant conditioned on an image is a new node with
+that image picked in 参考内容 (`requestEdit`); a variant of a *prompt* is a config node pressed twice,
+since the config node keeps the prompt and never reuses a result node. Neither needed the toggle — the
+automatic path was the manual path, performed silently on the user's behalf.
+
+**Where a reference actually comes from** An image node's references are **connections**
+(`buildNodeMentionReferences(node, nodes, connections)`); picking one in 参考内容 is that connection
+being made (`project.tsx`, the picker appends `{fromNodeId, toNodeId}`). The `@` mention is a different
+thing and lives elsewhere: the config node's 组装提示词 composer writes `@[node:…]` into the text, and
+double-clicking a text node gives a textarea with an `@` menu. An image node's prompt box is a plain
+textarea — there is no `@` there, and saying otherwise would send people looking for a menu that is not
+in that panel.
+
+**Cost, stated plainly** Pressing generate on a finished image destroys it. To keep it, 复制 the node
+first, or make the new node before generating. This is the trade the decision buys: the button does one
+thing, and the thing it does is visible in the node you pressed.
+
+**Tested** `npm run check` (i18n 1049/1031, no dead keys, exports clean), `npx vitest run` (124). In the
+browser against `:8191`: an image node with content and no references showed only the add button in
+参考内容 (the "原图" chip is gone), pressing 生成 kept the node count at 26 and replaced that node's image
+through `image-z-image-turbo` — a plain generation, no edit workflow, so no source image was sent — and
+the preferences page no longer lists the option.

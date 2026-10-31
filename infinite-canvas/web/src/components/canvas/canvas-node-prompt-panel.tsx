@@ -105,19 +105,6 @@ export function CanvasNodePromptPanel({
     const imageModeValue = String(config.imageMode || "").trim();
     const textOnlyImageMode = isImage && (imageModeValue === "t2i" || (!imageModeValue && workflowId === "image-qwen21"));
     const usesImageReferences = textOnlyImageMode ? false : imageInputLimit === undefined ? !isH3T2V : imageInputLimit > 0;
-    const sourceImageReference: CanvasResourceReference | null =
-        usesImageReferences && node.type === CanvasNodeType.Image && node.metadata?.content && config.nodeRegenerateBehavior !== "overwrite" && !imageReferences.length
-            ? {
-                  id: `canvas:${node.id}`,
-                  nodeId: node.id,
-                  kind: "image",
-                  label: t("canvas.references.source"),
-                  title: node.title || t("canvas.references.source"),
-                  previewUrl: node.metadata.content,
-                  active: true,
-              }
-            : null;
-    const promptImageReferences = sourceImageReference ? [sourceImageReference, ...imageReferences.filter((reference) => reference.nodeId !== node.id)] : imageReferences;
     const agentSession = useConfigStore((state) => state.agentSession);
     const [connecting, setConnecting] = useState(false);
     const optimizeStatus = node.metadata?.promptOptimizeStatus;
@@ -306,7 +293,7 @@ export function CanvasNodePromptPanel({
         const text = draft.trim();
         if (!text || optimizeRunning) return;
         commitPrompt(draft);
-        const selectedRefs = usesImageReferences ? promptImageReferences.slice(0, Math.max(1, imageInputLimit ?? 8)) : [];
+        const selectedRefs = usesImageReferences ? imageReferences.slice(0, Math.max(1, imageInputLimit ?? 8)) : [];
         const controller = new AbortController();
         registerPromptOptimizeJob(node.id, controller);
         onConfigChange(node.id, { promptOptimizeStatus: "running", promptOptimizeKind: "image", promptOptimizeSource: text, promptOptimizePrompt: undefined, promptOptimizeError: undefined });
@@ -413,7 +400,6 @@ export function CanvasNodePromptPanel({
                 nodeId={node.id}
                 nodes={nodes}
                 connectedNodes={connectedNodes}
-                leadingNode={sourceImageReference ? node : undefined}
                 onDisconnect={onDisconnectReference}
                 onStartSelection={onStartReferenceSelection}
                 addDisabled={isH3T2V}
@@ -654,7 +640,6 @@ export function CanvasNodePromptPanel({
                         nodeId={node.id}
                         nodes={nodes}
                         connectedNodes={connectedNodes}
-                        leadingNode={sourceImageReference ? node : undefined}
                         onDisconnect={onDisconnectReference}
                         onStartSelection={(nodeId) => {
                             setExpanded(false);

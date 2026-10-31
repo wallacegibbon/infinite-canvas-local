@@ -35,7 +35,6 @@ export type GenerationRun = {
     effectivePrompt: string;
     generationConfig: ReturnType<typeof import("@/lib/canvas/canvas-generation-helpers").buildGenerationConfig>;
     generationContext: Awaited<ReturnType<typeof hydrateNodeGenerationContext>>;
-    overwriteExisting: boolean;
     runController: AbortController;
     /**
      * Filled in by whichever mode ran, so the caller's `catch` can put the nodes it created into the
@@ -178,23 +177,19 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
 
     const runImageGeneration = useCallback(
         async (run: GenerationRun) => {
-            const { nodeId, prompt, sourceNode, effectivePrompt, generationConfig, generationContext, overwriteExisting, runController } = run;
+            const { nodeId, prompt, sourceNode, effectivePrompt, generationConfig, generationContext, runController } = run;
             const count = getGenerationCount(generationConfig.count);
             const isConfigNode = sourceNode?.type === CanvasNodeType.Config;
             const isImageNode = sourceNode?.type === CanvasNodeType.Image;
-            const isEmptyImageNode = isImageNode && !sourceNode?.metadata?.content;
-            const reuseImageNode = isImageNode && (overwriteExisting || isEmptyImageNode);
-            const sourceReference =
-                isImageNode && sourceNode?.metadata?.content && !overwriteExisting && !generationContext.referenceImages.length
-                    ? [{ id: sourceNode.id, name: `${sourceNode.title || sourceNode.id}.png`, type: sourceNode.metadata.mimeType || "image/png", dataUrl: sourceNode.metadata.content, storageKey: sourceNode.metadata.storageKey }]
-                    : [];
-            const referenceImages = [...new Map([...sourceReference, ...generationContext.referenceImages].map((image) => [image.id, image])).values()];
+            // An image node answers in place. A variant is a new node fed with this one through the
+            // reference bar — whatever is connected here is what conditions the request, nothing else.
+            const referenceImages = [...new Map(generationContext.referenceImages.map((image) => [image.id, image])).values()];
             const generationType = referenceImages.length ? ("edit" as const) : ("generation" as const);
             const generationMetadata = buildImageGenerationMetadata(generationType, generationConfig, count, referenceImages);
             const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : isImageNode ? CanvasNodeType.Image : CanvasNodeType.Text];
             const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
             const parentPosition = sourceNode?.position || { x: 0, y: 0 };
-            const rootId = reuseImageNode ? nodeId : nanoid();
+            const rootId = isImageNode ? nodeId : nanoid();
             const imageIds = Array.from({ length: count }, () => nanoid());
             run.pendingChildIds = [rootId];
             const rootNode: CanvasNodeData = {
@@ -202,11 +197,11 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                 type: CanvasNodeType.Image,
                 title: effectivePrompt.slice(0, 32) || "Generated Image",
                 position: {
-                    x: reuseImageNode ? parentPosition.x : parentPosition.x + parentConfig.width + 96,
+                    x: isImageNode ? parentPosition.x : parentPosition.x + parentConfig.width + 96,
                     y: parentPosition.y + parentConfig.height / 2 - imageConfig.height / 2,
                 },
-                width: reuseImageNode ? sourceNode?.width || imageConfig.width : imageConfig.width,
-                height: reuseImageNode ? sourceNode?.height || imageConfig.height : imageConfig.height,
+                width: isImageNode ? sourceNode?.width || imageConfig.width : imageConfig.width,
+                height: isImageNode ? sourceNode?.height || imageConfig.height : imageConfig.height,
                 metadata: {
                     prompt: effectivePrompt,
                     status: NODE_STATUS_LOADING,
@@ -224,7 +219,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                                   ...node,
                                   metadata: { ...node.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined },
                               }
-                            : reuseImageNode
+                            : isImageNode
                               ? {
                                     ...node,
                                     position: rootNode.position,
@@ -233,24 +228,19 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                                     title: rootNode.title,
                                     metadata: { ...node.metadata, ...rootNode.metadata, content: undefined, storageKey: undefined, naturalWidth: undefined, naturalHeight: undefined, bytes: undefined, mimeType: undefined, errorDetails: undefined },
                                 }
-                              : isImageNode
-                                ? {
-                                      ...node,
-                                      metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, errorDetails: undefined },
-                                  }
-                                : {
-                                      ...node,
-                                      type: CanvasNodeType.Text,
-                                      title: prompt.slice(0, 32) || "Prompt",
-                                      width: parentConfig.width,
-                                      height: parentConfig.height,
-                                      metadata: { ...node.metadata, content: prompt, prompt, status: NODE_STATUS_SUCCESS, fontSize: 14, errorDetails: undefined },
-                                  }
+                              : {
+                                    ...node,
+                                    type: CanvasNodeType.Text,
+                                    title: prompt.slice(0, 32) || "Prompt",
+                                    width: parentConfig.width,
+                                    height: parentConfig.height,
+                                    metadata: { ...node.metadata, content: prompt, prompt, status: NODE_STATUS_SUCCESS, fontSize: 14, errorDetails: undefined },
+                                }
                         : node,
                 ),
-                ...(reuseImageNode ? [] : [rootNode]),
+                ...(isImageNode ? [] : [rootNode]),
             ]);
-            if (!reuseImageNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: rootId }]);
+            if (!isImageNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: rootId }]);
             setSelectedNodeIds(new Set([nodeId]));
             setSelectedConnectionId(null);
             setDialogNodeId(nodeId);
@@ -361,10 +351,9 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
 
     const runVideoGeneration = useCallback(
         async (run: GenerationRun) => {
-            const { nodeId, sourceNode, effectivePrompt, generationConfig, generationContext, overwriteExisting, runController } = run;
+            const { nodeId, sourceNode, effectivePrompt, generationConfig, generationContext, runController } = run;
             const spec = nodeSizeFromRatio(generationConfig.size, NODE_DEFAULT_SIZE[CanvasNodeType.Video].width, NODE_DEFAULT_SIZE[CanvasNodeType.Video].height) || NODE_DEFAULT_SIZE[CanvasNodeType.Video];
-            const isEmptyVideoNode = sourceNode?.type === CanvasNodeType.Video && !sourceNode.metadata?.content;
-            const reuseVideoNode = sourceNode?.type === CanvasNodeType.Video && (overwriteExisting || isEmptyVideoNode);
+            const reuseVideoNode = sourceNode?.type === CanvasNodeType.Video;
             const videoId = reuseVideoNode ? nodeId : nanoid();
             const parent = sourceNode?.position || { x: 0, y: 0 };
             const videoNode: CanvasNodeData = {
@@ -422,10 +411,9 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
 
     const runAudioGeneration = useCallback(
         async (run: GenerationRun) => {
-            const { nodeId, sourceNode, effectivePrompt, generationConfig, overwriteExisting, runController } = run;
+            const { nodeId, sourceNode, effectivePrompt, generationConfig, runController } = run;
             const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Audio];
-            const isEmptyAudioNode = sourceNode?.type === CanvasNodeType.Audio && !sourceNode.metadata?.content;
-            const reuseAudioNode = sourceNode?.type === CanvasNodeType.Audio && (overwriteExisting || isEmptyAudioNode);
+            const reuseAudioNode = sourceNode?.type === CanvasNodeType.Audio;
             const audioId = reuseAudioNode ? nodeId : nanoid();
             const parent = sourceNode?.position || { x: 0, y: 0 };
             const audioNode: CanvasNodeData = {

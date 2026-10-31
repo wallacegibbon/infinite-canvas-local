@@ -4,13 +4,11 @@ import { createContext, useContext, type ChangeEvent, type InputHTMLAttributes, 
 import { cn } from "@/lib/utils";
 
 /**
- * Boolean and exclusive choices, replacing antd's `Switch`, `Checkbox` / `Checkbox.Group`
- * and `Radio` / `Radio.Group` / `Radio.Button`.
+ * Boolean and exclusive choices, replacing antd's `Switch` and `Checkbox` / `Checkbox.Group`.
  *
- * `Checkbox` and `Radio` hand their `onChange` the **native** change event, because every
- * call site already reads `event.target.checked` or `event.target.value`; keeping that
- * shape avoided rewriting any handler. Groups supply `checked` and the toggle through
- * context so the items stay as plain markup at the call sites.
+ * `Checkbox` hands its `onChange` the **native** change event, because every call site already
+ * reads `event.target.checked`; keeping that shape avoided rewriting any handler. Groups supply
+ * the state and the toggle through context so the items stay as plain markup at the call sites.
  */
 
 /* ---------------------------------------------------------------- Switch */
@@ -101,84 +99,3 @@ function CheckboxGroup({ value = [], onChange, className, children }: { value?: 
 }
 
 Checkbox.Group = CheckboxGroup;
-
-/* ----------------------------------------------------------------- Radio */
-
-type RadioGroupContext = { value?: string; select: (value: string) => void };
-
-const RadioContext = createContext<RadioGroupContext | null>(null);
-
-/** antd gave handlers an event; the call sites read `event.target.value`. */
-const asValueEvent = (value: string) => ({ target: { value } }) as unknown as ChangeEvent<HTMLInputElement>;
-
-export function Radio({
-    checked,
-    onChange,
-    disabled,
-    className,
-    children,
-    value,
-    ...props
-}: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "size"> & { checked?: boolean; onChange?: (event: ChangeEvent<HTMLInputElement>) => void; value?: string; children?: ReactNode }): ReactNode {
-    const group = useContext(RadioContext);
-    const inGroup = Boolean(group && value !== undefined);
-    const isChecked = inGroup ? group!.value === value : Boolean(checked);
-    return (
-        <label className={cn("inline-flex cursor-pointer items-center gap-2 text-sm", disabled && "cursor-not-allowed opacity-60", className)}>
-            <input
-                type="radio"
-                checked={isChecked}
-                disabled={disabled}
-                onChange={(event) => {
-                    if (inGroup) group!.select(value!);
-                    onChange?.(event);
-                }}
-                className="size-3.5 shrink-0 cursor-pointer accent-stone-900 disabled:cursor-not-allowed dark:accent-stone-100"
-                {...props}
-            />
-            {children}
-        </label>
-    );
-}
-
-/** A radio drawn as a segmented button, the way `optionType="button"` did. */
-function RadioButton({ value, disabled, children }: { value: string; disabled?: boolean; children?: ReactNode }): ReactNode {
-    const group = useContext(RadioContext);
-    const active = group?.value === value;
-    return (
-        <button
-            type="button"
-            role="radio"
-            aria-checked={active}
-            disabled={disabled}
-            onClick={() => group?.select(value)}
-            className={cn(
-                "inline-flex h-7 flex-1 items-center justify-center rounded px-2.5 text-sm whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                active ? "bg-white text-stone-900 shadow-sm dark:bg-stone-700 dark:text-stone-50" : "text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-stone-100",
-            )}
-        >
-            {children}
-        </button>
-    );
-}
-
-function RadioGroup({ value, onChange, className, children }: { value?: string; onChange?: (event: ChangeEvent<HTMLInputElement>) => void; className?: string; children?: ReactNode; optionType?: "default" | "button" }): ReactNode {
-    // `optionType="button"` used to switch antd's rendering; the buttons below read the same
-    // context either way, so the prop is accepted and not needed.
-    const select = (next: string) => onChange?.(asValueEvent(next));
-    const buttonMode = isButtonGroup(children);
-    return (
-        <RadioContext.Provider value={{ value, select }}>
-            <div role="radiogroup" className={cn(buttonMode ? "inline-flex items-center gap-0.5 rounded-md bg-stone-100 p-0.5 dark:bg-stone-800" : "flex flex-wrap items-center gap-4", className)}>
-                {children}
-            </div>
-        </RadioContext.Provider>
-    );
-}
-
-function isButtonGroup(children: ReactNode): boolean {
-    return Array.isArray(children) ? children.some((child) => typeof child === "object" && child !== null && (child as { type?: unknown }).type === RadioButton) : (children as { type?: unknown } | null)?.type === RadioButton;
-}
-
-Radio.Group = RadioGroup;
-Radio.Button = RadioButton;

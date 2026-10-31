@@ -2072,7 +2072,6 @@ function InfiniteCanvasPage() {
             }
 
             setRunningNodeId(nodeId);
-            const overwriteExisting = effectiveConfig.nodeRegenerateBehavior === "overwrite";
             const runController = startGenerationRequest(nodeId, nodeId, nodeId);
             // The prompt is the prompt. A text node that already holds an answer is not a document to
             // revise — regenerating asks the same question again, and refining means editing the prompt.
@@ -2097,7 +2096,6 @@ function InfiniteCanvasPage() {
                 effectivePrompt,
                 generationConfig,
                 generationContext,
-                overwriteExisting,
                 runController,
                 pendingChildIds: [],
             };

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
-import { Switch, Radio } from "@/components/kit/choice";
+import { Switch } from "@/components/kit/choice";
 import { Dialog } from "@/components/kit/dialog";
 import { Field } from "@/components/kit/field";
 import { Input } from "@/components/kit/input";
@@ -308,18 +308,6 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
                                             );
                                         })}
                                     </div>
-                                </Field>
-                                <Field label={t("config.preferences.regenerateBehavior")} className="mb-4">
-                                    <Radio.Group value={config.nodeRegenerateBehavior} onChange={(event) => updateConfig("nodeRegenerateBehavior", event.target.value as "new-node" | "overwrite")} className="flex flex-col gap-2">
-                                        <Radio value="overwrite">
-                                            <span className="block text-sm font-medium">{t("config.preferences.regenerateBehaviorOverwrite")}</span>
-                                            <span className="mt-0.5 block text-xs opacity-60">{t("config.preferences.regenerateBehaviorOverwriteDescription")}</span>
-                                        </Radio>
-                                        <Radio value="new-node">
-                                            <span className="block text-sm font-medium">{t("config.preferences.regenerateBehaviorNewNode")}</span>
-                                            <span className="mt-0.5 block text-xs opacity-60">{t("config.preferences.regenerateBehaviorNewNodeDescription")}</span>
-                                        </Radio>
-                                    </Radio.Group>
                                 </Field>
                                 <Field className="mb-4">
                                     <div className="flex items-center justify-between gap-3">

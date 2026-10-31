@@ -66,7 +66,6 @@ export type AiConfig = {
     background: string;
     count: string;
     canvasImageCount: string;
-    nodeRegenerateBehavior: "new-node" | "overwrite";
     autoFocusOnSelect: boolean;
     progressRingSkin: ProgressRingSkinId;
     seed?: string;
@@ -121,7 +120,6 @@ export const defaultConfig: AiConfig = {
     background: "",
     count: "1",
     canvasImageCount: "3",
-    nodeRegenerateBehavior: "new-node",
     autoFocusOnSelect: false,
     progressRingSkin: "cyan",
 };
@@ -354,7 +352,6 @@ export const useConfigStore = create<ConfigStore>()(
                         videoMode: config.videoMode === "reference" || config.videoMode === "text" ? config.videoMode : "frames",
                         videoSelfLiftMode: config.videoSelfLiftMode === "quality" ? "quality" : "fast",
                         canvasImageCount: config.canvasImageCount || "3",
-                        nodeRegenerateBehavior: config.nodeRegenerateBehavior === "overwrite" ? "overwrite" : "new-node",
                         autoFocusOnSelect: Boolean(config.autoFocusOnSelect),
                         progressRingSkin: normalizeProgressRingSkin(config.progressRingSkin),
                     },
