@@ -124,3 +124,19 @@ func TestRedactKeysKeepsTheShape(t *testing.T) {
 		t.Errorf("the field was lost: %s", got)
 	}
 }
+
+// The streaming plane is noise in a transcript; the frames around it say what happened.
+func TestDeltaFramesAreNotLogged(t *testing.T) {
+	for tag, want := range map[string]bool{
+		TagAssistantXDelta: true,
+		TagAssistantFDelta: true,
+		TagUserFDelta:      true,
+		TagAssistantX:      false,
+		TagSystemMsg:       false,
+		TagCmdOutput:       false,
+	} {
+		if got := isDelta(tag); got != want {
+			t.Errorf("isDelta(%q) = %v, want %v", tag, got, want)
+		}
+	}
+}

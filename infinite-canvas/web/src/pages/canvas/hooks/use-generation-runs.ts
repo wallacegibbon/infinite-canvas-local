@@ -470,7 +470,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
 
     const runTextGeneration = useCallback(
         async (run: GenerationRun) => {
-            const { nodeId, sourceNode, sourceTextContent, effectivePrompt, generationConfig, generationContext, overwriteExisting, runController } = run;
+            const { nodeId, sourceNode, effectivePrompt, generationConfig, generationContext, runController } = run;
             const isConfigNode = sourceNode?.type === CanvasNodeType.Config;
             // One prompt, one answer: a connected agent answers exactly one question, so a batch of texts
             // is no longer a thing (the count control went with the old text settings).
@@ -478,8 +478,10 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : CanvasNodeType.Text];
             const textConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Text];
             const parentPosition = sourceNode?.position || { x: 0, y: 0 };
-            const isEmptyTextNode = sourceNode?.type === CanvasNodeType.Text && !sourceTextContent;
-            const reuseTextNode = sourceNode?.type === CanvasNodeType.Text && (overwriteExisting || isEmptyTextNode);
+            // Asked from a text node, the answer belongs to that node: generating again rewrites it
+            // rather than dropping a second one beside it. A config node still produces a new text
+            // node, because there the output is not the thing you pressed.
+            const reuseTextNode = sourceNode?.type === CanvasNodeType.Text;
             const rootId = reuseTextNode ? nodeId : nanoid();
             const textIds = Array.from({ length: textCount }, () => nanoid());
             const rootNode: CanvasNodeData = {

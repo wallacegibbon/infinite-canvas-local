@@ -156,10 +156,17 @@ func (p *Process) Read() (*Frame, error) {
 }
 
 func (p *Process) logFrame(direction, tag, value string) {
-	if p.Log == nil {
+	if p.Log == nil || isDelta(tag) {
 		return
 	}
 	p.Log.Info("agent %s %s %s", direction, tag, truncateFrame(redactKeys(value)))
+}
+
+// isDelta reports the streaming plane — `Ax`, `Af`, `Uf`. They arrive per token, and a transcript made
+// of them buries the frames that say what happened. The closing `request done` line already counts
+// them, which is all a reader needs: how many deltas a turn took.
+func isDelta(tag string) bool {
+	return tag == TagAssistantXDelta || tag == TagAssistantFDelta || tag == TagUserFDelta
 }
 
 // reAPIKey matches the value of an api_key field in a frame body. `SM model_list` carries every key
