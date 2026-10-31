@@ -43,7 +43,7 @@ type InputSpec struct {
 }
 
 // semanticInputs are the keys that drive the request itself rather than a binding.
-var semanticInputs = []string{"prompt", "negative", "size", "count", "n", "quality", "seconds", "duration", "mode"}
+var semanticInputs = []string{"prompt", "negative", "size", "count", "n", "quality", "seconds", "duration", "mode", "background", "editCanvasSize", "layout", "layoutEnabled"}
 
 // InputSpecs is the typed contract of a workflow, assembled from three sources: the request-level
 // keys above, the workflow's declared `parameters`, and its non-media binding keys.
@@ -88,6 +88,15 @@ func (e *Entry) InputSpecs(limits InputLimits) []InputSpec {
 	add(InputSpec{Key: "seconds", Type: "number", Min: &minimumSeconds, Label: "Seconds"})
 	add(InputSpec{Key: "duration", Type: "number", Min: &minimumSeconds, Label: "Duration"})
 	add(InputSpec{Key: "mode", Type: "string", Options: e.VariantModes(), Label: "Mode"})
+	add(InputSpec{Key: "background", Type: "string", Label: "Background"})
+	add(InputSpec{Key: "editCanvasSize", Type: "size", Label: "Edit canvas size"})
+	// The structured layout a MOSS workflow renders into its prompt; the gateway owns its shape, so
+	// it is passed through rather than described here.
+	add(InputSpec{Key: "layout", Type: "any", Label: "Layout"})
+	add(InputSpec{Key: "layoutEnabled", Type: "boolean", Label: "Layout enabled"})
+	// The LoRA stack is applied by the engine (ApplyLoraChain), not by a binding, so it is a
+	// gateway-owned input rather than a workflow one.
+	add(InputSpec{Key: "loras", Type: "any", Label: "LoRAs"})
 
 	// Declared parameters carry the workflow's own ranges. They are authoritative for numbers.
 	for _, raw := range e.Parameters {
@@ -228,6 +237,8 @@ func validateInputValue(entry *Entry, spec InputSpec, value any) error {
 		if _, ok := value.(bool); !ok {
 			return fail("must be true or false")
 		}
+	case "any":
+		// A structured value the gateway consumes itself (the MOSS layout) is passed through.
 	default:
 		// An inferred binding type accepts anything the binding engine can coerce.
 	}

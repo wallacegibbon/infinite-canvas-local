@@ -408,3 +408,73 @@ func asString(value any) string {
 	text, _ := value.(string)
 	return text
 }
+
+// A transparent background rewrites the prompt in the `/v1` image routes; the run route has to do
+// the same, or the same request would render differently depending on which route produced it.
+func TestRunAppliesBackgroundPrompt(t *testing.T) {
+	fake := newFakeComfy(t)
+	file, graph, entry := imageFixture()
+	entry["backgroundPrompt"] = "rgba hint"
+	gateway := httptest.NewServer(newTestGatewayWith(t, fake, file, graph, entry).Handler())
+	defer gateway.Close()
+
+	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/api/runs", map[string]any{
+		"workflow": "image-test",
+		"inputs":   map[string]any{"prompt": "a glass", "background": "transparent"},
+	})
+	if status != http.StatusAccepted {
+		t.Fatalf("status = %d, body = %v", status, payload)
+	}
+	finished := waitForRun(t, gateway, asString(payload["id"]))
+	if finished["status"] != "succeeded" {
+		t.Fatalf("run did not succeed: %v", finished)
+	}
+	submitted := fake.submittedGraph()
+	encoder, _ := submitted["4"].(map[string]any)
+	inputs, _ := encoder["inputs"].(map[string]any)
+	prompt, _ := inputs["text"].(string)
+	if !strings.Contains(prompt, "alpha channel") || !strings.Contains(prompt, "a glass") {
+		t.Errorf("background prompt not applied: %q", prompt)
+	}
+}
+
+// A MOSS layout is rendered into the prompt by one function; a run must call it too.
+func TestRunAppliesMossLayoutPrompt(t *testing.T) {
+	fake := newFakeComfy(t)
+	file, graph, entry := imageFixture()
+	entry["promptInject"] = "moss-layout"
+	gateway := httptest.NewServer(newTestGatewayWith(t, fake, file, graph, entry).Handler())
+	defer gateway.Close()
+
+	status, payload := doJSON(t, gateway.Client(), http.MethodPost, gateway.URL+"/api/runs", map[string]any{
+		"workflow": "image-test",
+		"inputs": map[string]any{
+			"prompt":        "a quiet room",
+			"layoutEnabled": true,
+			"layout": map[string]any{
+				"width":   1024,
+				"height":  1024,
+				"summary": "a room",
+				"regions": []any{
+					map[string]any{"label": "character", "caption": "a woman", "bbox": map[string]any{"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4}},
+				},
+			},
+		},
+	})
+	if status != http.StatusAccepted {
+		t.Fatalf("status = %d, body = %v", status, payload)
+	}
+	finished := waitForRun(t, gateway, asString(payload["id"]))
+	if finished["status"] != "succeeded" {
+		t.Fatalf("run did not succeed: %v", finished)
+	}
+	submitted := fake.submittedGraph()
+	encoder, _ := submitted["4"].(map[string]any)
+	inputs, _ := encoder["inputs"].(map[string]any)
+	prompt, _ := inputs["text"].(string)
+	for _, want := range []string{`"summary"`, `"label"`, "a woman"} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("layout prompt missing %s: %q", want, prompt)
+		}
+	}
+}

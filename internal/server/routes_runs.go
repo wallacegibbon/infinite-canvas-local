@@ -196,14 +196,19 @@ func (s *Server) handleRunCreate(ctx *httpx.Ctx) error {
 			"workflow %s produces %q, which the gateway cannot run yet", entry.Name, object)
 	}
 
+	// A transparent background and a MOSS layout change the prompt itself, exactly as they do in the
+	// `/v1` adapters; the run route must apply the same two rules or the same request would render
+	// differently depending on which route produced it.
+	background := httpx.String(inputs, "background")
 	runCtx := workflow.BuildContext(workflow.BuildContextParams{
-		Prompt:         httpx.String(inputs, "prompt"),
+		Prompt:         applyBackgroundPrompt(httpx.String(inputs, "prompt"), background, entry),
 		Negative:       optionalString(inputs, "negative"),
 		Size:           httpx.String(inputs, "size"),
 		Count:          httpx.Number(inputs, "count", httpx.Number(inputs, "n", 0)),
 		Quality:        httpx.String(inputs, "quality"),
 		Seconds:        httpx.Number(inputs, "seconds", httpx.Number(inputs, "duration", 0)),
 		Mode:           plan.Mode,
+		Background:     background,
 		Images:         media.uploadResults,
 		UploadedImages: media.images,
 		UploadedVideos: media.videos,
@@ -212,6 +217,9 @@ func (s *Server) handleRunCreate(ctx *httpx.Ctx) error {
 		Presets:        entry.Presets,
 	})
 	runCtx.SourceVideoFrames = media.sourceVideoFrames
+	if entry.PromptInject == "moss-layout" {
+		applyLayoutPrompt(runCtx)
+	}
 
 	stored := s.submitRun(runSpec{
 		Object:    object,
