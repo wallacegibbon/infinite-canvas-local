@@ -2,7 +2,6 @@ import { CanvasNodeType, type CanvasNodeMetadata, type CanvasNodeTypeId } from "
 
 const INHERITABLE_FIELDS = new Set([
     "model",
-    "reasoningEffort",
     "size",
     "quality",
     "background",

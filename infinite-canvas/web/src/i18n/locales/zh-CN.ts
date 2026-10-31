@@ -55,7 +55,7 @@ export default {
         imageReadFailed: "读取图片失败",
     },
     settingsPanels: {
-        common: { auto: "自动", low: "低", medium: "中", high: "高", xhigh: "极高", max: "最高", fixedSeed: "固定种子", fixedSeedHint: "关闭时每次随机，开启后固定使用下方种子", seedPlaceholder: "随机种子" },
+        common: { auto: "自动", fixedSeed: "固定种子", fixedSeedHint: "关闭时每次随机，开启后固定使用下方种子", seedPlaceholder: "随机种子" },
         image: {
             title: "图像设置",
             size: "尺寸",
@@ -109,7 +109,6 @@ export default {
             ratios: { landscape: "横屏", portrait: "竖屏", square: "方形", standardLandscape: "标准横屏", standardPortrait: "标准竖屏", cinematic: "宽银幕", adaptive: "自适应" },
         },
         audio: { title: "音频设置", voice: "声音", format: "格式", speed: "语速", instructions: "歌词 / 声音指令", instructionsPlaceholder: "音乐工作流：填写歌词（可带 [Verse] / [Chorus] 段落标记）；语音工作流：填写声音风格说明。" },
-        text: { title: "文本设置", reasoning: "推理强度", count: "生成次数" },
         model: {
             select: "选择模型",
             withChannel: "{{model}}（{{channel}}）",
@@ -910,7 +909,7 @@ export default {
             imagePreview: "引用图片预览",
             resources: { image: "图片{{index}}", video: "视频{{index}}", audio: "音频{{index}}", text: "文本{{index}}", group: "组{{index}}" },
         },
-        controls: { duplicate: "复制", delete: "删除", images: "{{count}} 张", texts: "{{count}} 条", generations: "{{count}} 次", reasoning: "推理" },
+        controls: { duplicate: "复制", delete: "删除", images: "{{count}} 张", texts: "{{count}} 条" },
         generation: {
             interrupted: "页面刷新后生成已中断，请重新生成。",
             front: "正面视角",

@@ -29,7 +29,7 @@ export default {
         imageReadFailed: "Failed to read image",
     },
     settingsPanels: {
-        common: { auto: "Auto", low: "Low", medium: "Medium", high: "High", xhigh: "Extra high", max: "Maximum", fixedSeed: "Fixed seed", fixedSeedHint: "Random each run when off; reuse the seed below when on", seedPlaceholder: "Random seed" },
+        common: { auto: "Auto", fixedSeed: "Fixed seed", fixedSeedHint: "Random each run when off; reuse the seed below when on", seedPlaceholder: "Random seed" },
         image: {
             title: "Image settings",
             size: "Size",
@@ -90,7 +90,6 @@ export default {
             instructions: "Lyrics / voice instructions",
             instructionsPlaceholder: "Music workflows: the lyrics, optional [Verse] / [Chorus] tags; speech workflows: how the voice should sound.",
         },
-        text: { title: "Text settings", reasoning: "Reasoning effort", count: "Generation count" },
         model: {
             select: "Select model",
             withChannel: "{{model}} ({{channel}})",
@@ -911,7 +910,7 @@ export default {
             imagePreview: "Referenced image preview",
             resources: { image: "Image {{index}}", video: "Video {{index}}", audio: "Audio {{index}}", text: "Text {{index}}", group: "Group {{index}}" },
         },
-        controls: { duplicate: "Duplicate", delete: "Delete", images: "{{count}} images", texts: "{{count}} options", generations: "{{count}} runs", reasoning: "Reasoning" },
+        controls: { duplicate: "Duplicate", delete: "Delete", images: "{{count}} images", texts: "{{count}} texts" },
         generation: {
             interrupted: "Generation was interrupted by a page refresh. Generate again.",
             front: "front view",

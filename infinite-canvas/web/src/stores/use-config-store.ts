@@ -8,7 +8,6 @@ import { gatewayRoot, isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_GATEWAY_C
 import { normalizeProgressRingSkin, type ProgressRingSkinId } from "@/lib/canvas/progress-ring-skins";
 
 export type ModelCapability = "image" | "video" | "text" | "audio";
-export type ReasoningEffort = "auto" | "low" | "medium" | "high" | "xhigh";
 
 export type ChannelModel = {
     name: string;
@@ -61,7 +60,6 @@ export type AiConfig = {
     outpaint?: { left: number; top: number; right: number; bottom: number; width: number; height: number };
     layout?: { summary: string; regions: Array<{ id: string; label: "object" | "character" | "text"; caption: string; text?: string; x: number; y: number; width: number; height: number }>; width?: number; height?: number };
     systemPrompt: string;
-    reasoningEffort: ReasoningEffort;
     models: string[];
     quality: string;
     size: string;
@@ -117,7 +115,6 @@ export const defaultConfig: AiConfig = {
     videoSelfLiftMode: "fast",
     promptOptimizeLanguage: "zh",
     systemPrompt: "",
-    reasoningEffort: "auto",
     models: [],
     quality: "auto",
     size: "1:1",
@@ -350,7 +347,6 @@ export const useConfigStore = create<ConfigStore>()(
                         audioFormat: config.audioFormat || defaultConfig.audioFormat,
                         audioSpeed: config.audioSpeed || defaultConfig.audioSpeed,
                         audioInstructions: config.audioInstructions || "",
-                        reasoningEffort: config.reasoningEffort || "auto",
                         videoSeconds: config.videoSeconds || "6",
                         vquality: config.vquality || "720",
                         videoGenerateAudio: config.videoGenerateAudio || "true",

@@ -472,7 +472,9 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
         async (run: GenerationRun) => {
             const { nodeId, sourceNode, sourceTextContent, effectivePrompt, generationConfig, generationContext, overwriteExisting, runController } = run;
             const isConfigNode = sourceNode?.type === CanvasNodeType.Config;
-            const textCount = getGenerationCount(String(sourceNode?.metadata?.textCount || 1));
+            // One prompt, one answer: a connected agent answers exactly one question, so a batch of texts
+            // is no longer a thing (the count control went with the old text settings).
+            const textCount = 1;
             const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : CanvasNodeType.Text];
             const textConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Text];
             const parentPosition = sourceNode?.position || { x: 0, y: 0 };
@@ -492,7 +494,6 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                     status: NODE_STATUS_LOADING,
                     fontSize: 14,
                     model: generationConfig.model,
-                    reasoningEffort: generationConfig.reasoningEffort,
                     textCount,
                     texts: textIds.map((id) => ({ id, status: NODE_STATUS_LOADING, content: "" })),
                     primaryTextId: textIds[0],
