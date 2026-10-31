@@ -18,6 +18,7 @@ func (s *Server) routesGeneration(mux *http.ServeMux) {
 	s.route(mux, "POST /api/prompts/optimize-image", s.handlePromptOptimizeImage)
 	s.route(mux, "POST /api/prompts/caption", s.handlePromptCaption)
 	s.route(mux, "POST /api/prompts/chat", s.handlePromptChat)
+	s.routesAgent(mux)
 	s.route(mux, "GET /api/previews/{promptId}", s.handlePreview)
 	s.route(mux, "GET /api/progress/{requestId}", s.handleProgress)
 	s.route(mux, "GET /files/{name}", s.handleFile)

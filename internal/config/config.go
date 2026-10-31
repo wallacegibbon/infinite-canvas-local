@@ -53,6 +53,15 @@ type Config struct {
 	CleanupIntervalMs int
 	SessionStaleSec   int
 
+	// The agent. Its own config directory holds model.conf and the skills the user installs; the
+	// gateway names it and never reads or writes it. An empty AgentBin means "find it" (see
+	// AGENT_BIN_DISCOVERY in internal/agent).
+	AgentBin        string
+	AgentConfigPath string
+	// AgentSkills is the container of the skills this gateway ships (prompts/skills), passed to the
+	// agent so it can read them itself. The wording is the agent's business, not the gateway's.
+	AgentSkills string
+
 	MaxUploadBytes      int64
 	MaxWorkflowBytes    int64
 	MaxImageCount       int
@@ -133,6 +142,18 @@ func Load(opts ...Option) (*Config, error) {
 		MaxImageCount:       intValue(os.Getenv("MAX_IMAGE_COUNT"), 15),
 		ResourceConcurrency: intValue(os.Getenv("RESOURCE_CONCURRENCY"), 2),
 		GatewayToken:        strings.TrimSpace(os.Getenv("GATEWAY_TOKEN")),
+		AgentBin:            strings.TrimSpace(os.Getenv("ALAYACORE_BIN")),
+		AgentConfigPath:     strings.TrimSpace(os.Getenv("AGENT_CONFIG_PATH")),
+		AgentSkills:         filepath.Join(root, "prompts", "skills"),
+	}
+
+	// The agent keeps its own configuration; the gateway only says where. A default under the user's
+	// config directory (the platform's, not a hardcoded ~/.config) so a fresh directory is created by
+	// the agent itself on first spawn.
+	if cfg.AgentConfigPath == "" {
+		if dir, err := os.UserConfigDir(); err == nil {
+			cfg.AgentConfigPath = filepath.Join(dir, "comfyui-gateway", "alayacore")
+		}
 	}
 
 	cfg.WorkflowDir = absOrJoin(root, os.Getenv("WORKFLOW_DIR"), "workflows")

@@ -2,9 +2,9 @@ package agent
 
 import (
 	"bufio"
-	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -34,31 +34,49 @@ type Process struct {
 type SpawnOptions struct {
 	Binary     string
 	ConfigPath string
-	// System is extra system text (`--system`), the wording for a request that needs some.
-	System string
+	// Skills is the container of skill directories passed as `--skill`. The agent reads them itself;
+	// the gateway only says where they are.
+	Skills string
+	// Tools is the `--builtin-tools` list. Read-only file access is what a skill needs in order to be
+	// activated at all (the agent loads a skill by reading its SKILL.md); no other tool is enabled.
+	Tools string
 }
 
 // args builds the command line. Built-in tools are always disabled: this route asks an agent for
 // words, and a request must not be able to hand itself a shell. The model is not a flag: it is set
 // with `CI model_set` once the session is ready, which is where the agent reports the outcome.
 func (o SpawnOptions) args() []string {
-	args := []string{"--rawio", "--builtin-tools="}
+	args := []string{"--rawio", "--builtin-tools=" + o.Tools}
 	if o.ConfigPath != "" {
 		args = append(args, "--config-path", o.ConfigPath)
 	}
-	if o.System != "" {
-		args = append(args, "--system", o.System)
+	if o.Skills != "" {
+		args = append(args, "--skill", o.Skills)
 	}
 	return args
 }
 
+// findBinary locates alayacore: the configured path, then PATH, then next to this executable — the
+// same order the rest of the ecosystem uses, so a bundled copy wins over a stale one on PATH.
+func findBinary(configured string) string {
+	if configured = strings.TrimSpace(configured); configured != "" {
+		return configured
+	}
+	if path, err := exec.LookPath("alayacore"); err == nil {
+		return path
+	}
+	if exe, err := os.Executable(); err == nil {
+		beside := filepath.Join(filepath.Dir(exe), "alayacore")
+		if info, err := os.Stat(beside); err == nil && info.Size() > 0 {
+			return beside
+		}
+	}
+	return "alayacore"
+}
+
 // Spawn starts the agent. The caller must Release it.
 func Spawn(o SpawnOptions) (*Process, error) {
-	binary := strings.TrimSpace(o.Binary)
-	if binary == "" {
-		return nil, errors.New("agent: no binary configured")
-	}
-	cmd := exec.Command(binary, o.args()...)
+	cmd := exec.Command(findBinary(o.Binary), o.args()...)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
