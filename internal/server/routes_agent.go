@@ -46,20 +46,35 @@ func (s *Server) agentOptions() agent.SpawnOptions {
 // handleAgentConnect implements POST /api/agent/connect: start an agent and keep it, so the canvas can
 // show the model list before anyone asks a question.
 //
-// The response is the agent's own startup broadcast. The process stays until the prompt that follows
-// (or an idle timeout, or an explicit disconnect) releases it.
+// `session` is the name the client files the process under — the canvas id, in practice — and it is the
+// whole of the idempotency: connecting again with the same name returns the same process, which is how
+// a reloaded page finds the conversation it left. The gateway does not know what the name means.
+//
+// The response is the agent's own startup broadcast. The process stays until the client disconnects, or
+// until it dies.
 func (s *Server) handleAgentConnect(ctx *httpx.Ctx) error {
+	body, err := bodyOrEmpty(ctx)
+	if err != nil {
+		return err
+	}
 	started := time.Now()
-	session, err := s.agentSessions.Connect(ctx.R.Context(), s.agentOptions())
+	session, spawned, err := s.agentSessions.Connect(ctx.R.Context(), httpx.String(body, "session"), s.agentOptions())
 	if err != nil {
 		s.logger.Warn("agent: connect failed after %dms: %v", time.Since(started).Milliseconds(), err)
 		return httpx.NewError(http.StatusBadGateway, "agent_unavailable", err.Error())
+	}
+	if s.logger != nil && !spawned {
+		s.logger.Info("agent: connect reused session=%s", session.ID)
 	}
 	okJSON(ctx.W, map[string]any{"sessionId": session.ID, "state": session.State()})
 	return nil
 }
 
-// handleAgentDisconnect releases a session the client walked away from.
+// handleAgentDisconnect releases a session the client closed.
+//
+// This is the only way an agent ends. Nothing expires, so a canvas that never comes back leaves its
+// process running — which is the trade for a conversation that survives a reload, and the client's
+// close button is what makes it explicit rather than accidental.
 func (s *Server) handleAgentDisconnect(ctx *httpx.Ctx) error {
 	s.agentSessions.Close(ctx.R.PathValue("id"), "disconnect")
 	okJSON(ctx.W, map[string]any{})
@@ -71,6 +86,9 @@ func (s *Server) handleAgentDisconnect(ctx *httpx.Ctx) error {
 // The body is whatever should be written to the agent: `command`/`args` for a setting change,
 // `prompt` (and images) for a question, or both. Nothing is interpreted on the way — this is a
 // transcription of two streams, not an API with opinions.
+//
+// `session` names the agent, and it is required: this route speaks to a process the client is holding.
+// A question with no session to hold it belongs on `/api/agent/once`.
 func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 	body, err := bodyOrEmpty(ctx)
 	if err != nil {
@@ -79,44 +97,22 @@ func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 	request := agentRequest(body, ctx.Files())
 	sessionID := httpx.String(body, "session")
 	started := time.Now()
-	s.logger.Info("agent: request command=%q args=%q prompt=%q images=%d", request.Command, request.Args, truncateText(request.Prompt, 120), len(request.Images))
+	s.logger.Info("agent: request session=%q command=%q args=%q prompt=%q images=%d", sessionID, request.Command, request.Args, truncateText(request.Prompt, 120), len(request.Images))
 
 	// A session that is gone has to be reported before the stream starts: once the headers are out, an
 	// error can only be a broken event.
-	var session *agent.Session
-	if sessionID != "" {
-		var ok bool
-		session, ok = s.agentSessions.Peek(sessionID)
-		if !ok {
-			s.logger.Warn("agent: session %s is not connected", sessionID)
-			return httpx.NewError(http.StatusConflict, "session_not_connected", "this agent session is no longer connected")
-		}
+	session, ok := s.agentSessions.Get(sessionID)
+	if !ok {
+		s.logger.Warn("agent: session %q is not connected", sessionID)
+		return httpx.NewError(http.StatusConflict, "session_not_connected", "this agent session is no longer connected")
 	}
 
 	counts := map[string]int{}
 	emit := startEventStream(ctx.W)
-	relay := func(event agent.Event) {
+	runErr := session.Chat(ctx.R.Context(), request, func(event agent.Event) {
 		counts[event.Type]++
 		emit(event)
-	}
-	var runErr error
-	switch {
-	case session != nil && hasPrompt(request):
-		// The send half of the button: the question spends the connection, and the process with it.
-		proc, state, connected := s.agentSessions.Take(sessionID)
-		if !connected {
-			return httpx.NewError(http.StatusConflict, "session_not_connected", "this agent session is no longer connected")
-		}
-		runErr = agent.Continue(ctx.R.Context(), proc, state, request, relay)
-		s.logger.Info("agent: session=%s answered and released", sessionID)
-	case session != nil:
-		// A setting change: the same connection answers it and stays connected.
-		runErr = session.Command(ctx.R.Context(), request, relay)
-		s.agentSessions.Touch(sessionID)
-		s.logger.Info("agent: session=%s command=%q stayed connected", sessionID, request.Command)
-	default:
-		runErr = agent.Run(ctx.R.Context(), s.agentOptions(), request, relay)
-	}
+	})
 	return s.finishAgent(ctx, started, counts, runErr)
 }
 

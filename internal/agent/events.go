@@ -26,6 +26,13 @@ type Event struct {
 	// command: the agent's answer to a CI frame
 	OK bool `json:"ok,omitempty"`
 
+	// tool_call, tool_result: what the agent did between two sentences. A built-in tool runs inside
+	// AlayaCore, so both frames come back from it — the gateway relays them and answers neither.
+	CallID string `json:"callId,omitempty"`
+	Name   string `json:"name,omitempty"`
+	Input  string `json:"input,omitempty"`
+	Output string `json:"output,omitempty"`
+
 	// error: the agent's own words
 	Message string `json:"message,omitempty"`
 }
@@ -161,6 +168,41 @@ func commandOutput(value string) (commandID string, ok bool, message string) {
 		return "", false, ""
 	}
 	return payload.CommandID, !payload.IsError, payload.Result.Message
+}
+
+// toolCall is the AF body: one call arrives in two frames, the name first and the arguments in the
+// second, sharing a call_id. Both are relayed as they come rather than joined, because the canvas can
+// show a step before it knows what the step is doing.
+func toolCall(value string) (Event, bool) {
+	var payload struct {
+		CallID string          `json:"call_id"`
+		Name   string          `json:"name"`
+		Input  json.RawMessage `json:"input"`
+	}
+	if json.Unmarshal([]byte(value), &payload) != nil || payload.CallID == "" {
+		return Event{}, false
+	}
+	return Event{Type: "tool_call", CallID: payload.CallID, Name: payload.Name, Input: string(payload.Input)}, true
+}
+
+// toolResult is the UF body. The output is a list of content items; the text of the first is what
+// there is to show, and a result that carries no text is still a result.
+func toolResult(value string) (Event, bool) {
+	var payload struct {
+		CallID string `json:"call_id"`
+		Output []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"output"`
+	}
+	if json.Unmarshal([]byte(value), &payload) != nil || payload.CallID == "" {
+		return Event{}, false
+	}
+	text := ""
+	if len(payload.Output) > 0 {
+		text = payload.Output[0].Text
+	}
+	return Event{Type: "tool_result", CallID: payload.CallID, Output: text}, true
 }
 
 // systemError is the SM error payload, which is a plain sentence.

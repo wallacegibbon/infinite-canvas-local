@@ -2744,3 +2744,78 @@ artifact, with the bound mask (`7b985050…`). The count could not be observed o
 rule in this environment — a Z-Image text-to-image run with 画布生图张数 = 3 also fetched only
 `outputs/0`, so the workflows here return a single artifact per run regardless of `count`. The
 no-reference path is the same expression it was before this change.
+
+## 80. An agent's life belongs to the client that opened it
+
+**Decision** A connected agent is one process per client-chosen name, held until that client disconnects.
+Nothing expires. `POST /api/agent/connect` is idempotent: the same name returns the same process, which
+is how a reloaded page finds the conversation it left. `POST /api/agent/chat` requires a name and writes
+into that process without ever spending it; `POST /api/agent/once` has no name at all and releases its
+process when the answer ends (see #81 for why that split is structural).
+
+**Why** A conversation is the point of this process: an agent that forgot what it had done while the
+user was thinking would be worse than no agent. An idle timer cannot know the difference between "the
+user gave up" and "the user is reading a video that takes six minutes", and it took the history away in
+both cases. So the only thing that ends an agent is the user closing it.
+
+**The cost, stated plainly** A tab that is closed by the browser rather than the user leaves its process
+behind, and a gateway that is killed takes the map with it. Both are accepted: the first is the price of
+a history that survives a reload, and the second is why the canvas has to say "已断开" rather than
+pretend the agent is still there. The disconnect route is the one way out, and it is the client's job to
+call it.
+
+**The key is the client's, not the gateway's** The name is whatever the client files the process under;
+the canvas passes its own id. The gateway does not know what a canvas is — it files processes under
+strings, which is the same dumbness it keeps everywhere else. A string that changes means a new agent,
+and that is the whole of the semantics.
+
+**One turn at a time** Two streams reading one stdout would each take half the frames and split an
+answer between them, so a session serialises its turns. This replaced a `Take`/`Touch`/`idleSession`
+state machine — a session was previously consumed by its one question, and "does this request spend the
+connection" was a branch in the route. Both are gone; a question now spends nothing because there is
+nothing to spend.
+
+**What a turn ends on** `SM task in_progress: false`, measured against a real tool round: AlayaCore runs
+built-in tools itself, so `AF` (the call, in two frames — name then arguments) and `UF` (the result) both
+arrive inside one task, and the task ends once. The gateway relays all three as `tool_call` and
+`tool_result` events and answers none of them. That measurement is also why there is no reader goroutine
+fanning out to subscribers: the agent only speaks when spoken to, so the read loop stays in the request.
+
+**A cancelled turn is not a dead agent** A client that goes away mid-answer sends `CI cancel` and the
+frames that arrive while it winds down are read and dropped, so the next turn does not inherit them. Only
+a process that ends before its turn does returns `ErrGone`, and that releases the session.
+
+**Tested** On `:8191` with a real AlayaCore: `connect` twice with one name returned one pid; two
+questions on that session both answered ("收到", then "还在") from the same process; the tool round
+(prompt → `AF`/`AF`/`UF` → answer) streamed as `tool_call`/`tool_result`/`delta` with one `done`.
+The e2e tests state the idempotency, the second turn and the tool relay against a fake agent.
+
+## 81. A one-shot question has no name, so it cannot reach a canvas's agent
+
+**Decision** The words the canvas asks for without continuing — a text node's body, a rewritten prompt, a
+caption — go to `POST /api/agent/once`, which names no session and reads none. It spawns
+`alayacore --rawio`, asks, and releases. The canvas's own agent is reached only through
+`/api/agent/chat`, which requires a name.
+
+**Why** One function used to do both, and it read the session out of the store, so every one-shot
+question was sent to whichever agent the canvas happened to hold — and the gateway spent it when the
+answer ended. That was harmless while a connection was one question by design (#80 replaced that), and
+it would have become "pressing the sparkle next to a prompt empties the history of the agent you are
+working with" the moment the process started living. The rewrite buttons and the canvas agent are
+different kinds of thing; the route is where that difference lives rather than a convention the caller
+has to remember.
+
+**The shape of the guarantee** `/api/agent/once` never reads a `session` field, so a buggy caller cannot
+hand it one either — the field is not on the route. The client mirrors it: `requestAgentOnce` passes a
+literal `null` where `requestAgentChat` passes the store's session, and both go through one helper that
+takes the session as an argument, so the only place that can look one up is the caller that should.
+
+**Not a weakened agent** The one-shot keeps the tools and the skills container: it is the H3 prompt
+rewrite, which works by reading a `SKILL.md`, so `--builtin-tools=read_file` stays on both routes. The
+difference between the two kinds of agent is lifetime, not capability.
+
+**Tested** `:8191`: a prompt on `/chat` spends nothing and the session answers again; a prompt on `/chat`
+for a name that was never connected is `409 session_not_connected`; a prompt on `/once` handed a live
+session id answers, leaves that session connected, and the session still answers afterwards. From the
+browser, clicking 优化提示词 logged `POST /api/agent/once 200` with 20 deltas, and the process exited by
+itself (`lived=14886ms`) — a one-shot agent does not outlive its answer.

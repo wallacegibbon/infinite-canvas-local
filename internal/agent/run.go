@@ -3,7 +3,10 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -20,6 +23,11 @@ type Request struct {
 	Args    string
 }
 
+// ErrGone is the process ending before the turn did. A one-shot agent ends by itself and that is the
+// answer; a connected one that stops mid-sentence has nothing left to write to, and the canvas has to
+// be told rather than left waiting on a session that cannot speak.
+var ErrGone = errors.New("agent: the process ended before the turn did")
+
 // Run performs one request against one agent process and releases it.
 //
 // It decides nothing about the content: a delta is a delta, a command's answer is the agent's own
@@ -30,109 +38,131 @@ func Run(ctx context.Context, opts SpawnOptions, req Request, emit func(Event)) 
 	}, emit)
 }
 
-// Continue runs a request on a process a connect already started, and releases it when the answer
-// ends: the send button owns that process from here on.
-func Continue(ctx context.Context, proc *Process, state startup, req Request, emit func(Event)) error {
-	defer proc.Release()
-	// The list the connect already showed is re-emitted so a client that reconnected mid-flow still
-	// renders it; it is the same startup broadcast.
-	emit(state.event())
+// converse is the loop both paths share: the choices and the prompt go out, the agent's frames come
+// back, and the answer ends where the agent says the task ended.
+//
+// `ready` is the one thing they differ on, twice over. A freshly spawned agent still has to announce
+// that it accepts input, while a connected one already did before its connect returned; and a process
+// that ends is the end of a one-shot answer but the loss of a connected one.
+func converse(ctx context.Context, proc *Process, state *startup, req Request, emit func(Event), ready bool) error {
+	started := time.Now()
+	var answer strings.Builder
+	hasPrompt := strings.TrimSpace(req.Prompt) != "" || len(req.Images) > 0
+
+	// Writing to a dead process is the other way a session ends, and it is the one that arrives first:
+	// the write fails with a broken pipe, before any read would notice the process is gone. So a failed
+	// write is ErrGone, not a transport error — it is the same fact the caller has to act on either way.
+	send := func() error {
+		if req.Command != "" {
+			payload, err := json.Marshal(map[string]any{"command_id": commandID, "name": req.Command, "args": req.Args})
+			if err != nil {
+				return err
+			}
+			if err := proc.Write(TagCmdInput, string(payload)); err != nil {
+				return fmt.Errorf("%w: %v", ErrGone, err)
+			}
+		}
+		if hasPrompt {
+			if err := sendPrompt(proc, req); err != nil {
+				return fmt.Errorf("%w: %v", ErrGone, err)
+			}
+		}
+		return nil
+	}
+	if ready {
+		if err := send(); err != nil {
+			return err
+		}
+	} else if err := waitReady(proc, state, emit, send); err != nil {
+		return err
+	}
+
+	// A client that goes away is the agent's own `cancel`, not a kill. The process belongs to the
+	// canvas now, so it has to be left where the next turn can use it: the frames that arrive while it
+	// winds down are still read, and dropped, so nothing is attributed to the turn after this one.
+	var cancelled atomic.Bool
 	stopped := make(chan struct{})
 	defer close(stopped)
 	go func() {
 		select {
 		case <-ctx.Done():
+			cancelled.Store(true)
 			_ = proc.Write(TagCmdInput, `{"command_id":"cancel","name":"cancel"}`)
 		case <-stopped:
 		}
 	}()
-	return converse(ctx, proc, &state, req, emit, true)
-}
-
-// converse is the loop both paths share: the choices and the prompt go out, the agent's frames come
-// back, and the answer ends where the agent says the task ended.
-//
-// `ready` is the one thing they differ on: a freshly spawned agent still has to announce that it
-// accepts input, while a connected one already did before the connect response was written.
-func converse(ctx context.Context, proc *Process, state *startup, req Request, emit func(Event), ready bool) error {
-	{
-		started := time.Now()
-		var answer strings.Builder
-		hasPrompt := strings.TrimSpace(req.Prompt) != "" || len(req.Images) > 0
-
-		send := func() error {
-			if req.Command != "" {
-				payload, err := json.Marshal(map[string]any{"command_id": commandID, "name": req.Command, "args": req.Args})
-				if err != nil {
-					return err
-				}
-				if err := proc.Write(TagCmdInput, string(payload)); err != nil {
-					return err
-				}
-			}
-			if hasPrompt {
-				return sendPrompt(proc, req)
-			}
-			return nil
+	relay := func(event Event) {
+		if cancelled.Load() {
+			return
 		}
-		if ready {
-			if err := send(); err != nil {
-				return err
-			}
-		} else if err := waitReady(proc, state, emit, send); err != nil {
-			return err
-		}
+		emit(event)
+	}
 
-		for {
-			frame, err := proc.Read()
-			if err != nil || frame == nil {
-				return finish(answer.String(), started, emit)
+	for {
+		frame, err := proc.Read()
+		if err != nil || frame == nil {
+			if ready {
+				return ErrGone
 			}
-			switch frame.Tag {
-			case TagAssistantXDelta:
-				kind, text, ok := contentDelta(frame.Value)
-				if !ok {
-					continue
-				}
-				switch kind {
-				case "text":
-					answer.WriteString(text)
-					emit(Event{Type: "delta", Text: text})
-				case "reasoning":
-					emit(Event{Type: "reasoning", Text: text})
-				}
-			case TagCmdOutput:
-				id, ok, message := commandOutput(frame.Value)
-				if id != commandID {
-					continue
-				}
-				emit(Event{Type: "command", OK: ok, Message: message})
-				if !hasPrompt {
-					return finish("", started, emit)
-				}
-			case TagSystemMsg:
-				kind, data, ok := systemMessage(frame.Value)
-				if !ok {
-					continue
-				}
-				switch kind {
-				case "model", "reasoning_level":
-					// The agent announcing its own state: this is what the canvas displays.
-					state.collect(kind, data)
-					emit(Event{Type: kind, Active: state.active, Level: state.level})
-				case "task":
-					if over, known := taskInProgress(data); known && over && hasPrompt {
-						return finish(answer.String(), started, emit)
+			return finish(answer.String(), started, emit)
+		}
+		switch frame.Tag {
+		case TagAssistantXDelta:
+			kind, text, ok := contentDelta(frame.Value)
+			if !ok {
+				continue
+			}
+			switch kind {
+			case "text":
+				answer.WriteString(text)
+				relay(Event{Type: "delta", Text: text})
+			case "reasoning":
+				relay(Event{Type: "reasoning", Text: text})
+			}
+		case TagAssistantF, TagUserF:
+			// A built-in tool runs inside AlayaCore: the call and its result both come back here, and
+			// the gateway answers neither. They are drawn, not acted on.
+			event, ok := toolCall(frame.Value)
+			if frame.Tag == TagUserF {
+				event, ok = toolResult(frame.Value)
+			}
+			if ok {
+				relay(event)
+			}
+		case TagCmdOutput:
+			id, ok, message := commandOutput(frame.Value)
+			if id != commandID {
+				continue
+			}
+			relay(Event{Type: "command", OK: ok, Message: message})
+			if !hasPrompt {
+				return finish("", started, emit)
+			}
+		case TagSystemMsg:
+			kind, data, ok := systemMessage(frame.Value)
+			if !ok {
+				continue
+			}
+			switch kind {
+			case "model", "reasoning_level":
+				// The agent announcing its own state: this is what the canvas displays.
+				state.collect(kind, data)
+				relay(Event{Type: kind, Active: state.active, Level: state.level})
+			case "task":
+				if over, known := taskInProgress(data); known && over && hasPrompt {
+					if cancelled.Load() {
+						return nil
 					}
-				case "session":
-					if sessionState(data) == "closed" {
-						return finish(answer.String(), started, emit)
-					}
-				case "error":
-					emit(systemError(data))
-				default:
-					state.collect(kind, data)
+					return finish(answer.String(), started, emit)
 				}
+			case "session":
+				if sessionState(data) == "closed" {
+					return finish(answer.String(), started, emit)
+				}
+			case "error":
+				relay(systemError(data))
+			default:
+				state.collect(kind, data)
 			}
 		}
 	}

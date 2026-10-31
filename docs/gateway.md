@@ -170,26 +170,36 @@ same contract as typed `inputs`, which is what `POST /api/runs` validates a requ
 
 ## Endpoints
 
-Prompts are the agent's, not the gateway's: one route carries what the canvas wants asked and streams
+Prompts are the agent's, not the gateway's: these routes carry what the canvas wants asked and stream
 back what AlayaCore says. The gateway owns no wording, no model choice and no state — see
 [`decisions.md`](decisions.md) #75 for why, and AlayaCore's own `adapter-guide` for the frames.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/agent/chat` | Write one request to a connected agent process and stream its frames back. |
+| `POST` | `/api/agent/connect` | Start an agent under a name, or return the one already filed there. |
+| `POST` | `/api/agent/chat` | Write one request to that agent and stream its frames back. |
 | `POST` | `/api/agent/once` | Ask one question of a process of its own, released when the answer ends. |
+| `DELETE` | `/api/agent/session/{name}` | Release an agent. This is the only thing that ends one. |
 
-Both take `prompt` (and images), or `command` + `args` (one of AlayaCore's own commands, forwarded
-verbatim), or both, and answer with an event stream: `models`, `delta`, `reasoning`, `model`,
-`reasoning_level`, `command`, `done`, `error`.
+Both chat routes take `prompt` (and images), or `command` + `args` (one of AlayaCore's own commands,
+forwarded verbatim), or both, and answer with an event stream: `models`, `delta`, `reasoning`, `model`,
+`reasoning_level`, `command`, `tool_call`, `tool_result`, `done`, `error`.
 
-They are two kinds of thing, and the difference is lifetime. `/api/agent/chat` with a `session` writes
-into a process the canvas is holding — one per canvas, alive until the user closes it — so its history
-accumulates and its tools can be used. Changing a model or a reasoning level goes the same way: it is a
-frame to that process, not a question. `/api/agent/once` names no session and reads none: it spawns
-`alayacore --rawio`, asks, and releases the process when the answer ends. That split is what keeps a
-prompt rewrite or a caption — a single answer that nothing follows — from spending the history of the
-agent the user is working with.
+They are two kinds of thing, and the difference is lifetime. `/api/agent/chat` requires a `session` and
+writes into the process filed under that name — one per canvas, alive until the client disconnects, so
+its history accumulates and its tools can be used. Changing a model or a reasoning level goes the same
+way: a frame to that process, not a question that spends it. `/api/agent/once` names no session and reads
+none: it spawns `alayacore --rawio`, asks, and releases the process when the answer ends. That split is
+what keeps a prompt rewrite or a caption — a single answer that nothing follows — from spending the
+history of the agent the user is working with.
+
+The name on `connect` is the client's to choose (the canvas id, in practice). Connecting again with the
+same name returns the same process, which is how a reloaded page finds the conversation it left, and it
+means the gateway can stay ignorant of what a canvas is. Nothing expires: a process lives until the
+client releases it, or until it dies — see [`decisions.md`](decisions.md) #80 for the cost of that.
+
+A built-in tool (`read_file`, enabled for the skills the agent loads) runs inside AlayaCore, so the call
+and its result arrive as frames and the gateway relays both without answering either.
 
 A music graph needs two texts, and both are ordinary `registry.json` bindings (`prompt`, `lyrics`), so
 a run carries them as inputs like any other parameter. `response_format`-style container selection is
