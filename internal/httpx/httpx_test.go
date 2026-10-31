@@ -80,7 +80,7 @@ func TestCORSLoopbackIsAllowed(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	request := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/workflows", nil)
 	request.Header.Set("Origin", "http://127.0.0.1:3000")
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
@@ -99,7 +99,7 @@ func TestCORSRejectsUnknownOrigin(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	request := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/workflows", nil)
 	request.Header.Set("Origin", "http://evil.example.com")
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
@@ -118,7 +118,7 @@ func TestCORSSameHostOriginIsAllowed(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	request := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/workflows", nil)
 	request.Host = "192.168.3.232:8190"
 	request.Header.Set("Origin", "http://192.168.3.232:3000")
 	recorder := httptest.NewRecorder()
@@ -135,7 +135,7 @@ func TestCORSRejectsOtherHostOnTheSameNetwork(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	request := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/workflows", nil)
 	request.Host = "192.168.3.232:8190"
 	request.Header.Set("Origin", "http://192.168.3.99:3000")
 	recorder := httptest.NewRecorder()
@@ -152,7 +152,7 @@ func TestCORSPreflight(t *testing.T) {
 		t.Error("preflight must not reach the handler")
 	}))
 
-	request := httptest.NewRequest(http.MethodOptions, "/v1/models", nil)
+	request := httptest.NewRequest(http.MethodOptions, "/api/workflows", nil)
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 
