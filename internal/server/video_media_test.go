@@ -6,12 +6,14 @@ package server
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func videoFixture() (string, map[string]any, map[string]any) {
@@ -110,5 +112,59 @@ func TestVideoCreateEnforcesDeclaredMedia(t *testing.T) {
 		"image", "first.png", []byte("PNG"))
 	if status != http.StatusBadRequest || !strings.Contains(body, "at least 2 reference image") {
 		t.Fatalf("both frames with one image: status = %d, body = %s", status, body)
+	}
+}
+
+// The `/v1` adapter now shares the run's artifact step, so this pins that a video request with no
+// interpolation still answers with the encoded file.
+func TestVideoCreateReturnsTheArtifact(t *testing.T) {
+	fake := newFakeComfy(t)
+	fake.outputs = map[string]any{
+		"90": map[string]any{"gifs": []any{map[string]any{"filename": "out.mp4", "subfolder": "", "type": "output"}}},
+	}
+	fake.viewMime = "video/mp4"
+	fake.viewBody = "MP4DATA"
+	file, graph, entry := videoFixture()
+	srv := newTestGatewayWith(t, fake, file, graph, entry)
+	gateway := httptest.NewServer(srv.Handler())
+	defer gateway.Close()
+
+	status, body := postMultipart(t, gateway.URL+"/v1/videos",
+		map[string]string{"model": "video-test", "prompt": "a cat", "seconds": "5", "params": `{"interpolation":"off"}`},
+		"image", "first.png", []byte("PNG"))
+	if status != http.StatusOK || !strings.Contains(body, `"status":"queued"`) {
+		t.Fatalf("status = %d, body = %s", status, body)
+	}
+
+	var queued map[string]any
+	if err := json.Unmarshal([]byte(body), &queued); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	id, _ := queued["id"].(string)
+	if id == "" {
+		t.Fatalf("no task id: %s", body)
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		response, err := http.Get(gateway.URL + "/v1/videos/" + id + "/content")
+		if err != nil {
+			t.Fatalf("get content: %v", err)
+		}
+		raw, _ := io.ReadAll(response.Body)
+		response.Body.Close()
+		if response.StatusCode == http.StatusOK {
+			if string(raw) != "MP4DATA" {
+				t.Errorf("body = %q", raw)
+			}
+			if got := response.Header.Get("Content-Type"); got != "video/mp4" {
+				t.Errorf("content type = %q", got)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the task never produced a video: %d %s", response.StatusCode, raw)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
