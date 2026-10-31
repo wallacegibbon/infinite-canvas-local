@@ -125,6 +125,11 @@ export function useImageEditors(deps: NodeEditorDeps) {
             const source = { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey };
             const maskSource = { id: maskNodeId, name: "mask.png", type: maskImage.mimeType || "image/png", dataUrl: maskImage.url, storageKey: maskImage.storageKey };
             const references = [source, generationMask ? { ...maskSource, dataUrl: generationMask.url, storageKey: generationMask.storageKey } : maskSource];
+            // The node shows the mask drawn over the source; the mask itself is whichever of the two
+            // files the workflow takes. Bound to the node, so it is kept with it and an inpaint run can
+            // take it from the connection instead of the user redrawing the same marks.
+            const sentMask = references[1];
+            const maskBinding = sentMask.storageKey ? { mask: { storageKey: sentMask.storageKey, mimeType: sentMask.type } } : {};
             const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, references);
             const childMetadata = payload.generate ? { prompt, status: NODE_STATUS_LOADING, ...generationMetadata } : { prompt };
             setNodes((prev) => [
@@ -137,7 +142,7 @@ export function useImageEditors(deps: NodeEditorDeps) {
                     position: { x: node.position.x, y: node.position.y + node.height + 96 },
                     width: node.width,
                     height: node.height,
-                    metadata: imageMetadata(maskImage),
+                    metadata: { ...imageMetadata(maskImage), ...maskBinding },
                 },
                 {
                     id: childId,

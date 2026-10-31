@@ -104,6 +104,16 @@ export type CanvasNodeMetadata = {
     audioSpeed?: string;
     audioInstructions?: string;
     references?: string[];
+    /**
+     * The mask this node stands for, when it is a mask annotation.
+     *
+     * The node's own picture is the mask drawn over the source, which is what a person needs to see;
+     * what a workflow takes as `media.mask` is a different file — binary for the inpaint workflows,
+     * the drawn-over picture for the ones that accept it. Binding that file here is what lets the
+     * node survive a storage cleanup (`collectImageStorageKeys` keeps anything with a `storageKey`)
+     * and lets an inpaint run take the mask from whichever node is connected.
+     */
+    mask?: { storageKey: string; mimeType?: string };
     naturalWidth?: number;
     naturalHeight?: number;
     freeResize?: boolean;

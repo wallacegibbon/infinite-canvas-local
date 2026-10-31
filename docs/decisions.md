@@ -2691,27 +2691,33 @@ merge spread it over the defaults — so every field deleted from `AiConfig` (`p
 `use-config-store.ts` now drops those names at the merge, from one list, with the reason attached.
 Nothing reads them and the values need no migration: the setting they describe is gone.
 
-## 78. Inpaint keeps its mask; pressing generate again repeats that run
+## 78. A mask belongs to the node that shows it
 
-**Decision** An inpaint node re-runs from the references it saved, and only a node that has never been
-inpainted goes to the mask editor. `submit()` opens the editor when `metadata.imageMode === "inpaint"`
-has no saved mask behind it; `runImageGeneration` resolves `metadata.references` for an inpaint run
-instead of using the connections, and the canvas-wide rule from #77 keeps applying to every other mode.
+**Decision** The mask annotation node carries the mask the workflow consumes: `metadata.mask` holds
+the storage key of the file that goes out as `media.mask` — binary for the inpaint workflows, the
+drawn-over picture for the ones that accept that. Its own picture stays the mask painted over the
+source, because that is what a person needs to see. Inpaint runs take the mask from whichever connected
+node carries one; `submit()` opens the mask editor only when no connected node does, so wiring a source
+and a mask node by hand works exactly like a run the editor made.
 
-**Why the connections were not good enough** The mask editor uploads **two** pictures: a binary mask
-that the workflow takes as `media.mask`, and a tinted copy that it puts on the canvas so a person can
-see what they marked. The tinted one is what the reference bar shows and what `@`/connections resolve
-to, so re-running from connections would have sent a blue-tinted photograph where a binary mask belongs
-— the request would look right and inpaint the wrong thing. The binary mask survives as
-`metadata.references[1]`, written by `buildImageGenerationMetadata` when the run was made, which is
-also how `retryNode` has always retried.
+**Why not the result node's saved references** `buildImageGenerationMetadata` already records the
+references a run used, so an inpaint could re-run from `metadata.references`. That was the first attempt
+and it is wrong in two ways. It is a string, not a thing the canvas shows: `collectImageStorageKeys`
+only counts objects with a `storageKey`, so the binary mask was treated as garbage and deleted, and the
+run then fell back to the connected picture — a blue-tinted photograph in the `media.mask` slot, which
+inpaints nothing and reports nothing. And it makes the connections a second, silently overridden
+answer, so re-wiring a different mask would be ignored.
 
-**Why this is not a breach of #77** The mask is a setting of the operation, not an input the user picks
-per run: `buildGenerationConfig` already reads `imageMode`, `outpaint` and `layout` off the node for
-the same reason. Outpaint keeps opening its editor (the extension is something you choose), and that
-asymmetry is deliberate rather than an oversight.
+**What the binding buys** The file is part of a node, so a storage cleanup keeps it; the request is
+whatever is connected, so #77 still holds and a mask can be swapped by re-wiring; and pressing generate
+on an input of a run repeats the run because that is what the graph says, not because a hidden string
+was found.
 
-**Tested** `image-qwen21` inpaint on `:8191`, twice: the first run came from the mask editor, the second
-from pressing generate on the result node. No editor opened, the node count did not change, and the
-second run's uploads were byte-identical to the first (md5 `33d7776…` on both masks, `80fc3917…` on both
-sources) while its output differed — so it re-ran the same mask rather than substituting the tinted one.
+**The cost** Mask nodes made before this have no binding, and their binary mask is gone — deleted by
+the cleanup that caused the bug. Pressing generate with one connected now opens the editor instead of
+sending a picture where a mask belongs: one honest re-mark, and that node is fixed for good.
+
+**Tested** `image-qwen21` on `:8191`, three runs over the same source. The editor's run uploaded mask
+`7b985050…` (31,835 B). Re-running on the build that resolved saved references sent the tint instead
+(`81e7d561…`, 1.48 MB) — the bug, reproduced. With the mask bound to the node, re-running pressed
+generate, opened no editor, kept the node count at 30, and uploaded `7b985050…` again, byte-identical.

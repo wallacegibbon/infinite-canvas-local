@@ -11,7 +11,7 @@ import { downloadRunOutput, downloadRunOutputs, waitForRun, type Run, type RunPr
 import { isVideoTaskFailed } from "@/services/api/video";
 import { resolveModelRequestConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { readFileAsDataUrl } from "@/lib/image-utils";
-import { uploadImage } from "@/services/image-storage";
+import { uploadImage, imageToDataUrl } from "@/services/image-storage";
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
 import { fitNodeSize, nodeSizeFromRatio } from "@/lib/canvas/canvas-node-size";
 import { audioMetadata, buildAudioGenerationMetadata, buildImageGenerationMetadata, imageMetadata } from "@/lib/canvas/canvas-node-factory";
@@ -20,6 +20,7 @@ import { NODE_STATUS_ERROR, NODE_STATUS_IDLE, NODE_STATUS_LOADING, NODE_STATUS_S
 import { buildNodeGenerationContext, hydrateNodeGenerationContext } from "@/components/canvas/canvas-node-generation";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeImage, type CanvasNodeText } from "@/types/canvas";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
+import type { ReferenceImage } from "@/types/image";
 
 /**
  * One generation request, as every mode needs to see it.
@@ -68,6 +69,27 @@ export type GenerationRunDeps = {
         audios?: ReferenceAudio[],
     ) => Promise<void>;
 };
+
+/**
+ * Inpaint takes its mask from the node that carries one, not from the picture that node draws.
+ *
+ * A mask node shows the mask painted over the source, because that is what a person needs to see; the
+ * file the workflow consumes is bound to the same node (`metadata.mask`). So an inpaint run asks each
+ * connected node what mask it stands for, and only falls back to the picture for nodes that carry none.
+ */
+async function withBoundMasks(references: ReferenceImage[], nodes: CanvasNodeData[]): Promise<ReferenceImage[]> {
+    return Promise.all(
+        references.map(async (reference) => {
+            // The id is the node id — bare from the generation inputs, `canvas:<id>` from the resource
+            // resolver — so the prefix is stripped rather than required.
+            const nodeId = reference.id.replace(/^canvas:/, "");
+            const mask = nodes.find((node) => node.id === nodeId)?.metadata?.mask;
+            if (!mask?.storageKey) return reference;
+            const dataUrl = await imageToDataUrl({ storageKey: mask.storageKey });
+            return dataUrl ? { ...reference, dataUrl, storageKey: mask.storageKey } : reference;
+        }),
+    );
+}
 
 /**
  * The four things "generate" can mean.
@@ -181,14 +203,10 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             const count = getGenerationCount(generationConfig.count);
             const isConfigNode = sourceNode?.type === CanvasNodeType.Config;
             const isImageNode = sourceNode?.type === CanvasNodeType.Image;
-            // Inpaint is the one run whose mask is not the picture on the canvas: the editor uploads a
-            // binary mask to the workflow and draws a tinted copy for the eye, so the node records the
-            // binary one among the references it was run with, and running again repeats *that* run.
-            // Everything else is conditioned by what is connected now.
-            const savedInpaintReferences = generationConfig.imageMode === "inpaint" ? await resolveMetadataReferences(sourceNode?.metadata || {}) : null;
             // An image node answers in place. A variant is a new node fed with this one through the
             // reference bar — whatever is connected here is what conditions the request, nothing else.
-            const referenceImages = savedInpaintReferences?.length ? savedInpaintReferences : [...new Map(generationContext.referenceImages.map((image) => [image.id, image])).values()];
+            let referenceImages = [...new Map(generationContext.referenceImages.map((image) => [image.id, image])).values()];
+            if (generationConfig.imageMode === "inpaint") referenceImages = await withBoundMasks(referenceImages, nodesRef.current);
             const generationType = referenceImages.length ? ("edit" as const) : ("generation" as const);
             const generationMetadata = buildImageGenerationMetadata(generationType, generationConfig, count, referenceImages);
             const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : isImageNode ? CanvasNodeType.Image : CanvasNodeType.Text];
