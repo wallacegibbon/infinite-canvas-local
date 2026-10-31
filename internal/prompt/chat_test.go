@@ -39,7 +39,7 @@ func TestChatLogsRequestAndTokenUsage(t *testing.T) {
 
 	optimizer, logs := newLoggedOptimizer(t)
 	text, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "SYS", "USER", nil,
-		CloudConfig{BaseURL: server.URL, APIKey: "secret-key", Model: "local-llama"})
+		Endpoint{BaseURL: server.URL, APIKey: "secret-key", Model: "local-llama"})
 	if err != nil {
 		t.Fatalf("chat: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestChatLogsURLNormalisation(t *testing.T) {
 	optimizer, logs := newLoggedOptimizer(t)
 	// No /v1 suffix: the gateway appends it, and the change must be logged.
 	if _, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
+		Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
 		t.Fatalf("chat: %v", err)
 	}
 	if !strings.Contains(logs.String(), "prompt endpoint URL normalised") {
@@ -94,7 +94,7 @@ func TestChatLogsEndpointErrorMessage(t *testing.T) {
 
 	optimizer, logs := newLoggedOptimizer(t)
 	_, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"})
+		Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -120,7 +120,7 @@ func TestChatLogsImageRejectionHint(t *testing.T) {
 	optimizer, logs := newLoggedOptimizer(t)
 	_, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u",
 		[]string{"data:image/png;base64,AAAA"},
-		CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "text-only"})
+		Endpoint{BaseURL: server.URL, APIKey: "k", Model: "text-only"})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -142,7 +142,7 @@ func TestChatLogsNonJSONBody(t *testing.T) {
 
 	optimizer, logs := newLoggedOptimizer(t)
 	if _, _, _, err := optimizer.chat(context.Background(), "caption/zh", "s", "u", nil,
-		CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"}); err == nil {
+		Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"}); err == nil {
 		t.Fatal("expected an error for a body with no choices")
 	}
 	out := logs.String()
@@ -163,7 +163,7 @@ func TestChatReportsEmptyMessage(t *testing.T) {
 
 	optimizer, logs := newLoggedOptimizer(t)
 	_, _, _, err := optimizer.chat(context.Background(), "optimize/i2va", "s", "u", nil,
-		CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"})
+		Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"})
 	if err == nil {
 		t.Fatal("an empty message must be an error, not a silent empty prompt")
 	}
@@ -189,7 +189,7 @@ func TestChatReportsReasoningOnlyAnswer(t *testing.T) {
 
 	optimizer, logs := newLoggedOptimizer(t)
 	_, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "thinking-model"})
+		Endpoint{BaseURL: server.URL, APIKey: "k", Model: "thinking-model"})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -227,7 +227,7 @@ func TestOptimizeExplainsUnusableAnswer(t *testing.T) {
 		Prompt:   "一个人在雨里奔跑",
 		Mode:     "文生视频(T2VA)",
 		Duration: 5,
-		Cloud:    CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"},
+		Endpoint: Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"},
 	})
 	if err == nil {
 		t.Fatal("expected an error when nothing survives sanitising")
@@ -275,7 +275,7 @@ overall_soundscape:
 		Prompt:   "一个女人在雨夜独自前行",
 		Mode:     "文生视频(T2VA)",
 		Duration: 6,
-		Cloud:    CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"},
+		Endpoint: Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"},
 	})
 	if err != nil {
 		t.Fatalf("a valid H3 answer was rejected: %v", err)
@@ -301,8 +301,8 @@ func TestCompleteSendsNoSystemTurnWhenNoneIsGiven(t *testing.T) {
 
 	optimizer, _ := newLoggedOptimizer(t)
 	result, err := optimizer.Complete(context.Background(), ChatRequest{
-		Prompt: "  what is this?  ",
-		Cloud:  CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"},
+		Prompt:   "  what is this?  ",
+		Endpoint: Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"},
 	})
 	if err != nil {
 		t.Fatalf("complete: %v", err)
@@ -335,9 +335,9 @@ func TestCompleteSendsTheSystemMessageFirst(t *testing.T) {
 
 	optimizer, _ := newLoggedOptimizer(t)
 	if _, err := optimizer.Complete(context.Background(), ChatRequest{
-		Prompt: "hello",
-		System: "be brief",
-		Cloud:  CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"},
+		Prompt:   "hello",
+		System:   "be brief",
+		Endpoint: Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"},
 	}); err != nil {
 		t.Fatalf("complete: %v", err)
 	}
@@ -366,7 +366,7 @@ func TestCompleteRejectsABlankPrompt(t *testing.T) {
 func TestChatLogsMissingConfiguration(t *testing.T) {
 	optimizer, logs := newLoggedOptimizer(t)
 	_, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: "http://127.0.0.1:8099", Model: "m"})
+		Endpoint{BaseURL: "http://127.0.0.1:8099", Model: "m"})
 	if err == nil {
 		t.Fatal("expected an error for a missing API key")
 	}
@@ -378,7 +378,7 @@ func TestChatLogsMissingConfiguration(t *testing.T) {
 func TestChatLogsInvalidURL(t *testing.T) {
 	optimizer, logs := newLoggedOptimizer(t)
 	_, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: "ftp://nope", APIKey: "k", Model: "m"})
+		Endpoint{BaseURL: "ftp://nope", APIKey: "k", Model: "m"})
 	if err == nil {
 		t.Fatal("expected an error for a non-http scheme")
 	}
@@ -391,7 +391,7 @@ func TestChatLogsUnreachableEndpoint(t *testing.T) {
 	optimizer, logs := newLoggedOptimizer(t)
 	// Port 1 is closed: this is the "llama-server is not running" case.
 	_, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: "http://127.0.0.1:1", APIKey: "k", Model: "m"})
+		Endpoint{BaseURL: "http://127.0.0.1:1", APIKey: "k", Model: "m"})
 	if err == nil {
 		t.Fatal("expected a connection error")
 	}
@@ -437,7 +437,7 @@ func TestChatPurposeAppearsInLogs(t *testing.T) {
 	for _, purpose := range []string{"optimize/t2va", "optimize-image/t2i", "caption/en"} {
 		optimizer, logs := newLoggedOptimizer(t)
 		if _, _, _, err := optimizer.chat(context.Background(), purpose, "s", "u", nil,
-			CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
+			Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
 			t.Fatalf("chat(%s): %v", purpose, err)
 		}
 		if !strings.Contains(logs.String(), "purpose="+purpose) {
@@ -465,7 +465,7 @@ func TestChatUsageFieldsAreParsedFromRealShape(t *testing.T) {
 
 	optimizer, logs := newLoggedOptimizer(t)
 	text, model, elapsed, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: server.URL + "/v1", APIKey: "k", Model: "qwen3"})
+		Endpoint{BaseURL: server.URL + "/v1", APIKey: "k", Model: "qwen3"})
 	if err != nil {
 		t.Fatalf("chat: %v", err)
 	}
@@ -496,7 +496,7 @@ func TestChatSendsNoVendorFieldByDefault(t *testing.T) {
 
 	optimizer, logs := newLoggedOptimizer(t)
 	if _, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
+		Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
 		t.Fatalf("chat: %v", err)
 	}
 
@@ -528,7 +528,7 @@ func TestChatThinkingParamVariants(t *testing.T) {
 		optimizer, _ := newLoggedOptimizer(t)
 		optimizer.WithThinkingParam(param)
 		if _, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-			CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
+			Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
 			t.Fatalf("%s: chat: %v", param, err)
 		}
 		server.Close()
@@ -547,7 +547,7 @@ func TestChatThinkingParamNoneSendsNothing(t *testing.T) {
 	optimizer, logs := newLoggedOptimizer(t)
 	optimizer.WithThinkingParam("none")
 	if _, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
+		Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
 		t.Fatalf("chat: %v", err)
 	}
 	for _, key := range []string{"chat_template_kwargs", "enable_thinking", "reasoning_effort"} {
@@ -580,7 +580,7 @@ func TestChatRetriesWithoutThinkingOn400(t *testing.T) {
 	optimizer, logs := newLoggedOptimizer(t)
 	optimizer.WithThinkingParam("chat_template_kwargs")
 	text, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"})
+		Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"})
 	if err != nil {
 		t.Fatalf("the retry should have succeeded: %v", err)
 	}
@@ -608,7 +608,7 @@ func TestChatUnknownThinkingParamBehavesLikeAuto(t *testing.T) {
 	optimizer, logs := newLoggedOptimizer(t)
 	optimizer.WithThinkingParam("enable_thinkin") // typo
 	if _, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,
-		CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
+		Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"}); err != nil {
 		t.Fatalf("chat: %v", err)
 	}
 	for _, key := range []string{"chat_template_kwargs", "enable_thinking", "reasoning_effort"} {
@@ -647,10 +647,10 @@ func TestChatAutoLearnsThinkingHint(t *testing.T) {
 	defer server.Close()
 
 	optimizer, logs := newLoggedOptimizer(t)
-	cloud := CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"}
+	endpoint := Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"}
 
 	// First call: plain request, gets reasoning-only, retries with the hint, succeeds.
-	text, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil, cloud)
+	text, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil, endpoint)
 	if err != nil {
 		t.Fatalf("first call should have recovered: %v", err)
 	}
@@ -675,7 +675,7 @@ func TestChatAutoLearnsThinkingHint(t *testing.T) {
 
 	// Second call: the hint is known, so exactly one request and no wasted round trip.
 	bodies = nil
-	if _, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil, cloud); err != nil {
+	if _, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil, endpoint); err != nil {
 		t.Fatalf("second call: %v", err)
 	}
 	if len(bodies) != 1 {
@@ -704,11 +704,11 @@ func TestChatFallsBackWhenHintRejected(t *testing.T) {
 	defer server.Close()
 
 	optimizer, logs := newLoggedOptimizer(t)
-	cloud := CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"}
+	endpoint := Endpoint{BaseURL: server.URL, APIKey: "k", Model: "m"}
 
 	// Learning only kicks in for auto; start by pinning a hint so the rejection happens.
 	optimizer.WithThinkingParam("chat_template_kwargs")
-	if _, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil, cloud); err != nil {
+	if _, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil, endpoint); err != nil {
 		t.Fatalf("the retry should have succeeded: %v", err)
 	}
 	if len(bodies) != 2 {

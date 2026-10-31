@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
+import { withLegacyPromptFields } from "@/lib/config-migration";
 import { gatewayModelLabel } from "@/lib/gateway-labels";
 import { gatewayRoot, isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_GATEWAY_CHANNEL_ID } from "@/constant/app-mode";
 import { normalizeProgressRingSkin, type ProgressRingSkinId } from "@/lib/canvas/progress-ring-skins";
@@ -36,7 +37,7 @@ export type ModelChannel = {
     models: ChannelModel[];
 };
 
-export type PromptCloudApi = {
+export type PromptEndpoint = {
     id: string;
     name: string;
     baseUrl: string;
@@ -64,11 +65,11 @@ export type AiConfig = {
     videoMode: string;
     videoSelfLiftMode?: string;
     promptOptimizeLanguage?: "zh" | "en";
-    promptCloudBaseUrl?: string;
-    promptCloudApiKey?: string;
-    promptCloudModel?: string;
-    promptCloudApis?: PromptCloudApi[];
-    promptCloudApiId?: string;
+    promptBaseUrl?: string;
+    promptApiKey?: string;
+    promptModel?: string;
+    promptEndpoints?: PromptEndpoint[];
+    promptEndpointId?: string;
     frameMode?: "first" | "last" | "both";
     imageMode?: string;
     outpaint?: { left: number; top: number; right: number; bottom: number; width: number; height: number };
@@ -89,7 +90,7 @@ export type AiConfig = {
     params?: Record<string, unknown>;
 };
 
-export type ConfigTabKey = "channels" | "preferences" | "cloud-api" | "prompt-sources" | "local-storage" | "resources";
+export type ConfigTabKey = "channels" | "preferences" | "prompt-api" | "prompt-sources" | "local-storage" | "resources";
 
 const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
 const CHANNEL_MODEL_SEPARATOR = "::";
@@ -102,7 +103,7 @@ const localDefaultChannel: ModelChannel = {
     models: [],
 };
 
-// One literal, no shared "cloud" base to override: this build only ever talks to the
+// One literal, no shared base to override: this build only ever talks to the
 // local gateway, so a second default config would be dead weight that has to be kept
 // in sync field by field.
 export const defaultConfig: AiConfig = {
@@ -129,11 +130,11 @@ export const defaultConfig: AiConfig = {
     videoMode: "text",
     videoSelfLiftMode: "fast",
     promptOptimizeLanguage: "zh",
-    promptCloudBaseUrl: "",
-    promptCloudApiKey: "",
-    promptCloudModel: "",
-    promptCloudApis: [],
-    promptCloudApiId: "",
+    promptBaseUrl: "",
+    promptApiKey: "",
+    promptModel: "",
+    promptEndpoints: [],
+    promptEndpointId: "",
     systemPrompt: "",
     reasoningEffort: "auto",
     models: [],
@@ -153,10 +154,10 @@ type ConfigStore = {
     configTab: ConfigTabKey;
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
-    addPromptCloudApi: (input: Omit<PromptCloudApi, "id">) => string;
-    updatePromptCloudApi: (id: string, patch: Partial<Omit<PromptCloudApi, "id">>) => void;
-    removePromptCloudApi: (id: string) => void;
-    selectPromptCloudApi: (id: string) => void;
+    addPromptEndpoint: (input: Omit<PromptEndpoint, "id">) => string;
+    updatePromptEndpoint: (id: string, patch: Partial<Omit<PromptEndpoint, "id">>) => void;
+    removePromptEndpoint: (id: string) => void;
+    selectPromptEndpoint: (id: string) => void;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean, tab?: ConfigTabKey) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
@@ -281,10 +282,10 @@ function isAiConfigReady(config: AiConfig, model: string) {
  * endpoint configured — and the answer has nothing to do with the channel list.
  */
 export function promptEndpointReady(config: AiConfig) {
-    return Boolean((config.promptCloudBaseUrl || "").trim() && (config.promptCloudApiKey || "").trim() && (config.promptCloudModel || "").trim());
+    return Boolean((config.promptBaseUrl || "").trim() && (config.promptApiKey || "").trim() && (config.promptModel || "").trim());
 }
 
-function suggestPromptCloudApiName(baseUrl: string, model: string) {
+function suggestPromptEndpointName(baseUrl: string, model: string) {
     const value = `${baseUrl || ""} ${model || ""}`.toLowerCase();
     if (value.includes("deepseek")) return "DeepSeek";
     if (value.includes("siliconflow")) return "SiliconFlow";
@@ -293,58 +294,58 @@ function suggestPromptCloudApiName(baseUrl: string, model: string) {
     if (value.includes("openai")) return "OpenAI";
     // llama.cpp is the most common local/LAN endpoint, so give it a recognizable default name.
     if (/127\.0\.0\.1|localhost|\[::1\]|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\./.test(value)) {
-        return value.includes("llama") ? i18n.t("config.cloudApi.suggestedLocalLlama") : i18n.t("config.cloudApi.suggestedLocalEndpoint");
+        return value.includes("llama") ? i18n.t("config.promptApi.suggestedLocalLlama") : i18n.t("config.promptApi.suggestedLocalEndpoint");
     }
-    return i18n.t("config.cloudApi.suggestedGeneric");
+    return i18n.t("config.promptApi.suggestedGeneric");
 }
 
-function normalizePromptCloudModel(baseUrl: string, model: string) {
+function normalizePromptModel(baseUrl: string, model: string) {
     return /deepseek/i.test(baseUrl) && model === "deepseek-chat" ? "deepseek-flash" : model;
 }
 
-function normalizePromptCloudApis(value: unknown): PromptCloudApi[] {
+function normalizePromptEndpoints(value: unknown): PromptEndpoint[] {
     if (!Array.isArray(value)) return [];
     const seen = new Set<string>();
-    const apis: PromptCloudApi[] = [];
+    const apis: PromptEndpoint[] = [];
     for (const item of value) {
         if (!item || typeof item !== "object") continue;
-        const raw = item as Partial<PromptCloudApi>;
+        const raw = item as Partial<PromptEndpoint>;
         const baseUrl = String(raw.baseUrl || "").trim();
         const apiKey = String(raw.apiKey || "").trim();
-        const model = normalizePromptCloudModel(baseUrl, String(raw.model || "").trim());
+        const model = normalizePromptModel(baseUrl, String(raw.model || "").trim());
         const explicitName = String(raw.name || "").trim();
         if (!baseUrl && !apiKey && !model && !explicitName) continue;
         let id = String(raw.id || "").trim() || nanoid();
         if (seen.has(id)) id = nanoid();
         seen.add(id);
-        apis.push({ id, name: explicitName || suggestPromptCloudApiName(baseUrl, model), baseUrl, apiKey, model });
+        apis.push({ id, name: explicitName || suggestPromptEndpointName(baseUrl, model), baseUrl, apiKey, model });
     }
     return apis;
 }
 
-function promptCloudMirror(apis: PromptCloudApi[], activeId: string) {
+function promptEndpointFields(apis: PromptEndpoint[], activeId: string) {
     const active = apis.find((api) => api.id === activeId) || null;
     return {
-        promptCloudApis: apis,
-        promptCloudApiId: active?.id || "",
-        promptCloudBaseUrl: active?.baseUrl || "",
-        promptCloudApiKey: active?.apiKey || "",
-        promptCloudModel: active?.model || "",
+        promptEndpoints: apis,
+        promptEndpointId: active?.id || "",
+        promptBaseUrl: active?.baseUrl || "",
+        promptApiKey: active?.apiKey || "",
+        promptModel: active?.model || "",
     };
 }
 
-function normalizePromptCloudConfig(config: AiConfig): AiConfig {
-    const apis = normalizePromptCloudApis(config.promptCloudApis);
+function normalizePromptEndpointConfig(config: AiConfig): AiConfig {
+    const apis = normalizePromptEndpoints(config.promptEndpoints);
     if (!apis.length) {
-        const baseUrl = String(config.promptCloudBaseUrl || "").trim();
-        const apiKey = String(config.promptCloudApiKey || "").trim();
-        const model = normalizePromptCloudModel(baseUrl, String(config.promptCloudModel || "").trim());
+        const baseUrl = String(config.promptBaseUrl || "").trim();
+        const apiKey = String(config.promptApiKey || "").trim();
+        const model = normalizePromptModel(baseUrl, String(config.promptModel || "").trim());
         if (baseUrl || apiKey || model) {
-            apis.push({ id: nanoid(), name: suggestPromptCloudApiName(baseUrl, model), baseUrl, apiKey, model });
+            apis.push({ id: nanoid(), name: suggestPromptEndpointName(baseUrl, model), baseUrl, apiKey, model });
         }
     }
-    const activeId = apis.some((api) => api.id === config.promptCloudApiId) ? String(config.promptCloudApiId) : apis[0]?.id || "";
-    return { ...config, ...promptCloudMirror(apis, activeId) };
+    const activeId = apis.some((api) => api.id === config.promptEndpointId) ? String(config.promptEndpointId) : apis[0]?.id || "";
+    return { ...config, ...promptEndpointFields(apis, activeId) };
 }
 
 export const useConfigStore = create<ConfigStore>()(
@@ -361,24 +362,24 @@ export const useConfigStore = create<ConfigStore>()(
                         [key]: value,
                     },
                 })),
-            addPromptCloudApi: (input) => {
-                const api: PromptCloudApi = {
+            addPromptEndpoint: (input) => {
+                const api: PromptEndpoint = {
                     id: nanoid(),
-                    name: String(input.name || "").trim() || suggestPromptCloudApiName(input.baseUrl, input.model),
+                    name: String(input.name || "").trim() || suggestPromptEndpointName(input.baseUrl, input.model),
                     baseUrl: String(input.baseUrl || "").trim(),
                     apiKey: String(input.apiKey || "").trim(),
                     model: String(input.model || "").trim(),
                 };
                 set((state) => {
-                    const apis = [...(state.config.promptCloudApis || []), api];
-                    const keepActive = Boolean(state.config.promptCloudApiId && apis.some((item) => item.id === state.config.promptCloudApiId));
-                    return { config: { ...state.config, ...promptCloudMirror(apis, keepActive ? String(state.config.promptCloudApiId) : api.id) } };
+                    const apis = [...(state.config.promptEndpoints || []), api];
+                    const keepActive = Boolean(state.config.promptEndpointId && apis.some((item) => item.id === state.config.promptEndpointId));
+                    return { config: { ...state.config, ...promptEndpointFields(apis, keepActive ? String(state.config.promptEndpointId) : api.id) } };
                 });
                 return api.id;
             },
-            updatePromptCloudApi: (id, patch) =>
+            updatePromptEndpoint: (id, patch) =>
                 set((state) => {
-                    const apis = (state.config.promptCloudApis || []).map((api) =>
+                    const apis = (state.config.promptEndpoints || []).map((api) =>
                         api.id === id
                             ? {
                                   ...api,
@@ -390,20 +391,20 @@ export const useConfigStore = create<ConfigStore>()(
                               }
                             : api,
                     );
-                    const activeId = apis.some((api) => api.id === state.config.promptCloudApiId) ? String(state.config.promptCloudApiId) : apis[0]?.id || "";
-                    return { config: { ...state.config, ...promptCloudMirror(apis, activeId) } };
+                    const activeId = apis.some((api) => api.id === state.config.promptEndpointId) ? String(state.config.promptEndpointId) : apis[0]?.id || "";
+                    return { config: { ...state.config, ...promptEndpointFields(apis, activeId) } };
                 }),
-            removePromptCloudApi: (id) =>
+            removePromptEndpoint: (id) =>
                 set((state) => {
-                    const apis = (state.config.promptCloudApis || []).filter((api) => api.id !== id);
-                    const activeId = apis.some((api) => api.id === state.config.promptCloudApiId) ? String(state.config.promptCloudApiId) : apis[0]?.id || "";
-                    return { config: { ...state.config, ...promptCloudMirror(apis, activeId) } };
+                    const apis = (state.config.promptEndpoints || []).filter((api) => api.id !== id);
+                    const activeId = apis.some((api) => api.id === state.config.promptEndpointId) ? String(state.config.promptEndpointId) : apis[0]?.id || "";
+                    return { config: { ...state.config, ...promptEndpointFields(apis, activeId) } };
                 }),
-            selectPromptCloudApi: (id) =>
+            selectPromptEndpoint: (id) =>
                 set((state) => {
-                    const apis = state.config.promptCloudApis || [];
+                    const apis = state.config.promptEndpoints || [];
                     if (!apis.some((api) => api.id === id)) return {};
-                    return { config: { ...state.config, ...promptCloudMirror(apis, id) } };
+                    return { config: { ...state.config, ...promptEndpointFields(apis, id) } };
                 }),
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
             openConfigDialog: (shouldPromptContinue = false, configTab = "channels") => set({ isConfigOpen: true, shouldPromptContinue, configTab }),
@@ -415,7 +416,7 @@ export const useConfigStore = create<ConfigStore>()(
             partialize: (state) => ({ config: state.config }),
             merge: (persisted, current) => {
                 const persistedState = (persisted || {}) as Partial<ConfigStore>;
-                const persistedConfig = (persistedState.config || {}) as Partial<AiConfig>;
+                const persistedConfig = withLegacyPromptFields((persistedState.config || {}) as Record<string, unknown>);
                 const config = { ...defaultConfig, ...persistedConfig };
                 if (!Array.isArray(persistedConfig.channels)) config.channels = [];
                 {
@@ -452,7 +453,7 @@ export const useConfigStore = create<ConfigStore>()(
                 const imageModel = pickModel(config.imageModel || config.model, imageOptions);
                 const videoModel = pickModel(config.videoModel, videoOptions);
                 const audioModel = pickModel(config.audioModel, audioOptions);
-                const normalizedCloud = normalizePromptCloudConfig(config);
+                const promptConfig = normalizePromptEndpointConfig(config);
                 return {
                     ...current,
                     config: {
@@ -475,11 +476,11 @@ export const useConfigStore = create<ConfigStore>()(
                         videoWatermark: config.videoWatermark || "false",
                         videoMode: config.videoMode === "reference" || config.videoMode === "text" ? config.videoMode : "frames",
                         videoSelfLiftMode: config.videoSelfLiftMode === "quality" ? "quality" : "fast",
-                        promptCloudApis: normalizedCloud.promptCloudApis,
-                        promptCloudApiId: normalizedCloud.promptCloudApiId,
-                        promptCloudBaseUrl: normalizedCloud.promptCloudBaseUrl,
-                        promptCloudApiKey: normalizedCloud.promptCloudApiKey,
-                        promptCloudModel: normalizedCloud.promptCloudModel,
+                        promptEndpoints: promptConfig.promptEndpoints,
+                        promptEndpointId: promptConfig.promptEndpointId,
+                        promptBaseUrl: promptConfig.promptBaseUrl,
+                        promptApiKey: promptConfig.promptApiKey,
+                        promptModel: promptConfig.promptModel,
                         canvasImageCount: config.canvasImageCount || "3",
                         nodeRegenerateBehavior: config.nodeRegenerateBehavior === "overwrite" ? "overwrite" : "new-node",
                         autoFocusOnSelect: Boolean(config.autoFocusOnSelect),

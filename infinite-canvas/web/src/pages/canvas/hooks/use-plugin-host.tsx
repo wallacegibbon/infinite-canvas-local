@@ -83,7 +83,7 @@ export function usePluginHost(params: PluginHostParams) {
                 const config = { ...buildGenerationConfig(effectiveConfig, undefined, "text"), ...(options?.model ? { model: options.model } : {}) };
                 // Words come from the prompt endpoint; no workflow stands behind them.
                 if (!promptEndpointReady(config)) {
-                    openConfigDialog(true, "cloud-api");
+                    openConfigDialog(true, "prompt-api");
                     throw new Error(t("canvas.plugins.aiConfigRequired"));
                 }
                 const text = await requestPromptChat(config, { prompt, system: options?.system }, { signal: options?.signal });

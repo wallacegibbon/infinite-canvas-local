@@ -29,9 +29,9 @@ const config = (overrides: Record<string, unknown> = {}) =>
         models: [],
         model: "text-qwen",
         systemPrompt: "",
-        promptCloudBaseUrl: "http://127.0.0.1:8099/v1",
-        promptCloudApiKey: "nokey",
-        promptCloudModel: "qwen3.8-27b",
+        promptBaseUrl: "http://127.0.0.1:8099/v1",
+        promptApiKey: "nokey",
+        promptModel: "qwen3.8-27b",
         ...overrides,
     }) as unknown as Config;
 
@@ -81,9 +81,9 @@ describe("requestPromptChat", () => {
         await requestPromptChat(config(), { prompt: "hi" });
 
         const { form } = formOf(calls);
-        expect(form.get("cloudBaseUrl")).toBe("http://127.0.0.1:8099/v1");
-        expect(form.get("cloudApiKey")).toBe("nokey");
-        expect(form.get("cloudModel")).toBe("qwen3.8-27b");
+        expect(form.get("promptBaseUrl")).toBe("http://127.0.0.1:8099/v1");
+        expect(form.get("promptApiKey")).toBe("nokey");
+        expect(form.get("promptModel")).toBe("qwen3.8-27b");
     });
 
     it("sends no system message when neither the settings nor the caller has one", async () => {

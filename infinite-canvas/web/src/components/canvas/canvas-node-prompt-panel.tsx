@@ -8,18 +8,19 @@ import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { Tooltip } from "@/components/kit/tooltip";
 import { BaseModelPicker, ModelPicker, WorkflowModelPicker } from "@/components/model-picker";
-import { channelModelOf, defaultConfig, modelImageInputs, modelOptionName, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { channelModelOf, defaultConfig, modelImageInputs, modelOptionName, promptEndpointReady, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { isPlainEnterKey } from "@/lib/keyboard-event";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
+import { CanvasPromptEndpointChip } from "./canvas-prompt-endpoint-chip";
 import { CanvasTextSettingsPopover } from "./canvas-text-settings-popover";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { resolveCanvasReferenceImages } from "@/lib/canvas/canvas-resource-references";
-import { requestImageCaption, requestImagePromptOptimize, requestPromptOptimize, type ImageCaptionEngine, type PromptOptimizeMode } from "@/services/api/prompts";
+import { requestImageCaption, requestImagePromptOptimize, requestPromptOptimize, type PromptOptimizeMode } from "@/services/api/prompts";
 import { videoModelForWorkflow, videoModelModePatch, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasNodeReferenceBar } from "./canvas-node-reference-bar";
 import { abortCaptionJob, hasCaptionJob, registerCaptionJob, releaseCaptionJob } from "@/lib/canvas/caption-jobs";
@@ -88,7 +89,6 @@ export function CanvasNodePromptPanel({
         .filter((reference) => reference.kind === "text" && reference.text?.trim())
         .map((reference) => reference.text!.trim())
         .join("\n\n");
-    const captionEngine = node.metadata?.captionEngine;
     const rawWorkflowId = channelModelOf(config, config.model)?.model.workflowId || modelOptionName(config.model);
     const workflowId = baseVideoWorkflowId(rawWorkflowId);
     const isNoVdnModel = rawWorkflowId !== workflowId;
@@ -125,14 +125,13 @@ export function CanvasNodePromptPanel({
     const canOptimize = isH3 && Boolean(draft.trim()) && !isRunning && !optimizeRunning;
     const canOptimizeImage = isImage && Boolean(draft.trim()) && !isRunning && !optimizeRunning;
     const optimizeLanguage = config.promptOptimizeLanguage === "en" ? "en" : "zh";
-    const optimizeCloudReady = Boolean((config.promptCloudBaseUrl || "").trim() && (config.promptCloudApiKey || "").trim() && (config.promptCloudModel || "").trim());
-    const captionReady = mode === "text" && Boolean(captionEngine);
+    const endpointReady = promptEndpointReady(config);
     const captionStatus = mode === "text" ? node.metadata?.captionStatus : undefined;
     const captionRunning = mode === "text" && captionStatus === "running";
     const captionResult = mode === "text" ? node.metadata?.captionPrompt || "" : "";
     const captionError = mode === "text" ? node.metadata?.captionError || "" : "";
     // Captioning has exactly one path: an OpenAI-compatible endpoint, which may point at a local llama.cpp.
-    const canCaption = mode === "text" && optimizeCloudReady && imageReferences.length > 0 && !isRunning && !captionRunning;
+    const canCaption = mode === "text" && endpointReady && imageReferences.length > 0 && !isRunning && !captionRunning;
     const hasMediaReferences = mentionReferences.some((reference) => reference.kind !== "text");
     const textVideoHasReferences = isH3T2V && hasMediaReferences;
     const frameMode: "first" | "last" | "both" = node.metadata?.frameMode === "last" || node.metadata?.frameMode === "both" || node.metadata?.frameMode === "first" ? node.metadata.frameMode : imageReferences.length >= 2 ? "both" : "first";
@@ -256,9 +255,9 @@ export function CanvasNodePromptPanel({
 
     // ✨ starts immediately: if the endpoint is not configured, warn and jump to settings instead of opening another panel first.
     const startOptimize = (run: () => void) => {
-        if (!optimizeCloudReady) {
-            toast.warning(t("canvas.promptPanel.optimizeCloudMissing"));
-            openConfigDialog(true, "cloud-api");
+        if (!endpointReady) {
+            toast.warning(t("canvas.promptPanel.promptEndpointMissing"));
+            openConfigDialog(true, "prompt-api");
             return;
         }
         run();
@@ -269,11 +268,6 @@ export function CanvasNodePromptPanel({
         if (!text || optimizeRunning) return;
         commitPrompt(draft);
         const defaults = optimizeDefaults();
-        const cloud = {
-            baseUrl: (config.promptCloudBaseUrl || "").trim(),
-            apiKey: (config.promptCloudApiKey || "").trim(),
-            model: (config.promptCloudModel || "").trim(),
-        };
         const controller = new AbortController();
         registerPromptOptimizeJob(node.id, controller);
         onConfigChange(node.id, { promptOptimizeStatus: "running", promptOptimizeKind: "h3", promptOptimizeSource: text, promptOptimizePrompt: undefined, promptOptimizeError: undefined });
@@ -288,7 +282,6 @@ export function CanvasNodePromptPanel({
                     referenceNote: defaults.referenceNote,
                     language: optimizeLanguage,
                     images,
-                    cloud,
                 },
                 { signal: controller.signal },
             );
@@ -317,11 +310,6 @@ export function CanvasNodePromptPanel({
                     mode: selectedRefs.length ? "image" : "text",
                     language: optimizeLanguage,
                     imageCount: selectedRefs.length,
-                    cloud: {
-                        baseUrl: (config.promptCloudBaseUrl || "").trim(),
-                        apiKey: (config.promptCloudApiKey || "").trim(),
-                        model: (config.promptCloudModel || "").trim(),
-                    },
                 },
                 { signal: controller.signal },
             );
@@ -363,16 +351,12 @@ export function CanvasNodePromptPanel({
         if (!canCaption) return;
         const controller = new AbortController();
         registerCaptionJob(node.id, controller);
-        onConfigChange(node.id, { captionStatus: "running", captionEngineUsed: captionEngine, captionPrompt: undefined, captionError: undefined });
+        onConfigChange(node.id, { captionStatus: "running", captionPrompt: undefined, captionError: undefined });
         try {
             const images = await resolveCanvasReferenceImages(imageReferences.slice(0, 1), nodes);
             if (!images.length) throw new Error(t("canvas.promptPanel.captionNoImage"));
-            const result = await requestImageCaption(
-                config,
-                { images, language: "zh", engine: "cloud", cloud: { baseUrl: (config.promptCloudBaseUrl || "").trim(), apiKey: (config.promptCloudApiKey || "").trim(), model: (config.promptCloudModel || "").trim() } },
-                { signal: controller.signal },
-            );
-            onConfigChange(node.id, { captionStatus: "done", captionPrompt: result.prompt, captionEngineUsed: result.engine || "cloud" });
+            const result = await requestImageCaption(config, { images, language: "zh" }, { signal: controller.signal });
+            onConfigChange(node.id, { captionStatus: "done", captionPrompt: result.prompt });
         } catch (error) {
             if (controller.signal.aborted) clearCaptionPreview();
             else onConfigChange(node.id, { captionStatus: "error", captionError: error instanceof Error ? error.message : t("canvas.promptPanel.optimizeFailed") });
@@ -523,23 +507,7 @@ export function CanvasNodePromptPanel({
                         </>
                     ) : (
                         <>
-                            <ModelPicker
-                                config={config}
-                                value={captionEngine ? "caption:cloud" : config.model}
-                                onChange={(model) => {
-                                    if (model === "caption:cloud") onConfigChange(node.id, { captionEngine: "cloud" as ImageCaptionEngine });
-                                    else onConfigChange(node.id, { model, captionEngine: undefined });
-                                }}
-                                capability="text"
-                                extraOptions={[
-                                    {
-                                        value: "caption:cloud",
-                                        label: `${t("canvas.promptPanel.captionShort")} · ${t("canvas.promptPanel.optimizeEngineCloud")}${optimizeCloudReady ? `（${config.promptCloudModel}）` : `（${t("canvas.promptPanel.captionCloudNotConfigured")}）`}`,
-                                    },
-                                ]}
-                                onMissingConfig={() => openConfigDialog(true)}
-                                className="max-w-[190px]"
-                            />
+                            <CanvasPromptEndpointChip config={config} className="!h-10 !max-w-[190px] !justify-start !rounded-full !px-3" onClick={() => openConfigDialog(true, "prompt-api")} />
                             <CanvasTextSettingsPopover
                                 config={config}
                                 count={node.metadata?.textCount || 1}
@@ -549,49 +517,46 @@ export function CanvasNodePromptPanel({
                         </>
                     )}
                 </div>
+                {mode === "text" ? (
+                    <Tooltip title={canCaption ? t("canvas.promptPanel.captionHint") : t("canvas.promptPanel.captionNeedsImage")}>
+                        <Button
+                            type="text"
+                            className="!h-10 ml-auto shrink-0 !rounded-full !px-2 text-xs"
+                            style={{ color: theme.node.text }}
+                            icon={captionRunning ? <LoaderCircle className="size-4 animate-spin" /> : <ScanText className="size-4" />}
+                            disabled={!canCaption && !captionRunning}
+                            onClick={() => (captionRunning ? stopCaption() : void captionPrompt())}
+                            aria-label={captionRunning ? t("canvas.promptPanel.captionStop") : t("canvas.promptPanel.caption")}
+                        >
+                            {captionRunning ? t("canvas.promptPanel.captionStop") : t("canvas.promptPanel.captionShort")}
+                        </Button>
+                    </Tooltip>
+                ) : null}
                 <Button
                     type="primary"
-                    className={`ml-auto !h-10 shrink-0 !rounded-full ${isRunning || captionRunning ? "!min-w-10 !px-2" : "!min-w-16 !px-3"}`}
-                    danger={isRunning || captionRunning}
-                    disabled={!isRunning && !captionRunning && !(captionReady ? imageReferences.length : draft.trim())}
-                    title={
-                        captionRunning ? t("canvas.promptPanel.captionStop") : captionReady ? (imageReferences.length ? t("canvas.promptPanel.captionHint") : t("canvas.promptPanel.captionNoImage")) : isRunning ? t("canvas.promptPanel.stop") : undefined
-                    }
-                    onClick={() => {
-                        if (isRunning) {
-                            onStop(node.id);
-                            return;
-                        }
-                        if (captionRunning) {
-                            stopCaption();
-                            return;
-                        }
-                        if (captionReady) {
-                            void captionPrompt();
-                            return;
-                        }
-                        submit();
-                    }}
-                    aria-label={t(isRunning || captionRunning ? "canvas.promptPanel.captionStop" : captionReady ? "canvas.promptPanel.caption" : "canvas.promptPanel.generate")}
+                    className={`${mode === "text" ? "" : "ml-auto"} !h-10 shrink-0 !rounded-full ${isRunning ? "!min-w-10 !px-2" : "!min-w-16 !px-3"}`}
+                    danger={isRunning}
+                    disabled={!isRunning && !draft.trim()}
+                    title={isRunning ? t("canvas.promptPanel.stop") : undefined}
+                    onClick={() => (isRunning ? onStop(node.id) : submit())}
+                    aria-label={t(isRunning ? "canvas.promptPanel.stop" : "canvas.promptPanel.generate")}
                 >
                     <span className="flex items-center gap-1.5">
-                        {isRunning || captionRunning ? (
+                        {isRunning ? (
                             <>
                                 <LoaderCircle className="size-4 animate-spin" />
                                 <Square className="size-3.5 fill-current" />
                             </>
-                        ) : captionReady ? (
-                            <ScanText className="size-4" />
                         ) : (
                             <ArrowUp className="size-4" />
                         )}
                     </span>
                 </Button>
             </div>
-            {mode === "text" && captionEngine === "cloud" && !optimizeCloudReady ? (
+            {mode === "text" && !endpointReady ? (
                 <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-                    <span className="min-w-0 truncate">{t("canvas.promptPanel.captionCloudMissing")}</span>
-                    <button type="button" className="shrink-0 underline underline-offset-2" onClick={() => openConfigDialog(false, "cloud-api")}>
+                    <span className="min-w-0 truncate">{t("canvas.promptPanel.promptEndpointMissing")}</span>
+                    <button type="button" className="shrink-0 underline underline-offset-2" onClick={() => openConfigDialog(false, "prompt-api")}>
                         {t("canvas.promptPanel.optimizeOpenSettings")}
                     </button>
                 </div>
@@ -609,10 +574,7 @@ export function CanvasNodePromptPanel({
                 return (
                     <div className="mt-2 rounded-xl border p-2" style={{ borderColor: theme.toolbar.border, background: theme.toolbar.panel }}>
                         <div className="mb-1 flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium">
-                                {t(isImage ? "canvas.promptPanel.optimizeImageTitle" : mode === "text" ? "canvas.promptPanel.captionTitle" : "canvas.promptPanel.optimizeTitle")}
-                                {mode === "text" ? ` · ${t("canvas.promptPanel.optimizeEngineCloud")}` : ""}
-                            </span>
+                            <span className="text-xs font-medium">{t(isImage ? "canvas.promptPanel.optimizeImageTitle" : mode === "text" ? "canvas.promptPanel.captionTitle" : "canvas.promptPanel.optimizeTitle")}</span>
                             <Button
                                 type="text"
                                 size="small"

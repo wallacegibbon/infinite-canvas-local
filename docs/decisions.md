@@ -2413,7 +2413,7 @@ network capture shows every gateway request on `/api/...` with no `/v1` path any
 ## 73. Text is a prompt route, not a model
 
 **Decision** `POST /api/prompts/chat` answers one prompt with one text: `prompt` (required), `system`
-and images (optional), plus the endpoint's `cloudBaseUrl` / `cloudApiKey` / `cloudModel`. The gateway
+and images (optional), plus the endpoint's `promptBaseUrl` / `promptApiKey` / `promptModel`. The gateway
 adds no wording of its own and answers once — no streaming.
 
 **Why the canvas needed it** The text node and the plugin API's `generateText` called OpenAI's
@@ -2460,3 +2460,57 @@ and the browser's own capture shows no `/v1` path on the gateway.
 `infinite-canvas/web/src/pages/canvas/project.tsx`,
 `infinite-canvas/web/src/stores/use-config-store.ts`,
 `infinite-canvas/web/src/components/canvas/{canvas-config-node-panel,canvas-node-prompt-panel}.tsx`.
+
+## 74. The prompt endpoint is called what it is, and text has no model
+
+**Decision** Three leftovers from the cloud era, removed together:
+
+1. `cloud` → `prompt` everywhere it meant "the configured chat endpoint": the Go type is
+   `prompt.Endpoint`, the request fields are `promptBaseUrl` / `promptApiKey` / `promptModel` /
+   `promptEndpointId`, the config keys are `promptBaseUrl` / `promptApiKey` / `promptModel` /
+   `promptEndpoints` / `promptEndpointId`, the settings tab is `prompt-api`, and the error codes are
+   `prompt_not_configured` / `prompt_invalid_url` / `prompt_api_failed` / `prompt_api_timeout`.
+2. `ImageCaptionEngine` (`"qwen35" | "florence" | "cloud"`) is gone. Only `"cloud"` was ever
+   produced — the canvas hardcoded it and the gateway always answered it — so the union documented
+   two engines that do not exist. `captionEngine` / `captionEngineUsed` went with it, and so did the
+   `provider: "cloud"` / `engine: "cloud"` fields the gateway echoed back: one producer needs no label.
+3. Text mode has no model picker. It offered "text models" (a capability no workflow has, so the list
+   was always empty) plus a `caption:cloud` entry that was really a mode switch. Both are replaced by
+   the prompt endpoint's model in a read-only chip, and by a separate **反推** button beside the send
+   button.
+
+**Why now** The rename was deferred while `/v1` was being deleted, and the caption union was blocked
+by the same thing: with `docs/known-issues.md`'s text node still 404ing there was no working path to
+name. Decision 73 created it, so the names had to follow — "cloud" described a provider that this
+build does not have, and a picker with an empty list is not a choice.
+
+**What the split means for the four routes** The endpoint travels per request, but there is exactly
+one of it in the settings, so the canvas services read it instead of taking it as an argument: the
+three call sites that each rebuilt `{ baseUrl, apiKey, model }` from config now pass nothing. Images
+are attached only where they are read — `optimize-image` and `optimize` never sent them anywhere, and
+`optimize-image` is text-only by design, so its client stopped uploading files it knew would be
+ignored.
+
+**Migration** A saved config that still says `promptCloud*` is read once by
+`withLegacyPromptFields()` and written back in the current spelling only. It is four keys and a
+rename; silently dropping a working endpoint would be a worse bug than the name ever was.
+
+**Cost** A hand-written client posting `cloudBaseUrl` gets a `prompt_not_configured` 400 instead of
+silently working. Nothing outside this repository calls these routes.
+
+**Tested** `make check`, `make test-race`, `npm run check` (lint, types, i18n, exports), `npx vitest
+run` (128; new `tests/config-migration.test.ts` covers the rename, "current spelling wins" and "no
+prompt fields at all"). In the browser with the pre-rename config still in localStorage: the config
+node and the text panel show `qwen3.8-27b` (migrated, not re-entered), the settings tab lists the
+endpoint as "使用中", a text generation answered `孤灯向海，夜浪无声` via `POST /api/prompts/chat`, and the
+caption route returned a prompt with no `engine` field.
+
+**Where** `internal/prompt/optimizer.go`, `internal/server/routes_generation.go`,
+`infinite-canvas/web/src/lib/config-migration.ts`,
+`infinite-canvas/web/src/stores/use-config-store.ts`,
+`infinite-canvas/web/src/services/api/prompts.ts`,
+`infinite-canvas/web/src/components/canvas/canvas-prompt-endpoint-chip.tsx`,
+`infinite-canvas/web/src/components/canvas/canvas-node-prompt-panel.tsx`,
+`infinite-canvas/web/src/components/canvas/canvas-config-node-panel.tsx`,
+`infinite-canvas/web/src/components/settings/app-config-modal.tsx`,
+`infinite-canvas/web/src/types/canvas.ts`.

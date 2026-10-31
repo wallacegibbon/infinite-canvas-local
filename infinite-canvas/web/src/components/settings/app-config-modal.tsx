@@ -24,11 +24,11 @@ import { stone } from "@/lib/design-tokens";
 import { isCardSkinLocked, verifySkinPassword } from "@/lib/canvas/skin-unlocks";
 import { persistSkinUnlock } from "@/services/api/skin-unlocks";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { channelName, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ConfigTabKey, type ModelCapability, type ModelChannel, type PromptCloudApi } from "@/stores/use-config-store";
+import { channelName, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ConfigTabKey, type ModelCapability, type ModelChannel, type PromptEndpoint } from "@/stores/use-config-store";
 
-type CloudApiDraft = { name: string; baseUrl: string; apiKey: string; model: string };
+type PromptEndpointDraft = { name: string; baseUrl: string; apiKey: string; model: string };
 
-const EMPTY_CLOUD_API: CloudApiDraft = { name: "", baseUrl: "", apiKey: "", model: "" };
+const EMPTY_PROMPT_ENDPOINT: PromptEndpointDraft = { name: "", baseUrl: "", apiKey: "", model: "" };
 
 type ModelGroup = {
     capability: ModelCapability;
@@ -47,10 +47,10 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState<ConfigTabKey>(initialTab);
     const [editingChannelId, setEditingChannelId] = useState("");
-    const [cloudApiEditorOpen, setCloudApiEditorOpen] = useState(false);
-    const [editingCloudApiId, setEditingCloudApiId] = useState("");
-    const [cloudApiDraft, setCloudApiDraft] = useState<CloudApiDraft>(EMPTY_CLOUD_API);
-    const [cloudApiErrors, setCloudApiErrors] = useState<Partial<Record<keyof CloudApiDraft, string>>>({});
+    const [promptEndpointEditorOpen, setPromptEndpointEditorOpen] = useState(false);
+    const [editingPromptEndpointId, setEditingPromptEndpointId] = useState("");
+    const [promptEndpointDraft, setPromptEndpointDraft] = useState<PromptEndpointDraft>(EMPTY_PROMPT_ENDPOINT);
+    const [promptEndpointErrors, setPromptEndpointErrors] = useState<Partial<Record<keyof PromptEndpointDraft, string>>>({});
     const [passwordSkinId, setPasswordSkinId] = useState<CardSkinId | null>(null);
     const [skinPassword, setSkinPassword] = useState("");
     const [skinPasswordError, setSkinPasswordError] = useState("");
@@ -67,16 +67,16 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
     const fishWhipSide = useThemeStore((state) => state.fishWhipSide);
     const setFishWhipSide = useThemeStore((state) => state.setFishWhipSide);
     const updateConfig = useConfigStore((state) => state.updateConfig);
-    const addPromptCloudApi = useConfigStore((state) => state.addPromptCloudApi);
-    const updatePromptCloudApi = useConfigStore((state) => state.updatePromptCloudApi);
-    const removePromptCloudApi = useConfigStore((state) => state.removePromptCloudApi);
-    const selectPromptCloudApi = useConfigStore((state) => state.selectPromptCloudApi);
+    const addPromptEndpoint = useConfigStore((state) => state.addPromptEndpoint);
+    const updatePromptEndpoint = useConfigStore((state) => state.updatePromptEndpoint);
+    const removePromptEndpoint = useConfigStore((state) => state.removePromptEndpoint);
+    const selectPromptEndpoint = useConfigStore((state) => state.selectPromptEndpoint);
     const shouldPromptContinue = useConfigStore((state) => state.shouldPromptContinue);
     const setConfigDialogOpen = useConfigStore((state) => state.setConfigDialogOpen);
     const clearPromptContinue = useConfigStore((state) => state.clearPromptContinue);
     const editingChannel = config.channels.find((channel) => channel.id === editingChannelId) || null;
-    const cloudApis = config.promptCloudApis || [];
-    const activeCloudApiId = config.promptCloudApiId || "";
+    const promptEndpoints = config.promptEndpoints || [];
+    const activePromptEndpointId = config.promptEndpointId || "";
     const imageResolutionOptions = mediaScaleOptions.map((value) => ({ value, label: value === "auto" ? t("settingsPanels.common.auto") : value.toUpperCase() }));
     useEffect(() => setActiveTab(initialTab), [initialTab]);
 
@@ -148,41 +148,41 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
         updateChannels(config.channels.map((item) => (item.id === channel.id ? channel : item)));
     };
 
-    const openCloudApiEditor = (api?: PromptCloudApi) => {
-        setEditingCloudApiId(api?.id || "");
-        setCloudApiDraft(api ? { name: api.name, baseUrl: api.baseUrl, apiKey: api.apiKey, model: api.model } : EMPTY_CLOUD_API);
-        setCloudApiErrors({});
-        setCloudApiEditorOpen(true);
+    const openPromptEndpointEditor = (api?: PromptEndpoint) => {
+        setEditingPromptEndpointId(api?.id || "");
+        setPromptEndpointDraft(api ? { name: api.name, baseUrl: api.baseUrl, apiKey: api.apiKey, model: api.model } : EMPTY_PROMPT_ENDPOINT);
+        setPromptEndpointErrors({});
+        setPromptEndpointEditorOpen(true);
     };
 
-    const setCloudApiField = <K extends keyof CloudApiDraft>(key: K, value: CloudApiDraft[K]) => {
-        setCloudApiDraft((current) => ({ ...current, [key]: value }));
-        setCloudApiErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
+    const setPromptEndpointField = <K extends keyof PromptEndpointDraft>(key: K, value: PromptEndpointDraft[K]) => {
+        setPromptEndpointDraft((current) => ({ ...current, [key]: value }));
+        setPromptEndpointErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
     };
 
-    const saveCloudApi = () => {
-        const problems: Partial<Record<keyof CloudApiDraft, string>> = {};
-        if (!cloudApiDraft.name.trim()) problems.name = t("config.cloudApi.nameRequired");
-        if (!cloudApiDraft.baseUrl.trim()) problems.baseUrl = t("config.cloudApi.baseUrlRequired");
-        if (!cloudApiDraft.model.trim()) problems.model = t("config.cloudApi.modelRequired");
-        if (!cloudApiDraft.apiKey.trim()) problems.apiKey = t("config.cloudApi.keyRequired");
-        setCloudApiErrors(problems);
+    const savePromptEndpoint = () => {
+        const problems: Partial<Record<keyof PromptEndpointDraft, string>> = {};
+        if (!promptEndpointDraft.name.trim()) problems.name = t("config.promptApi.nameRequired");
+        if (!promptEndpointDraft.baseUrl.trim()) problems.baseUrl = t("config.promptApi.baseUrlRequired");
+        if (!promptEndpointDraft.model.trim()) problems.model = t("config.promptApi.modelRequired");
+        if (!promptEndpointDraft.apiKey.trim()) problems.apiKey = t("config.promptApi.keyRequired");
+        setPromptEndpointErrors(problems);
         if (Object.keys(problems).length) return;
 
-        if (editingCloudApiId) updatePromptCloudApi(editingCloudApiId, cloudApiDraft);
-        else addPromptCloudApi(cloudApiDraft);
-        setCloudApiEditorOpen(false);
-        toast.success(t("config.cloudApi.saved"));
+        if (editingPromptEndpointId) updatePromptEndpoint(editingPromptEndpointId, promptEndpointDraft);
+        else addPromptEndpoint(promptEndpointDraft);
+        setPromptEndpointEditorOpen(false);
+        toast.success(t("config.promptApi.saved"));
     };
 
-    const deleteCloudApi = (api: PromptCloudApi) => {
+    const deletePromptEndpoint = (api: PromptEndpoint) => {
         confirm({
-            title: t("config.cloudApi.deleteTitle", { name: api.name || t("config.cloudApi.unnamed") }),
-            content: t("config.cloudApi.deleteDescription"),
+            title: t("config.promptApi.deleteTitle", { name: api.name || t("config.promptApi.unnamed") }),
+            content: t("config.promptApi.deleteDescription"),
             okText: t("common.delete"),
             danger: true,
             cancelText: t("common.cancel"),
-            onOk: () => removePromptCloudApi(api.id),
+            onOk: () => removePromptEndpoint(api.id),
         });
     };
 
@@ -222,60 +222,60 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
                         ),
                     },
                     {
-                        key: "cloud-api",
-                        label: t("config.tabs.cloudApi"),
+                        key: "prompt-api",
+                        label: t("config.tabs.promptApi"),
                         children: (
                             <div>
                                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                                     <div>
-                                        <div className="text-sm font-semibold">{t("config.cloudApi.title")}</div>
-                                        <div className="mt-1 text-xs text-stone-500">{t("config.cloudApi.description")}</div>
+                                        <div className="text-sm font-semibold">{t("config.promptApi.title")}</div>
+                                        <div className="mt-1 text-xs text-stone-500">{t("config.promptApi.description")}</div>
                                     </div>
-                                    <Button type="primary" icon={<Plus className="size-4" />} onClick={() => openCloudApiEditor()}>
-                                        {t("config.cloudApi.add")}
+                                    <Button type="primary" icon={<Plus className="size-4" />} onClick={() => openPromptEndpointEditor()}>
+                                        {t("config.promptApi.add")}
                                     </Button>
                                 </div>
-                                {cloudApis.length ? (
+                                {promptEndpoints.length ? (
                                     <div className="space-y-2">
-                                        {cloudApis.map((api) => {
-                                            const active = api.id === activeCloudApiId;
+                                        {promptEndpoints.map((api) => {
+                                            const active = api.id === activePromptEndpointId;
                                             return (
                                                 <div key={api.id} className={`flex items-center justify-between gap-3 rounded-lg border px-4 py-3 ${active ? "border-stone-400 dark:border-stone-500" : "border-stone-200 dark:border-stone-800"}`}>
                                                     <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-                                                        <Radio checked={active} onChange={() => selectPromptCloudApi(api.id)} aria-label={t("config.cloudApi.use")} />
+                                                        <Radio checked={active} onChange={() => selectPromptEndpoint(api.id)} aria-label={t("config.promptApi.use")} />
                                                         <div className="min-w-0">
                                                             <div className="flex min-w-0 items-center gap-2">
-                                                                <span className="truncate text-sm font-semibold">{api.name || t("config.cloudApi.unnamed")}</span>
-                                                                {active ? <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-600 dark:bg-stone-800 dark:text-stone-300">{t("config.cloudApi.active")}</span> : null}
+                                                                <span className="truncate text-sm font-semibold">{api.name || t("config.promptApi.unnamed")}</span>
+                                                                {active ? <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-600 dark:bg-stone-800 dark:text-stone-300">{t("config.promptApi.active")}</span> : null}
                                                             </div>
                                                             <div className="mt-1 truncate text-xs text-stone-500">
                                                                 {api.baseUrl || t("config.channels.missingUrl")} · {api.model || "—"}
                                                             </div>
-                                                            <div className="mt-0.5 text-xs text-stone-500">{api.apiKey ? t("config.cloudApi.keySaved") : t("config.cloudApi.keyMissing")}</div>
+                                                            <div className="mt-0.5 text-xs text-stone-500">{api.apiKey ? t("config.promptApi.keySaved") : t("config.promptApi.keyMissing")}</div>
                                                         </div>
                                                     </label>
                                                     <div className="flex shrink-0 gap-2">
-                                                        <Button size="small" icon={<Pencil className="size-3.5" />} onClick={() => openCloudApiEditor(api)}>
+                                                        <Button size="small" icon={<Pencil className="size-3.5" />} onClick={() => openPromptEndpointEditor(api)}>
                                                             {t("common.edit")}
                                                         </Button>
-                                                        <Button size="small" danger icon={<Trash2 className="size-3.5" />} onClick={() => deleteCloudApi(api)} aria-label={t("common.delete")} />
+                                                        <Button size="small" danger icon={<Trash2 className="size-3.5" />} onClick={() => deletePromptEndpoint(api)} aria-label={t("common.delete")} />
                                                     </div>
                                                 </div>
                                             );
                                         })}
                                     </div>
                                 ) : (
-                                    <div className="rounded-lg border border-dashed border-stone-300 px-4 py-6 text-center text-xs text-stone-500 dark:border-stone-700">{t("config.cloudApi.empty")}</div>
+                                    <div className="rounded-lg border border-dashed border-stone-300 px-4 py-6 text-center text-xs text-stone-500 dark:border-stone-700">{t("config.promptApi.empty")}</div>
                                 )}
                                 <div className="mt-5 border-t border-stone-200 pt-4 dark:border-stone-800">
-                                    <div className="mb-1 text-sm font-semibold">{t("config.cloudApi.outputLanguage")}</div>
-                                    <div className="mb-2 text-xs text-stone-500">{t("config.cloudApi.outputLanguageDescription")}</div>
+                                    <div className="mb-1 text-sm font-semibold">{t("config.promptApi.outputLanguage")}</div>
+                                    <div className="mb-2 text-xs text-stone-500">{t("config.promptApi.outputLanguageDescription")}</div>
                                     <Radio.Group value={config.promptOptimizeLanguage === "en" ? "en" : "zh"} onChange={(event) => updateConfig("promptOptimizeLanguage", event.target.value as "zh" | "en")} optionType="button">
                                         <Radio.Button value="zh">中文</Radio.Button>
                                         <Radio.Button value="en">English</Radio.Button>
                                     </Radio.Group>
                                 </div>
-                                <div className="mt-3 text-xs text-stone-500">{t("config.cloudApi.hint")}</div>
+                                <div className="mt-3 text-xs text-stone-500">{t("config.promptApi.hint")}</div>
                             </div>
                         ),
                     },
@@ -493,14 +493,14 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
                 {skinPasswordError ? <p className="mt-2 text-xs text-red-500">{skinPasswordError}</p> : null}
             </Dialog>
             <Dialog
-                open={cloudApiEditorOpen}
+                open={promptEndpointEditorOpen}
                 size="form"
-                title={editingCloudApiId ? t("config.cloudApi.editTitle") : t("config.cloudApi.addTitle")}
-                onClose={() => setCloudApiEditorOpen(false)}
+                title={editingPromptEndpointId ? t("config.promptApi.editTitle") : t("config.promptApi.addTitle")}
+                onClose={() => setPromptEndpointEditorOpen(false)}
                 footer={
                     <>
-                        <Button onClick={() => setCloudApiEditorOpen(false)}>{t("common.cancel")}</Button>
-                        <Button type="primary" onClick={() => void saveCloudApi()}>
+                        <Button onClick={() => setPromptEndpointEditorOpen(false)}>{t("common.cancel")}</Button>
+                        <Button type="primary" onClick={() => void savePromptEndpoint()}>
                             {t("common.save")}
                         </Button>
                     </>
@@ -511,23 +511,23 @@ function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { s
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();
-                        saveCloudApi();
+                        savePromptEndpoint();
                     }}
                 >
-                    <Field label={t("config.cloudApi.name")} error={cloudApiErrors.name}>
-                        <Input placeholder={t("config.cloudApi.namePlaceholder")} value={cloudApiDraft.name} onChange={(event) => setCloudApiField("name", event.target.value)} />
+                    <Field label={t("config.promptApi.name")} error={promptEndpointErrors.name}>
+                        <Input placeholder={t("config.promptApi.namePlaceholder")} value={promptEndpointDraft.name} onChange={(event) => setPromptEndpointField("name", event.target.value)} />
                     </Field>
-                    <Field label={t("config.cloudApi.baseUrl")} error={cloudApiErrors.baseUrl}>
-                        <Input placeholder="https://api.deepseek.com/v1" value={cloudApiDraft.baseUrl} onChange={(event) => setCloudApiField("baseUrl", event.target.value)} />
+                    <Field label={t("config.promptApi.baseUrl")} error={promptEndpointErrors.baseUrl}>
+                        <Input placeholder="https://api.deepseek.com/v1" value={promptEndpointDraft.baseUrl} onChange={(event) => setPromptEndpointField("baseUrl", event.target.value)} />
                     </Field>
-                    <Field label={t("config.cloudApi.model")} error={cloudApiErrors.model}>
-                        <Input placeholder="deepseek-chat" value={cloudApiDraft.model} onChange={(event) => setCloudApiField("model", event.target.value)} />
+                    <Field label={t("config.promptApi.model")} error={promptEndpointErrors.model}>
+                        <Input placeholder="deepseek-chat" value={promptEndpointDraft.model} onChange={(event) => setPromptEndpointField("model", event.target.value)} />
                     </Field>
-                    <Field label={t("config.cloudApi.apiKey")} error={cloudApiErrors.apiKey}>
-                        <Input.Password placeholder="sk-..." autoComplete="off" value={cloudApiDraft.apiKey} onChange={(event) => setCloudApiField("apiKey", event.target.value)} />
+                    <Field label={t("config.promptApi.apiKey")} error={promptEndpointErrors.apiKey}>
+                        <Input.Password placeholder="sk-..." autoComplete="off" value={promptEndpointDraft.apiKey} onChange={(event) => setPromptEndpointField("apiKey", event.target.value)} />
                     </Field>
                 </form>
-                <div className="text-xs text-stone-500">{t("config.cloudApi.hint")}</div>
+                <div className="text-xs text-stone-500">{t("config.promptApi.hint")}</div>
             </Dialog>
         </>
     );

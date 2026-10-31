@@ -42,7 +42,7 @@ func (s *Server) runPromptRoute(ctx *httpx.Ctx, imageOnly bool) error {
 	requestCtx, cleanup := s.withCancel(ctx.R, ctx.RequestID)
 	defer cleanup()
 
-	cloud := promptCloud(body)
+	endpoint := promptEndpointOf(body)
 
 	var result map[string]any
 
@@ -52,7 +52,7 @@ func (s *Server) runPromptRoute(ctx *httpx.Ctx, imageOnly bool) error {
 			Mode:       httpx.String(body, "mode"),
 			Language:   httpx.String(body, "language"),
 			ImageCount: int(httpx.Number(body, "imageCount", 0)),
-			Cloud:      cloud,
+			Endpoint:   endpoint,
 		})
 	} else {
 		files := orderedPromptImages(ctx.Files())
@@ -62,9 +62,9 @@ func (s *Server) runPromptRoute(ctx *httpx.Ctx, imageOnly bool) error {
 			Duration:      httpx.Number(body, "duration", httpx.Number(body, "seconds", 0)),
 			ReferenceNote: defaultStringOf(httpx.String(body, "referenceNote"), httpx.String(body, "reference_note")),
 			Language:      httpx.String(body, "language"),
-			CloudImages:   promptImageURLs(files),
+			Images:        promptImageURLs(files),
 			ImageCount:    len(files),
-			Cloud:         cloud,
+			Endpoint:      endpoint,
 		})
 	}
 	if err != nil {
@@ -97,7 +97,7 @@ func (s *Server) handlePromptCaption(ctx *httpx.Ctx) error {
 		images,
 		httpx.String(body, "language"),
 		httpx.String(body, "instruction"),
-		promptCloud(body))
+		promptEndpointOf(body))
 	if err != nil {
 		if requestCtx.Err() != nil {
 			return nil
@@ -124,10 +124,10 @@ func (s *Server) handlePromptChat(ctx *httpx.Ctx) error {
 	defer cleanup()
 
 	result, err := s.optimizer.Complete(requestCtx, prompt.ChatRequest{
-		Prompt: httpx.String(body, "prompt"),
-		System: httpx.String(body, "system"),
-		Images: promptImageURLs(orderedPromptImages(ctx.Files())),
-		Cloud:  promptCloud(body),
+		Prompt:   httpx.String(body, "prompt"),
+		System:   httpx.String(body, "system"),
+		Images:   promptImageURLs(orderedPromptImages(ctx.Files())),
+		Endpoint: promptEndpointOf(body),
 	})
 	if err != nil {
 		if requestCtx.Err() != nil {
@@ -139,16 +139,16 @@ func (s *Server) handlePromptChat(ctx *httpx.Ctx) error {
 	return nil
 }
 
-// promptCloud reads the prompt endpoint's address, key and model from a request body.
+// promptEndpointOf reads the prompt endpoint's address, key and model from a request body.
 //
 // They travel per request, not as gateway configuration: the endpoint belongs to the browser's
 // settings, and the gateway is only the party that sends the request (the browser never contacts
 // llama-server directly).
-func promptCloud(body map[string]any) prompt.CloudConfig {
-	return prompt.CloudConfig{
-		BaseURL: httpx.String(body, "cloudBaseUrl"),
-		APIKey:  httpx.String(body, "cloudApiKey"),
-		Model:   httpx.String(body, "cloudModel"),
+func promptEndpointOf(body map[string]any) prompt.Endpoint {
+	return prompt.Endpoint{
+		BaseURL: httpx.String(body, "promptBaseUrl"),
+		APIKey:  httpx.String(body, "promptApiKey"),
+		Model:   httpx.String(body, "promptModel"),
 	}
 }
 

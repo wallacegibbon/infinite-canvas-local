@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Image as ImageIcon, LoaderCircle, MessageSquare, Play, ScanText, Settings2, Square, Video } from "lucide-react";
+import { Image as ImageIcon, LoaderCircle, MessageSquare, Play, Settings2, Square, Video } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
 
@@ -13,6 +13,7 @@ import { videoModelForWorkflow, videoModelModePatch, videoWorkflowId, isNoVdnWor
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
+import { CanvasPromptEndpointChip } from "./canvas-prompt-endpoint-chip";
 import { CanvasTextSettingsPopover } from "./canvas-text-settings-popover";
 import type { CanvasGenerationMode, CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 
@@ -105,16 +106,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
                     {/* Text is answered by the prompt endpoint, not by a workflow: there is no text
                         model to pick, only that endpoint's model to go and configure. */}
                     {mode === "text" ? (
-                        <button
-                            type="button"
-                            className="canvas-compact-control flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm"
-                            title={t("canvas.configNode.promptModel")}
-                            onMouseDown={(event) => event.stopPropagation()}
-                            onClick={() => openConfigDialog(true, "cloud-api")}
-                        >
-                            <ScanText className="size-3.5 shrink-0" />
-                            <span className="truncate">{config.promptCloudModel || t("canvas.configNode.promptModelMissing")}</span>
-                        </button>
+                        <CanvasPromptEndpointChip config={config} className="canvas-compact-control h-10 w-full min-w-0 justify-start rounded-lg px-2 text-sm" onClick={() => openConfigDialog(true, "prompt-api")} />
                     ) : (
                         <>
                             <WorkflowModelPicker

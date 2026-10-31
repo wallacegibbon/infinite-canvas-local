@@ -599,7 +599,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                     : { ...buildGenerationConfig(effectiveConfig, sourceNode, node.type === CanvasNodeType.Text ? "text" : node.type === CanvasNodeType.Video ? "video" : node.type === CanvasNodeType.Audio ? "audio" : "image"), count: "1" };
             // A text node retries against the prompt endpoint, not against a workflow.
             if (node.type === CanvasNodeType.Text ? !promptEndpointReady(generationConfig) : !isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true, node.type === CanvasNodeType.Text ? "cloud-api" : undefined);
+                openConfigDialog(true, node.type === CanvasNodeType.Text ? "prompt-api" : undefined);
                 return;
             }
 

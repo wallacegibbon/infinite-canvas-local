@@ -52,12 +52,12 @@ var (
 	reMetaPara    = regexp.MustCompile(`(?i)^(?:思考|分析|推理|我们|首先|用户|需求|要求|说明|注|最终|The user|We need|Let me|I need|Analysis|Reasoning|Explanation|Here'?s|Okay|Sure)`)
 )
 
-// CloudConfig points at any OpenAI-compatible /chat/completions endpoint.
+// Endpoint is where a prompt request goes: an OpenAI-compatible chat endpoint.
 //
 // Pointing this at a local llama.cpp is a supported and tested configuration, which
 // is why there is no allow-list of hosts: the gateway binds to loopback by default,
 // and that is the actual security boundary.
-type CloudConfig struct {
+type Endpoint struct {
 	BaseURL string
 	APIKey  string
 	Model   string
@@ -69,10 +69,10 @@ type CloudConfig struct {
 // Nothing here is a skill: the gateway owns no wording for this endpoint. That is what makes it
 // usable by anything in the canvas that needs a model's words rather than an image.
 type ChatRequest struct {
-	Prompt string
-	System string
-	Images []string
-	Cloud  CloudConfig
+	Prompt   string
+	System   string
+	Images   []string
+	Endpoint Endpoint
 }
 
 // OptimizeRequest is the normalized input of prompt optimization.
@@ -82,12 +82,12 @@ type OptimizeRequest struct {
 	Duration      float64
 	ReferenceNote string
 	Language      string
-	CloudImages   []string
+	Images        []string
 	ImageCount    int
-	Cloud         CloudConfig
+	Endpoint      Endpoint
 }
 
-// Optimizer owns the H3 skill text and the cloud chat client.
+// Optimizer owns the H3 skill text and the chat client.
 type Optimizer struct {
 	skillDir string
 	logger   *logx.Logger
@@ -354,7 +354,7 @@ func (o *Optimizer) Optimize(ctx context.Context, req OptimizeRequest) (map[stri
 	}
 	language := normalizeLanguage(req.Language)
 
-	images := req.CloudImages
+	images := req.Images
 	if len(images) > 8 {
 		images = images[:8]
 	}
@@ -364,7 +364,7 @@ func (o *Optimizer) Optimize(ctx context.Context, req OptimizeRequest) (map[stri
 	}
 
 	userText := buildOptimizeUserText(req, taskType, language, len(images))
-	content, model, elapsed, err := o.chat(ctx, "optimize/"+modeToken(taskType), system, userText, images, req.Cloud)
+	content, model, elapsed, err := o.chat(ctx, "optimize/"+modeToken(taskType), system, userText, images, req.Endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +384,6 @@ func (o *Optimizer) Optimize(ctx context.Context, req OptimizeRequest) (map[stri
 		"prompt":    ensureFrameAlignmentPrompt(speaker.Prompt, taskType, seconds),
 		"mode":      taskType,
 		"duration":  seconds,
-		"provider":  "cloud",
 		"model":     model,
 		"elapsedMs": elapsed,
 		"speakerTags": map[string]any{
@@ -456,7 +455,7 @@ func (o *Optimizer) OptimizeImage(ctx context.Context, req OptimizeRequest) (map
 	}
 	lines = append(lines, "用户原始提示词：\n"+req.Prompt)
 
-	content, model, elapsed, err := o.chat(ctx, "optimize-image/"+modeToken(mode), imageSystemPrompt, strings.Join(lines, "\n"), nil, req.Cloud)
+	content, model, elapsed, err := o.chat(ctx, "optimize-image/"+modeToken(mode), imageSystemPrompt, strings.Join(lines, "\n"), nil, req.Endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -472,14 +471,13 @@ func (o *Optimizer) OptimizeImage(ctx context.Context, req OptimizeRequest) (map
 	return map[string]any{
 		"prompt":    result,
 		"mode":      mode,
-		"provider":  "cloud",
 		"model":     model,
 		"elapsedMs": elapsed,
 	}, nil
 }
 
 // Caption reverse-engineers a prompt from one image.
-func (o *Optimizer) Caption(ctx context.Context, images []string, language, instruction string, cloud CloudConfig) (map[string]any, error) {
+func (o *Optimizer) Caption(ctx context.Context, images []string, language, instruction string, endpoint Endpoint) (map[string]any, error) {
 	if len(images) == 0 {
 		return nil, httpx.BadRequest("missing_reference_image", "captioning needs one image")
 	}
@@ -497,7 +495,7 @@ func (o *Optimizer) Caption(ctx context.Context, images []string, language, inst
 		userText = captionUserEn
 	}
 
-	content, model, elapsed, err := o.chat(ctx, "caption/"+normalizeLanguage(language), system, userText, images, cloud)
+	content, model, elapsed, err := o.chat(ctx, "caption/"+normalizeLanguage(language), system, userText, images, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -507,7 +505,6 @@ func (o *Optimizer) Caption(ctx context.Context, images []string, language, inst
 
 	return map[string]any{
 		"prompt":    content,
-		"engine":    "cloud",
 		"model":     model,
 		"elapsedMs": elapsed,
 	}, nil
@@ -533,7 +530,7 @@ func (o *Optimizer) Complete(ctx context.Context, req ChatRequest) (map[string]a
 
 	// An empty system message is dropped in chat() rather than here: the omission belongs to the
 	// request shape, not to this endpoint.
-	content, model, elapsed, err := o.chat(ctx, "chat", req.System, text, images, req.Cloud)
+	content, model, elapsed, err := o.chat(ctx, "chat", req.System, text, images, req.Endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -550,10 +547,10 @@ func (o *Optimizer) Complete(ctx context.Context, req ChatRequest) (map[string]a
 // endpoint's own message. This is the most easily misconfigured part of the system:
 // a base URL that normalises to the wrong path, a model that rejects images, or a
 // context window smaller than the H3 skill otherwise surface only as a vague error.
-func (o *Optimizer) chat(ctx context.Context, purpose, system, userText string, images []string, cloud CloudConfig) (string, string, int64, error) {
-	baseURL := strings.TrimSpace(cloud.BaseURL)
-	apiKey := strings.TrimSpace(cloud.APIKey)
-	model := strings.TrimSpace(cloud.Model)
+func (o *Optimizer) chat(ctx context.Context, purpose, system, userText string, images []string, endpoint Endpoint) (string, string, int64, error) {
+	baseURL := strings.TrimSpace(endpoint.BaseURL)
+	apiKey := strings.TrimSpace(endpoint.APIKey)
+	model := strings.TrimSpace(endpoint.Model)
 	if baseURL == "" || apiKey == "" || model == "" {
 		var missing []string
 		if baseURL == "" {
@@ -566,16 +563,16 @@ func (o *Optimizer) chat(ctx context.Context, purpose, system, userText string, 
 			missing = append(missing, "model")
 		}
 		o.logger.Warn("prompt endpoint not configured (purpose=%s): missing %s", purpose, strings.Join(missing, ", "))
-		return "", "", 0, httpx.BadRequest("cloud_not_configured", "prompt endpoint is not configured: set the base URL, API key and model in the settings first")
+		return "", "", 0, httpx.BadRequest("prompt_not_configured", "prompt endpoint is not configured: set the base URL, API key and model in the settings first")
 	}
 
-	endpoint, err := chatEndpoint(baseURL)
+	chatURL, err := chatEndpoint(baseURL)
 	if err != nil {
 		o.logger.Warn("prompt endpoint URL rejected (purpose=%s, base_url=%q): %s", purpose, baseURL, err)
 		return "", "", 0, err
 	}
-	if trimmed := strings.TrimRight(baseURL, "/"); trimmed != endpoint {
-		o.logger.Info("prompt endpoint URL normalised: %q -> %q", trimmed, endpoint)
+	if trimmed := strings.TrimRight(baseURL, "/"); trimmed != chatURL {
+		o.logger.Info("prompt endpoint URL normalised: %q -> %q", trimmed, chatURL)
 	}
 
 	imageBytes := 0
@@ -602,13 +599,13 @@ func (o *Optimizer) chat(ctx context.Context, purpose, system, userText string, 
 		"max_tokens":  o.maxTokens,
 	}
 
-	mechanism := o.resolveThinking(endpoint, model)
+	mechanism := o.resolveThinking(chatURL, model)
 	thinkingLabel := mechanism
 	if thinkingLabel == "" {
 		thinkingLabel = "none"
 	}
 	o.logger.Info("prompt endpoint request: purpose=%s url=%s model=%s images=%d image_payload=%dKB prompt_chars=%d system_chars=%d thinking=%s",
-		purpose, endpoint, model, len(images), imageBytes/1024, len([]rune(userText)), len([]rune(system)), thinkingLabel)
+		purpose, chatURL, model, len(images), imageBytes/1024, len([]rune(userText)), len([]rune(system)), thinkingLabel)
 
 	requestCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
@@ -622,15 +619,15 @@ func (o *Optimizer) chat(ctx context.Context, purpose, system, userText string, 
 			return "", "", 0, httpx.NewError(http.StatusInternalServerError, "internal_error", "failed to build the request")
 		}
 
-		exchange, err := o.exchange(requestCtx, endpoint, apiKey, purpose, payload)
+		exchange, err := o.exchange(requestCtx, chatURL, apiKey, purpose, payload)
 		if err != nil {
 			elapsed := time.Since(started).Milliseconds()
 			if ctx.Err() != nil {
 				o.logger.Warn("prompt endpoint call timed out after %dms (purpose=%s, url=%s)", elapsed, purpose, endpoint)
-				return "", "", 0, httpx.NewError(http.StatusGatewayTimeout, "cloud_api_timeout", "prompt endpoint request was cancelled or timed out")
+				return "", "", 0, httpx.NewError(http.StatusGatewayTimeout, "prompt_api_timeout", "prompt endpoint request was cancelled or timed out")
 			}
 			o.logger.Warn("prompt endpoint call failed after %dms (purpose=%s, url=%s): %s", elapsed, purpose, endpoint, err)
-			return "", "", 0, httpx.NewError(http.StatusBadGateway, "cloud_api_failed", "prompt endpoint request failed: "+err.Error())
+			return "", "", 0, httpx.NewError(http.StatusBadGateway, "prompt_api_failed", "prompt endpoint request failed: "+err.Error())
 		}
 		call = exchange
 
@@ -638,7 +635,7 @@ func (o *Optimizer) chat(ctx context.Context, purpose, system, userText string, 
 		// that this endpoint wants none, and retry once.
 		if call.status == http.StatusBadRequest && mechanism != "" {
 			o.logger.Warn("prompt endpoint returned HTTP 400 with %q; retrying without it", mechanism)
-			o.rememberThinking(endpoint, model, "", "the endpoint rejected the thinking parameter")
+			o.rememberThinking(chatURL, model, "", "the endpoint rejected the thinking parameter")
 			mechanism = ""
 			continue
 		}
@@ -659,13 +656,13 @@ func (o *Optimizer) chat(ctx context.Context, purpose, system, userText string, 
 
 	elapsed := time.Since(started).Milliseconds()
 	if call == nil {
-		return "", "", 0, httpx.NewError(http.StatusBadGateway, "cloud_api_failed", "prompt endpoint request failed")
+		return "", "", 0, httpx.NewError(http.StatusBadGateway, "prompt_api_failed", "prompt endpoint request failed")
 	}
 
 	// Remember a hint that was needed, so the next call skips the failed attempt.
 	if call.status >= 200 && call.status < 300 && strings.TrimSpace(call.text) != "" &&
 		mechanism != "" && o.pinnedThinking() == "" && o.learningEnabled() {
-		o.rememberThinking(endpoint, model, mechanism, "the answer needed a thinking hint")
+		o.rememberThinking(chatURL, model, mechanism, "the answer needed a thinking hint")
 	}
 
 	if call.status < 200 || call.status >= 300 {
@@ -675,14 +672,14 @@ func (o *Optimizer) chat(ctx context.Context, purpose, system, userText string, 
 		}
 		o.logger.Warn("prompt endpoint returned HTTP %d (purpose=%s, %dms): %s",
 			call.status, purpose, elapsed, util.Truncate(call.errMessage, 500))
-		return "", "", 0, httpx.NewError(http.StatusBadGateway, "cloud_api_failed",
+		return "", "", 0, httpx.NewError(http.StatusBadGateway, "prompt_api_failed",
 			"prompt endpoint returned an error: "+util.Truncate(call.errMessage, 800)+hint)
 	}
 
 	if !call.hasChoices {
 		o.logger.Warn("prompt endpoint returned no choices (purpose=%s, status=%d, %dms): %s",
 			purpose, call.status, elapsed, util.Truncate(call.rawBody, 300))
-		return "", "", 0, httpx.NewError(http.StatusBadGateway, "cloud_api_failed", "the prompt endpoint returned no content")
+		return "", "", 0, httpx.NewError(http.StatusBadGateway, "prompt_api_failed", "the prompt endpoint returned no content")
 	}
 
 	if call.reasoning != "" {
@@ -836,14 +833,14 @@ func contentText(value any) string {
 func chatEndpoint(baseURL string) (string, error) {
 	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if trimmed == "" {
-		return "", httpx.BadRequest("cloud_not_configured", "prompt endpoint base URL is not configured")
+		return "", httpx.BadRequest("prompt_not_configured", "prompt endpoint base URL is not configured")
 	}
 	parsed, err := url.Parse(trimmed)
 	if err != nil {
-		return "", httpx.BadRequest("cloud_invalid_url", "invalid base URL")
+		return "", httpx.BadRequest("prompt_invalid_url", "invalid base URL")
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", httpx.BadRequest("cloud_invalid_url", "the base URL must be http or https")
+		return "", httpx.BadRequest("prompt_invalid_url", "the base URL must be http or https")
 	}
 	lowered := strings.ToLower(trimmed)
 	if strings.HasSuffix(lowered, "/chat/completions") {

@@ -134,7 +134,7 @@ These three are the command-line equivalents of the three canvas buttons; `{"ok"
 means success:
 
 ```bash
-C='-F cloudBaseUrl=http://127.0.0.1:8099/v1 -F cloudApiKey=sk-local -F cloudModel=local-model'
+C='-F promptBaseUrl=http://127.0.0.1:8099/v1 -F promptApiKey=sk-local -F promptModel=local-model'
 
 # Image prompt expansion
 curl -s -X POST http://127.0.0.1:8190/api/prompts/optimize-image $C \

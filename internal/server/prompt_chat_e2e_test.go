@@ -146,10 +146,10 @@ func TestPromptChatAnswersWithTheConfiguredEndpoint(t *testing.T) {
 	gateway := startChatGateway(t)
 
 	status, payload := postPromptChat(t, gateway.URL, map[string]string{
-		"prompt":       "describe the scene",
-		"cloudBaseUrl": chat.server.URL,
-		"cloudApiKey":  "secret-key",
-		"cloudModel":   "qwen3.8-27b",
+		"prompt":        "describe the scene",
+		"promptBaseUrl": chat.server.URL,
+		"promptApiKey":  "secret-key",
+		"promptModel":   "qwen3.8-27b",
 	}, false)
 	if status != http.StatusOK {
 		t.Fatalf("status = %d, body = %v", status, payload)
@@ -185,11 +185,11 @@ func TestPromptChatCarriesSystemMessageAndImages(t *testing.T) {
 	gateway := startChatGateway(t)
 
 	status, payload := postPromptChat(t, gateway.URL, map[string]string{
-		"prompt":       "how many chairs?",
-		"system":       "Answer in three words.",
-		"cloudBaseUrl": chat.server.URL,
-		"cloudApiKey":  "secret-key",
-		"cloudModel":   "vision-model",
+		"prompt":        "how many chairs?",
+		"system":        "Answer in three words.",
+		"promptBaseUrl": chat.server.URL,
+		"promptApiKey":  "secret-key",
+		"promptModel":   "vision-model",
 	}, true)
 	if status != http.StatusOK {
 		t.Fatalf("status = %d, body = %v", status, payload)
@@ -234,7 +234,7 @@ func TestPromptChatWithoutConfigurationNamesTheMissingSettings(t *testing.T) {
 		t.Fatalf("status = %d, body = %v", status, payload)
 	}
 	errPayload, _ := payload["error"].(map[string]any)
-	if errPayload["code"] != "cloud_not_configured" {
+	if errPayload["code"] != "prompt_not_configured" {
 		t.Errorf("error = %v", errPayload)
 	}
 	if message, _ := errPayload["message"].(string); !strings.Contains(message, "not configured") {
@@ -253,10 +253,10 @@ func TestPromptChatPassesThroughTheEndpointError(t *testing.T) {
 	gateway := startChatGateway(t)
 
 	status, payload := postPromptChat(t, gateway.URL, map[string]string{
-		"prompt":       "hello",
-		"cloudBaseUrl": chat.server.URL,
-		"cloudApiKey":  "wrong",
-		"cloudModel":   "m",
+		"prompt":        "hello",
+		"promptBaseUrl": chat.server.URL,
+		"promptApiKey":  "wrong",
+		"promptModel":   "m",
 	}, false)
 	if status != http.StatusBadGateway {
 		t.Fatalf("status = %d, body = %v", status, payload)
@@ -273,10 +273,10 @@ func TestPromptChatRequiresAPrompt(t *testing.T) {
 	gateway := startChatGateway(t)
 
 	status, payload := postPromptChat(t, gateway.URL, map[string]string{
-		"prompt":       "   ",
-		"cloudBaseUrl": chat.server.URL,
-		"cloudApiKey":  "k",
-		"cloudModel":   "m",
+		"prompt":        "   ",
+		"promptBaseUrl": chat.server.URL,
+		"promptApiKey":  "k",
+		"promptModel":   "m",
 	}, false)
 	if status != http.StatusBadRequest {
 		t.Fatalf("status = %d, body = %v", status, payload)

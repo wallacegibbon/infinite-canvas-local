@@ -2029,7 +2029,7 @@ function InfiniteCanvasPage() {
             const generationConfig = buildGenerationConfig(effectiveConfig, sourceNode, mode);
             // Text is answered by the prompt endpoint, so that is the setting to send the user to.
             if (mode === "text" ? !promptEndpointReady(generationConfig) : !isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true, mode === "text" ? "cloud-api" : undefined);
+                openConfigDialog(true, mode === "text" ? "prompt-api" : undefined);
                 return;
             }
 
