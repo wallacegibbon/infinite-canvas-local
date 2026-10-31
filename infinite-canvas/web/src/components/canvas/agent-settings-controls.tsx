@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ScanText } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/kit/select-primitive";
-import { requestAgentStream } from "@/services/api/agent";
+import { requestAgentChat } from "@/services/api/agent";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 
 /**
@@ -23,7 +23,7 @@ export function AgentSettingsControls({ className }: { className?: string }) {
     const send = async (command: string, args: string) => {
         setBusy(true);
         try {
-            await requestAgentStream(config, { command, args });
+            await requestAgentChat(config, { command, args });
         } finally {
             setBusy(false);
         }

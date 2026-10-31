@@ -20,7 +20,7 @@ import { SentPromptDisclosure } from "./sent-prompt-disclosure";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { resolveCanvasReferenceImages } from "@/lib/canvas/canvas-resource-references";
-import { requestAgentConnect, requestAgentStream } from "@/services/api/agent";
+import { requestAgentConnect, requestAgentOnce } from "@/services/api/agent";
 import type { PromptOptimizeMode } from "@/services/api/prompts";
 import { videoModelForWorkflow, videoModelModePatch, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasNodeReferenceBar } from "./canvas-node-reference-bar";
@@ -280,7 +280,7 @@ export function CanvasNodePromptPanel({
             const images = defaults.selectedRefs.length ? await resolveCanvasReferenceImages(defaults.selectedRefs, nodes) : [];
             const note = defaults.referenceNote ? `\n参考素材说明：${defaults.referenceNote}` : "";
             const instruction = `把下面这段需求改写成一条 MiniMax H3 视频生成提示词。任务类型：${defaults.taskType}；时长：${defaults.duration} 秒；输出语言：${optimizeLanguage === "en" ? "英文" : "中文"}。${note}\n\n${text}`;
-            const result = await requestAgentStream(
+            const result = await requestAgentOnce(
                 config,
                 { prompt: instruction, images },
                 {
@@ -309,7 +309,7 @@ export function CanvasNodePromptPanel({
         onConfigChange(node.id, { promptOptimizeStatus: "running", promptOptimizeKind: "image", promptOptimizeSource: text, promptOptimizePrompt: undefined, promptOptimizeError: undefined });
         try {
             const instruction = `把下面这段需求改写为一条可直接用于生图模型的提示词，只输出提示词本身。输出语言：${optimizeLanguage === "en" ? "英文" : "中文"}。${selectedRefs.length ? `参考图片 ${selectedRefs.length} 张。` : ""}\n\n${text}`;
-            const result = await requestAgentStream(
+            const result = await requestAgentOnce(
                 config,
                 { prompt: instruction },
                 {
@@ -361,7 +361,7 @@ export function CanvasNodePromptPanel({
         try {
             const images = await resolveCanvasReferenceImages(imageReferences.slice(0, 1), nodes);
             if (!images.length) throw new Error(t("canvas.promptPanel.captionNoImage"));
-            const result = await requestAgentStream(
+            const result = await requestAgentOnce(
                 config,
                 { prompt: "用一段话描述这张图片，输出可以直接当作生图提示词的描述，只输出描述本身。", images },
                 {

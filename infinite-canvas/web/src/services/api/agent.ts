@@ -55,12 +55,33 @@ type AgentRequest = {
 };
 
 /**
+ * Ask the agent a question that the canvas will follow up on.
+ *
+ * Names the connected session, so the answer comes from the process that holds this canvas's history
+ * and can use its tools. Only the canvas agent panel calls this.
+ */
+export async function requestAgentChat(config: AiConfig, request: AgentRequest, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
+    return streamAgent(config, "/api/agent/chat", request, useConfigStore.getState().agentSession, options);
+}
+
+/**
+ * Ask for one answer that nothing follows: a text node's body, a rewritten prompt, a caption.
+ *
+ * The session is passed as a literal null, not looked up — a one-shot question has no business
+ * reaching the agent a canvas is holding, whose history is the user's work. The gateway keeps the two
+ * apart the same way: `/api/agent/once` spawns a process for this request and releases it.
+ */
+export async function requestAgentOnce(config: AiConfig, request: AgentRequest, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
+    return streamAgent(config, "/api/agent/once", request, null, options);
+}
+
+/**
  * Run one agent request and read its stream.
  *
  * Returns the answer text as the deltas assembled it (empty for a command), and reports every event
  * so a caller can render the model list, the current model, or a refusal as they arrive.
  */
-export async function requestAgentStream(config: AiConfig, request: AgentRequest, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
+async function streamAgent(config: AiConfig, path: string, request: AgentRequest, session: string | null, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
     // The same root every other service uses: the channel address without its legacy `/v1`.
     const root = gatewayProtocolRoot(config.baseUrl);
 
@@ -68,9 +89,6 @@ export async function requestAgentStream(config: AiConfig, request: AgentRequest
     if (request.prompt) formData.set("prompt", request.prompt);
     if (request.command) formData.set("command", request.command);
     if (request.args !== undefined) formData.set("args", request.args);
-    // A connected agent answers this request and is gone afterwards; without one the gateway spawns a
-    // process for this request alone.
-    const session = useConfigStore.getState().agentSession;
     if (session) formData.set("session", session);
     const files = await Promise.all((request.images || []).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file, index) => formData.append(index === 0 ? "image" : `image${index + 1}`, file));
@@ -78,7 +96,7 @@ export async function requestAgentStream(config: AiConfig, request: AgentRequest
     let answer = "";
     let failure = "";
     try {
-        const response = await fetch(`${root}/api/agent/chat`, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}` }, body: formData, signal: options?.signal });
+        const response = await fetch(`${root}${path}`, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}` }, body: formData, signal: options?.signal });
         if (!response.ok) throw new Error(apiText("requestFailed"));
         if (!response.body) throw new Error(apiText("requestFailed"));
 
@@ -109,10 +127,6 @@ export async function requestAgentStream(config: AiConfig, request: AgentRequest
         return answer;
     } catch (error) {
         throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
-    } finally {
-        // Only a question spends the connection. A setting change leaves the agent connected, so the
-        // button stays on Send; this is the one place that decides it.
-        if (request.prompt && useConfigStore.getState().agentSession) useConfigStore.getState().setAgentSession(null);
     }
 }
 

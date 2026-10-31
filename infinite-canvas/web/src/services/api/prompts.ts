@@ -1,4 +1,4 @@
-import { requestAgentStream } from "@/services/api/agent";
+import { requestAgentOnce } from "@/services/api/agent";
 import type { AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 
@@ -9,11 +9,11 @@ export type PromptOptimizeMode = "全参考模式(Reference to Video)" | "文生
  * Ask the agent for words: one prompt in, one answer out, read as it arrives.
  *
  * The model and the reasoning level are the agent's own settings, not fields of a prompt — they are
- * changed with `command` (see requestAgentStream), never attached to a question.
+ * changed with `command` (see requestAgentChat), never attached to a question.
  */
 export async function requestPromptChat(config: AiConfig, params: { prompt: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal; onDelta?: (text: string) => void }): Promise<string> {
     let streamed = "";
-    const answer = await requestAgentStream(
+    const answer = await requestAgentOnce(
         config,
         { prompt: params.prompt, images: params.images },
         {

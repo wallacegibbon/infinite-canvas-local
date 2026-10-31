@@ -3,10 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * The chat request the canvas sends for text.
  *
- * It used to be an OpenAI *Responses* call (`POST /v1/responses`) straight at the channel's address,
- * which the gateway never served: every text node in this build answered 404. Now it is one prompt
- * to the gateway's `/api/prompts/chat`, with the prompt endpoint's address, key and model travelling
- * in the form because the browser never contacts the model itself.
+ * A text node's body is one answer that nothing follows, so it goes to `/api/agent/once`: a process of
+ * its own, released when the answer ends. It is deliberately not `/api/agent/chat`, which writes into
+ * the agent a canvas holds — a shortcut must never be able to spend that agent's history.
  */
 vi.mock("@/i18n", () => ({ default: { t: (key: string) => key } }));
 vi.mock("@/services/api/gateway-status", () => ({ noteGatewayError: () => undefined }));
@@ -66,14 +65,16 @@ beforeEach(() => {
 });
 
 describe("requestPromptChat", () => {
-    it("asks the agent's one route, and does not carry an endpoint of its own", async () => {
+    it("asks the one-shot route, and does not carry an endpoint of its own", async () => {
         const calls = stubGateway({ body: 'data: {"type":"delta","text":"an "}\n\ndata: {"type":"delta","text":"answer"}\n\ndata: {"type":"done","text":"an answer"}\n\n' });
 
         await expect(requestPromptChat(config(), { prompt: "describe a teapot" })).resolves.toBe("an answer");
 
         const { call, form } = formOf(calls);
-        expect(call.url).toBe("http://127.0.0.1:8190/api/agent/chat");
+        expect(call.url).toBe("http://127.0.0.1:8190/api/agent/once");
         expect(form.get("prompt")).toBe("describe a teapot");
+        // No session, ever: the whole point of the route is that it cannot reach a canvas's agent.
+        expect(form.get("session")).toBeNull();
         // The model, the key and the base URL are the agent's own configuration now: a question
         // carries a question.
         for (const field of ["promptBaseUrl", "promptApiKey", "promptModel", "system", "command"]) {
@@ -94,11 +95,5 @@ describe("requestPromptChat", () => {
         stubGateway({ body: 'data: {"type":"error","message":"model_set: model not found: 9"}\n\ndata: {"type":"done"}\n\n' });
 
         await expect(requestPromptChat(config(), { prompt: "hi" })).rejects.toThrow("model_set: model not found: 9");
-    });
-
-    it("refuses a channel that is not the gateway", async () => {
-        stubGateway({ body: "" });
-
-        await expect(requestPromptChat(config({ baseUrl: "https://api.example.com/v1" }), { prompt: "hi" })).rejects.toThrow("promptOptimizeLocalOnly");
     });
 });

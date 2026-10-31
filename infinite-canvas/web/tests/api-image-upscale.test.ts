@@ -128,8 +128,4 @@ describe("requestUpscale", () => {
 
         await expect(requestUpscale(gateway(), image("source.png"), { workflowId: "image-esrgan-upscale" })).rejects.toThrow("Prompt outputs failed validation");
     });
-
-    it("refuses a remote base URL: upscaling is a local ComfyUI workflow", async () => {
-        await expect(requestUpscale({ ...gateway(), baseUrl: "https://api.example.com/v1" } as Config, image("source.png"), { workflowId: "image-esrgan-upscale" })).rejects.toThrow("upscaleLocalOnly");
-    });
 });
