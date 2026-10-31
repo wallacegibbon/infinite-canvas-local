@@ -742,6 +742,7 @@ export default {
             maskPrompt:
                 "{{source}} is the original image. {{mask}} marks the area to edit with a translucent blue overlay on the original image. Only modify the area covered by the blue overlay, keep everything else identical to the original, output a full image with the same size as the original, and do not keep any blue overlay in the result. Edit request: {{prompt}}",
             maskNodeTitle: "Mask annotation",
+            maskNodeNeeded: "Inpaint needs a mask: mark the area on this image with the mask tool, or connect a node that carries one",
             cropNodeTitle: "Cropped image",
         },
         recovery: {

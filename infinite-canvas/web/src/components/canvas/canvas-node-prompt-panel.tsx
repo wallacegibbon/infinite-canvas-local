@@ -216,6 +216,12 @@ export function CanvasNodePromptPanel({
             // hand works the same as one the editor made. Without a mask there is nothing to inpaint.
             const hasMask = imageReferences.some((reference) => Boolean(nodes.find((item) => item.id === reference.nodeId)?.metadata?.mask?.storageKey));
             if (config.imageMode === "inpaint" && !hasMask) {
+                // The editor draws on the node's own picture, so it cannot open on a node that has none:
+                // without this the button would just do nothing.
+                if (!node.metadata?.content) {
+                    toast.warning(t("canvas.runtime.maskNodeNeeded"));
+                    return;
+                }
                 onOpenMaskEditor?.(node.id);
                 return;
             }
