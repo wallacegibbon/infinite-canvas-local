@@ -2585,10 +2585,18 @@ model_list` + `SM model`, **every `api_key` stripped** — the frame carries the
 them from memory; on an empty cache it does one 30 ms probe and caches that. So the list is there
 before the first run, and no process outlives the request that produced it.
 
-The choice travels as `--model <name>` — not `CI model_set`, which would rewrite the agent's
-persisted model and cost a round trip. There is no gateway-side allow-list: the only check is the
-agent's own, and a name that no longer exists in `model.conf` comes back as its error, which is the
-honest place for it.
+The choice travels as `--model <name>` on the spawn — the agent's own startup flag ("model name to
+activate, overrides runtime config"), verified: `--model "V100 Wireguard / Qwen3.8-27B NVFP4"` makes
+`SM model` report that id and name. `CI model_set` is the *in-session* switch, for a process that is
+already running; a one-operation process has nothing to switch, and `model_set` would additionally
+persist the change into the agent's runtime config — silently repointing the user's terminal agent
+because they pressed ✨ once.
+
+One thing has to be checked, because `--model` is quiet about failure: a name that no longer exists
+does **not** produce an `SM error` — the agent prints `model_set: model not found: "<name>"` on
+stderr and carries on with whichever model was active. So the gateway compares the requested name
+with the `active_name` in the startup broadcast and fails the request, quoting that stderr line,
+rather than answering from a model the user did not pick.
 
 **The event surface is a whitelist** `delta` (Ax text), `reasoning`, `step` (SM `task`), `done`,
 `error` (+ an optional one-line `tool` state). Everything else the agent emits stays on the gateway:
