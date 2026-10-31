@@ -77,6 +77,7 @@ func ResolveMode(entry *Entry, mode string) *Entry {
 	if variant.OutputSize != nil {
 		merged.OutputSize = variant.OutputSize
 	}
+	mergeVariantContract(&merged, variant)
 	return &merged
 }
 

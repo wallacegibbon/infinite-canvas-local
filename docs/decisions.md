@@ -1652,3 +1652,184 @@ original blob was restored afterwards and checked.
 
 **Where** `stores/canvas/canvas-persist.ts`, `stores/asset-persist.ts`, both stores,
 `tests/persist-migration.test.ts`.
+
+## 53. One run protocol; media type is data, not routing
+
+**Decision** Every generation is a `run`: `POST /api/runs` returns an id, and status, progress,
+outputs and cancellation all hang off that id. Image, video and audio are three workflows, not
+three families of endpoints. `wait`-style blocking endpoints do not exist. The target is written
+down in [`protocol.md`](protocol.md); this entry records why, and what lands first.
+
+**What was wrong without it**
+
+- The API grew as *media × action*: `images/generations`, `images/edits`, `images/upscale`,
+  `videos`, `videos/upscale`, `videos/interpolate`, `audio/speech`. Every new capability adds a
+  route, a handler and a test, and the handlers drift apart.
+- Execution model was chosen by media type, not by how long the work takes. Images and audio
+  blocked inside one HTTP request; video got a job. Music generation takes minutes, so it ended up
+  on the blocking path — exactly the case where a dropped connection loses the work.
+- Handler code contained workflow identity: `entry.ID == "video-h3-t2v"`, `"video-h3-fast"`,
+  `"video-h3-frames"`, `"video-h3-ref2va"`, `image-qwen21`, `image-moss-*`. Adding a workflow meant
+  editing Go, which contradicts `registry.json` being the workflow data.
+- One concept, several spellings: duration is `seconds` for video and `duration` for audio;
+  resolution is `size`, `quality`, `vquality` and `resolution_name`; everything else went into a
+  `params` field that accepts both an object and a JSON string.
+- Uploads were classified by magic field names (`contains "image"` or `"frame"`), so an OpenAI
+  `mask` could not be expressed at all, and roles depended on field order.
+- Outputs had three retrieval paths: base64 in the body, `/files/{name}`, and
+  `/v1/videos/{id}/content`.
+
+**Why the id, and why no `wait`** A blocking variant returns two different success shapes (`200`
+with the artifact, `202` with a run), so clients need polling anyway — while the blocking call
+brings back the failure the id exists to prevent: the connection dies and the finished work is
+unreachable. One shape, one code path, and the work survives reloads and disconnects.
+
+**What lands first** The execution core, because it is shared by every later phase: submission,
+queueing, persistence, progress and cancellation move into one helper over the existing
+`internal/task` store, and audio joins video on it. Audio then stops being a blocking generation —
+its `/v1/audio/speech` adapter submits a run and waits on the run, and the run survives the client.
+`/v1/*` stays as a thin adapter so the canvas keeps working and the existing e2e tests keep
+guarding the behaviour until their node type migrates.
+
+**Order** (each phase leaves `make check` green): execution core → `accepts`/`inputs`/`outputs` in
+`registry.json` plus a generic validator, deleting the per-workflow branches → `/api/runs` and
+`/api/uploads` next to the adapters, canvas migrating node type by node type → delete adapters,
+`/v1/*` and this table's "today" column.
+
+**Where** `docs/protocol.md`, `internal/server/runs.go`, `internal/task`, `internal/server/routes_*.go`.
+
+## 54. Media rules are registry data, not handler branches
+
+**Decision** What a workflow may accept from a request — how many images, one or none, which media
+kinds, that first/last-frame mode needs two images for `both` but one otherwise — is declared per
+workflow in `registry.json` (`accepts`, `frameMode`, `mode`, `promptInject`, `promptReorder`,
+`sourceVideoFrames`) and resolved by one function, `workflow.PlanMedia`. The handlers no longer
+mention a workflow id.
+
+**What was wrong without it** `handleVideoCreate` carried a `switch entry.ID` with four arms
+(`video-h3-t2v`, `-fast`, `-frames`, `-ref2va`), then a second `switch` for the same ids to build
+the error hint, plus `requiredImageCount` reverse-engineering minima out of bindings.
+`handleImageEdits` hardcoded `entry.ID == "image-qwen21"` with three count rules, and
+`handleImageGenerations` matched `strings.HasPrefix(entry.ID, "image-moss-")` to decide whether to
+inject layout JSON. Adding a workflow meant editing Go, which is the opposite of the reason
+`registry.json` exists.
+
+**Where the rules went**
+
+| Was | Is |
+| --- | --- |
+| `switch entry.ID` for media counts | `accepts.images/videos/audios {min,max}` + `accepts.minTotal` |
+| `switch entry.ID` for the error hint | `accepts.note`, appended to every refusal |
+| frame-mode defaults and per-mode counts | `frameMode {default, images{first,last,both}}` |
+| fixed execution mode per H3 workflow | `mode` (`text`, `frames`, `reference`) |
+| Qwen's per-mode image counts | `variants.<mode>.accepts` |
+| Qwen's reference reordering | `variants.edit.promptReorder: "qwen-edit"` |
+| MOSS layout prompt injection | `promptInject: "moss-layout"` |
+| probing the source video length | `sourceVideoFrames: true` |
+
+**Three behaviour changes, all deliberate**
+
+1. Error codes are uniform: a too-many-media refusal is `unsupported_media` (was
+   `unsupported_video_media` for video, and `invalid_inpaint_media` / `invalid_outpaint_media` /
+   `too_many_reference_images` for Qwen). The canvas does not map these codes; the message, which
+   now names the workflow's own hint, is what it shows.
+2. Multi-reference rejects more than six images instead of silently truncating to six. The canvas
+   already caps at six, so only a hand-written request can reach it — and a silent truncation is
+   exactly the class of bug this refactor is meant to remove.
+3. A first/last-frame request with `frameMode: both` and one image now fails on the image minimum
+   before any upload, with a message that says two are needed.
+
+**Tested** `internal/workflow/media_test.go` exercises the rule engine directly and then asserts the
+same answers against the *shipped* `registry.json` — the old hardcoded behaviour, expressed as data.
+`internal/server/video_media_test.go` proves the route calls the engine (a frames workflow refuses
+no image, refuses audio, and counts two images for `both`) without a workflow id in the handler.
+Verified against the running gateway for all six H3 workflows and all four Qwen modes; a real
+image generation still passes end to end.
+
+**Where** `internal/workflow/media.go`, `internal/workflow/entry.go`, `internal/server/routes_video.go`,
+`internal/server/routes_generation.go`, `workflows/registry.json`.
+
+## 55. The run protocol exists on the wire
+
+**Decision** `POST /api/runs` + `/api/uploads` are the gateway's own shape, not a translation of
+someone else's: submit returns `202` with a run id, and status, progress, outputs and cancel all
+hang off that id. Media is uploaded first (`POST /api/uploads`) and referenced by role. One row per
+artifact, so a batch image request returns several outputs from one run. `docs/protocol.md` is the
+contract; this entry records what landed and what deliberately did not.
+
+**Why now, and not "just fix audio"** The audio endpoint needed the queue, and the queue needed one
+submission path. Building that path twice — once for `/v1/audio/speech`, once for the real protocol —
+would have been the only way to get audio working sooner, and the second version would then have to
+be kept in step with the first. The cheaper order was: one execution core, then audio as an adapter
+on it, then the protocol itself.
+
+**What landed**
+
+| Piece | Where |
+| --- | --- |
+| Queue, persistence, progress, cancel, one `submitRun` | `internal/server/runs.go` |
+| `POST/GET /api/uploads`, `POST /api/runs`, `GET /api/runs[/{id}[/outputs/{i}]]`, preview, `DELETE` | `internal/server/routes_runs.go` |
+| Upload store with retention pruning and a cached ComfyUI reference | `internal/upload` |
+| Multi-artifact runs (`outputs[]`), per-output paths, `started_at` | `internal/task` |
+| Audio as an adapter over the same path | `internal/server/routes_generation.go` |
+
+**Two deliberate limits**
+
+1. **No `wait`.** The audio adapter blocks because the canvas asks it to; the protocol itself never
+   does. A `wait` parameter would give every client two success shapes (`200` with an artifact,
+   `202` with a run) and reintroduce "the connection died, the work is lost".
+2. **Media roles are the conventional names** (`source`, `mask`, `first_frame`, `last_frame`,
+   `reference`, `image`, `video`, `audio`) rather than a per-workflow declaration. The role list is
+   one table in `routes_runs.go`; making it data belongs with typed `inputs`, and inventing it
+   before the canvas uses it would be dead weight.
+
+**Tested** `internal/server/runs_e2e_test.go`: a two-output image run (both artifacts fetched), an
+upload used as a reference image (the injected `LoadImage` node carries the ComfyUI name), and the
+refusals — unknown role, wrong kind, missing upload, unknown workflow. `internal/upload` covers kind
+inference, reload, size limit and retention pruning. `internal/task` covers multi-output storage and
+`OutputPath` bounds. Verified live against the real ComfyUI: an audio run through `/api/runs`, a
+two-image batch, and a cancel that emptied the ComfyUI queue.
+
+**Where** `internal/server/routes_runs.go`, `internal/server/runs.go`, `internal/upload`,
+`internal/task`, `docs/protocol.md`.
+
+## 56. A run's inputs are typed and checked at submission
+
+**Decision** `inputs` is a closed, typed surface. `GET /api/workflows/{id}/schema` publishes it, and
+`POST /api/runs` validates against it before anything is queued. Unknown keys are rejected with the
+accepted list; types, ranges and `required` are enforced; `quality` is an enumerated value because
+the gateway owns the preset names; other `select` options stay advisory because they are ComfyUI's
+vocabulary, not ours. The list is assembled from the request-level keys plus the workflow's declared
+`parameters` plus its non-media binding keys, so no workflow restates it.
+
+**What was wrong without it** `inputs` was a bag. A typo (`setps`) was silently ignored and the run
+quietly used the default; a wrong value (a string where a number belonged, a size that is not a size,
+`count: 0`) travelled into the graph and failed inside ComfyUI — for a queued run that meant the
+caller got a failed run minutes later instead of a `400` immediately. `count` was also clamped
+silently by `BuildContext`, so a request for zero images was answered with one.
+
+**Why these boundaries**
+
+- *Unknown keys rejected*: silently ignoring input is never what the caller meant.
+- *Media binding names rejected, with `use media.<role>`*: the two input channels must not blur;
+  the error names the right one.
+- *Ranges enforced, sampler lists advisory*: ranges are our own declarations (and were corrected
+  while doing this — seeds now allow 0, audio steps allow 1). Sampler/scheduler lists are a curated
+  UI subset of ComfyUI's; enforcing them would reject valid values the canvas never offered.
+- *`/v1/*` stays lenient* until the canvas migrates: an adapter that suddenly rejects values an
+  existing client sends is a behaviour change disguised as a refactor.
+
+**A race found on the way** Running the suite with `-race` exposed a pre-existing bug: `persistNow`
+marshalled the live task records after releasing the lock, racing the worker's progress updates.
+It now snapshots under the lock. `make test-race` is clean over repeated runs.
+
+**Tested** `internal/workflow/inputs_test.go`: the declared surface is accepted, ten rejection cases
+carry the right code and message, media keys point at `media.<role>`, the schema marks `prompt`
+required and `count` bounded, and every shipped workflow accepts a minimal request and rejects a
+typo. `internal/server/runs_e2e_test.go` drives the same through HTTP, plus the schema endpoint.
+Verified live against the real registry: unknown key, `count: 0`, `size: "huge"`, `steps: 999`,
+`refs` as an input and `quality: "ultra"` all answer `400` with a message that says what to change,
+and a valid audio run still completes.
+
+**Where** `internal/workflow/inputs.go`, `internal/workflow/render.go`,
+`internal/server/routes_runs.go`, `internal/task/task.go`, `workflows/registry.json`.

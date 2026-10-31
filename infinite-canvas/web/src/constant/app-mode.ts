@@ -41,6 +41,7 @@ export const LOCAL_GATEWAY_MODELS = [
     { name: "video-h3-t2v-novdn", capability: "video" as const, imageInputs: 0 },
     { name: "video-h3-frames-novdn", capability: "video" as const, imageInputs: 2 },
     { name: "video-h3-ref2va-novdn", capability: "video" as const, imageInputs: 6 },
+    { name: "audio-minimax-music-3", capability: "audio" as const, imageInputs: 0 },
 ];
 
 export const LOCAL_GATEWAY_MODEL_VALUES = LOCAL_GATEWAY_MODELS.map((model) => `${LOCAL_GATEWAY_CHANNEL_ID}::${model.name}`);

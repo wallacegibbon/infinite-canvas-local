@@ -114,7 +114,7 @@ export default {
             sizes: { landscape: "横屏", portrait: "竖屏", square: "方形", widescreen: "宽屏", tall: "长图", auto: "自动" },
             ratios: { landscape: "横屏", portrait: "竖屏", square: "方形", standardLandscape: "标准横屏", standardPortrait: "标准竖屏", cinematic: "宽银幕", adaptive: "自适应" },
         },
-        audio: { title: "音频设置", voice: "声音", format: "格式", speed: "语速", instructions: "声音指令", instructionsPlaceholder: "例如：自然、温暖、适合旁白。" },
+        audio: { title: "音频设置", voice: "声音", format: "格式", speed: "语速", instructions: "歌词 / 声音指令", instructionsPlaceholder: "音乐工作流：填写歌词（可带 [Verse] / [Chorus] 段落标记）；语音工作流：填写声音风格说明。" },
         text: { title: "文本设置", reasoning: "推理强度", count: "生成次数" },
         model: {
             select: "选择模型",

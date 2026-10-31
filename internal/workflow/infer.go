@@ -44,11 +44,13 @@ func InferType(graph Graph, hint string) string {
 	if reVideoClass.MatchString(joined) {
 		return "video"
 	}
-	if reImageClass.MatchString(joined) {
-		return "image"
-	}
+	// Audio is checked before image because audio graphs still sample with a KSampler,
+	// which would otherwise classify MiniMax Music workflows as image-to-image graphs.
 	if reAudioClass.MatchString(joined) {
 		return "audio"
+	}
+	if reImageClass.MatchString(joined) {
+		return "image"
 	}
 	return "text"
 }

@@ -302,9 +302,42 @@ func (r *Runner) RunVideo(ctx context.Context, opts RunOptions) (*RunResult, err
 	}
 }
 
+// RunAudio runs a workflow and returns only the audio artifact.
+func (r *Runner) RunAudio(ctx context.Context, opts RunOptions) (*RunResult, error) {
+	result, err := r.RunWorkflow(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range result.Files {
+		if strings.HasPrefix(strings.ToLower(file.MimeType), "audio/") ||
+			isAudioExtension(file.Filename) {
+			return &RunResult{PromptID: result.PromptID, Files: []OutputFile{file}}, nil
+		}
+	}
+	names := make([]string, 0, len(result.Files))
+	for _, file := range result.Files {
+		names = append(names, file.Filename)
+	}
+	encoded, _ := json.Marshal(names)
+	return nil, &httpx.Error{
+		Status:  http.StatusBadGateway,
+		Code:    "no_audio_output",
+		Message: "the audio workflow produced no audio file (only images or videos)",
+		Details: string(encoded),
+	}
+}
+
 func isVideoExtension(filename string) bool {
 	switch strings.ToLower(path.Ext(filename)) {
 	case ".mp4", ".webm", ".mov":
+		return true
+	}
+	return false
+}
+
+func isAudioExtension(filename string) bool {
+	switch strings.ToLower(path.Ext(filename)) {
+	case ".mp3", ".flac", ".wav", ".ogg", ".opus", ".m4a", ".aac":
 		return true
 	}
 	return false
@@ -411,7 +444,7 @@ func collectOutputFiles(history map[string]any, includePreview bool) []collected
 	seen := map[string]bool{}
 	for nodeID, raw := range outputs {
 		output, _ := raw.(map[string]any)
-		for _, key := range []string{"images", "gifs", "videos"} {
+		for _, key := range []string{"images", "gifs", "videos", "audio"} {
 			items, _ := output[key].([]any)
 			for _, item := range items {
 				entry, ok := item.(map[string]any)

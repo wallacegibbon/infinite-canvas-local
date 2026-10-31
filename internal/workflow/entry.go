@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -175,6 +176,38 @@ type BaseModelEntry struct {
 	Params map[string]any `json:"params,omitempty"`
 }
 
+// OutputSpec is what a workflow produces, where a graph cannot say it.
+//
+// The artifact kind matches the workflow type today, so it is optional. The container part
+// exists because an encoder node only writes specific formats with specific quality values
+// (SaveAudioAdvanced takes mp3/V0 or opus/128k, never opus/V0); declaring the accepted pairs
+// here is what keeps that knowledge out of the handler.
+type OutputSpec struct {
+	Kind         string                `json:"kind,omitempty"`
+	FormatParam  string                `json:"formatParam,omitempty"`
+	QualityParam string                `json:"qualityParam,omitempty"`
+	Formats      map[string]FormatSpec `json:"formats,omitempty"`
+}
+
+// FormatSpec is one accepted container. Quality is a value the encoder accepts for it; empty
+// means the container takes no quality input.
+type FormatSpec struct {
+	Quality string `json:"quality,omitempty"`
+}
+
+// FormatNames returns the accepted containers in a stable order, for error messages.
+func (o *OutputSpec) FormatNames() []string {
+	if o == nil {
+		return nil
+	}
+	names := make([]string, 0, len(o.Formats))
+	for name := range o.Formats {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // Source records where an imported workflow came from.
 type Source struct {
 	Kind string `json:"kind,omitempty"`
@@ -192,6 +225,15 @@ type Variant struct {
 	Defaults    map[string]any              `json:"defaults,omitempty"`
 	OutputSize  *OutputSize                 `json:"outputSize,omitempty"`
 	Source      *Source                     `json:"source,omitempty"`
+
+	// Per-mode contract. A variant is a different graph with different wiring, so it can accept
+	// a different media mix (Qwen's inpaint wants a source and a mask; t2i wants none).
+	Accepts       *Accepts       `json:"accepts,omitempty"`
+	Mode          string         `json:"mode,omitempty"`
+	FrameMode     *FrameModeRule `json:"frameMode,omitempty"`
+	PromptInject  string         `json:"promptInject,omitempty"`
+	PromptReorder string         `json:"promptReorder,omitempty"`
+	Outputs       *OutputSpec    `json:"outputs,omitempty"`
 
 	// Workflow is the parsed graph, loaded next to the registry entry.
 	Workflow Graph `json:"-"`
@@ -213,18 +255,28 @@ type Entry struct {
 	Hidden           bool
 	MinMedia         int
 	BackgroundPrompt string
-	Workflow         Graph
-	RawBindings      OrderedMap[OrderedMap[any]]
-	Defaults         map[string]any
-	Presets          map[string]any
-	Parameters       []any
-	Lora             *Lora
-	BaseModels       *BaseModelConfig
-	OutputSize       *OutputSize
-	Variants         OrderedMap[*Variant]
-	VariantLabels    OrderedMap[string]
-	ImportedAt       string
-	Source           *Source
+
+	// Declarative request contract, so the handlers stay generic. See media.go.
+	Accepts           *Accepts       `json:"accepts,omitempty"`
+	Mode              string         `json:"mode,omitempty"`
+	FrameMode         *FrameModeRule `json:"frameMode,omitempty"`
+	PromptInject      string         `json:"promptInject,omitempty"`
+	PromptReorder     string         `json:"promptReorder,omitempty"`
+	SourceVideoFrames bool           `json:"sourceVideoFrames,omitempty"`
+	Outputs           *OutputSpec    `json:"outputs,omitempty"`
+
+	Workflow      Graph
+	RawBindings   OrderedMap[OrderedMap[any]]
+	Defaults      map[string]any
+	Presets       map[string]any
+	Parameters    []any
+	Lora          *Lora
+	BaseModels    *BaseModelConfig
+	OutputSize    *OutputSize
+	Variants      OrderedMap[*Variant]
+	VariantLabels OrderedMap[string]
+	ImportedAt    string
+	Source        *Source
 
 	// Decoration applied when a base-model variant or a per-workflow main-model
 	// override is in play. Request-scoped copies, never persisted.
@@ -273,27 +325,34 @@ func toBindings(source OrderedMap[OrderedMap[any]]) map[string]*Binding {
 
 // rawEntry mirrors registry.json's per-workflow object.
 type rawEntry struct {
-	ID               string                      `json:"id"`
-	Name             string                      `json:"name"`
-	Type             string                      `json:"type"`
-	File             string                      `json:"file"`
-	Label            string                      `json:"label"`
-	Description      string                      `json:"description"`
-	Category         string                      `json:"category"`
-	Hidden           bool                        `json:"hidden"`
-	MinMedia         int                         `json:"minMedia"`
-	BackgroundPrompt string                      `json:"backgroundPrompt"`
-	Bindings         OrderedMap[OrderedMap[any]] `json:"bindings"`
-	Defaults         map[string]any              `json:"defaults"`
-	Presets          map[string]any              `json:"presets"`
-	Parameters       []any                       `json:"parameters"`
-	Lora             *Lora                       `json:"lora"`
-	BaseModels       *BaseModelConfig            `json:"baseModels"`
-	OutputSize       *OutputSize                 `json:"outputSize"`
-	Variants         OrderedMap[*Variant]        `json:"variants"`
-	VariantLabels    OrderedMap[string]          `json:"variantLabels"`
-	ImportedAt       string                      `json:"importedAt"`
-	Source           *Source                     `json:"source"`
+	ID                string                      `json:"id"`
+	Name              string                      `json:"name"`
+	Type              string                      `json:"type"`
+	File              string                      `json:"file"`
+	Label             string                      `json:"label"`
+	Description       string                      `json:"description"`
+	Category          string                      `json:"category"`
+	Hidden            bool                        `json:"hidden"`
+	MinMedia          int                         `json:"minMedia"`
+	BackgroundPrompt  string                      `json:"backgroundPrompt"`
+	Accepts           *Accepts                    `json:"accepts,omitempty"`
+	Mode              string                      `json:"mode,omitempty"`
+	FrameMode         *FrameModeRule              `json:"frameMode,omitempty"`
+	PromptInject      string                      `json:"promptInject,omitempty"`
+	PromptReorder     string                      `json:"promptReorder,omitempty"`
+	SourceVideoFrames bool                        `json:"sourceVideoFrames,omitempty"`
+	Outputs           *OutputSpec                 `json:"outputs,omitempty"`
+	Bindings          OrderedMap[OrderedMap[any]] `json:"bindings"`
+	Defaults          map[string]any              `json:"defaults"`
+	Presets           map[string]any              `json:"presets"`
+	Parameters        []any                       `json:"parameters"`
+	Lora              *Lora                       `json:"lora"`
+	BaseModels        *BaseModelConfig            `json:"baseModels"`
+	OutputSize        *OutputSize                 `json:"outputSize"`
+	Variants          OrderedMap[*Variant]        `json:"variants"`
+	VariantLabels     OrderedMap[string]          `json:"variantLabels"`
+	ImportedAt        string                      `json:"importedAt"`
+	Source            *Source                     `json:"source"`
 }
 
 // registryFile mirrors the on-disk registry document.

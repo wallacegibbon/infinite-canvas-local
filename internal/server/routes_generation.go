@@ -2,13 +2,16 @@ package server
 
 import (
 	"encoding/base64"
+	"math"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"comfyui-gateway/internal/generate"
 	"comfyui-gateway/internal/httpx"
 	"comfyui-gateway/internal/prompt"
+	"comfyui-gateway/internal/task"
 	"comfyui-gateway/internal/util"
 	"comfyui-gateway/internal/workflow"
 )
@@ -21,6 +24,7 @@ func (s *Server) routesGeneration(mux *http.ServeMux) {
 	s.route(mux, "POST /v1/prompts/optimize", s.handlePromptOptimize)
 	s.route(mux, "POST /v1/prompts/optimize-image", s.handlePromptOptimizeImage)
 	s.route(mux, "POST /v1/prompts/caption", s.handlePromptCaption)
+	s.route(mux, "POST /v1/audio/speech", s.handleAudioSpeech)
 	s.route(mux, "POST /v1/videos", s.handleVideoCreate)
 	s.route(mux, "POST /v1/videos/upscale", s.handleVideoUpscale)
 	s.route(mux, "POST /v1/videos/interpolate", s.handleVideoInterpolate)
@@ -39,7 +43,7 @@ func (s *Server) imageResponse(ctx *httpx.Ctx, files []generate.OutputFile, resp
 	for _, file := range files {
 		if responseFormat == "url" {
 			extension := util.ExtFromMime(file.MimeType, file.Filename, "png")
-			saved, err := s.tasks.SaveImage(util.RandomID("img_"), file.Buffer, extension)
+			saved, err := s.tasks.SaveFile(util.RandomID("img_"), file.Buffer, extension)
 			if err != nil {
 				return nil, httpx.NewError(http.StatusInternalServerError, "save_failed", "failed to save the image: "+err.Error())
 			}
@@ -124,7 +128,7 @@ func (s *Server) handleImageGenerations(ctx *httpx.Ctx) error {
 		Params:     params,
 		Presets:    entry.Presets,
 	})
-	if strings.HasPrefix(entry.ID, "image-moss-") {
+	if entry.PromptInject == "moss-layout" {
 		applyLayoutPrompt(runCtx)
 	}
 
@@ -230,41 +234,30 @@ func (s *Server) handleImageEdits(ctx *httpx.Ctx) error {
 				"model %s does not support mode: %s", entry.Name, defaultStringOf(mode, "(empty)"))
 		}
 	}
-	if entry.ID == "image-qwen21" {
-		switch mode {
-		case "inpaint":
-			if len(files) != 2 {
-				return httpx.NewError(http.StatusBadRequest, "invalid_inpaint_media", "Qwen inpaint needs exactly 2 images: the source and a binary mask")
-			}
-		case "edit":
-			if len(files) > 4 {
-				return httpx.NewError(http.StatusBadRequest, "too_many_reference_images", "Qwen multi-image edit accepts at most 4 reference images")
-			}
-		case "outpaint":
-			if len(files) != 1 {
-				return httpx.NewError(http.StatusBadRequest, "invalid_outpaint_media", "Qwen outpaint takes exactly 1 source image")
-			}
-		}
+	params, err := parseParams(body)
+	if err != nil {
+		return err
 	}
 
-	qwenEdit := entry.ID == "image-qwen21" && mode == "edit" && len(files) > 1
+	// The variant is the contract: inpaint wants a source and a mask, outpaint one source, edit up
+	// to four references. Those limits live in registry.json, not here.
+	resolvedEntry := s.registry.ResolveForMode(entry, mode)
+	if _, err := workflow.PlanMedia(resolvedEntry, workflow.MediaCounts{Images: len(files)}, mode, params); err != nil {
+		return err
+	}
+
+	reorderReferences := resolvedEntry.PromptReorder == "qwen-edit" && len(files) > 1
 	orderedFiles := files
 	promptText := httpx.String(body, "prompt")
-	if qwenEdit {
+	if reorderReferences {
 		orderedFiles = append(append([]httpx.File{}, files[1:]...), files[0])
 		promptText = prompt.ReorderQwenEditPrompt(promptText, len(files))
 	}
 
-	resolvedEntry := s.registry.ResolveForMode(entry, mode)
 	background := httpx.String(body, "background")
 	if background != "" && !hasBackgroundSupport(resolvedEntry) {
 		return httpx.Errorf(http.StatusBadRequest, "unsupported_background",
 			"workflow %s has no background binding, so a transparent background cannot be guaranteed.", resolvedEntry.Name)
-	}
-
-	params, err := parseParams(body)
-	if err != nil {
-		return err
 	}
 	uploadCtx, cleanup := s.withCancel(ctx.R, ctx.RequestID)
 	defer cleanup()
@@ -286,7 +279,7 @@ func (s *Server) handleImageEdits(ctx *httpx.Ctx) error {
 		Params:         params,
 		Presets:        entry.Presets,
 	})
-	if strings.HasPrefix(entry.ID, "image-moss-") {
+	if entry.PromptInject == "moss-layout" {
 		applyLayoutPrompt(runCtx)
 	}
 
@@ -403,6 +396,153 @@ func (s *Server) handlePromptCaption(ctx *httpx.Ctx) error {
 		return err
 	}
 	okJSON(ctx.W, result)
+	return nil
+}
+
+// applyAudioFormatParams fills the encoder bindings for the requested container.
+//
+// The accepted containers and the quality value each one requires come from the workflow's
+// `outputs.formats` declaration: SaveAudioAdvanced validates quality against the selected format
+// (V0/128k/320k for mp3, 64k-320k for opus, nothing for flac), so the two inputs have to move
+// together and a mismatched pair is rejected by ComfyUI, not by us. A container the encoder cannot
+// write is refused rather than silently answered with a different one — the canvas names the saved
+// file after the response Content-Type, so a lie would surface as a mismatched extension. Values
+// the caller supplied win, and a workflow that declares no containers passes the request through.
+func applyAudioFormatParams(entry *workflow.Entry, format string, params map[string]any) error {
+	if format == "" {
+		return nil
+	}
+	if entry == nil || entry.Outputs == nil || len(entry.Outputs.Formats) == 0 {
+		if _, exists := params["format"]; !exists {
+			params["format"] = format
+		}
+		return nil
+	}
+	spec, ok := entry.Outputs.Formats[format]
+	if !ok {
+		return httpx.Errorf(http.StatusBadRequest, "unsupported_audio_format",
+			"workflow %s writes %s, not %s", entry.Name,
+			strings.Join(entry.Outputs.FormatNames(), ", "), format)
+	}
+	if entry.Outputs.FormatParam != "" {
+		if _, exists := params[entry.Outputs.FormatParam]; !exists {
+			params[entry.Outputs.FormatParam] = format
+		}
+	}
+	if spec.Quality != "" && entry.Outputs.QualityParam != "" {
+		if _, exists := params[entry.Outputs.QualityParam]; !exists {
+			params[entry.Outputs.QualityParam] = spec.Quality
+		}
+	}
+	return nil
+}
+
+// handleAudioSpeech implements POST /v1/audio/speech.
+//
+// The canvas audio node speaks the OpenAI speech contract: one text in, audio bytes out.
+// Music workflows take two texts, so `input` is the style caption and the optional
+// `instructions` field carries the lyrics. Both are plain bindings in registry.json, so a
+// prompt-only speech workflow keeps working without a special case here. `speed` and
+// `voice` have no meaning for music and are ignored.
+func (s *Server) handleAudioSpeech(ctx *httpx.Ctx) error {
+	s.registry.ReloadIfChanged()
+	body, err := bodyOrEmpty(ctx)
+	if err != nil {
+		return err
+	}
+
+	entry, err := s.requireModel(httpx.String(body, "model"), "audio")
+	if err != nil {
+		return err
+	}
+
+	prompt := strings.TrimSpace(httpx.String(body, "input"))
+	if prompt == "" {
+		return httpx.NewError(http.StatusBadRequest, "missing_prompt", "the audio request is missing `input`")
+	}
+
+	params, err := parseParams(body)
+	if err != nil {
+		return err
+	}
+	if lyrics := strings.TrimSpace(httpx.String(body, "instructions")); lyrics != "" {
+		if _, exists := params["lyrics"]; !exists {
+			params["lyrics"] = lyrics
+		}
+	}
+	if err := applyAudioFormatParams(entry, strings.ToLower(strings.TrimSpace(httpx.String(body, "response_format"))), params); err != nil {
+		return err
+	}
+
+	// Unlike images and videos there is no length parameter in the speech contract, so
+	// `duration`/`seconds` are accepted for callers that want to cap the song length.
+	seconds := httpx.Number(body, "duration", httpx.Number(body, "seconds", 0))
+	if seconds > 0 {
+		seconds = math.Min(math.Max(seconds, 4), 360)
+	}
+
+	runCtx := workflow.BuildContext(workflow.BuildContextParams{
+		Prompt:  prompt,
+		Count:   1,
+		Seconds: seconds,
+		Quality: httpx.String(body, "quality"),
+		Params:  params,
+		Presets: entry.Presets,
+	})
+
+	// The audio node expects one blocking call, so this adapter submits the run and waits for
+	// it. The run itself is queued: if this request dies, the song keeps rendering and stays
+	// readable through GET /api/tasks/{id} — the reason it is no longer generated inline.
+	stored := s.submitRun(runSpec{
+		Object:    task.ObjectAudio,
+		Entry:     entry,
+		Context:   runCtx,
+		TimeoutMs: s.cfg.AudioTimeoutMs,
+		RequestID: ctx.RequestID,
+		Request: map[string]any{
+			"prompt":         prompt,
+			"seconds":        seconds,
+			"format":         params["format"],
+			"hasLyrics":      params["lyrics"] != nil,
+			"steps":          params["steps"],
+			"audioQuality":   params["audioQuality"],
+			"responseFormat": httpx.String(body, "response_format"),
+		},
+	}, nil)
+	s.logger.Info("audio %s queued %s %s", entry.Name, stored.ID, ctx.RequestID)
+
+	requestCtx, cleanup := s.withCancel(ctx.R, ctx.RequestID)
+	defer cleanup()
+
+	finished, err := s.waitRun(requestCtx, stored.ID)
+	if err != nil {
+		if requestCtx.Err() != nil {
+			s.logger.Info("audio %s is still running as run %s after the client left", entry.Name, stored.ID)
+			return nil
+		}
+		return err
+	}
+	switch finished.Status {
+	case "completed":
+	case "cancelled":
+		return httpx.NewError(http.StatusConflict, "run_cancelled", "the audio run was cancelled")
+	default:
+		return runFailure(finished)
+	}
+
+	path := s.tasks.ContentPath(stored.ID)
+	if path == "" {
+		return httpx.NewError(http.StatusBadGateway, "no_audio_output", "the audio run finished without an output file")
+	}
+	mimeType := ""
+	if finished.MimeType != nil {
+		mimeType = *finished.MimeType
+	}
+	s.logger.Info("audio %s -> %s (%s) %s", entry.Name, stored.ID, defaultStringOf(mimeType, "audio/mpeg"), ctx.RequestID)
+
+	ctx.W.Header().Set("Content-Type", defaultStringOf(mimeType, util.MimeFromFilename(path)))
+	ctx.W.Header().Set("Content-Disposition", "inline; filename=\""+filepath.Base(path)+"\"")
+	http.ServeFile(ctx.W, ctx.R, path)
 	return nil
 }
 

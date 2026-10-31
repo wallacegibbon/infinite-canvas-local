@@ -36,6 +36,12 @@ type Error struct {
 // Error implements the error interface.
 func (e *Error) Error() string { return e.Message }
 
+// FailureCode, FailureDetails and StatusCode mirror httpx.Error so a subsystem error can be
+// persisted on a run without the task store importing this package.
+func (e *Error) FailureCode() string { return e.Code }
+func (e *Error) FailureDetails() any { return e.Details }
+func (e *Error) StatusCode() int     { return e.Status }
+
 func comfyError(status int, code, message string) *Error {
 	return &Error{Status: status, Code: code, Message: message}
 }

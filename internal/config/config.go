@@ -43,6 +43,7 @@ type Config struct {
 
 	RequestTimeoutMs   int
 	VideoTimeoutMs     int
+	AudioTimeoutMs     int
 	PollIntervalMs     int
 	ComfyRetryAttempts int
 	ComfyRetryDelayMs  int
@@ -92,6 +93,9 @@ func WithoutScanOnStart() Option {
 // WithRequestTimeout overrides the image generation timeout.
 func WithRequestTimeout(ms int) Option { return func(c *Config) { c.RequestTimeoutMs = ms } }
 
+// WithAudioTimeout overrides the audio generation timeout (0 = no limit).
+func WithAudioTimeout(ms int) Option { return func(c *Config) { c.AudioTimeoutMs = ms } }
+
 // WithPollInterval overrides the history poll interval.
 func WithPollInterval(ms int) Option { return func(c *Config) { c.PollIntervalMs = ms } }
 
@@ -116,6 +120,7 @@ func Load(opts ...Option) (*Config, error) {
 			"http://localhost:3000,http://127.0.0.1:3000,http://localhost:8188,http://127.0.0.1:8188"),
 		RequestTimeoutMs:    intValue(os.Getenv("REQUEST_TIMEOUT_MS"), 10*60*1000),
 		VideoTimeoutMs:      intOrZero(os.Getenv("VIDEO_TIMEOUT_MS")),
+		AudioTimeoutMs:      intOrZero(os.Getenv("AUDIO_TIMEOUT_MS")),
 		PollIntervalMs:      intValue(os.Getenv("POLL_INTERVAL_MS"), 750),
 		ComfyRetryAttempts:  intValue(os.Getenv("COMFY_RETRY_ATTEMPTS"), 3),
 		ComfyRetryDelayMs:   intValue(os.Getenv("COMFY_RETRY_DELAY_MS"), 500),

@@ -25,6 +25,7 @@ import (
 	"comfyui-gateway/internal/store"
 	"comfyui-gateway/internal/sysinfo"
 	"comfyui-gateway/internal/task"
+	"comfyui-gateway/internal/upload"
 	"comfyui-gateway/internal/util"
 	"comfyui-gateway/internal/workflow"
 )
@@ -43,6 +44,7 @@ type Server struct {
 	mainModels *store.MainModels
 	registry   *workflow.Registry
 	tasks      *task.Store
+	uploads    *upload.Store
 	setup      *setup.Manager
 	resources  *resource.Manager
 	optimizer  *prompt.Optimizer
@@ -94,6 +96,17 @@ func New(cfg *config.Config, logger *logx.Logger) (*Server, error) {
 	}
 	tasks.Load()
 
+	uploads, err := upload.New(upload.Options{
+		DataDir:       cfg.DataDir,
+		RetentionDays: cfg.TaskRetentionDays,
+		MaxBytes:      cfg.MaxUploadBytes,
+		Logger:        logger,
+	})
+	if err != nil {
+		return nil, err
+	}
+	uploads.Load()
+
 	skins := store.NewSkins(cfg.DataDir, logger)
 	skins.Load()
 	visibility := store.NewVisibility(cfg.DataDir, logger)
@@ -132,6 +145,7 @@ func New(cfg *config.Config, logger *logx.Logger) (*Server, error) {
 		mainModels: mainModels,
 		registry:   registry,
 		tasks:      tasks,
+		uploads:    uploads,
 		setup:      setupManager,
 		resources:  resources,
 		optimizer: prompt.NewOptimizer(cfg.RootDir, logger).
@@ -515,7 +529,19 @@ func (s *Server) probeVideoFrames(file httpx.File) int {
 		return 0
 	}
 	defer os.Remove(temporary)
+	return s.probeVideoFile(temporary)
+}
 
+// probeVideoPath reads the length of a video that is already on disk (an upload).
+func (s *Server) probeVideoPath(path string) int {
+	if path == "" || !util.Exists(path) {
+		return 0
+	}
+	return s.probeVideoFile(path)
+}
+
+// probeVideoFile runs ffprobe on one file and returns the 17k+5 frame count.
+func (s *Server) probeVideoFile(temporary string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 

@@ -1,0 +1,210 @@
+{
+  "35": {
+    "inputs": {
+      "filename_prefix": "audio/audio_minimax_music3",
+      "format": "mp3",
+      "format.quality": "V0",
+      "audio": [
+        "37:43",
+        0
+      ]
+    },
+    "class_type": "SaveAudioAdvanced",
+    "_meta": {
+      "title": "Save Audio (Advanced)",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:6": {
+    "inputs": {
+      "unet_name": "minimax_music3_dit_fp16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:13": {
+    "inputs": {
+      "caption": "Upbeat pop, warm pads, clean electric guitar, mid-tempo groove, bright drums, catchy hook.",
+      "lyrics": "",
+      "seed": [
+        "37:38",
+        0
+      ],
+      "max_duration": 60,
+      "cfg_scale": 1.7,
+      "top_k": 50,
+      "clip": [
+        "37:3",
+        0
+      ]
+    },
+    "class_type": "MiniMaxMusic3TextEncode",
+    "_meta": {
+      "title": "MiniMax Music3 Text Encode",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:3": {
+    "inputs": {
+      "clip_name": "minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:7": {
+    "inputs": {
+      "vae_name": "minimax_music3_dav.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:10": {
+    "inputs": {
+      "conditioning": [
+        "37:13",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "Conditioning Zero Out",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:15": {
+    "inputs": {
+      "seconds": [
+        "37:13",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyMiniMaxMusic3LatentAudio",
+    "_meta": {
+      "title": "Empty MiniMax Music3 Latent Audio",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:9": {
+    "inputs": {
+      "seed": [
+        "37:38",
+        0
+      ],
+      "steps": 30,
+      "cfg": 1.7,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "37:6",
+        0
+      ],
+      "positive": [
+        "37:13",
+        0
+      ],
+      "negative": [
+        "37:10",
+        0
+      ],
+      "latent_image": [
+        "37:15",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:12": {
+    "inputs": {
+      "samples": [
+        "37:9",
+        0
+      ],
+      "vae": [
+        "37:7",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "VAE Decode Audio",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:38": {
+    "inputs": {
+      "seed": 763157650530932
+    },
+    "class_type": "SeedNode",
+    "_meta": {
+      "title": "Seed",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:42": {
+    "inputs": {
+      "tile_size": 1536,
+      "overlap": 64,
+      "samples": [
+        "37:9",
+        0
+      ],
+      "vae": [
+        "37:7",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudioTiled",
+    "_meta": {
+      "title": "VAE Decode Audio (Tiled)",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  },
+  "37:43": {
+    "inputs": {
+      "switch": true,
+      "on_false": [
+        "37:12",
+        0
+      ],
+      "on_true": [
+        "37:42",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "If/Else Switch",
+      "cnr_id": "comfy-core",
+      "ver": "0.31.0"
+    }
+  }
+}

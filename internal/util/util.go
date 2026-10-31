@@ -178,6 +178,14 @@ func MimeFromFilename(filename string) string {
 		return "audio/wav"
 	case ".mp3":
 		return "audio/mpeg"
+	case ".flac":
+		return "audio/flac"
+	case ".opus":
+		return "audio/opus"
+	case ".ogg":
+		return "audio/ogg"
+	case ".m4a":
+		return "audio/mp4"
 	}
 	return "application/octet-stream"
 }

@@ -86,9 +86,10 @@ gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a *diffe
 | `GATEWAY_TOKEN` | *(empty)* | When set, `/api/*` requires the `X-Gateway-Token` header. `/v1/*` never does. |
 | `REQUEST_TIMEOUT_MS` | `600000` | Image generation timeout. |
 | `VIDEO_TIMEOUT_MS` | `0` | Video timeout; `0` means no limit. |
+| `AUDIO_TIMEOUT_MS` | `0` | Audio/music timeout; `0` means no limit. A song is the same order of work as a short video, so it gets the same default. |
 | `POLL_INTERVAL_MS` | `750` | ComfyUI history poll interval. |
 | `SCAN_ON_START` | `1` | Scan ComfyUI for nodes and models at boot. |
-| `TASK_RETENTION_DAYS` | `0` | Prune finished tasks older than this; `0` keeps everything. |
+| `TASK_RETENTION_DAYS` | `0` | Prune finished runs (and uploads) older than this; `0` keeps everything. |
 | `MAX_STORED_TASKS` | `0` | Cap on stored tasks; `0` is unlimited. |
 | `MAX_UPLOAD_BYTES` | `52428800` | Per-file upload limit. |
 | `RESOURCE_CONCURRENCY` | `2` | Parallel downloads during a resource install. |
@@ -161,8 +162,12 @@ prefix, wrong prefix for the graph it contains, or capitals and spaces in the na
 registered**; the scan reports it as `workflow files left unregistered` with the reason, and the
 fix is to rename the file.
 
-Anything a graph cannot describe — a prompt binding, presets — is left for you to add in
-`registry.json`; the scan warns when a registered graph has no prompt binding or no output node.
+Anything a graph cannot describe — a prompt binding, presets, and the media a workflow accepts —
+is left for you to add in `registry.json`; the scan warns when a registered graph has no prompt
+binding or no output node. Media acceptance (`accepts`, `frameMode`, `mode`, `promptInject`,
+`promptReorder`, `sourceVideoFrames`) is validated by one function, so a new workflow declares its
+contract instead of adding a branch to a handler. `GET /api/workflows/{id}/schema` publishes the
+same contract as typed `inputs`, which is what `POST /api/runs` validates a request against.
 
 ## Endpoints
 
@@ -179,9 +184,39 @@ Generation (multipart where media is involved):
 | `GET` | `/v1/videos/{id}` | Job status, including preview and step progress. |
 | `GET` | `/v1/videos/{id}/content` | Finished video bytes. |
 | `POST` | `/v1/videos/{id}/cancel` | Cancel a job. |
+| `POST` | `/v1/audio/speech` | Text-to-music (and speech-style) workflows: audio bytes out. `input` is the style caption, optional `instructions` is the lyrics. |
 | `POST` | `/v1/prompts/optimize` | Rewrite a prompt for H3 video. |
 | `POST` | `/v1/prompts/optimize-image` | Rewrite a prompt for image generation. |
 | `POST` | `/v1/prompts/caption` | Reverse-engineer a prompt from an image. |
+
+Audio requests speak the OpenAI speech shape (`model`, `input`, `response_format`, …) because
+that is what the canvas audio node already sends. A music graph needs two texts, so `input`
+becomes the style caption and the optional `instructions` field becomes the lyrics; both are
+ordinary `registry.json` bindings (`prompt`, `lyrics`), so a prompt-only speech workflow needs no
+special case. `response_format` is honoured for the containers the encoder writes itself —
+`mp3`, `flac`, `opus` — and anything else is refused with `unsupported_audio_format` instead of
+being silently converted. `speed` and `voice` mean nothing for music and are dropped. An optional
+`duration` (or `seconds`) caps the song length, which the speech contract has no field for.
+
+This route is an **adapter**: it submits a run to the same queue video uses, then waits for that
+run. The HTTP call still blocks — that is the client's contract — but the work no longer depends on
+it. If the connection dies mid-song, the run finishes anyway and stays readable through
+`GET /api/tasks/{id}` (with its file under `data/outputs/`), and a gateway restart reconciles it
+like any other run. The blocking shape is what the canvas sends today; [`protocol.md`](protocol.md)
+describes the run protocol that replaces it for every media type.
+
+Runs (the protocol in [`protocol.md`](protocol.md); the canvas still uses the `/v1/*` adapters):
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/uploads` | Upload one media file. Returns an id a run can reference by role. |
+| `GET` | `/api/uploads` | Uploads that have not expired, newest first. |
+| `POST` | `/api/runs` | Submit a run. Always `202` with the run, never blocks. |
+| `GET` | `/api/runs` | Runs, newest first; `?status=` and `?workflow=` filter. |
+| `GET` | `/api/runs/{id}` | Status, progress, outputs, error. |
+| `GET` | `/api/runs/{id}/outputs/{index}` | One artifact. |
+| `GET` | `/api/runs/{id}/preview` | In-flight preview frame, when one exists. |
+| `DELETE` | `/api/runs/{id}` | Cancel (idempotent; also interrupts ComfyUI). |
 
 Metadata and management:
 
@@ -193,6 +228,8 @@ Metadata and management:
 | `GET` | `/api/resources/status` | Model and node install status. |
 | `POST` | `/api/resources/install` | Start an install job. |
 | `POST` | `/api/resources/refresh` | The only rescan: reloads the resource index, re-scans ComfyUI (nodes, models, availability, new workflow graphs) and returns the resource status. This is the panel's refresh button. |
+| `GET` | `/api/tasks` | Every run the gateway has queued or finished, newest first. |
+| `GET` | `/api/tasks/{id}` | One run by id (also reachable as `/v1/tasks/{id}`). |
 | `GET` | `/api/setup/status` | Last scan result. |
 | `GET` | `/api/system/stats` | GPU and RAM, plus the last OOM. |
 

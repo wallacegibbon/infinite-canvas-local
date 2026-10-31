@@ -8,10 +8,12 @@ package task
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +25,67 @@ import (
 // Terminal statuses never change again.
 var terminalStatuses = map[string]bool{"completed": true, "failed": true, "cancelled": true}
 
+// Objects a run can produce. The object travels with the record so the queue, the
+// reconciliation pass and the wire projection do not have to assume video.
+const (
+	ObjectImage = "image"
+	ObjectVideo = "video"
+	ObjectAudio = "audio"
+	ObjectText  = "text"
+)
+
+// extensionsByObject is the set of file extensions a finished run of that object can
+// have. Reconciliation uses it to find an output whose path was never recorded (older
+// records stored no path at all) and to pick a default MIME type.
+var extensionsByObject = map[string][]string{
+	ObjectImage: {".png", ".jpg", ".jpeg", ".webp"},
+	ObjectVideo: {".mp4", ".webm", ".mov"},
+	ObjectAudio: {".mp3", ".flac", ".wav", ".opus", ".ogg", ".m4a"},
+	ObjectText:  {".txt"},
+}
+
+// normalizeObject keeps historical records (which were always video) working.
+func normalizeObject(object string) string {
+	if object == "" {
+		return ObjectVideo
+	}
+	return object
+}
+
+// defaultMimeType is the fallback when a run reports no MIME type of its own.
+func defaultMimeType(object string) string {
+	switch normalizeObject(object) {
+	case ObjectImage:
+		return "image/png"
+	case ObjectAudio:
+		return "audio/mpeg"
+	case ObjectText:
+		return "text/plain"
+	default:
+		return "video/mp4"
+	}
+}
+
+// candidateOutputPaths lists where a reconciled run's file may live, most likely first.
+func candidateOutputPaths(outputDir, id, object string) []string {
+	extensions := extensionsByObject[normalizeObject(object)]
+	paths := make([]string, 0, len(extensions))
+	for _, extension := range extensions {
+		paths = append(paths, filepath.Join(outputDir, id+extension))
+	}
+	return paths
+}
+
+// TaskOutput is one artifact a finished run produced. A run normally has one; an image
+// request with count > 1 has several, and the canvas shows them as a batch.
+type TaskOutput struct {
+	Index    int    `json:"index"`
+	File     string `json:"file"`
+	URL      string `json:"url"`
+	MimeType string `json:"mimeType"`
+	Bytes    int64  `json:"bytes"`
+}
+
 // Task is one queued generation job.
 type Task struct {
 	ID          string         `json:"id"`
@@ -32,6 +95,7 @@ type Task struct {
 	Model       string         `json:"model"`
 	Request     map[string]any `json:"request"`
 	CreatedAt   string         `json:"createdAt"`
+	StartedAt   *string        `json:"startedAt,omitempty"`
 	UpdatedAt   string         `json:"updatedAt"`
 	CompletedAt *string        `json:"completedAt"`
 	PromptID    *string        `json:"promptId"`
@@ -39,11 +103,27 @@ type Task struct {
 	File        *string        `json:"file"`
 	MimeType    *string        `json:"mimeType"`
 	Bytes       int64          `json:"bytes"`
-	Error       *string        `json:"error"`
+	// Outputs is the full artifact list. File/URL/MimeType/Bytes above mirror the first
+	// one for the legacy single-file endpoints and for records written before this field.
+	Outputs []TaskOutput `json:"outputs,omitempty"`
+	Error   *string      `json:"error"`
+	// Structured failure, kept alongside the human-readable message so a caller can
+	// react to a code instead of parsing text. Absent on success.
+	ErrorCode    *string `json:"errorCode,omitempty"`
+	ErrorDetails any     `json:"errorDetails,omitempty"`
+	ErrorStatus  int     `json:"errorStatus,omitempty"`
 
 	// Cancellation plumbing, never serialized.
 	cancelled  bool
 	cancelFunc context.CancelFunc
+}
+
+// CodedFailure is a failure that carries a stable, machine-readable code. The task
+// store persists it without importing the package that produced the error.
+type CodedFailure interface {
+	error
+	FailureCode() string
+	FailureDetails() any
 }
 
 // Update is one progress tick from the runner.
@@ -52,12 +132,17 @@ type Update struct {
 	PromptID string
 }
 
-// Result is what a finished job produces.
+// Result is what a finished job produces: one file per output, in request order.
 type Result struct {
+	Outputs  []ResultFile
+	PromptID string
+}
+
+// ResultFile is one artifact of a Result, before it is written to disk.
+type ResultFile struct {
 	Buffer   []byte
 	Ext      string
 	MimeType string
-	PromptID string
 }
 
 // RunFunc performs the work of one task.
@@ -148,10 +233,12 @@ func (s *Store) Load() {
 // failed after a restart even though its video was still on disk.
 func (s *Store) reconcileLocked(task *Task) {
 	if task.File == nil || *task.File == "" {
-		candidate := filepath.Join(s.outputDir, task.ID+".mp4")
-		if util.Exists(candidate) {
-			value := candidate
-			task.File = &value
+		for _, candidate := range candidateOutputPaths(s.outputDir, task.ID, task.Object) {
+			if util.Exists(candidate) {
+				value := candidate
+				task.File = &value
+				break
+			}
 		}
 	}
 	if task.File != nil && util.Exists(*task.File) {
@@ -185,12 +272,16 @@ func (s *Store) reconcileLocked(task *Task) {
 	}
 }
 
-// Create registers a new queued task.
-func (s *Store) Create(model string, request map[string]any) *Task {
+// Create registers a new queued task. The object says what the run produces; it decides
+// the fallback MIME type and where reconciliation looks for the output file.
+//
+// The returned record is the live one the queue will mutate: read it through Get when the value is
+// about to be serialised, or the read races the worker.
+func (s *Store) Create(object, model string, request map[string]any) *Task {
 	now := util.NowIso()
 	task := &Task{
 		ID:        util.RandomID("task_"),
-		Object:    "video",
+		Object:    normalizeObject(object),
 		Status:    "queued",
 		Progress:  0,
 		Model:     model,
@@ -278,6 +369,8 @@ func (s *Store) pump(run RunFunc) {
 	task.Status = "running"
 	task.Progress = 0.02
 	task.UpdatedAt = util.NowIso()
+	startedAt := task.UpdatedAt
+	task.StartedAt = &startedAt
 	s.mu.Unlock()
 	s.schedulePersist()
 
@@ -305,11 +398,28 @@ func (s *Store) pump(run RunFunc) {
 		message := err.Error()
 		task.Status = "failed"
 		task.Error = &message
+		var coded CodedFailure
+		if errors.As(err, &coded) {
+			code := coded.FailureCode()
+			task.ErrorCode = &code
+			task.ErrorDetails = coded.FailureDetails()
+		}
+		var statusCoded interface{ StatusCode() int }
+		if errors.As(err, &statusCoded) {
+			task.ErrorStatus = statusCoded.StatusCode()
+		}
+		completed := util.NowIso()
+		task.CompletedAt = &completed
+		s.logger.Warn("task %s failed: %s", task.ID, message)
+	} else if len(result.Outputs) == 0 {
+		message := "the run produced no output file"
+		task.Status = "failed"
+		task.Error = &message
 		completed := util.NowIso()
 		task.CompletedAt = &completed
 		s.logger.Warn("task %s failed: %s", task.ID, message)
 	} else {
-		savedURL, savedFile, saveErr := s.saveOutput(task.ID, result.Buffer, defaultExt(result.Ext))
+		outputs, saveErr := s.saveOutputs(task.ID, task.Object, result.Outputs)
 		if saveErr != nil {
 			message := "failed to write the output file: " + saveErr.Error()
 			task.Status = "failed"
@@ -324,14 +434,12 @@ func (s *Store) pump(run RunFunc) {
 				promptID := result.PromptID
 				task.PromptID = &promptID
 			}
-			task.URL = &savedURL
-			task.File = &savedFile
-			mimeType := result.MimeType
-			if mimeType == "" {
-				mimeType = "video/mp4"
-			}
-			task.MimeType = &mimeType
-			task.Bytes = int64(len(result.Buffer))
+			task.Outputs = outputs
+			first := outputs[0]
+			task.URL = &first.URL
+			task.File = &first.File
+			task.MimeType = &first.MimeType
+			task.Bytes = first.Bytes
 			completed := util.NowIso()
 			task.CompletedAt = &completed
 		}
@@ -396,14 +504,19 @@ func (s *Store) Cancel(id string) *Task {
 			break
 		}
 	}
-	wasQueued := task.Status == "queued"
+	// A cancel is reflected immediately, whether the run is still queued or already running: the
+	// caller asked for it, and the worker unwinds on its own. Waiting for the worker would make
+	// DELETE report "running" for a run the caller just cancelled.
+	wasActive := task.Status == "queued" || task.Status == "running"
 	cancelFunc := task.cancelFunc
-	if wasQueued {
+	if wasActive {
 		task.Status = "cancelled"
 		message := "task cancelled"
 		task.Error = &message
 		now := util.NowIso()
-		task.CompletedAt = &now
+		if task.CompletedAt == nil {
+			task.CompletedAt = &now
+		}
 		task.UpdatedAt = now
 	}
 	s.mu.Unlock()
@@ -411,22 +524,44 @@ func (s *Store) Cancel(id string) *Task {
 	if cancelFunc != nil {
 		cancelFunc()
 	}
-	if wasQueued {
+	if wasActive {
 		s.persistNow()
 	}
 	return s.Get(id)
 }
 
-// ContentPath returns the on-disk path of a finished task's output, or "" when it
+// ContentPath returns the on-disk path of a finished task's first output, or "" when it
 // is missing or outside the output directory.
 func (s *Store) ContentPath(id string) string {
+	return s.OutputPath(id, 0)
+}
+
+// OutputPath returns the on-disk path of one output of a finished task, or "" when it is
+// missing or outside the output directory.
+func (s *Store) OutputPath(id string, index int) string {
 	s.mu.RLock()
-	task, ok := s.tasks[id]
+	stored, ok := s.tasks[id]
 	s.mu.RUnlock()
-	if !ok || task.File == nil || *task.File == "" {
+	if !ok {
 		return ""
 	}
-	resolved, err := filepath.Abs(*task.File)
+	files := stored.Outputs
+	if len(files) == 0 {
+		// A record written before multi-output tasks existed carries only the first file.
+		if index != 0 || stored.File == nil || *stored.File == "" {
+			return ""
+		}
+		return s.withinOutput(*stored.File)
+	}
+	if index < 0 || index >= len(files) {
+		return ""
+	}
+	return s.withinOutput(files[index].File)
+}
+
+// withinOutput resolves a path and refuses anything outside this store's output directory.
+func (s *Store) withinOutput(path string) string {
+	resolved, err := filepath.Abs(path)
 	if err != nil {
 		return ""
 	}
@@ -440,20 +575,51 @@ func (s *Store) ContentPath(id string) string {
 	return resolved
 }
 
-// saveOutput writes a finished artifact and returns its public URL and path.
-func (s *Store) saveOutput(id string, buffer []byte, ext string) (string, string, error) {
-	filename := id + "." + ext
+// saveOutputs writes every artifact of a run and returns their public projection.
+//
+// Names are `<id>.<ext>` for the first output and `<id>-2.<ext>` after that, so a batch is
+// recognisable on disk and the first file keeps the historical name.
+func (s *Store) saveOutputs(id, object string, files []ResultFile) ([]TaskOutput, error) {
+	outputs := make([]TaskOutput, 0, len(files))
+	for index, file := range files {
+		stem := id
+		if index > 0 {
+			stem = id + "-" + strconv.Itoa(index+1)
+		}
+		filename := stem + "." + defaultExt(file.Ext)
+		target := filepath.Join(s.outputDir, filename)
+		if err := os.WriteFile(target, file.Buffer, 0o644); err != nil {
+			return nil, err
+		}
+		mimeType := file.MimeType
+		if mimeType == "" {
+			mimeType = defaultMimeType(object)
+		}
+		outputs = append(outputs, TaskOutput{
+			Index:    index,
+			File:     target,
+			URL:      s.publicURL(filename),
+			MimeType: mimeType,
+			Bytes:    int64(len(file.Buffer)),
+		})
+	}
+	return outputs, nil
+}
+
+// SaveFile stores a one-off file and returns its public URL.
+func (s *Store) SaveFile(id string, buffer []byte, ext string) (string, error) {
+	url, _, err := s.saveSingle(id, buffer, ext)
+	return url, err
+}
+
+// saveSingle writes one file outside any run (an image returned as a URL).
+func (s *Store) saveSingle(id string, buffer []byte, ext string) (string, string, error) {
+	filename := id + "." + defaultExt(ext)
 	target := filepath.Join(s.outputDir, filename)
 	if err := os.WriteFile(target, buffer, 0o644); err != nil {
 		return "", "", err
 	}
 	return s.publicURL(filename), target, nil
-}
-
-// SaveImage stores a one-off image and returns its public URL.
-func (s *Store) SaveImage(id string, buffer []byte, ext string) (string, error) {
-	url, _, err := s.saveOutput(id, buffer, defaultExt(ext))
-	return url, err
 }
 
 func (s *Store) publicURL(filename string) string {
@@ -471,7 +637,9 @@ func (s *Store) persistNow() {
 		Tasks     []*Task `json:"tasks"`
 	}{Version: 1, UpdatedAt: util.NowIso(), Tasks: make([]*Task, 0, len(s.tasks))}
 	for _, task := range s.tasks {
-		payload.Tasks = append(payload.Tasks, task)
+		// Snapshot under the lock: the worker mutates the live record, and marshalling it after
+		// unlocking raced every progress update.
+		payload.Tasks = append(payload.Tasks, task.snapshot())
 	}
 	s.mu.RUnlock()
 
@@ -580,12 +748,13 @@ func PublicTask(task *Task) map[string]any {
 	}
 	return map[string]any{
 		"id":          task.ID,
-		"object":      "video",
+		"object":      normalizeObject(task.Object),
 		"status":      task.Status,
 		"progress":    task.Progress,
 		"model":       task.Model,
 		"request":     task.Request,
 		"createdAt":   task.CreatedAt,
+		"startedAt":   task.StartedAt,
 		"updatedAt":   task.UpdatedAt,
 		"completedAt": task.CompletedAt,
 		"promptId":    task.PromptID,
@@ -593,8 +762,21 @@ func PublicTask(task *Task) map[string]any {
 		"file":        task.File,
 		"mimeType":    task.MimeType,
 		"bytes":       task.Bytes,
+		"outputs":     nonNilOutputs(task.Outputs),
 		"error":       task.Error,
+		"errorCode":   task.ErrorCode,
+		"errorDetail": task.ErrorDetails,
+		"errorStatus": task.ErrorStatus,
 	}
+}
+
+// nonNilOutputs keeps the wire projection an array even for a record written before the
+// field existed.
+func nonNilOutputs(outputs []TaskOutput) []TaskOutput {
+	if outputs == nil {
+		return []TaskOutput{}
+	}
+	return outputs
 }
 
 func taskTime(task *Task) time.Time {

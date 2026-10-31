@@ -216,3 +216,40 @@ func TestSanitizeToken(t *testing.T) {
 		t.Errorf("sanitizeToken(%q) = %q, dots must not survive", "..", got)
 	}
 }
+
+// SaveAudio / SaveAudioAdvanced report under "audio", a key the collector used to skip;
+// without it an audio workflow looks like it produced nothing at all.
+func TestCollectOutputFilesIncludesAudio(t *testing.T) {
+	history := map[string]any{
+		"outputs": map[string]any{
+			"35": map[string]any{
+				"audio": []any{
+					map[string]any{"filename": "canvas_minimax_music3_00001_.mp3", "subfolder": "audio", "type": "output"},
+				},
+			},
+		},
+	}
+	files := collectOutputFiles(history, false)
+	if len(files) != 1 {
+		t.Fatalf("files = %d, want 1", len(files))
+	}
+	if files[0].Filename != "canvas_minimax_music3_00001_.mp3" || files[0].Type != "output" {
+		t.Errorf("collected %+v", files[0])
+	}
+}
+
+func TestIsAudioExtension(t *testing.T) {
+	cases := map[string]bool{
+		"song.mp3":  true,
+		"song.FLAC": true,
+		"song.opus": true,
+		"song.wav":  true,
+		"song.mp4":  false,
+		"song.png":  false,
+	}
+	for name, want := range cases {
+		if got := isAudioExtension(name); got != want {
+			t.Errorf("isAudioExtension(%q) = %v, want %v", name, got, want)
+		}
+	}
+}

@@ -43,7 +43,7 @@ the canvas frontend is a self-contained third-party subtree beside it:
 ├── data/              # runtime state: tasks.json, resource-lock.json, outputs/ (not tracked)
 ├── bin/               # build output (not tracked)
 ├── infinite-canvas/   # canvas frontend (third-party, ships its own web/ and build)
-├── docs/              # gateway API and env vars, prompt optimization, runtime deps
+├── docs/              # gateway API and env vars, the run protocol, prompt optimization, runtime deps
 ├── tools/             # development scripts
 ├── Makefile           # make build / check / check-full / verify-static / web / web-check
 └── start.sh           # starts the gateway and previews the canvas

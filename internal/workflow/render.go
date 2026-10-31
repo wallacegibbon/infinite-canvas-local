@@ -40,7 +40,10 @@ type Schema struct {
 	VariantLabels  map[string]string `json:"variantLabels"`
 	Fields         []map[string]any  `json:"fields"`
 	Parameters     []any             `json:"parameters"`
-	Lora           *Lora             `json:"lora"`
+	// Inputs is the typed request contract a run is validated against: the semantic keys
+	// (prompt, size, count, …) plus every declared parameter and non-media binding.
+	Inputs []InputSpec `json:"inputs"`
+	Lora   *Lora       `json:"lora"`
 }
 
 // PublicProjection renders one entry for the workflows list.
@@ -110,6 +113,7 @@ func BuildSchema(entry *Entry) Schema {
 		VariantLabels: entry.VariantLabelsMap(),
 		Fields:        fields,
 		Parameters:    nonNilSlice(entry.Parameters),
+		Inputs:        entry.InputSpecs(InputLimits{}),
 		Lora:          entry.Lora,
 	}
 	if entry.BaseModel != "" {

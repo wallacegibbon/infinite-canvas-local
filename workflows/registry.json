@@ -78,7 +78,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -152,6 +152,20 @@
       "type": "video",
       "file": "video-h3-ref2va-drama-vdn.json",
       "description": "MiniMax-H3 multi-reference on the VDN 8-step backend (Singularity + VDN stage-dmd-step-250; turbo adapter + TESpeed + Sage + SelfLift + SigmaRefiner, 9 NFE). Supports 1–6 images, 0–2 audio clips and 0–1 video (at least one media). Requires models/vdn/stage-dmd-step-250.",
+      "mode": "reference",
+      "accepts": {
+        "images": {
+          "max": 6
+        },
+        "videos": {
+          "max": 1
+        },
+        "audios": {
+          "max": 2
+        },
+        "minTotal": 1,
+        "note": "multi-reference accepts 1-6 images, 0-2 audio clips and 0-1 video, with at least one media item"
+      },
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
         "source": "5"
@@ -273,7 +287,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -343,8 +357,7 @@
           "default": 1
         }
       ],
-      "label": "H3 multi-reference (VDN)",
-      "minMedia": 1
+      "label": "H3 multi-reference (VDN)"
     },
     {
       "id": "video-h3-t2v",
@@ -352,6 +365,19 @@
       "type": "video",
       "file": "video-h3-ref2va-drama-vdn.json",
       "description": "MiniMax-H3 text-to-video on the VDN 8-step backend (Singularity + VDN stage-dmd-step-250; turbo adapter + TESpeed + Sage + SelfLift + SigmaRefiner, 9 NFE). No image/audio/video input. Requires models/vdn/stage-dmd-step-250.",
+      "mode": "text",
+      "accepts": {
+        "images": {
+          "max": 0
+        },
+        "videos": {
+          "max": 0
+        },
+        "audios": {
+          "max": 0
+        },
+        "note": "text-to-video accepts no image/video/audio; use the first/last-frame workflow or multi-reference instead"
+      },
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
         "source": "5"
@@ -448,7 +474,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -526,6 +552,28 @@
       "type": "video",
       "file": "video-h3-ref2va-drama-vdn.json",
       "description": "MiniMax-H3 first/last-frame video on the VDN 8-step backend (VDN stage-dmd-step-250 + TESpeed + Sage + SelfLift + SigmaRefiner, 9 NFE). Requires 1–2 images: first, last, or both; task_type switches I2VA/L2VA/FL2VA.",
+      "mode": "frames",
+      "frameMode": {
+        "default": "byCount",
+        "images": {
+          "first": 1,
+          "last": 1,
+          "both": 2
+        }
+      },
+      "accepts": {
+        "images": {
+          "min": 1,
+          "max": 2
+        },
+        "videos": {
+          "max": 0
+        },
+        "audios": {
+          "max": 0
+        },
+        "note": "first/last frame accepts a first frame, a last frame, or both; both needs 2 images"
+      },
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
         "source": "5"
@@ -637,7 +685,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -715,6 +763,20 @@
       "type": "video",
       "file": "video-h3-ref2va-drama.json",
       "description": "MiniMax-H3 multi-reference on the original canvas chain (LightX2V 8-step LoRA + SolAttn/Sage + TESpeed + SelfLift + SigmaRefiner, 9 NFE; no VDN). Supports 1–6 images, 0–2 audio clips and 0–1 video (at least one media).",
+      "mode": "reference",
+      "accepts": {
+        "images": {
+          "max": 6
+        },
+        "videos": {
+          "max": 1
+        },
+        "audios": {
+          "max": 2
+        },
+        "minTotal": 1,
+        "note": "multi-reference accepts 1-6 images, 0-2 audio clips and 0-1 video, with at least one media item"
+      },
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
         "source": "5"
@@ -836,7 +898,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -906,8 +968,7 @@
           "default": 1
         }
       ],
-      "label": "H3 multi-reference (no VDN)",
-      "minMedia": 1
+      "label": "H3 multi-reference (no VDN)"
     },
     {
       "id": "video-h3-t2v-novdn",
@@ -915,6 +976,19 @@
       "type": "video",
       "file": "video-h3-ref2va-drama.json",
       "description": "MiniMax-H3 text-to-video on the original canvas chain (LightX2V 8-step LoRA + SolAttn/Sage + TESpeed + SelfLift + SigmaRefiner, 9 NFE; no VDN). No image/audio/video input.",
+      "mode": "text",
+      "accepts": {
+        "images": {
+          "max": 0
+        },
+        "videos": {
+          "max": 0
+        },
+        "audios": {
+          "max": 0
+        },
+        "note": "text-to-video accepts no image/video/audio; use the first/last-frame workflow or multi-reference instead"
+      },
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
         "source": "5"
@@ -1011,7 +1085,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -1089,6 +1163,28 @@
       "type": "video",
       "file": "video-h3-ref2va-drama.json",
       "description": "MiniMax-H3 first/last-frame video on the original canvas chain (LightX2V 8-step LoRA + SolAttn/Sage + TESpeed + SelfLift + SigmaRefiner, 9 NFE; no VDN). Requires 1–2 images: first, last, or both; task_type switches I2VA/L2VA/FL2VA.",
+      "mode": "frames",
+      "frameMode": {
+        "default": "byCount",
+        "images": {
+          "first": 1,
+          "last": 1,
+          "both": 2
+        }
+      },
+      "accepts": {
+        "images": {
+          "min": 1,
+          "max": 2
+        },
+        "videos": {
+          "max": 0
+        },
+        "audios": {
+          "max": 0
+        },
+        "note": "first/last frame accepts a first frame, a last frame, or both; both needs 2 images"
+      },
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
         "source": "5"
@@ -1200,7 +1296,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -1347,7 +1443,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "default": 42
@@ -1431,7 +1527,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -1659,7 +1755,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -1694,7 +1790,14 @@
             "latentNode": "10",
             "latentInput": "latent_image",
             "latentSource": "14"
-          }
+          },
+          "accepts": {
+            "images": {
+              "min": 1,
+              "max": 4
+            }
+          },
+          "promptReorder": "qwen-edit"
         },
         "inpaint": {
           "file": "image-qwen21-inpaint.json",
@@ -1743,6 +1846,12 @@
               "from": "image",
               "imageIndex": 1,
               "required": true
+            }
+          },
+          "accepts": {
+            "images": {
+              "min": 2,
+              "max": 2
             }
           }
         },
@@ -1842,6 +1951,12 @@
               "transform": "int",
               "default": 1024
             }
+          },
+          "accepts": {
+            "images": {
+              "min": 1,
+              "max": 1
+            }
           }
         },
         "t2i": {
@@ -1886,6 +2001,11 @@
             "latentSource": "14",
             "fromSize": true,
             "skipNativeSquare": true
+          },
+          "accepts": {
+            "images": {
+              "max": 0
+            }
           }
         }
       },
@@ -1897,6 +2017,7 @@
       "label": "MOSS-Image fast 8-step",
       "type": "image",
       "description": "MOSS-Image SFT bf16 + Qwen3.5 9B + FLUX.2 VAE with a built-in 8-step DMD LoRA; 8 steps / cfg 1 / euler simple by default, tuned for speed.",
+      "promptInject": "moss-layout",
       "file": "image-moss-sft-8step.json",
       "bindings": {
         "prompt": {
@@ -1974,7 +2095,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -2115,6 +2236,22 @@
       "type": "video",
       "file": "video-h3-character-swap-vdn.json",
       "description": "MiniMax-H3 Ref2VA + Character Swap 1.5 LoRA on the local VDN 8-step backend. Source video length drives output duration; character image + prompt required. SAM 3.1 mask refinement follows separately.",
+      "accepts": {
+        "images": {
+          "min": 1,
+          "max": 6
+        },
+        "videos": {
+          "min": 1,
+          "max": 1
+        },
+        "audios": {
+          "max": 2
+        },
+        "minTotal": 2,
+        "note": "character swap needs one source video and at least one reference image"
+      },
+      "sourceVideoFrames": true,
       "lora": {
         "filter": "H3|minimax_h3|TaoMate-H3",
         "source": "5"
@@ -2229,7 +2366,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -2300,7 +2437,6 @@
         }
       ],
       "label": "H3 character swap (Character Swap 1.5)",
-      "minMedia": 1,
       "hidden": false
     },
     {
@@ -2309,6 +2445,7 @@
       "label": "MOSS Balanced fast 8-step",
       "type": "image",
       "description": "MOSS-Image Base+SFT merged with the Balanced preset (strength 1.0) as a bf16 model plus the 8-step DMD LoRA; 8 steps / cfg 1 / euler simple by default. Run the merge once first to produce moss_balanced_s100.safetensors.",
+      "promptInject": "moss-layout",
       "file": "image-moss-balanced-8step.json",
       "bindings": {
         "prompt": {
@@ -2386,7 +2523,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -2460,6 +2597,7 @@
       "label": "MOSS-Image low-VRAM int8 8-step",
       "type": "image",
       "description": "MOSS-Image SFT int8 convrot + Qwen3.5 INT8 text encoder + full FLUX.2 VAE + 8-step LoRA; the low-VRAM variant, with no Balanced merge.",
+      "promptInject": "moss-layout",
       "file": "image-moss-sft-int8-8step.json",
       "bindings": {
         "prompt": {
@@ -2537,7 +2675,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -2688,7 +2826,7 @@
           "key": "seed",
           "label": "Seed",
           "type": "number",
-          "min": 1,
+          "min": 0,
           "max": 2147483647,
           "step": 1,
           "description": "Leave empty for a random seed each time"
@@ -2751,6 +2889,228 @@
           "krea2_turbo_int8_convrot.safetensors": "int8",
           "krea2_raw_fp8_scaled.safetensors": "raw",
           "SinoXvision_Krea2_Aesthetics_fp8_scale.safetensors": "aesthetics"
+        }
+      }
+    },
+    {
+      "id": "audio-minimax-music-3",
+      "name": "audio-minimax-music-3",
+      "label": "MiniMax Music 3",
+      "type": "audio",
+      "file": "audio-minimax-music-3.json",
+      "description": "MiniMax Music 3 text-to-music: a style caption plus optional lyrics, FP16 DiT with the pruned int8 text encoder and the dav VAE; 30-step euler at CFG 1.7, up to 360s per song.",
+      "outputs": {
+        "kind": "audio",
+        "formatParam": "format",
+        "qualityParam": "audioQuality",
+        "formats": {
+          "mp3": {
+            "quality": "V0"
+          },
+          "flac": {},
+          "opus": {
+            "quality": "128k"
+          }
+        }
+      },
+      "bindings": {
+        "prompt": {
+          "node": "37:13",
+          "input": "caption",
+          "required": true
+        },
+        "lyrics": {
+          "node": "37:13",
+          "input": "lyrics",
+          "from": "params.lyrics"
+        },
+        "seed": {
+          "node": "37:38",
+          "input": "seed",
+          "from": "params.seed",
+          "transform": "int",
+          "random": true
+        },
+        "duration": {
+          "node": "37:13",
+          "input": "max_duration",
+          "from": "seconds",
+          "default": 60
+        },
+        "steps": {
+          "node": "37:9",
+          "input": "steps",
+          "from": "quality.steps",
+          "default": 30
+        },
+        "stepsOverride": {
+          "node": "37:9",
+          "input": "steps",
+          "from": "params.steps",
+          "transform": "int"
+        },
+        "cfg": {
+          "node": "37:9",
+          "input": "cfg",
+          "from": "params.cfg",
+          "default": 1.7
+        },
+        "sampler": {
+          "node": "37:9",
+          "input": "sampler_name",
+          "from": "params.sampler",
+          "default": "euler"
+        },
+        "scheduler": {
+          "node": "37:9",
+          "input": "scheduler",
+          "from": "params.scheduler",
+          "default": "simple"
+        },
+        "topK": {
+          "node": "37:13",
+          "input": "top_k",
+          "from": "params.topK",
+          "transform": "int",
+          "default": 50
+        },
+        "textCfg": {
+          "node": "37:13",
+          "input": "cfg_scale",
+          "from": "params.textCfg",
+          "default": 1.7
+        },
+        "format": {
+          "node": "35",
+          "input": "format",
+          "from": "params.format",
+          "default": "mp3"
+        },
+        "formatQuality": {
+          "node": "35",
+          "input": "format.quality",
+          "from": "params.audioQuality",
+          "default": "V0"
+        },
+        "unet": {
+          "node": "37:6",
+          "input": "unet_name",
+          "from": "params.unet",
+          "default": "minimax_music3_dit_fp16.safetensors"
+        },
+        "clip": {
+          "node": "37:3",
+          "input": "clip_name",
+          "from": "params.clip",
+          "default": "minimax_music3_text_encoder_pruned_int8_convrot.safetensors"
+        },
+        "vae": {
+          "node": "37:7",
+          "input": "vae_name",
+          "from": "params.vae",
+          "default": "minimax_music3_dav.safetensors"
+        }
+      },
+      "defaults": {
+        "37:13.lyrics": ""
+      },
+      "parameters": [
+        {
+          "key": "seed",
+          "label": "Seed",
+          "type": "number",
+          "min": 0,
+          "max": 2147483647,
+          "step": 1,
+          "description": "Leave empty for a random seed each time"
+        },
+        {
+          "key": "duration",
+          "label": "Max duration (s)",
+          "type": "number",
+          "min": 4,
+          "max": 360,
+          "step": 0.04,
+          "description": "Upper bound in seconds; the model can finish the song earlier"
+        },
+        {
+          "key": "steps",
+          "label": "Steps",
+          "type": "number",
+          "min": 1,
+          "max": 60,
+          "step": 1
+        },
+        {
+          "key": "cfg",
+          "label": "CFG",
+          "type": "number",
+          "min": 0,
+          "max": 10,
+          "step": 0.1
+        },
+        {
+          "key": "sampler",
+          "label": "Sampler",
+          "type": "select",
+          "default": "euler",
+          "options": [
+            "euler",
+            "euler_ancestral",
+            "dpmpp_2m",
+            "dpmpp_2m_sde",
+            "res_multistep"
+          ]
+        },
+        {
+          "key": "scheduler",
+          "label": "Scheduler",
+          "type": "select",
+          "default": "simple",
+          "options": [
+            "simple",
+            "normal",
+            "beta",
+            "karras",
+            "exponential"
+          ]
+        },
+        {
+          "key": "topK",
+          "label": "Top-K",
+          "type": "number",
+          "min": 1,
+          "max": 16384,
+          "step": 1
+        }
+      ],
+      "presets": {
+        "quality": {
+          "low": {
+            "steps": 16
+          },
+          "medium": {
+            "steps": 24
+          },
+          "high": {
+            "steps": 30
+          },
+          "xhigh": {
+            "steps": 40
+          }
+        }
+      },
+      "baseModels": {
+        "param": "unet",
+        "classType": "UNETLoader",
+        "input": "unet_name",
+        "label": "Base model",
+        "filter": "minimax_music3_dit",
+        "prefix": "mm3",
+        "aliases": {
+          "minimax_music3_dit_fp16.safetensors": "fp16",
+          "minimax_music3_dit_int8_convrot.safetensors": "int8",
+          "minimax_music3_dit_fp32.safetensors": "fp32"
         }
       }
     }

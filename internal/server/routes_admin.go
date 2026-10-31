@@ -16,6 +16,7 @@ import (
 // routes registers the full HTTP surface.
 func (s *Server) routes(mux *http.ServeMux) {
 	s.routesGeneration(mux)
+	s.routesRuns(mux)
 	s.routesAdmin(mux)
 }
 
@@ -57,6 +58,7 @@ func (s *Server) routesAdmin(mux *http.ServeMux) {
 
 	s.route(mux, "POST /api/requests/{id}/cancel", s.handleRequestCancel)
 	s.route(mux, "GET /api/tasks", s.handleTasks)
+	s.route(mux, "GET /api/tasks/{id}", s.handleTaskGet)
 }
 
 // handleHealth implements GET /health, the canvas's liveness probe.

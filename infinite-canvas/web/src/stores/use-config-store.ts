@@ -447,9 +447,11 @@ export const useConfigStore = create<ConfigStore>()(
                 const models = modelOptionsFromChannels(channels);
                 const imageOptions = channels.flatMap((channel) => channel.models.filter((model) => model.capability === "image").map((model) => encodeChannelModel(channel.id, model.name)));
                 const videoOptions = channels.flatMap((channel) => channel.models.filter((model) => model.capability === "video").map((model) => encodeChannelModel(channel.id, model.name)));
+                const audioOptions = channels.flatMap((channel) => channel.models.filter((model) => model.capability === "audio").map((model) => encodeChannelModel(channel.id, model.name)));
                 const pickModel = (current: string, options: string[]) => (options.includes(current) ? current : options[0] || "");
                 const imageModel = pickModel(config.imageModel || config.model, imageOptions);
                 const videoModel = pickModel(config.videoModel, videoOptions);
+                const audioModel = pickModel(config.audioModel, audioOptions);
                 const normalizedCloud = normalizePromptCloudConfig(config);
                 return {
                     ...current,
@@ -462,7 +464,7 @@ export const useConfigStore = create<ConfigStore>()(
                         imageModel,
                         videoModel,
                         textModel: "",
-                        audioModel: "",
+                        audioModel,
                         audioVoice: config.audioVoice || defaultConfig.audioVoice,
                         audioFormat: config.audioFormat || defaultConfig.audioFormat,
                         audioSpeed: config.audioSpeed || defaultConfig.audioSpeed,

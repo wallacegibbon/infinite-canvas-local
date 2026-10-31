@@ -55,102 +55,35 @@ func (s *Server) handleVideoCreate(ctx *httpx.Ctx) error {
 		return httpx.NewError(http.StatusBadRequest, "invalid_interpolation", "interpolation must be off, 2x or 3x")
 	}
 
-	videoMode := strings.TrimSpace(httpx.String(body, "mode"))
-	switch entry.ID {
-	case "video-h3-t2v":
-		videoMode = "text"
-	case "video-h3-frames":
-		videoMode = "frames"
-	case "video-h3-fast":
-		if videoMode != "text" {
-			videoMode = "frames"
-		}
-	case "video-h3-ref2va":
-		videoMode = "reference"
+	// Every per-workflow media rule (text-to-video takes none, frames take one or two images,
+	// multi-reference takes up to six images and a video, character swap needs a video) lives in
+	// registry.json now; this call is the only place that judges a request's media mix.
+	plan, err := workflow.PlanMedia(entry, workflow.MediaCounts{
+		Images: len(files),
+		Videos: len(videoFiles),
+		Audios: len(audioFiles),
+	}, strings.TrimSpace(httpx.String(body, "mode")), mergedParams)
+	if err != nil {
+		return err
 	}
-
-	requiredImages := requiredImageCount(entry)
-	totalMedia := len(files) + len(videoFiles) + len(audioFiles)
-
-	switch {
-	case entry.ID == "video-h3-t2v":
-		if totalMedia > 0 {
-			return httpx.NewError(http.StatusBadRequest, "unsupported_video_media",
-				"H3 text-to-video accepts no image/video/audio; use the H3 first/last-frame workflow or H3 multi-reference instead")
-		}
-		requiredImages = 0
-
-	case entry.ID == "video-h3-fast" && videoMode == "text":
-		if totalMedia > 0 {
-			return httpx.NewError(http.StatusBadRequest, "unsupported_video_media",
-				"the H3 fast draft text mode accepts no image/video/audio; switch to first/last frame to supply a first frame")
-		}
-		requiredImages = 0
-
-	case entry.ID == "video-h3-frames" || entry.ID == "video-h3-fast":
-		if len(videoFiles) > 0 || len(audioFiles) > 0 {
-			return httpx.NewError(http.StatusBadRequest, "unsupported_video_media",
-				"H3 first/last frame accepts only 1-2 images; use H3 multi-reference for audio or video")
-		}
-		frameMode := util.StringField(params, "frameMode")
-		if frameMode == "" {
-			if len(files) >= 2 {
-				frameMode = "both"
-			} else {
-				frameMode = "first"
-			}
-		}
-		switch frameMode {
-		case "first", "last", "both":
-		default:
-			return httpx.NewError(http.StatusBadRequest, "invalid_frame_mode", "frameMode must be first, last or both")
-		}
-		mergedParams["frameMode"] = frameMode
-		switch {
-		case frameMode == "both":
-			requiredImages = 2
-		case entry.ID == "video-h3-fast":
-			requiredImages = 0
-		default:
-			requiredImages = 1
-		}
+	videoMode := plan.Mode
+	if plan.FrameMode != "" {
+		mergedParams["frameMode"] = plan.FrameMode
 	}
-
-	if len(files) < requiredImages {
-		hint := ""
-		switch entry.ID {
-		case "video-h3-ref2va":
-			hint = " (H3 multi-reference accepts 1-6 images, 0-2 audio clips and 0-1 video, with at least one media item)"
-		case "video-h3-frames", "video-h3-fast":
-			hint = " (first/last frame accepts a first frame, a last frame, or both; both needs 2 images)"
-		}
-		return httpx.Errorf(http.StatusBadRequest, "missing_reference_image",
-			"workflow %s needs at least %d reference image(s)%s", entry.Name, requiredImages, hint)
-	}
-	if entry.MinMedia > 0 && totalMedia < entry.MinMedia {
-		return httpx.Errorf(http.StatusBadRequest, "missing_reference_media",
-			"workflow %s needs at least %d reference media item(s) (image/audio/video)", entry.Name, entry.MinMedia)
-	}
-
-	requestCtx, cancel := context.WithCancel(context.Background())
-	_ = requestCtx
 
 	uploadCtx, cleanup := s.withCancel(ctx.R, ctx.RequestID)
 	defer cleanup()
 
 	uploadedImages, err := s.uploadFiles(uploadCtx, files)
 	if err != nil {
-		cancel()
 		return err
 	}
 	uploadedVideos, err := s.uploadFiles(uploadCtx, videoFiles)
 	if err != nil {
-		cancel()
 		return err
 	}
 	uploadedAudios, err := s.uploadFiles(uploadCtx, audioFiles)
 	if err != nil {
-		cancel()
 		return err
 	}
 
@@ -178,7 +111,7 @@ func (s *Server) handleVideoCreate(ctx *httpx.Ctx) error {
 		runCtx.Params[key] = value
 	}
 	delete(runCtx.Params, "params")
-	if len(videoFiles) > 0 {
+	if entry.SourceVideoFrames && len(videoFiles) > 0 {
 		runCtx.SourceVideoFrames = s.probeVideoFrames(videoFiles[0])
 	}
 
@@ -195,24 +128,14 @@ func (s *Server) handleVideoCreate(ctx *httpx.Ctx) error {
 		"interpolation":   interpolation,
 	}
 
-	stored := s.tasks.Create(entry.Name, request)
-	s.tasks.Enqueue(stored, func(job *task.Task, progress func(task.Update), jobCtx context.Context) (*task.Result, error) {
-		result, err := s.runner.RunVideo(jobCtx, generate.RunOptions{
-			Entry:          entry,
-			Context:        runCtx,
-			RequestID:      ctx.RequestID,
-			LoraCatalog:    s.setup.LoraNames(),
-			ModelAliasFor:  s.setup.ModelAliasFor,
-			TimeoutMs:      s.cfg.VideoTimeoutMs,
-			PollIntervalMs: s.cfg.PollIntervalMs,
-			OnProgress: func(event generate.ProgressEvent) {
-				progress(task.Update{Progress: event.Progress, PromptID: event.PromptID})
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-
+	stored := s.submitRun(runSpec{
+		Object:    task.ObjectVideo,
+		Entry:     entry,
+		Context:   runCtx,
+		TimeoutMs: s.cfg.VideoTimeoutMs,
+		RequestID: ctx.RequestID,
+		Request:   request,
+	}, func(jobCtx context.Context, result *generate.RunResult, progress func(task.Update)) (*task.Result, error) {
 		file := result.Files[0]
 		if interpolation != "off" {
 			progress(task.Update{Progress: 0.97})
@@ -232,16 +155,17 @@ func (s *Server) handleVideoCreate(ctx *httpx.Ctx) error {
 			}
 		}
 		return &task.Result{
-			Buffer:   file.Buffer,
-			Ext:      util.ExtFromMime(file.MimeType, file.Filename, "mp4"),
-			MimeType: file.MimeType,
+			Outputs: []task.ResultFile{{
+				Buffer:   file.Buffer,
+				Ext:      util.ExtFromMime(file.MimeType, file.Filename, "mp4"),
+				MimeType: file.MimeType,
+			}},
 			PromptID: result.PromptID,
 		}, nil
 	})
 
 	s.logger.Info("video %s queued %s %s", entry.Name, stored.ID, ctx.RequestID)
-	cancel()
-	httpx.OK(ctx.W, queuedPayload(stored.ID))
+	httpx.OK(ctx.W, queuedPayload(s.tasks.Get(stored.ID)))
 	return nil
 }
 
@@ -292,33 +216,17 @@ func (s *Server) handleVideoUpscale(ctx *httpx.Ctx) error {
 		"fps":        params["fps"],
 		"scale":      params["scale"],
 	}
-	stored := s.tasks.Create(entry.Name, request)
-	s.tasks.Enqueue(stored, func(job *task.Task, progress func(task.Update), jobCtx context.Context) (*task.Result, error) {
-		result, err := s.runner.RunVideo(jobCtx, generate.RunOptions{
-			Entry:          entry,
-			Context:        runCtx,
-			RequestID:      ctx.RequestID,
-			ModelAliasFor:  s.setup.ModelAliasFor,
-			TimeoutMs:      s.cfg.VideoTimeoutMs,
-			PollIntervalMs: s.cfg.PollIntervalMs,
-			OnProgress: func(event generate.ProgressEvent) {
-				progress(task.Update{Progress: event.Progress, PromptID: event.PromptID})
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		file := result.Files[0]
-		return &task.Result{
-			Buffer:   file.Buffer,
-			Ext:      util.ExtFromMime(file.MimeType, file.Filename, "mp4"),
-			MimeType: file.MimeType,
-			PromptID: result.PromptID,
-		}, nil
-	})
+	stored := s.submitRun(runSpec{
+		Object:    task.ObjectVideo,
+		Entry:     entry,
+		Context:   runCtx,
+		TimeoutMs: s.cfg.VideoTimeoutMs,
+		RequestID: ctx.RequestID,
+		Request:   request,
+	}, nil)
 
 	s.logger.Info("video upscale %s queued %s %s", entry.Name, stored.ID, ctx.RequestID)
-	httpx.OK(ctx.W, queuedPayload(stored.ID))
+	httpx.OK(ctx.W, queuedPayload(s.tasks.Get(stored.ID)))
 	return nil
 }
 
@@ -345,7 +253,7 @@ func (s *Server) handleVideoInterpolate(ctx *httpx.Ctx) error {
 	}
 	originalName := defaultStringOf(source.Filename, "input.mp4")
 
-	stored := s.tasks.Create("video-rife", map[string]any{
+	stored := s.tasks.Create(task.ObjectVideo, "video-rife", map[string]any{
 		"mode":       "interpolate",
 		"multiplier": multiplier,
 		"video":      originalName,
@@ -363,40 +271,17 @@ func (s *Server) handleVideoInterpolate(ctx *httpx.Ctx) error {
 			return nil, err
 		}
 		return &task.Result{
-			Buffer:   result.Buffer,
-			Ext:      util.ExtFromMime(result.MimeType, result.Filename, "mp4"),
-			MimeType: result.MimeType,
+			Outputs: []task.ResultFile{{
+				Buffer:   result.Buffer,
+				Ext:      util.ExtFromMime(result.MimeType, result.Filename, "mp4"),
+				MimeType: result.MimeType,
+			}},
 		}, nil
 	})
 
 	s.logger.Info("video interpolate %s queued %s %s", multiplier, stored.ID, ctx.RequestID)
-	httpx.OK(ctx.W, queuedPayload(stored.ID))
+	httpx.OK(ctx.W, queuedPayload(s.tasks.Get(stored.ID)))
 	return nil
-}
-
-// requiredImageCount derives how many reference images a workflow needs.
-func requiredImageCount(entry *workflow.Entry) int {
-	max := 0
-	for _, binding := range entry.Bindings() {
-		from := binding.String("from")
-		if from == "image" && binding.Bool("array") {
-			if min := binding.Int("min", 0); min > max {
-				max = min
-			}
-			continue
-		}
-		if !binding.Bool("required") {
-			continue
-		}
-		if from != "image" && !binding.Has("imageIndex") {
-			continue
-		}
-		index := binding.Int("imageIndex", 0)
-		if index+1 > max {
-			max = index + 1
-		}
-	}
-	return max
 }
 
 func hasBackgroundSupport(entry *workflow.Entry) bool {
@@ -463,10 +348,16 @@ func firstMediaName(items []workflow.Media) string {
 }
 
 // queuedPayload is the response every video endpoint returns immediately.
-func queuedPayload(id string) map[string]any {
+func queuedPayload(stored *task.Task) map[string]any {
+	object := task.ObjectVideo
+	id := ""
+	if stored != nil {
+		object = stored.Object
+		id = stored.ID
+	}
 	return map[string]any{
 		"id":         id,
-		"object":     "video",
+		"object":     object,
 		"status":     "queued",
 		"progress":   0,
 		"created_at": nowUnix(),

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -27,6 +28,27 @@ type fakeComfy struct {
 	hits     atomic.Int32
 	// failSubmit makes /prompt return node_errors, to exercise the error path.
 	failSubmit bool
+
+	// Optional overrides. Nil/empty keeps the image defaults above, so existing tests
+	// describe only what they care about.
+	objectInfo map[string]any
+	outputs    map[string]any
+	viewMime   string
+	viewBody   string
+
+	// historyGate, when set, holds /history until it is closed. It lets a test observe a
+	// run that outlives the HTTP request that started it.
+	historyGate chan struct{}
+
+	mu         sync.Mutex
+	lastPrompt map[string]any
+}
+
+// submittedGraph returns the graph the last POST /prompt carried.
+func (f *fakeComfy) submittedGraph() map[string]any {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.lastPrompt
 }
 
 func newFakeComfy(t *testing.T) *fakeComfy {
@@ -43,6 +65,10 @@ func newFakeComfy(t *testing.T) *fakeComfy {
 	mux.HandleFunc("/object_info", func(w http.ResponseWriter, _ *http.Request) {
 		// No model loaders are declared, so the availability check has nothing to
 		// complain about. Only the node classes the test graph uses are needed.
+		if fake.objectInfo != nil {
+			writeJSON(w, fake.objectInfo)
+			return
+		}
 		writeJSON(w, map[string]any{
 			"CLIPTextEncode": map[string]any{"input": map[string]any{}},
 			"KSampler":       map[string]any{"input": map[string]any{}},
@@ -51,6 +77,16 @@ func newFakeComfy(t *testing.T) *fakeComfy {
 	})
 	mux.HandleFunc("/prompt", func(w http.ResponseWriter, r *http.Request) {
 		fake.hits.Add(1)
+		if body, err := io.ReadAll(r.Body); err == nil {
+			var decoded map[string]any
+			if json.Unmarshal(body, &decoded) == nil {
+				if graph, ok := decoded["prompt"].(map[string]any); ok {
+					fake.mu.Lock()
+					fake.lastPrompt = graph
+					fake.mu.Unlock()
+				}
+			}
+		}
 		if fake.failSubmit {
 			writeJSON(w, map[string]any{
 				"node_errors": map[string]any{
@@ -61,23 +97,34 @@ func newFakeComfy(t *testing.T) *fakeComfy {
 		}
 		writeJSON(w, map[string]any{"prompt_id": fake.promptID, "number": 1})
 	})
-	mux.HandleFunc("/history/"+fake.promptID, func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, map[string]any{
-			fake.promptID: map[string]any{
-				"status": map[string]any{"completed": true, "status_str": "success"},
-				"outputs": map[string]any{
-					"9": map[string]any{
-						"images": []any{
-							map[string]any{"filename": "out.png", "subfolder": "", "type": "output"},
-						},
+	mux.HandleFunc("/history/"+fake.promptID, func(w http.ResponseWriter, r *http.Request) {
+		if fake.historyGate != nil {
+			select {
+			case <-fake.historyGate:
+			case <-r.Context().Done():
+				return
+			}
+		}
+		outputs := fake.outputs
+		if outputs == nil {
+			outputs = map[string]any{
+				"9": map[string]any{
+					"images": []any{
+						map[string]any{"filename": "out.png", "subfolder": "", "type": "output"},
 					},
 				},
+			}
+		}
+		writeJSON(w, map[string]any{
+			fake.promptID: map[string]any{
+				"status":  map[string]any{"completed": true, "status_str": "success"},
+				"outputs": outputs,
 			},
 		})
 	})
 	mux.HandleFunc("/view", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "image/png")
-		_, _ = w.Write([]byte("PNGDATA"))
+		w.Header().Set("Content-Type", defaultStringOf(fake.viewMime, "image/png"))
+		_, _ = w.Write([]byte(defaultStringOf(fake.viewBody, "PNGDATA")))
 	})
 	mux.HandleFunc("/upload/image", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]any{"name": "uploaded.png", "subfolder": "", "type": "input"})
@@ -99,9 +146,42 @@ func writeJSON(w http.ResponseWriter, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
+// imageFixture is the default workflow a test gateway serves: enough shape to run an
+// image, with a prompt binding and a quality preset the tests can observe.
+func imageFixture() (string, map[string]any, map[string]any) {
+	graph := map[string]any{
+		"4": map[string]any{"class_type": "CLIPTextEncode", "inputs": map[string]any{"text": "placeholder"}},
+		"8": map[string]any{"class_type": "KSampler", "inputs": map[string]any{"seed": 1.0, "steps": 4.0, "cfg": 1.0}},
+		"9": map[string]any{"class_type": "SaveImage", "inputs": map[string]any{
+			"images": []any{"8", 0}, "filename_prefix": "out",
+		}},
+	}
+	entry := map[string]any{
+		"id":         "image-test",
+		"name":       "image-test",
+		"type":       "image",
+		"file":       "test-image.json",
+		"parameters": []any{},
+		"bindings": map[string]any{
+			"prompt": map[string]any{"node": "4", "input": "text"},
+			"seed":   map[string]any{"node": "8", "input": "seed", "from": "params.seed", "random": true},
+			"steps":  map[string]any{"node": "8", "input": "steps", "from": "quality.steps", "default": 4},
+		},
+	}
+	return "test-image.json", graph, entry
+}
+
 // newTestGateway builds a gateway backed by a temporary workflow directory and a
 // fake ComfyUI.
 func newTestGateway(t *testing.T, fake *fakeComfy) *Server {
+	t.Helper()
+	file, graph, entry := imageFixture()
+	return newTestGatewayWith(t, fake, file, graph, entry)
+}
+
+// newTestGatewayWith is newTestGateway with the workflow and registry entry supplied by the
+// caller, so a test can exercise a non-image run without copying the setup.
+func newTestGatewayWith(t *testing.T, fake *fakeComfy, graphFile string, graph, entry map[string]any) *Server {
 	t.Helper()
 
 	root := t.TempDir()
@@ -114,33 +194,11 @@ func newTestGateway(t *testing.T, fake *fakeComfy) *Server {
 		}
 	}
 
-	graph := map[string]any{
-		"4": map[string]any{"class_type": "CLIPTextEncode", "inputs": map[string]any{"text": "placeholder"}},
-		"8": map[string]any{"class_type": "KSampler", "inputs": map[string]any{"seed": 1.0, "steps": 4.0, "cfg": 1.0}},
-		"9": map[string]any{"class_type": "SaveImage", "inputs": map[string]any{
-			"images": []any{"8", 0}, "filename_prefix": "out",
-		}},
-	}
-	writeFixture(t, filepath.Join(workflowDir, "test-image.json"), graph)
-
-	registry := map[string]any{
-		"version": 1,
-		"workflows": []any{
-			map[string]any{
-				"id":   "image-test",
-				"name": "image-test",
-				"type": "image",
-				"file": "test-image.json",
-				"bindings": map[string]any{
-					"prompt": map[string]any{"node": "4", "input": "text"},
-					"seed":   map[string]any{"node": "8", "input": "seed", "from": "params.seed", "random": true},
-					"steps":  map[string]any{"node": "8", "input": "steps", "from": "quality.steps", "default": 4},
-				},
-				"parameters": []any{},
-			},
-		},
-	}
-	writeFixture(t, filepath.Join(workflowDir, "registry.json"), registry)
+	writeFixture(t, filepath.Join(workflowDir, graphFile), graph)
+	writeFixture(t, filepath.Join(workflowDir, "registry.json"), map[string]any{
+		"version":   1,
+		"workflows": []any{entry},
+	})
 
 	cfg, err := config.Load(
 		config.WithComfyURL(fake.server.URL),

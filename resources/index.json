@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "version": "2026.10.30-29",
+  "version": "2026.10.31-30",
   "channel": "stable",
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-10-31",
   "packs": [
     {
       "id": "core",
@@ -296,6 +296,37 @@
           "h3_vdn_stage_default_config",
           "h3_character_swap_lora",
           "h3_tiny_vae"
+        ]
+      }
+    },
+    {
+      "id": "music",
+      "label": "MiniMax Music 3 音乐生成",
+      "description": "MiniMax Music 3 文生音乐：风格描述 + 可选歌词，默认 fp16 底模、int8 文本编码器和 dav 音频 VAE；int8/fp32 底模与更大的文本编码器是选下内容。",
+      "resources": [
+        "minimax_music3_dit_fp16",
+        "minimax_music3_te_pruned_int8",
+        "minimax_music3_vae",
+        "minimax_music3_dit_int8_convrot",
+        "minimax_music3_dit_fp32",
+        "minimax_music3_te_pruned_bf16",
+        "minimax_music3_te_bf16"
+      ],
+      "optionalResources": [
+        "minimax_music3_dit_int8_convrot",
+        "minimax_music3_dit_fp32",
+        "minimax_music3_te_pruned_bf16",
+        "minimax_music3_te_bf16"
+      ],
+      "workflows": [
+        "audio-minimax-music-3"
+      ],
+      "optional": true,
+      "workflowDependencies": {
+        "audio-minimax-music-3": [
+          "minimax_music3_dit_fp16",
+          "minimax_music3_te_pruned_int8",
+          "minimax_music3_vae"
         ]
       }
     },
@@ -1052,6 +1083,104 @@
       "note": "4x 快速放大；输出尺寸较大。",
       "sources": [
         "https://modelscope.cn/datasets/shensanshu/ComfyUI-Local-Infinite-Canvas-Models/resolve/master/upscale_models/RealESRGAN_x4plus.pth"
+      ]
+    },
+    {
+      "id": "minimax_music3_dit_fp16",
+      "type": "model",
+      "label": "MiniMax Music 3 DiT fp16",
+      "target": "diffusion_models/minimax_music3_dit_fp16.safetensors",
+      "size": 4914197682,
+      "sha256": "45494a2b6b69af115902ff28eaf54118d19067aa54da01000f3e3efce7ba0e34",
+      "license": "Apache-2.0",
+      "note": "音乐生成默认底模，约 4.9GB。",
+      "sources": [
+        "https://www.modelscope.cn/models/Comfy-Org/MiniMax-Music-3/resolve/master/diffusion_models/minimax_music3_dit_fp16.safetensors",
+        "https://hf-mirror.com/Comfy-Org/MiniMax-Music-3/resolve/main/diffusion_models/minimax_music3_dit_fp16.safetensors"
+      ]
+    },
+    {
+      "id": "minimax_music3_dit_int8_convrot",
+      "type": "model",
+      "label": "MiniMax Music 3 DiT int8 ConvRot",
+      "target": "diffusion_models/minimax_music3_dit_int8_convrot.safetensors",
+      "size": 2502161682,
+      "sha256": "d6b959633e69899f99f3a92d6741c0fe79f26958a30811e50e372ef978b24d5f",
+      "license": "Apache-2.0",
+      "note": "低显存底模，约 2.5GB；在模型选择里手动切换。",
+      "sources": [
+        "https://www.modelscope.cn/models/Comfy-Org/MiniMax-Music-3/resolve/master/diffusion_models/minimax_music3_dit_int8_convrot.safetensors",
+        "https://hf-mirror.com/Comfy-Org/MiniMax-Music-3/resolve/main/diffusion_models/minimax_music3_dit_int8_convrot.safetensors"
+      ]
+    },
+    {
+      "id": "minimax_music3_dit_fp32",
+      "type": "model",
+      "label": "MiniMax Music 3 DiT fp32",
+      "target": "diffusion_models/minimax_music3_dit_fp32.safetensors",
+      "size": 9828345396,
+      "sha256": "ab54b44bcc40ea49c44bd65fd86cade12adf1c5bd9a5aba63f0c68f438554d2d",
+      "license": "Apache-2.0",
+      "note": "全精度底模，约 9.8GB，显存占用最大。",
+      "sources": [
+        "https://www.modelscope.cn/models/Comfy-Org/MiniMax-Music-3/resolve/master/diffusion_models/minimax_music3_dit_fp32.safetensors",
+        "https://hf-mirror.com/Comfy-Org/MiniMax-Music-3/resolve/main/diffusion_models/minimax_music3_dit_fp32.safetensors"
+      ]
+    },
+    {
+      "id": "minimax_music3_te_pruned_int8",
+      "type": "model",
+      "label": "MiniMax Music 3 文本编码器 pruned int8 ConvRot",
+      "target": "text_encoders/minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+      "size": 9196611886,
+      "sha256": "010b7416d2336a08c711bc22ee65849c9623069ddb7d89bec011a75699e52014",
+      "license": "Apache-2.0",
+      "note": "音乐默认文本编码器，约 9.2GB。",
+      "sources": [
+        "https://www.modelscope.cn/models/Comfy-Org/MiniMax-Music-3/resolve/master/text_encoders/minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+        "https://hf-mirror.com/Comfy-Org/MiniMax-Music-3/resolve/main/text_encoders/minimax_music3_text_encoder_pruned_int8_convrot.safetensors"
+      ]
+    },
+    {
+      "id": "minimax_music3_te_pruned_bf16",
+      "type": "model",
+      "label": "MiniMax Music 3 文本编码器 pruned bf16",
+      "target": "text_encoders/minimax_music3_text_encoder_pruned_bf16.safetensors",
+      "size": 16706629398,
+      "sha256": "e81e469c92af324dc69b77e5a11179e22542a6d628f2b205c8cf6143e510d976",
+      "license": "Apache-2.0",
+      "note": "非量化文本编码器，约 16.7GB。",
+      "sources": [
+        "https://www.modelscope.cn/models/Comfy-Org/MiniMax-Music-3/resolve/master/text_encoders/minimax_music3_text_encoder_pruned_bf16.safetensors",
+        "https://hf-mirror.com/Comfy-Org/MiniMax-Music-3/resolve/main/text_encoders/minimax_music3_text_encoder_pruned_bf16.safetensors"
+      ]
+    },
+    {
+      "id": "minimax_music3_te_bf16",
+      "type": "model",
+      "label": "MiniMax Music 3 文本编码器 bf16（完整）",
+      "target": "text_encoders/minimax_music3_text_encoder_bf16.safetensors",
+      "size": 18472478038,
+      "sha256": "9805d045978ce917cd1e6327b5cd8b85df1a46e4c69b61c9acf3eb29891c3958",
+      "license": "Apache-2.0",
+      "note": "完整文本编码器，约 18.5GB，一般用不到。",
+      "sources": [
+        "https://www.modelscope.cn/models/Comfy-Org/MiniMax-Music-3/resolve/master/text_encoders/minimax_music3_text_encoder_bf16.safetensors",
+        "https://hf-mirror.com/Comfy-Org/MiniMax-Music-3/resolve/main/text_encoders/minimax_music3_text_encoder_bf16.safetensors"
+      ]
+    },
+    {
+      "id": "minimax_music3_vae",
+      "type": "model",
+      "label": "MiniMax Music 3 音频 VAE",
+      "target": "vae/minimax_music3_dav.safetensors",
+      "size": 216696128,
+      "sha256": "2a32155b769be01445fcc2a8663b910fc9e1751e18dc1c3ec528064512d9ef0c",
+      "license": "Apache-2.0",
+      "note": "音频解码 VAE，约 207MB。",
+      "sources": [
+        "https://www.modelscope.cn/models/Comfy-Org/MiniMax-Music-3/resolve/master/vae/minimax_music3_dav.safetensors",
+        "https://hf-mirror.com/Comfy-Org/MiniMax-Music-3/resolve/main/vae/minimax_music3_dav.safetensors"
       ]
     }
   ]

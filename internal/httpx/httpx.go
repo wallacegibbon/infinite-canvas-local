@@ -24,6 +24,16 @@ type Error struct {
 	Details any
 }
 
+// FailureCode exposes the stable code to packages that persist a failure without
+// importing this one (internal/task does exactly that).
+func (e *Error) FailureCode() string { return e.Code }
+
+// FailureDetails exposes the structured payload for the same reason.
+func (e *Error) FailureDetails() any { return e.Details }
+
+// StatusCode exposes the HTTP status for the same reason.
+func (e *Error) StatusCode() int { return e.Status }
+
 // Error implements the error interface.
 func (e *Error) Error() string { return e.Message }
 

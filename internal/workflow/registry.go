@@ -159,27 +159,34 @@ func (r *Registry) buildEntry(raw json.RawMessage, file string) (*Entry, error) 
 	name := EnsureTypePrefix(defaultString(decoded.Name, id), workflowType)
 
 	entry := &Entry{
-		ID:               id,
-		Name:             name,
-		Type:             workflowType,
-		File:             file,
-		FilePath:         filePath,
-		Label:            decoded.Label,
-		Description:      decoded.Description,
-		Category:         decoded.Category,
-		Hidden:           decoded.Hidden,
-		MinMedia:         decoded.MinMedia,
-		BackgroundPrompt: decoded.BackgroundPrompt,
-		Workflow:         graph,
-		Defaults:         decoded.Defaults,
-		Presets:          decoded.Presets,
-		Parameters:       decoded.Parameters,
-		Lora:             decoded.Lora,
-		BaseModels:       decoded.BaseModels,
-		OutputSize:       decoded.OutputSize,
-		VariantLabels:    decoded.VariantLabels,
-		ImportedAt:       decoded.ImportedAt,
-		Source:           decoded.Source,
+		ID:                id,
+		Name:              name,
+		Type:              workflowType,
+		File:              file,
+		FilePath:          filePath,
+		Label:             decoded.Label,
+		Description:       decoded.Description,
+		Category:          decoded.Category,
+		Hidden:            decoded.Hidden,
+		MinMedia:          decoded.MinMedia,
+		BackgroundPrompt:  decoded.BackgroundPrompt,
+		Accepts:           decoded.Accepts,
+		Mode:              decoded.Mode,
+		FrameMode:         decoded.FrameMode,
+		PromptInject:      decoded.PromptInject,
+		PromptReorder:     decoded.PromptReorder,
+		SourceVideoFrames: decoded.SourceVideoFrames,
+		Outputs:           decoded.Outputs,
+		Workflow:          graph,
+		Defaults:          decoded.Defaults,
+		Presets:           decoded.Presets,
+		Parameters:        decoded.Parameters,
+		Lora:              decoded.Lora,
+		BaseModels:        decoded.BaseModels,
+		OutputSize:        decoded.OutputSize,
+		VariantLabels:     decoded.VariantLabels,
+		ImportedAt:        decoded.ImportedAt,
+		Source:            decoded.Source,
 	}
 	if entry.Defaults == nil {
 		entry.Defaults = map[string]any{}
@@ -413,7 +420,31 @@ func (r *Registry) ResolveForMode(entry *Entry, mode string) *Entry {
 	if variant.OutputSize != nil {
 		merged.OutputSize = variant.OutputSize
 	}
+	mergeVariantContract(&merged, variant)
 	return &merged
+}
+
+// mergeVariantContract lets a variant replace the media/mode contract of its parent. A variant
+// is a different graph, so inheriting the parent's limits would describe the wrong wiring.
+func mergeVariantContract(merged *Entry, variant *Variant) {
+	if variant.Accepts != nil {
+		merged.Accepts = variant.Accepts
+	}
+	if variant.Mode != "" {
+		merged.Mode = variant.Mode
+	}
+	if variant.FrameMode != nil {
+		merged.FrameMode = variant.FrameMode
+	}
+	if variant.PromptInject != "" {
+		merged.PromptInject = variant.PromptInject
+	}
+	if variant.PromptReorder != "" {
+		merged.PromptReorder = variant.PromptReorder
+	}
+	if variant.Outputs != nil {
+		merged.Outputs = variant.Outputs
+	}
 }
 
 // decorateWithMainModel applies a per-workflow main-model override, if any.

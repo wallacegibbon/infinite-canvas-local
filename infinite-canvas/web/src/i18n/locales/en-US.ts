@@ -87,7 +87,14 @@ export default {
             sizes: { landscape: "Landscape", portrait: "Portrait", square: "Square", widescreen: "Widescreen", tall: "Tall", auto: "Auto" },
             ratios: { landscape: "Landscape", portrait: "Portrait", square: "Square", standardLandscape: "Standard landscape", standardPortrait: "Standard portrait", cinematic: "Cinematic", adaptive: "Adaptive" },
         },
-        audio: { title: "Audio settings", voice: "Voice", format: "Format", speed: "Speed", instructions: "Voice instructions", instructionsPlaceholder: "For example: natural, warm, and suitable for narration." },
+        audio: {
+            title: "Audio settings",
+            voice: "Voice",
+            format: "Format",
+            speed: "Speed",
+            instructions: "Lyrics / voice instructions",
+            instructionsPlaceholder: "Music workflows: the lyrics, optional [Verse] / [Chorus] tags; speech workflows: how the voice should sound.",
+        },
         text: { title: "Text settings", reasoning: "Reasoning effort", count: "Generation count" },
         model: {
             select: "Select model",
