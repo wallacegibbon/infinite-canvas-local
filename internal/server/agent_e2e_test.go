@@ -147,7 +147,7 @@ func TestAgentChatStreamsTheAnswer(t *testing.T) {
 func TestAgentCommandRelaysTheAgentsAnswer(t *testing.T) {
 	gateway := startAgentGateway(t)
 
-	events := postForm(t, gateway.URL+"/api/agent/command", map[string]string{"name": "model_set", "args": "2"})
+	events := postForm(t, gateway.URL+"/api/agent/chat", map[string]string{"command": "model_set", "args": "2"})
 	var announced, answered bool
 	for _, event := range events {
 		switch event["type"] {
@@ -163,7 +163,7 @@ func TestAgentCommandRelaysTheAgentsAnswer(t *testing.T) {
 	}
 
 	// A rejection is relayed as the agent worded it; the gateway has no opinion to add.
-	events = postForm(t, gateway.URL+"/api/agent/command", map[string]string{"name": "model_set", "args": "99"})
+	events = postForm(t, gateway.URL+"/api/agent/chat", map[string]string{"command": "model_set", "args": "99"})
 	var message string
 	for _, event := range events {
 		if event["type"] == "command" {

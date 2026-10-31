@@ -8,13 +8,13 @@ import (
 	"comfyui-gateway/internal/httpx"
 )
 
-// routesAgent registers the two agent routes: one prompt, and one command.
+// routesAgent registers the one agent route.
 //
-// The old `/api/prompts/*` recipes are untouched and keep running; these sit beside them until the
-// canvas is moved over.
+// A prompt and a command are the same kind of thing to AlayaCore — frames on its stdin — so they are
+// one route and one stream: what the request carries is written to the agent, and what the agent says
+// comes back. The old `/api/prompts/*` recipes are untouched and keep running for now.
 func (s *Server) routesAgent(mux *http.ServeMux) {
 	s.route(mux, "POST /api/agent/chat", s.handleAgentChat)
-	s.route(mux, "POST /api/agent/command", s.handleAgentCommand)
 }
 
 // agentOptions is what every spawn needs. The wording (skills) and the tools are passed through from
@@ -28,35 +28,23 @@ func (s *Server) agentOptions() agent.SpawnOptions {
 	}
 }
 
-// handleAgentChat implements POST /api/agent/chat: a prompt in, the agent's frames out as SSE.
+// handleAgentChat implements POST /api/agent/chat.
 //
-// Nothing is interpreted on the way: `delta` is a delta, `models` is the agent's own startup
-// broadcast (with the keys stripped by the agent package), and `error` is the agent's own sentence.
+// The body is whatever should be written to the agent: `command`/`args` for a setting change,
+// `prompt` (and images) for a question, or both. Nothing is interpreted on the way — this is a
+// transcription of two streams, not an API with opinions.
 func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 	body, err := bodyOrEmpty(ctx)
 	if err != nil {
 		return err
 	}
 	request := agent.Request{
-		Prompt: httpx.String(body, "prompt"),
-		Images: promptImageURLs(orderedPromptImages(ctx.Files())),
+		Prompt:  httpx.String(body, "prompt"),
+		Images:  promptImageURLs(orderedPromptImages(ctx.Files())),
+		Command: httpx.String(body, "command"),
+		Args:    httpx.String(body, "args"),
 	}
-	emit := startEventStream(ctx.W)
-	return agent.Run(ctx.R.Context(), s.agentOptions(), request, emit)
-}
-
-// handleAgentCommand implements POST /api/agent/command: the canvas names one of AlayaCore's commands
-// (`model_set`, `reasoning_level_set`, …) and the frames answering it come back as they are.
-//
-// The gateway does not know the command vocabulary, does not check the arguments, and keeps no state:
-// the agent decides, announces, and its announcement is what the canvas displays.
-func (s *Server) handleAgentCommand(ctx *httpx.Ctx) error {
-	body, err := bodyOrEmpty(ctx)
-	if err != nil {
-		return err
-	}
-	emit := startEventStream(ctx.W)
-	return agent.Send(ctx.R.Context(), s.agentOptions(), httpx.String(body, "name"), httpx.String(body, "args"), emit)
+	return agent.Run(ctx.R.Context(), s.agentOptions(), request, startEventStream(ctx.W))
 }
 
 // startEventStream answers with an event stream and returns the function that writes one event.

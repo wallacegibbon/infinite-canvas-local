@@ -2578,12 +2578,18 @@ no idle agent to reap, no TTL, no "the panel is still open but the process was r
 hide, and no per-node processes for the config nodes that are always on screen. A spawn costs ~30 ms,
 which is why re-opening one for every ✨ press is the cheap end of the trade.
 
+**One route, one stream** A prompt and a command are the same kind of thing to AlayaCore — frames on
+its stdin — so they are one route (`POST /api/agent/chat`) and one stream: what the request carries is
+written to the agent (a `command` + `args` for a setting change, a `prompt` and images for a question,
+either or both), and what the agent says comes back. Two routes would have been two ways to say one
+thing.
+
 **The model and the level are the user's, and the gateway only shows them** Everywhere the canvas
 uses the agent there is a model `<select>` and a reasoning-level control. The gateway does not track,
 remember, re-send or validate either of them. It displays what the agent says — `SM model` and `SM
-reasoning_level`, forwarded as they arrive — and when the user changes one, that is its own request
-which forwards the agent's own command (`CI model_set`, `CI reasoning_level_set`) and returns the
-agent's answer to it. A prompt request carries the prompt and the images and nothing else. Whether a
+reasoning_level`, forwarded as they arrive — and when the user changes one, the canvas sends the
+agent's own command (`model_set`, `reasoning_level_set`) and the agent's answer comes back on the same
+stream. Whether a
 setting survives a session is AlayaCore's business: it persists the model in `runtime.conf` and does
 what it likes with the level, and the canvas shows whatever it reports next.
 

@@ -95,27 +95,28 @@ func TestRunStreamsTheAnswerAndKeepsKeysHome(t *testing.T) {
 	}
 }
 
-// A change of model is its own action, and the agent's own frames are the whole result: it announces
-// the new active model, then answers the command.
-func TestSendRelaysTheAgentsOwnStatement(t *testing.T) {
+// A setting change is the same stream as a question: one command, no prompt, and the agent's own
+// frames are the whole result.
+func TestRunRelaysACommandAndTheAgentsStatement(t *testing.T) {
 	opts, log := fakeAgentBinary(t)
 	var events []Event
-	if err := Send(context.Background(), opts, "model_set", "2", func(event Event) { events = append(events, event) }); err != nil {
-		t.Fatalf("send: %v", err)
+	if err := Run(context.Background(), opts, Request{Command: "model_set", Args: "2"}, func(event Event) { events = append(events, event) }); err != nil {
+		t.Fatalf("run: %v", err)
 	}
 
 	frames, _ := os.ReadFile(log)
 	if !strings.Contains(string(frames), `"name":"model_set"`) || !strings.Contains(string(frames), `"args":"2"`) {
 		t.Fatalf("the command was not forwarded: %q", string(frames))
 	}
+	if strings.Contains(string(frames), "UE") {
+		t.Errorf("a bare command must not flush an empty prompt: %q", string(frames))
+	}
 
 	var announced, answered bool
 	for _, event := range events {
 		switch event.Type {
 		case "model":
-			if event.Active != nil && event.Active.ID == 2 {
-				announced = true
-			}
+			announced = event.Active != nil && event.Active.ID == 2
 		case "command":
 			answered = event.OK
 		}
@@ -128,11 +129,11 @@ func TestSendRelaysTheAgentsOwnStatement(t *testing.T) {
 	}
 }
 
-func TestSendRelaysARejection(t *testing.T) {
+func TestRunRelaysARejection(t *testing.T) {
 	opts, _ := fakeAgentBinary(t)
 	var events []Event
-	if err := Send(context.Background(), opts, "model_set", "9", func(event Event) { events = append(events, event) }); err != nil {
-		t.Fatalf("send: %v", err)
+	if err := Run(context.Background(), opts, Request{Command: "model_set", Args: "99"}, func(event Event) { events = append(events, event) }); err != nil {
+		t.Fatalf("run: %v", err)
 	}
 	var message string
 	for _, event := range events {
@@ -140,7 +141,7 @@ func TestSendRelaysARejection(t *testing.T) {
 			message = event.Message
 		}
 	}
-	if !strings.Contains(message, "model not found: 9") {
+	if !strings.Contains(message, "model not found") {
 		t.Errorf("the agent's message was not relayed: %v", events)
 	}
 }
