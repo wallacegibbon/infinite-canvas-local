@@ -2,7 +2,7 @@ import i18n from "@/i18n";
 import { LOCAL_GATEWAY_BASE_URL } from "@/constant/app-mode";
 import { gatewayFetch } from "@/services/api/gateway-status";
 
-const gatewayRoot = LOCAL_GATEWAY_BASE_URL.replace(/\/v1\/?$/, "");
+const gatewayBase = LOCAL_GATEWAY_BASE_URL;
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
 /** A download URL. Resources staged under resources/payload have none. */
@@ -202,21 +202,21 @@ function errorMessage(data: Record<string, any>, fallback: string) {
 }
 
 export async function fetchResourceStatus(): Promise<ResourceStatus> {
-    const response = await gatewayFetch(`${gatewayRoot}/api/resources/status`, { headers: { Accept: "application/json" } });
+    const response = await gatewayFetch(`${gatewayBase}/api/resources/status`, { headers: { Accept: "application/json" } });
     const data = await readJson(response);
     if (!response.ok || data.ok === false) throw new Error(errorMessage(data, apiText("resourceStatusFailed", { status: response.status })));
     return data as ResourceStatus;
 }
 
 export async function refreshResourceStatus(): Promise<ResourceStatus> {
-    const response = await gatewayFetch(`${gatewayRoot}/api/resources/refresh`, { method: "POST", headers: { Accept: "application/json" } });
+    const response = await gatewayFetch(`${gatewayBase}/api/resources/refresh`, { method: "POST", headers: { Accept: "application/json" } });
     const data = await readJson(response);
     if (!response.ok || data.ok === false) throw new Error(errorMessage(data, apiText("resourceRefreshFailed", { status: response.status })));
     return data as ResourceStatus;
 }
 
 export async function installResources(input: { ids?: string[]; packs?: string[] }): Promise<ResourceJob> {
-    const response = await gatewayFetch(`${gatewayRoot}/api/resources/install`, {
+    const response = await gatewayFetch(`${gatewayBase}/api/resources/install`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -227,7 +227,7 @@ export async function installResources(input: { ids?: string[]; packs?: string[]
 }
 
 export async function fetchResourceJob(id: string): Promise<ResourceJob> {
-    const response = await gatewayFetch(`${gatewayRoot}/api/resources/jobs/${encodeURIComponent(id)}`, { headers: { Accept: "application/json" } });
+    const response = await gatewayFetch(`${gatewayBase}/api/resources/jobs/${encodeURIComponent(id)}`, { headers: { Accept: "application/json" } });
     const data = await readJson(response);
     if (!response.ok || data.ok === false) throw new Error(errorMessage(data, apiText("resourceInstallProgressFailed", { status: response.status })));
     return data.job as ResourceJob;
@@ -237,7 +237,7 @@ export async function pickResourceReplacement(resourceId: string): Promise<strin
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 300000);
     try {
-        const response = await gatewayFetch(`${gatewayRoot}/api/resources/pick-replacement`, {
+        const response = await gatewayFetch(`${gatewayBase}/api/resources/pick-replacement`, {
             method: "POST",
             headers: { Accept: "application/json", "Content-Type": "application/json" },
             body: JSON.stringify({ resourceId }),
@@ -255,7 +255,7 @@ export async function pickResourceReplacement(resourceId: string): Promise<strin
 }
 
 export async function setResourceReplacement(resourceId: string, file: string): Promise<ResourceStatus> {
-    const response = await gatewayFetch(`${gatewayRoot}/api/resources/replacement`, {
+    const response = await gatewayFetch(`${gatewayBase}/api/resources/replacement`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ resourceId, file }),
@@ -266,7 +266,7 @@ export async function setResourceReplacement(resourceId: string, file: string): 
 }
 
 export async function setWorkflowVisibility(id: string, enabled: boolean): Promise<void> {
-    const response = await gatewayFetch(`${gatewayRoot}/api/workflows/${encodeURIComponent(id)}/visibility`, {
+    const response = await gatewayFetch(`${gatewayBase}/api/workflows/${encodeURIComponent(id)}/visibility`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
@@ -276,7 +276,7 @@ export async function setWorkflowVisibility(id: string, enabled: boolean): Promi
 }
 
 export async function cancelResourceJob(id: string): Promise<ResourceJob> {
-    const response = await gatewayFetch(`${gatewayRoot}/api/resources/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST", headers: { Accept: "application/json" } });
+    const response = await gatewayFetch(`${gatewayBase}/api/resources/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST", headers: { Accept: "application/json" } });
     const data = await readJson(response);
     if (!response.ok || data.ok === false) throw new Error(errorMessage(data, apiText("resourceCancelFailed", { status: response.status })));
     return data.job as ResourceJob;

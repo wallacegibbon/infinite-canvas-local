@@ -28,10 +28,6 @@ type VideoMediaOptions = RequestOptions & { videos?: ReferenceVideo[]; audios?: 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
 type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
-/**
- * A generation in flight. `provider` says how to watch it: `run` is the gateway's run protocol (the
- * id is a run id), the other two are the `/v1` task contracts those channels expose.
- */
 /** A video task is a run: the id is the run id, and the file is read off the run. */
 type VideoGenerationTask = { id: string; model: string };
 type VideoUpscaleSource = { name: string; type?: string; url?: string; storageKey?: string };

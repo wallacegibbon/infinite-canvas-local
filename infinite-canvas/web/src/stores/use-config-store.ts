@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
 import { gatewayModelLabel } from "@/lib/gateway-labels";
-import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_GATEWAY_CHANNEL_ID } from "@/constant/app-mode";
+import { gatewayRoot, isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL, LOCAL_GATEWAY_CHANNEL_ID } from "@/constant/app-mode";
 import { normalizeProgressRingSkin, type ProgressRingSkinId } from "@/lib/canvas/progress-ring-skins";
 
 export type ModelCapability = "image" | "video" | "text" | "audio";
@@ -544,9 +544,10 @@ function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
     return {
         id: channel?.id?.trim() || nanoid(),
         name: name || i18n.t("config.channels.newName"),
+        // The stored address is the gateway root; an older config may still end in /v1.
+        baseUrl: gatewayRoot(channel?.baseUrl || defaultBaseUrl()),
         // An older config stored the translated default; adopt the key so the name follows the language.
         nameKey: channel?.nameKey || defaultChannelNameKey(name) || undefined,
-        baseUrl: channel?.baseUrl?.trim() || defaultBaseUrl(),
         apiKey: channel?.apiKey || "",
         models: normalizeChannelModels(channel?.models),
     };

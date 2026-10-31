@@ -1,10 +1,31 @@
 import { RUNTIME_LOCAL_GATEWAY_HOST, RUNTIME_LOCAL_GATEWAY_PORT, RUNTIME_LOCAL_GATEWAY_URL } from "./runtime-config";
 
+/**
+ * The gateway's address, without an API prefix.
+ *
+ * It used to carry `/v1`, because the gateway spoke OpenAI's paths. It does not any more: every
+ * endpoint is under `/api`, so the suffix was carried around and stripped again by each caller. What
+ * is left is a URL `fetch` can append `/api/...` to, and an address a deployment can point at another
+ * gateway (docs/decisions.md #72).
+ */
 function runtimeGatewayBaseUrl() {
-    if (RUNTIME_LOCAL_GATEWAY_URL) return RUNTIME_LOCAL_GATEWAY_URL.replace(/\/+$/, "").endsWith("/v1") ? RUNTIME_LOCAL_GATEWAY_URL.replace(/\/+$/, "") : `${RUNTIME_LOCAL_GATEWAY_URL.replace(/\/+$/, "")}/v1`;
+    if (RUNTIME_LOCAL_GATEWAY_URL) return gatewayRoot(RUNTIME_LOCAL_GATEWAY_URL);
     const host = RUNTIME_LOCAL_GATEWAY_HOST || pageHostname() || "127.0.0.1";
     const port = RUNTIME_LOCAL_GATEWAY_PORT || "8190";
-    return `http://${host}:${port}/v1`;
+    return `http://${host}:${port}`;
+}
+
+/**
+ * Normalize any gateway address to its root.
+ *
+ * A trailing `/v1` is still tolerated: an older `dist/config.js` (or a hand-written channel entry)
+ * can carry one, and stripping it here is what keeps the suffix from spreading again.
+ */
+export function gatewayRoot(url: string) {
+    return String(url || "")
+        .trim()
+        .replace(/\/+$/, "")
+        .replace(/\/v1$/i, "");
 }
 
 // The gateway listens on the machine that serves this bundle, so the page's own hostname is
@@ -17,7 +38,7 @@ function pageHostname(): string {
     return window.location?.hostname || "";
 }
 
-export const LOCAL_GATEWAY_BASE_URL = import.meta.env.VITE_LOCAL_GATEWAY_URL || runtimeGatewayBaseUrl();
+export const LOCAL_GATEWAY_BASE_URL = import.meta.env.VITE_LOCAL_GATEWAY_URL ? gatewayRoot(import.meta.env.VITE_LOCAL_GATEWAY_URL) : runtimeGatewayBaseUrl();
 export const LOCAL_GATEWAY_ORIGIN = (() => {
     try {
         return new URL(LOCAL_GATEWAY_BASE_URL).origin;

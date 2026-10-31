@@ -5,7 +5,7 @@ const HEARTBEAT_MS = 5000;
 let started = false;
 
 function sessionUrl(path: string) {
-    return `${LOCAL_GATEWAY_BASE_URL.replace(/\/v1\/?$/, "")}${path}`;
+    return `${LOCAL_GATEWAY_BASE_URL}${path}`;
 }
 
 // Register the canvas session with the gateway so the launcher can reclaim the backend once the last page closes.

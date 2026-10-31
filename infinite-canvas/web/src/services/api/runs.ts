@@ -1,13 +1,13 @@
 import i18n from "@/i18n";
+import { gatewayRoot } from "@/constant/app-mode";
 import { apiErrorMessage, httpBlob, httpJson } from "@/services/api/http";
 import type { AiConfig } from "@/stores/use-config-store";
 
 /**
  * The gateway's run protocol (docs/protocol.md): submit a workflow run, poll it, fetch its outputs.
  *
- * This is the canvas's native path to the local gateway. The `/v1/*` services stay for channels
- * that are not the gateway; a run is the shape the gateway actually exposes, so nothing here maps
- * fields or guesses at a response envelope.
+ * This is the only path the canvas uses to produce media: a run is the shape the gateway exposes, so
+ * nothing here maps fields or guesses at a response envelope.
  */
 type RunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
@@ -69,10 +69,9 @@ export class RunFailedError extends Error {
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 const DEFAULT_INTERVAL_MS = 500;
 
-/** The gateway root for `/api/*`: the channel base URL without its `/v1` suffix. */
+/** The gateway root for `/api/*`: the channel address, with any legacy `/v1` suffix removed. */
 export function gatewayProtocolRoot(baseUrl: string) {
-    const trimmed = baseUrl.trim().replace(/\/+$/, "");
-    return trimmed.replace(/\/v1$/i, "");
+    return gatewayRoot(baseUrl);
 }
 
 function runUrl(config: AiConfig, path: string) {

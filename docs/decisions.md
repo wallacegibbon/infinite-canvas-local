@@ -2372,3 +2372,39 @@ browser: the existing canvas, created in Chinese, shows "Audio" and "Local Comfy
 `infinite-canvas/web/src/components/canvas/canvas-node.tsx`,
 `infinite-canvas/web/src/pages/canvas/hooks/use-image-editors.ts`,
 `infinite-canvas/web/src/pages/canvas/project.tsx`.
+
+## 72. The gateway address has no `/v1`
+
+**Decision** `LOCAL_GATEWAY_BASE_URL` is the gateway's **root** (`http://host:8190`), and
+`start.sh`/`config.js` inject it that way. A trailing `/v1` is still accepted on input and stripped
+in exactly one place (`gatewayRoot`), so an older `config.js` or a stored channel keeps working.
+
+**Why it was still there** The base URL was written when the gateway spoke OpenAI's paths, and
+deleting the routes did not touch it: the value was carried around with `/v1` on the end and each
+caller stripped it again before using it — `gatewayProtocolRoot`, `local-session`, `resources`,
+`canvas-system-status`, two plugin-host fetches, plus the config store's own normalization. Six strips
+for a suffix nothing needed.
+
+**What replaced them** One function, `gatewayRoot(url)` in `constant/app-mode.ts`, applied where the
+address enters the app (the injected value and a persisted channel). The call sites now use the value
+directly, which is what makes "there is no `/v1`" true rather than maintained by convention.
+
+**Kept deliberately** `buildApiUrl` still appends `/v1` for the prompt-API endpoint. That is a
+*different* service (llama-server, any OpenAI-compatible chat endpoint), not the gateway; it is also
+the only remaining caller of the canvas's chat path, which has no gateway endpoint behind it (see
+docs/known-issues.md).
+
+**Cost** A hand-written channel entry that points at a path like `https://host/openai/v1` loses the
+suffix. Nothing in this build talks to such an endpoint: the gateway and the prompt API are configured
+separately.
+
+**Tested** `make check`, `npm run check`, `npx vitest run` (117). In the browser, with a cleared config:
+17 models sync from `http://127.0.0.1:8190`, the stored channel address has no `/v1`, and a recorded
+network capture shows every gateway request on `/api/...` with no `/v1` path anywhere.
+
+**Where** `infinite-canvas/web/src/constant/app-mode.ts`, `start.sh`,
+`infinite-canvas/web/src/services/api/{runs,resources}.ts`,
+`infinite-canvas/web/src/lib/local-session.ts`,
+`infinite-canvas/web/src/components/canvas/canvas-system-status.tsx`,
+`infinite-canvas/web/src/pages/canvas/hooks/use-plugin-host.tsx`,
+`infinite-canvas/web/src/stores/use-config-store.ts`.

@@ -1,3 +1,4 @@
+import { gatewayRoot } from "@/constant/app-mode";
 import { useCallback, useEffect, useMemo, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -97,7 +98,7 @@ export function usePluginHost(params: PluginHostParams) {
                 if (!baseUrl) return null;
                 const workflow = decoded?.model || model;
                 try {
-                    const response = await fetch(`${baseUrl.replace(/\/v1$/i, "")}/api/workflows/${encodeURIComponent(workflow)}/schema`);
+                    const response = await fetch(`${gatewayRoot(baseUrl)}/api/workflows/${encodeURIComponent(workflow)}/schema`);
                     if (!response.ok) return null;
                     const data = await response.json();
                     const schema = data?.schema || data;
@@ -113,7 +114,7 @@ export function usePluginHost(params: PluginHostParams) {
                     .replace(/\/+$/, "");
                 if (!baseUrl) return [];
                 try {
-                    const response = await fetch(`${baseUrl.replace(/\/v1$/i, "")}/api/loras`);
+                    const response = await fetch(`${gatewayRoot(baseUrl)}/api/loras`);
                     if (!response.ok) return [];
                     const data = await response.json();
                     return Array.isArray(data?.loras) ? data.loras : [];

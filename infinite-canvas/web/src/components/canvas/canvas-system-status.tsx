@@ -36,7 +36,7 @@ type FreeResult = {
     error?: string;
 };
 
-const gatewayRoot = LOCAL_GATEWAY_BASE_URL.replace(/\/v1\/?$/, "");
+const gatewayBase = LOCAL_GATEWAY_BASE_URL;
 
 function gb(bytes: number) {
     return (bytes / 1024 ** 3).toFixed(1);
@@ -62,7 +62,7 @@ export function CanvasSystemStatus() {
 
     const refresh = useCallback(async () => {
         try {
-            const response = await fetch(`${gatewayRoot}/api/system/stats`);
+            const response = await fetch(`${gatewayBase}/api/system/stats`);
             if (!response.ok) return;
             setStats(await response.json());
         } catch {
@@ -88,7 +88,7 @@ export function CanvasSystemStatus() {
         setFreeError("");
         setFreeResult(null);
         try {
-            const response = await fetch(`${gatewayRoot}/api/system/free-memory`, { method: "POST" });
+            const response = await fetch(`${gatewayBase}/api/system/free-memory`, { method: "POST" });
             const data = (await response.json().catch(() => ({}))) as FreeResult;
             if (!response.ok || data.ok === false) throw new Error(data.error || t("canvas.systemStatus.freeFailed"));
             setFreeResult(data);

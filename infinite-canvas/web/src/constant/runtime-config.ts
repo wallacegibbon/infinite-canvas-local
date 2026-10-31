@@ -7,7 +7,7 @@
 // built, and no documentation or .env entry mentioned them.
 
 type RuntimeConfig = {
-    LOCAL_GATEWAY_URL?: string; // e.g. http://127.0.0.1:8190/v1
+    LOCAL_GATEWAY_URL?: string; // e.g. http://127.0.0.1:8190 (a trailing /v1 is tolerated)
     LOCAL_GATEWAY_HOST?: string; // host when URL is not given
     LOCAL_GATEWAY_PORT?: string; // port when URL is not given
 };
