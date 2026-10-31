@@ -164,3 +164,20 @@ func TestWeightFilePattern(t *testing.T) {
 		}
 	}
 }
+
+// A node pack is installed when ComfyUI loaded its classes, not when a directory of that name
+// exists: a zip extraction renames the folder, and a missing python dependency leaves a folder with
+// nothing in it.
+func TestMissingNodeClasses(t *testing.T) {
+	loaded := map[string]bool{"VHS_VideoCombine": true, "RIFE VFI": true}
+	provides := []string{"VHS_VideoCombine", "RIFE VFI"}
+	if missing := missingNodeClasses(provides, func(name string) bool { return loaded[name] }); len(missing) != 0 {
+		t.Errorf("missing = %v, want none", missing)
+	}
+
+	// The SeedVR2 case: the directory is there, the import failed, so no class is loaded.
+	missing := missingNodeClasses([]string{"SeedVR2LoadDiTModel", "SeedVR2VideoUpscaler"}, func(name string) bool { return loaded[name] })
+	if len(missing) != 2 || missing[0] != "SeedVR2LoadDiTModel" {
+		t.Errorf("missing = %v, want both classes named", missing)
+	}
+}

@@ -333,6 +333,21 @@ func (m *Manager) resourceAliasFor(resource *Resource) (string, bool) {
 }
 
 // itemStatus computes the panel row for one resource.
+// missingNodeClasses lists the classes ComfyUI has not loaded out of the ones a pack declares.
+//
+// It is the answer to "is this node pack really installed": a directory says where bytes were
+// written, not what ComfyUI managed to import — and a pack whose python dependency is missing has a
+// perfectly good directory and no classes.
+func missingNodeClasses(provides []string, hasClass func(string) bool) []string {
+	missing := make([]string, 0, len(provides))
+	for _, class := range provides {
+		if !hasClass(class) {
+			missing = append(missing, class)
+		}
+	}
+	return missing
+}
+
 func (m *Manager) itemStatus(resource *Resource, root string, byID map[string]*Item) *Item {
 	dir, _ := targetParts(resource.Target)
 	isNode := dir == "custom_nodes" || resource.Type == "node"
@@ -351,6 +366,28 @@ func (m *Manager) itemStatus(resource *Resource, root string, byID map[string]*I
 		Sources:         m.sourcesFor(resource),
 		Installed:       m.installedFor(resource.ID),
 		MissingRequires: []string{},
+	}
+
+	// A node pack is present when ComfyUI loaded the classes it declares. The directory check below
+	// cannot answer that question: the folder may be named differently after a zip extraction, and
+	// with a remote ComfyUI it is not even on this machine.
+	if isNode && len(resource.Provides) > 0 && m.setup != nil && m.setup.HasScanned() {
+		missing := missingNodeClasses(resource.Provides, m.setup.HasClass)
+		item.MissingClasses = missing
+		if len(missing) == 0 {
+			item.Exists = true
+			item.Registered = true
+			item.Status = "present"
+			item.Present = true
+			item.MatchedBy = "classes"
+			return item
+		}
+		// ComfyUI has been read, and the classes are not there: whatever is on disk, the pack is not
+		// loaded — a missing python dependency is the usual reason.
+		item.Status = "missing"
+		item.Present = false
+		item.Exists = false
+		return item
 	}
 
 	var match matchResult

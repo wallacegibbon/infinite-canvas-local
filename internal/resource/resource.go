@@ -41,6 +41,7 @@ type Resource struct {
 	Sha256   string         `json:"sha256"`
 	License  string         `json:"license"`
 	Note     string         `json:"note"`
+	Provides []string       `json:"provides"`
 	Sources  []any          `json:"sources"`
 	Requires []string       `json:"requires"`
 	Builder  map[string]any `json:"builder"`
@@ -94,6 +95,9 @@ type Item struct {
 	ActualSize      int64          `json:"actualSize"`
 	Installed       map[string]any `json:"installed"`
 	MissingRequires []string       `json:"missingRequires"`
+	// MissingClasses names the node classes a pack declares but ComfyUI has not loaded. It is what
+	// "the folder is there but nothing works" looks like: a missing python dependency, for instance.
+	MissingClasses []string `json:"missingClasses,omitempty"`
 	// ManualCommand is set for resources the gateway never installs itself (type
 	// "bake"): the exact command that produces the file.
 	ManualCommand string `json:"manualCommand,omitempty"`

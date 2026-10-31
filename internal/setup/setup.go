@@ -256,6 +256,20 @@ func (m *Manager) LoaderOptions() workflow.LoaderOptions {
 	return out
 }
 
+// HasClass reports whether ComfyUI loaded a node class.
+//
+// This is the only trustworthy answer to "is that node pack installed": a directory name says where
+// something was written, not what ComfyUI managed to import, and with a remote ComfyUI the path is
+// not even on this machine.
+func (m *Manager) HasClass(name string) bool {
+	if name == "" {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.nodeClasses[name]
+}
+
 // FolderPaths returns ComfyUI's model directory mapping.
 func (m *Manager) FolderPaths() map[string]any {
 	m.mu.Lock()
