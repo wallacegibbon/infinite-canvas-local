@@ -120,6 +120,7 @@ export default {
         httpFailed: "Request failed (HTTP {{status}}). Check the Base URL and API key.",
         htmlError: "The service returned an HTML error page ({{preview}})",
         imageTimeout: "The image request timed out. The endpoint did not respond in time; retry later or switch channels.",
+        runUploadFailed: "Could not upload the reference media",
         runCreateFailed: "Could not submit the generation job",
         runQueryFailed: "Could not read the generation job",
         runFailed: "The generation job failed",

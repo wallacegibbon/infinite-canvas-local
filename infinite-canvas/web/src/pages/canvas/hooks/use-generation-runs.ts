@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 
 import { toast } from "@/components/kit/toast";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
-import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
+import { isGatewayImageModel, requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
 import { downloadRunOutput, waitForRun, type Run, type RunProgress } from "@/services/api/runs";
 import { isVideoTaskFailed } from "@/services/api/video";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
@@ -106,7 +106,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
      * Run progress is the only source of the step ring for audio: the node is not a video task, so
      * there is no preview stream to read steps from.
      */
-    const setAudioStepProgress = useCallback(
+    const setRunStepProgress = useCallback(
         (nodeId: string, progress?: RunProgress) => {
             const total = progress?.total && progress.total > 0 ? progress.total : 0;
             const step = Math.max(0, progress?.step || 0);
@@ -198,65 +198,115 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             let hasSuccess = false;
             let hasFailure = false;
             let firstError = "";
-            await Promise.all(
-                imageIds.map(async (imageId) => {
-                    try {
-                        const image = referenceImages.length
-                            ? await requestEdit({ ...generationConfig, count: "1" }, effectivePrompt, referenceImages, { signal: controller.signal }).then((items) => items[0])
-                            : await requestGeneration({ ...generationConfig, count: "1" }, effectivePrompt, { signal: controller.signal }).then((items) => items[0]);
-                        const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
-                        const imageSize = fitNodeSize(uploaded.width, uploaded.height, imageConfig.width, imageConfig.height);
-                        const item: CanvasNodeImage = {
-                            id: imageId,
-                            status: NODE_STATUS_SUCCESS,
-                            content: uploaded.url,
-                            storageKey: uploaded.storageKey,
-                            naturalWidth: uploaded.width,
-                            naturalHeight: uploaded.height,
-                            bytes: uploaded.bytes,
-                            mimeType: uploaded.mimeType,
+            const fillImageSlot = async (imageId: string, dataUrl: string) => {
+                const uploaded = await uploadImage(dataUrl, { signal: controller.signal });
+                const imageSize = fitNodeSize(uploaded.width, uploaded.height, imageConfig.width, imageConfig.height);
+                const item: CanvasNodeImage = {
+                    id: imageId,
+                    status: NODE_STATUS_SUCCESS,
+                    content: uploaded.url,
+                    storageKey: uploaded.storageKey,
+                    naturalWidth: uploaded.width,
+                    naturalHeight: uploaded.height,
+                    bytes: uploaded.bytes,
+                    mimeType: uploaded.mimeType,
+                };
+                setNodes((prev) =>
+                    prev.map((node) => {
+                        if (node.id !== rootId) return node;
+                        const images = node.metadata?.images?.map((image) => (image.id === imageId ? item : image)) || [];
+                        if (node.metadata?.primaryImageId) return { ...node, metadata: { ...node.metadata, images } };
+                        const center = { x: node.position.x + node.width / 2, y: node.position.y + node.height / 2 };
+                        return {
+                            ...node,
+                            position: { x: center.x - imageSize.width / 2, y: center.y - imageSize.height / 2 },
+                            ...imageSize,
+                            metadata: {
+                                ...node.metadata,
+                                content: item.content,
+                                storageKey: item.storageKey,
+                                naturalWidth: item.naturalWidth,
+                                naturalHeight: item.naturalHeight,
+                                bytes: item.bytes,
+                                mimeType: item.mimeType,
+                                images,
+                                primaryImageId: imageId,
+                            },
                         };
-                        setNodes((prev) =>
-                            prev.map((node) => {
-                                if (node.id !== rootId) return node;
-                                const images = node.metadata?.images?.map((image) => (image.id === imageId ? item : image)) || [];
-                                if (node.metadata?.primaryImageId) return { ...node, metadata: { ...node.metadata, images } };
-                                const center = { x: node.position.x + node.width / 2, y: node.position.y + node.height / 2 };
-                                return {
-                                    ...node,
-                                    position: { x: center.x - imageSize.width / 2, y: center.y - imageSize.height / 2 },
-                                    ...imageSize,
-                                    metadata: {
-                                        ...node.metadata,
-                                        content: item.content,
-                                        storageKey: item.storageKey,
-                                        naturalWidth: item.naturalWidth,
-                                        naturalHeight: item.naturalHeight,
-                                        bytes: item.bytes,
-                                        mimeType: item.mimeType,
-                                        images,
-                                        primaryImageId: imageId,
-                                    },
-                                };
-                            }),
-                        );
-                        hasSuccess = true;
-                        if (isConfigNode) setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, errorDetails: undefined } } : node)));
-                        return true;
-                    } catch (error) {
-                        if (isGenerationCanceled(error)) return false;
-                        const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
-                        if (!firstError) firstError = errorDetails;
-                        hasFailure = true;
-                        setNodes((prev) =>
-                            prev.map((node) =>
-                                node.id === rootId ? { ...node, metadata: { ...node.metadata, images: node.metadata?.images?.map((image) => (image.id === imageId ? { ...image, status: NODE_STATUS_ERROR, errorDetails } : image)) } } : node,
-                            ),
-                        );
+                    }),
+                );
+            };
+            const failImageSlot = (imageId: string, errorDetails: string) => {
+                setNodes((prev) =>
+                    prev.map((node) => (node.id === rootId ? { ...node, metadata: { ...node.metadata, images: node.metadata?.images?.map((image) => (image.id === imageId ? { ...image, status: NODE_STATUS_ERROR, errorDetails } : image)) } } : node)),
+                );
+            };
+            const markConfigSuccess = () => {
+                if (!isConfigNode) return;
+                setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, errorDetails: undefined } } : node)));
+            };
+
+            if (isGatewayImageModel(generationConfig)) {
+                // One run for the whole batch: the gateway returns every artifact of a run, so asking
+                // for `count` once avoids loading the model once per image.
+                try {
+                    const requestOptions = {
+                        signal: controller.signal,
+                        onProgress: (state: Run) => setRunStepProgress(rootId, state.progress),
+                    };
+                    const batchConfig = { ...generationConfig, count: String(count) };
+                    const results = referenceImages.length ? await requestEdit(batchConfig, effectivePrompt, referenceImages, requestOptions) : await requestGeneration(batchConfig, effectivePrompt, requestOptions);
+                    for (let index = 0; index < imageIds.length; index += 1) {
+                        const result = results[index];
+                        if (!result) {
+                            const errorDetails = t("canvas.runtime.generationFailed");
+                            if (!firstError) firstError = errorDetails;
+                            hasFailure = true;
+                            failImageSlot(imageIds[index], errorDetails);
+                            continue;
+                        }
+                        try {
+                            await fillImageSlot(imageIds[index], result.dataUrl);
+                            hasSuccess = true;
+                        } catch (error) {
+                            const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
+                            if (!firstError) firstError = errorDetails;
+                            hasFailure = true;
+                            failImageSlot(imageIds[index], errorDetails);
+                        }
                     }
-                    return false;
-                }),
-            );
+                    if (hasSuccess) markConfigSuccess();
+                } catch (error) {
+                    if (isGenerationCanceled(error)) return;
+                    const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
+                    if (!firstError) firstError = errorDetails;
+                    hasFailure = true;
+                    imageIds.forEach((imageId) => failImageSlot(imageId, errorDetails));
+                } finally {
+                    setRunStepProgress(rootId, undefined);
+                }
+            } else {
+                await Promise.all(
+                    imageIds.map(async (imageId) => {
+                        try {
+                            const image = referenceImages.length
+                                ? await requestEdit({ ...generationConfig, count: "1" }, effectivePrompt, referenceImages, { signal: controller.signal }).then((items) => items[0])
+                                : await requestGeneration({ ...generationConfig, count: "1" }, effectivePrompt, { signal: controller.signal }).then((items) => items[0]);
+                            await fillImageSlot(imageId, image.dataUrl);
+                            hasSuccess = true;
+                            markConfigSuccess();
+                            return true;
+                        } catch (error) {
+                            if (isGenerationCanceled(error)) return false;
+                            const errorDetails = error instanceof Error ? error.message : t("canvas.runtime.generationFailed");
+                            if (!firstError) firstError = errorDetails;
+                            hasFailure = true;
+                            failImageSlot(imageId, errorDetails);
+                        }
+                        return false;
+                    }),
+                );
+            }
             if (rootId !== nodeId) finishGenerationRequest(rootId, controller);
             if (controller.signal.aborted) {
                 setNodes((prev) => prev.map((node) => (node.id === nodeId && isConfigNode && node.metadata?.status === NODE_STATUS_LOADING ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_IDLE, errorDetails: undefined } } : node)));
@@ -368,7 +418,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                         signal: controller.signal,
                         // The id lands on the node before the first poll, so a reload can resume it.
                         onRun: (runId) => setNodes((prev) => prev.map((node) => (node.id === audioId ? { ...node, metadata: { ...node.metadata, audioRunId: runId } } : node))),
-                        onProgress: (run) => setAudioStepProgress(audioId, run.progress),
+                        onProgress: (run) => setRunStepProgress(audioId, run.progress),
                     }),
                     generationConfig.audioFormat,
                 );
@@ -382,7 +432,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             }
             return;
         },
-        [finishGenerationRequest, setAudioStepProgress, setNodes, startGenerationRequest],
+        [finishGenerationRequest, setNodes, setRunStepProgress, startGenerationRequest],
     );
 
     const runTextGeneration = useCallback(
@@ -632,7 +682,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                         await requestAudioGeneration(generationConfig, prompt, {
                             signal: controller.signal,
                             onRun: (runId) => setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, audioRunId: runId } } : item))),
-                            onProgress: (run) => setAudioStepProgress(node.id, run.progress),
+                            onProgress: (run) => setRunStepProgress(node.id, run.progress),
                         }),
                         generationConfig.audioFormat,
                     );
@@ -721,7 +771,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                 setRunningNodeId(null);
             }
         },
-        [completeVideoNodeTask, effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, pollVideoNodeTask, setAudioStepProgress, startGenerationRequest, t],
+        [completeVideoNodeTask, effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, pollVideoNodeTask, setRunStepProgress, startGenerationRequest, t],
     );
 
     /**
@@ -752,7 +802,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                 controller = startGenerationRequest(node.id, node.id, node.id);
                 const finished = await waitForRun(generationConfig, runId, {
                     signal: controller.signal,
-                    onProgress: (run) => setAudioStepProgress(node.id, run.progress),
+                    onProgress: (run) => setRunStepProgress(node.id, run.progress),
                     // Watching a run must not kill it: the page leaving is exactly the case this exists for.
                     cancelOnAbort: false,
                 });
@@ -773,7 +823,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                 audioPollIdsRef.current.delete(node.id);
             }
         },
-        [effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, setAudioStepProgress, setNodes, setRunningNodeId, startGenerationRequest, t],
+        [effectiveConfig, finishGenerationRequest, isAiConfigReady, openConfigDialog, setNodes, setRunStepProgress, setRunningNodeId, startGenerationRequest, t],
     );
 
     return { runImageGeneration, runVideoGeneration, runAudioGeneration, runTextGeneration, retryNode, pollAudioRun };

@@ -1,12 +1,13 @@
 import i18n from "@/i18n";
 import { LOCAL_GATEWAY_BASE_URL, isLocalGatewayUrl } from "@/constant/app-mode";
-import { buildApiUrl, channelModelOf, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
+import { buildApiUrl, channelModelOf, modelImageInputs, modelOptionName, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
 import { nanoid } from "nanoid";
-import { dataUrlToFile } from "@/lib/image-utils";
+import { dataUrlToFile, readFileAsDataUrl } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import { imageSizePresets } from "@/lib/media-size";
 import { apiErrorMessage, httpJson } from "@/services/api/http";
+import { createRun, downloadRunOutputs, uploadMedia, waitForRun, type Run } from "@/services/api/runs";
 import { publishStepProgress } from "@/services/api/step-progress";
 import type { ReferenceImage } from "@/types/image";
 
@@ -69,7 +70,22 @@ type GeminiPayload = {
     promptFeedback?: { blockReason?: string };
 };
 type GeminiStreamState = { buffer: string; text: string; toolCalls: ResponseToolCall[]; error?: string };
-type RequestOptions = { signal?: AbortSignal; params?: Record<string, unknown> };
+type RequestOptions = {
+    signal?: AbortSignal;
+    params?: Record<string, unknown>;
+    /** Reported as soon as the gateway accepts a run, so the node can resume it after a reload. */
+    onRun?: (runId: string) => void;
+    onProgress?: (run: Run) => void;
+};
+
+/** Gateway image workflow ids are `image-<slug>` (the registry's naming rule). */
+const GATEWAY_IMAGE_WORKFLOW = /^image-/;
+
+/** Whether this channel+model is served by the local gateway and therefore uses runs. */
+export function isGatewayImageModel(config: Pick<AiConfig, "baseUrl" | "model">) {
+    // The selection may be the encoded `channel::model` form; the workflow id is the bare name.
+    return isLocalGatewayUrl(config.baseUrl) && GATEWAY_IMAGE_WORKFLOW.test(modelOptionName(config.model));
+}
 
 const DEFAULT_IMAGE_SHORT_SIDE = 1024;
 const IMAGE_SIZE_STEP = 16;
@@ -634,6 +650,63 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
     return images;
 }
 
+/**
+ * Generate through the gateway's run protocol.
+ *
+ * The reference images are uploaded first and named by role, the run carries the semantic inputs
+ * (prompt, size, quality, mode) plus the workflow's own params, and each output is returned as a
+ * data URL — the shape every image caller already expects.
+ *
+ * Reference capacity comes from the channel metadata (`imageInputs`): a workflow that takes no
+ * images ignores extras today, and sending them would now be a `400` from the typed input contract.
+ */
+async function requestGatewayImages(input: {
+    config: AiConfig;
+    prompt: string;
+    references: ReferenceImage[];
+    count: number;
+    size?: string;
+    background?: string;
+    imageMode?: string;
+    params: Record<string, unknown>;
+    options?: RequestOptions;
+}): Promise<Array<{ id: string; dataUrl: string }>> {
+    const { config, prompt, references, count, size, background, imageMode, params, options } = input;
+    const inputs: Record<string, unknown> = { prompt, count };
+    if (size) inputs.size = size;
+    if (background) inputs.background = background;
+    // "layout" is a MOSS mode expressed entirely by params.layout, not a workflow variant.
+    if (imageMode && imageMode !== "layout") inputs.mode = imageMode;
+    if (config.quality?.trim()) inputs.quality = config.quality.trim();
+    Object.assign(inputs, params);
+
+    const capacity = modelImageInputs(config, config.model);
+    const usable = typeof capacity === "number" ? references.slice(0, Math.max(0, capacity)) : references;
+    const media: Record<string, string[]> = {};
+    for (const [index, reference] of usable.entries()) {
+        const dataUrl = await imageToDataUrl(reference, { signal: options?.signal });
+        if (!dataUrl) continue;
+        const uploaded = await uploadMedia(config, dataUrlToFile({ ...reference, dataUrl }), reference.name || `reference-${index + 1}.png`, { signal: options?.signal });
+        const role = imageMode === "inpaint" ? (index === 0 ? "source" : "mask") : imageMode === "outpaint" ? "source" : "reference";
+        media[role] = [...(media[role] || []), uploaded.id];
+    }
+
+    try {
+        const run = await createRun(config, { workflow: config.model, inputs, ...(Object.keys(media).length ? { media } : {}) });
+        options?.onRun?.(run.id);
+        const finished = await waitForRun(config, run.id, { signal: options?.signal, onProgress: options?.onProgress, cancelOnAbort: true });
+        const files = await downloadRunOutputs(config, finished, { signal: options?.signal });
+        return await Promise.all(
+            files.map(async (file, index) => ({
+                id: nanoid(),
+                dataUrl: await readFileAsDataUrl(new File([file.blob], `image-${index + 1}.png`, { type: file.mime || file.blob.type || "image/png" })),
+            })),
+        );
+    } catch (error) {
+        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
+    }
+}
+
 export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
@@ -652,6 +725,20 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
         requestParams.layout = config.layout;
         requestParams.layoutEnabled = true;
     }
+    if (isGatewayImageModel(requestConfig)) {
+        return requestGatewayImages({
+            config: requestConfig,
+            prompt: withSystemPrompt(requestConfig, prompt),
+            references: [],
+            count: n,
+            size: requestSize,
+            background,
+            imageMode,
+            params: requestParams,
+            options,
+        });
+    }
+
     const requestId = `img_${nanoid()}`;
     const detachCancel = attachLocalCancel(requestConfig, requestId, options?.signal);
     const detachProgress = attachLocalProgress(requestConfig, requestId, options?.signal);
@@ -729,6 +816,20 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     if (Object.keys(requestParams).length) {
         formData.set("params", JSON.stringify(requestParams));
     }
+    if (isGatewayImageModel(requestConfig)) {
+        return requestGatewayImages({
+            config: requestConfig,
+            prompt: withSystemPrompt(requestConfig, requestPrompt),
+            references,
+            count: n,
+            size: requestSize,
+            background,
+            imageMode,
+            params: requestParams,
+            options,
+        });
+    }
+
     const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     const imageField = files.length > 1 ? "image[]" : "image";
     files.forEach((file) => formData.append(imageField, file));

@@ -94,6 +94,43 @@ export async function createRun(config: AiConfig, request: RunRequest): Promise<
     }
 }
 
+/** One media file uploaded to the gateway, ready to be referenced by a run. */
+type UploadedMedia = { id: string; kind: string; mime: string; bytes: number; filename: string };
+
+/**
+ * Upload one media file and return its id.
+ *
+ * Runs reference media by id and role, so a reference image is uploaded once and named in the run
+ * request instead of being re-sent as a multipart part with a guessed field name.
+ */
+export async function uploadMedia(config: AiConfig, file: Blob, filename: string, options: { signal?: AbortSignal } = {}): Promise<UploadedMedia> {
+    const body = new FormData();
+    body.append("file", file, filename);
+    try {
+        const payload = await httpJson<{ upload?: UploadedMedia }>(runUrl(config, "/api/uploads"), {
+            method: "POST",
+            headers: { Authorization: `Bearer ${config.apiKey}` },
+            body,
+            signal: options.signal,
+        });
+        if (!payload?.upload?.id) throw new Error(apiText("runUploadFailed"));
+        return payload.upload;
+    } catch (error) {
+        throw new Error(apiErrorMessage(error, apiText("runUploadFailed")));
+    }
+}
+
+/** Download every output of a finished run, in index order. */
+export async function downloadRunOutputs(config: AiConfig, run: Run, options: { signal?: AbortSignal } = {}): Promise<Array<{ index: number; blob: Blob; mime: string }>> {
+    const outputs = run.outputs || [];
+    if (!outputs.length) throw new Error(apiText("runDownloadFailed"));
+    const files: Array<{ index: number; blob: Blob; mime: string }> = [];
+    for (let index = 0; index < outputs.length; index += 1) {
+        files.push({ index, blob: await downloadRunOutput(config, run, index, options), mime: outputs[index].mime });
+    }
+    return files;
+}
+
 /** Read one run. */
 async function getRun(config: AiConfig, id: string): Promise<Run> {
     try {

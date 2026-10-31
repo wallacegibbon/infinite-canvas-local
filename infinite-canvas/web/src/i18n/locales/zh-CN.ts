@@ -140,6 +140,7 @@ export default {
         httpFailed: "请求失败（HTTP {{status}}），请检查 Base URL 和 API Key 是否正确",
         htmlError: "服务返回了 HTML 错误页面（{{preview}}）",
         imageTimeout: "生图请求超时，接口长时间没有返回，请稍后重试或更换渠道",
+        runUploadFailed: "上传参考素材失败",
         runCreateFailed: "无法提交生成任务",
         runQueryFailed: "查询生成任务失败",
         runFailed: "生成任务失败",
