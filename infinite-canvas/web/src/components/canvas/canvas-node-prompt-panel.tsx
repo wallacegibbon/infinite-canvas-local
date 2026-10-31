@@ -8,7 +8,7 @@ import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
 import { Tooltip } from "@/components/kit/tooltip";
 import { BaseModelPicker, ModelPicker, WorkflowModelPicker } from "@/components/model-picker";
-import { channelModelOf, defaultConfig, modelImageInputs, modelOptionName, promptEndpointReady, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { channelModelOf, defaultConfig, modelImageInputs, modelOptionName, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { isPlainEnterKey } from "@/lib/keyboard-event";
@@ -20,7 +20,8 @@ import { CanvasTextSettingsPopover } from "./canvas-text-settings-popover";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { resolveCanvasReferenceImages } from "@/lib/canvas/canvas-resource-references";
-import { requestImageCaption, requestImagePromptOptimize, requestPromptOptimize, type PromptOptimizeMode } from "@/services/api/prompts";
+import { requestAgentStream } from "@/services/api/agent";
+import type { PromptOptimizeMode } from "@/services/api/prompts";
 import { videoModelForWorkflow, videoModelModePatch, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasNodeReferenceBar } from "./canvas-node-reference-bar";
 import { abortCaptionJob, hasCaptionJob, registerCaptionJob, releaseCaptionJob } from "@/lib/canvas/caption-jobs";
@@ -125,13 +126,12 @@ export function CanvasNodePromptPanel({
     const canOptimize = isH3 && Boolean(draft.trim()) && !isRunning && !optimizeRunning;
     const canOptimizeImage = isImage && Boolean(draft.trim()) && !isRunning && !optimizeRunning;
     const optimizeLanguage = config.promptOptimizeLanguage === "en" ? "en" : "zh";
-    const endpointReady = promptEndpointReady(config);
     const captionStatus = mode === "text" ? node.metadata?.captionStatus : undefined;
     const captionRunning = mode === "text" && captionStatus === "running";
     const captionResult = mode === "text" ? node.metadata?.captionPrompt || "" : "";
     const captionError = mode === "text" ? node.metadata?.captionError || "" : "";
     // Captioning has exactly one path: an OpenAI-compatible endpoint, which may point at a local llama.cpp.
-    const canCaption = mode === "text" && endpointReady && imageReferences.length > 0 && !isRunning && !captionRunning;
+    const canCaption = mode === "text" && imageReferences.length > 0 && !isRunning && !captionRunning;
     const hasMediaReferences = mentionReferences.some((reference) => reference.kind !== "text");
     const textVideoHasReferences = isH3T2V && hasMediaReferences;
     const frameMode: "first" | "last" | "both" = node.metadata?.frameMode === "last" || node.metadata?.frameMode === "both" || node.metadata?.frameMode === "first" ? node.metadata.frameMode : imageReferences.length >= 2 ? "both" : "first";
@@ -253,15 +253,9 @@ export function CanvasNodePromptPanel({
         return { selectedRefs, referenceNote, taskType, duration: isCharacterSwap ? (sourceVideoDurationSeconds ?? (Number(config.videoSeconds) || 5)) : Number(config.videoSeconds) || 5 };
     };
 
-    // ✨ starts immediately: if the endpoint is not configured, warn and jump to settings instead of opening another panel first.
-    const startOptimize = (run: () => void) => {
-        if (!endpointReady) {
-            toast.warning(t("canvas.promptPanel.promptEndpointMissing"));
-            openConfigDialog(true, "prompt-api");
-            return;
-        }
-        run();
-    };
+    // ✨ starts immediately: there is nothing to configure first — the agent has its own model and
+    // its own skills, and the instruction below is all this button has to say.
+    const startOptimize = (run: () => void) => void run();
 
     const optimizePrompt = async () => {
         const text = draft.trim();
@@ -273,19 +267,19 @@ export function CanvasNodePromptPanel({
         onConfigChange(node.id, { promptOptimizeStatus: "running", promptOptimizeKind: "h3", promptOptimizeSource: text, promptOptimizePrompt: undefined, promptOptimizeError: undefined });
         try {
             const images = defaults.selectedRefs.length ? await resolveCanvasReferenceImages(defaults.selectedRefs, nodes) : [];
-            const result = await requestPromptOptimize(
+            const note = defaults.referenceNote ? `\n参考素材说明：${defaults.referenceNote}` : "";
+            const instruction = `把下面这段需求改写成一条 MiniMax H3 视频生成提示词。任务类型：${defaults.taskType}；时长：${defaults.duration} 秒；输出语言：${optimizeLanguage === "en" ? "英文" : "中文"}。${note}\n\n${text}`;
+            const result = await requestAgentStream(
                 config,
+                { prompt: instruction, images },
                 {
-                    prompt: text,
-                    mode: defaults.taskType,
-                    duration: defaults.duration,
-                    referenceNote: defaults.referenceNote,
-                    language: optimizeLanguage,
-                    images,
+                    signal: controller.signal,
+                    onEvent: (event) => {
+                        if (event.type === "delta" && event.text) onConfigChange(node.id, { promptOptimizePrompt: event.text });
+                    },
                 },
-                { signal: controller.signal },
             );
-            onConfigChange(node.id, { promptOptimizeStatus: "done", promptOptimizePrompt: result.prompt });
+            onConfigChange(node.id, { promptOptimizeStatus: "done", promptOptimizePrompt: result });
         } catch (error) {
             if (controller.signal.aborted) clearOptimizePreview();
             else onConfigChange(node.id, { promptOptimizeStatus: "error", promptOptimizeError: error instanceof Error ? error.message : t("canvas.promptPanel.optimizeFailed") });
@@ -303,17 +297,18 @@ export function CanvasNodePromptPanel({
         registerPromptOptimizeJob(node.id, controller);
         onConfigChange(node.id, { promptOptimizeStatus: "running", promptOptimizeKind: "image", promptOptimizeSource: text, promptOptimizePrompt: undefined, promptOptimizeError: undefined });
         try {
-            const result = await requestImagePromptOptimize(
+            const instruction = `把下面这段需求改写为一条可直接用于生图模型的提示词，只输出提示词本身。输出语言：${optimizeLanguage === "en" ? "英文" : "中文"}。${selectedRefs.length ? `参考图片 ${selectedRefs.length} 张。` : ""}\n\n${text}`;
+            const result = await requestAgentStream(
                 config,
+                { prompt: instruction },
                 {
-                    prompt: text,
-                    mode: selectedRefs.length ? "image" : "text",
-                    language: optimizeLanguage,
-                    imageCount: selectedRefs.length,
+                    signal: controller.signal,
+                    onEvent: (event) => {
+                        if (event.type === "delta" && event.text) onConfigChange(node.id, { promptOptimizePrompt: event.text });
+                    },
                 },
-                { signal: controller.signal },
             );
-            onConfigChange(node.id, { promptOptimizeStatus: "done", promptOptimizePrompt: result.prompt });
+            onConfigChange(node.id, { promptOptimizeStatus: "done", promptOptimizePrompt: result });
         } catch (error) {
             if (controller.signal.aborted) clearOptimizePreview();
             else onConfigChange(node.id, { promptOptimizeStatus: "error", promptOptimizeError: error instanceof Error ? error.message : t("canvas.promptPanel.optimizeFailed") });
@@ -355,8 +350,17 @@ export function CanvasNodePromptPanel({
         try {
             const images = await resolveCanvasReferenceImages(imageReferences.slice(0, 1), nodes);
             if (!images.length) throw new Error(t("canvas.promptPanel.captionNoImage"));
-            const result = await requestImageCaption(config, { images, language: "zh" }, { signal: controller.signal });
-            onConfigChange(node.id, { captionStatus: "done", captionPrompt: result.prompt });
+            const result = await requestAgentStream(
+                config,
+                { prompt: "用一段话描述这张图片，输出可以直接当作生图提示词的描述，只输出描述本身。", images },
+                {
+                    signal: controller.signal,
+                    onEvent: (event) => {
+                        if (event.type === "delta" && event.text) onConfigChange(node.id, { captionPrompt: event.text });
+                    },
+                },
+            );
+            onConfigChange(node.id, { captionStatus: "done", captionPrompt: result });
         } catch (error) {
             if (controller.signal.aborted) clearCaptionPreview();
             else onConfigChange(node.id, { captionStatus: "error", captionError: error instanceof Error ? error.message : t("canvas.promptPanel.optimizeFailed") });
@@ -553,14 +557,6 @@ export function CanvasNodePromptPanel({
                     </span>
                 </Button>
             </div>
-            {mode === "text" && !endpointReady ? (
-                <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-                    <span className="min-w-0 truncate">{t("canvas.promptPanel.promptEndpointMissing")}</span>
-                    <button type="button" className="shrink-0 underline underline-offset-2" onClick={() => openConfigDialog(false, "prompt-api")}>
-                        {t("canvas.promptPanel.optimizeOpenSettings")}
-                    </button>
-                </div>
-            ) : null}
             {(() => {
                 const previewRunning = mode === "text" ? captionRunning : optimizeRunning;
                 const previewPrompt = mode === "text" ? captionResult : optimizeResult;
