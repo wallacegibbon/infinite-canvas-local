@@ -2522,7 +2522,8 @@ chat client are still what runs; this entry records the target so the code that 
 not have to re-litigate it.
 
 **Decision** The gateway stops calling a chat-completion endpoint and starts **spawning the agent**:
-one request → one `alayacore --rawio` process → one event stream → process released. The prompt
+one request → one `alayacore --rawio` process → one event stream → process released. Nothing else
+lives longer than that; the canvas's panels do not keep an agent alive. The prompt
 surface collapses to a single route (`POST /api/prompts/chat`), and `internal/prompt` (the chat
 client, the four recipes, the H3 skill assembly, the sanitisers, the speaker tags) goes away. No dual
 backend and no fallback: a second path would be two configuration stories and two code paths for one
@@ -2569,21 +2570,25 @@ from "uses your quota" to "reads your files and runs your commands".
 **Required regardless of auth** A concurrency cap and a per-request timeout. Spawning is unbounded
 otherwise, and a token does not help: whoever can open the canvas has the token too.
 
-**The model is visible and selectable** Everywhere the canvas uses the agent there is a model
-`<select>`, because "which model answered" is the user's first question and the only way to notice
-that the agent is still on AlayaCore's default.
+**Nothing binds to a window** The process lives for one operation and no longer: spawn when the
+request arrives, release on `done`/`error`/cancel. It is not tied to a panel's lifetime, so there is
+no idle agent to reap, no TTL, no "the panel is still open but the process was reclaimed" state to
+hide, and no per-node processes for the config nodes that are always on screen. A spawn costs ~30 ms,
+which is why re-opening one for every ✨ press is the cheap end of the trade.
 
-Nothing is fetched up front and no probe route exists. `SM model_list` and `SM model` are part of the
-startup broadcast of every spawn, ahead of the model call — so they arrive even when generation then
-fails — and the gateway forwards them as one `models` event with **every `api_key` stripped** (the
-frame carries them verbatim). The canvas caches that in its config store, so every select renders
-from one request's worth of data and survives a reload; the next request overwrites it.
+**The model sits where the action is, and its list comes from a cache** The select belongs to the
+panel that runs the operation (the H3 optimize dialog, the text panel), not to the node, because that
+is the moment the user knows what they are about to ask and which model matters.
+
+`GET /api/agent` serves the list: the gateway keeps the startup frames of the last spawn (`SM
+model_list` + `SM model`, **every `api_key` stripped** — the frame carries them verbatim) and returns
+them from memory; on an empty cache it does one 30 ms probe and caches that. So the list is there
+before the first run, and no process outlives the request that produced it.
 
 The choice travels as `--model <name>` — not `CI model_set`, which would rewrite the agent's
-persisted model and cost a round trip. There is no gateway-side allow-list: with no list in hand, the
-only check is the agent's own, and a name that no longer exists in `model.conf` comes back as its
-error. Until the first call the select shows the agent's default and nothing to choose from, which is
-also the honest state of affairs.
+persisted model and cost a round trip. There is no gateway-side allow-list: the only check is the
+agent's own, and a name that no longer exists in `model.conf` comes back as its error, which is the
+honest place for it.
 
 **The event surface is a whitelist** `delta` (Ax text), `reasoning`, `step` (SM `task`), `done`,
 `error` (+ an optional one-line `tool` state). Everything else the agent emits stays on the gateway:
