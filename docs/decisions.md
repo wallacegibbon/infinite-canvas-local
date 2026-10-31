@@ -2567,8 +2567,10 @@ the optional, existing knob for an exposed deployment. Built-in tools are off (`
 unless the operator turns them on — that switch, not the agent itself, is what changes the risk class
 from "uses your quota" to "reads your files and runs your commands".
 
-**Required regardless of auth** A concurrency cap and a per-request timeout. Spawning is unbounded
-otherwise, and a token does not help: whoever can open the canvas has the token too.
+**Cancel belongs to the agent** Its `CI cancel` command winds a task down on its own terms — it is
+the process that knows what a half-finished step means — so the gateway does not layer its own
+timeout on top, and it does not invent a reaper either. A request that ends early sends `cancel` and
+stops reading; the process exits when it says it has.
 
 **Nothing binds to a window** The process lives for one operation and no longer: spawn when the
 request arrives, release on `done`/`error`/cancel. It is not tied to a panel's lifetime, so there is
@@ -2576,27 +2578,21 @@ no idle agent to reap, no TTL, no "the panel is still open but the process was r
 hide, and no per-node processes for the config nodes that are always on screen. A spawn costs ~30 ms,
 which is why re-opening one for every ✨ press is the cheap end of the trade.
 
-**The model sits where the action is, and its list comes from a cache** The select belongs to the
-panel that runs the operation (the H3 optimize dialog, the text panel), not to the node, because that
-is the moment the user knows what they are about to ask and which model matters.
+**The model is chosen in the panel and travels with the prompt** Everywhere the canvas uses the
+agent there is a model `<select>` and a reasoning-level control, because "which model answered" is the
+user's first question and the only way to notice the agent is still on AlayaCore's default. Both are
+AlayaCore's own concerns, so the gateway adds no endpoint and no notion of its own for either: a
+prompt request carries the chosen model id and reasoning level, and the gateway writes
+`CI model_set <id>` and `CI reasoning_level_set <n>` to the agent's stdin before the prompt. The agent
+applies them as it reads them, rejects one it does not like with a `CO` error (forwarded as an
+`error` event), and persists the model itself in `runtime.conf` — which is how the next spawn starts
+on the model the user last picked.
 
-`GET /api/agent` serves the list: the gateway keeps the startup frames of the last spawn (`SM
-model_list` + `SM model`, **every `api_key` stripped** — the frame carries them verbatim) and returns
-them from memory; on an empty cache it does one 30 ms probe and caches that. So the list is there
-before the first run, and no process outlives the request that produced it.
-
-The choice travels as `--model <name>` on the spawn — the agent's own startup flag ("model name to
-activate, overrides runtime config"), verified: `--model "V100 Wireguard / Qwen3.8-27B NVFP4"` makes
-`SM model` report that id and name. `CI model_set` is the *in-session* switch, for a process that is
-already running; a one-operation process has nothing to switch, and `model_set` would additionally
-persist the change into the agent's runtime config — silently repointing the user's terminal agent
-because they pressed ✨ once.
-
-One thing has to be checked, because `--model` is quiet about failure: a name that no longer exists
-does **not** produce an `SM error` — the agent prints `model_set: model not found: "<name>"` on
-stderr and carries on with whichever model was active. So the gateway compares the requested name
-with the `active_name` in the startup broadcast and fails the request, quoting that stderr line,
-rather than answering from a model the user did not pick.
+**The list arrives with the answer, not before it** `SM model_list` and `SM model` are part of the
+startup broadcast of every spawn, ahead of the model call. The gateway forwards them as one `models`
+event with **every `api_key` stripped**, and the canvas renders the select from the last such event.
+There is no listing route, no probe and no gateway-side cache: an empty picker before the first
+request in a page is the honest state, and one request fills it.
 
 **The event surface is a whitelist** `delta` (Ax text), `reasoning`, `step` (SM `task`), `done`,
 `error` (+ an optional one-line `tool` state). Everything else the agent emits stays on the gateway:
