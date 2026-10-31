@@ -82,7 +82,7 @@
     },
     "class_type": "VAELoader",
     "_meta": {
-      "title": "⑧ 视频VAE（普通·无需烘焙）",
+      "title": "⑧ Video VAE (plain, no bake)",
       "cnr_id": "comfy-core"
     }
   },
@@ -104,7 +104,7 @@
     },
     "class_type": "KSamplerSelect",
     "_meta": {
-      "title": "①d 采样算法 euler",
+      "title": "①d Sampler: euler",
       "cnr_id": "comfy-core",
       "ver": "0.33.0"
     }
@@ -139,7 +139,7 @@
     },
     "class_type": "MiniMaxH3AudioConditioningT8",
     "_meta": {
-      "title": "①a 条件（尺寸=1344×768 可改）",
+      "title": "①a Conditioning (size 1344×768, editable)",
       "cnr_id": "minimax-h3-audio-T8"
     }
   },
@@ -152,7 +152,7 @@
     },
     "class_type": "ConditioningZeroOut",
     "_meta": {
-      "title": "①e 负向条件",
+      "title": "①e Negative conditioning",
       "cnr_id": "comfy-core",
       "ver": "0.34.0"
     }
@@ -200,7 +200,7 @@
     },
     "class_type": "SelfLiftH3Sampler",
     "_meta": {
-      "title": "① 单采 SelfLift（日常版参数）"
+      "title": "① Single-sampler SelfLift (daily preset)"
     }
   },
   "79": {
@@ -220,7 +220,7 @@
     },
     "class_type": "MiniMaxH3AVDecodeT8",
     "_meta": {
-      "title": "①f AV 解码",
+      "title": "①f AV decode",
       "cnr_id": "minimax-h3-audio-T8"
     }
   },
@@ -246,7 +246,7 @@
     },
     "class_type": "VHS_VideoCombine",
     "_meta": {
-      "title": "★ 输出·单采版",
+      "title": "★ Output, single-sampler",
       "cnr_id": "comfy-core"
     }
   },

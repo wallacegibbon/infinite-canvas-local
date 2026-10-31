@@ -39,7 +39,7 @@
       "text": ""
     },
     "_meta": {
-      "title": "正向提示词"
+      "title": "Positive prompt"
     }
   },
   "5": {
@@ -52,7 +52,7 @@
       "text": "worst quality, bad anatomy, watermark, jpeg artifact"
     },
     "_meta": {
-      "title": "负面提示词"
+      "title": "Negative prompt"
     }
   },
   "6": {
@@ -66,7 +66,7 @@
       "strength_model": 1
     },
     "_meta": {
-      "title": "MOSS 8步 DMD LoRA"
+      "title": "MOSS 8-step DMD LoRA"
     }
   },
   "7": {
@@ -107,7 +107,7 @@
       "denoise": 1
     },
     "_meta": {
-      "title": "KSampler 8步 cfg1"
+      "title": "KSampler 8-step cfg1"
     }
   },
   "9": {
@@ -136,7 +136,7 @@
       "filename_prefix": "MOSS_8step"
     },
     "_meta": {
-      "title": "保存图片"
+      "title": "Save image"
     }
   }
 }

@@ -159,7 +159,7 @@
   "22": {
     "class_type": "StringConcatenate",
     "inputs": {
-      "string_a": "保持主体、颜色、材质和画面风格一致，只改变相机视角与构图。",
+      "string_a": "Keep the subject, colours, materials and style identical; change only the camera angle and framing.",
       "string_b": [
         "20",
         0

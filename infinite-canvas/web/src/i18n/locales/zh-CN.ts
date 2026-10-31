@@ -18,6 +18,7 @@ export default {
             "video-h3-t2v-novdn": { label: "H3 文生视频（无 VDN）" },
             "video-h3-frames-novdn": { label: "H3 首尾帧（无 VDN）" },
             "video-h3-character-swap": { label: "H3 角色替换（Character Swap 1.5）" },
+            "video-rife": { label: "RIFE 帧插值" },
             "video-seedvr2-upscale": { label: "SeedVR2 视频超分" },
             "image-esrgan-upscale": { label: "ESRGAN 快速放大" },
             "image-moss-sft-8step": { label: "MOSS-Image 极速 8 步" },

@@ -1969,7 +1969,7 @@
         "prompt": {
           "node": "22",
           "input": "string_a",
-          "default": "保持主体、颜色、材质和画面风格一致，只改变相机视角与构图。"
+          "default": "Keep the subject, colours, materials and style identical; change only the camera angle and framing."
         },
         "horizontal": {
           "node": "20",
@@ -2237,7 +2237,7 @@
       "name": "video-rife",
       "type": "video",
       "file": "video-rife.json",
-      "label": "RIFE 帧插值",
+      "label": "RIFE frame interpolation",
       "description": "RIFE frame interpolation: 2× or 3× the frame rate of an existing clip. The audio track passes through. The source is assumed to be 24fps, which is what the canvas's own clips are.",
       "accepts": {
         "videos": {
@@ -2273,13 +2273,13 @@
       "parameters": [
         {
           "key": "multiplier",
-          "label": "倍数",
+          "label": "Multiplier",
           "type": "number",
           "min": 2,
           "max": 3,
           "step": 1,
           "default": 2,
-          "description": "RIFE VFI 只支持 2× 和 3×"
+          "description": "RIFE VFI only supports 2× and 3×"
         }
       ]
     },

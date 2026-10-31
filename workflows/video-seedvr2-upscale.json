@@ -5,7 +5,7 @@
       "file": "placeholder.mp4"
     },
     "_meta": {
-      "title": "SeedVR2 源视频"
+      "title": "SeedVR2 source video"
     }
   },
   "2": {
@@ -17,7 +17,7 @@
       ]
     },
     "_meta": {
-      "title": "SeedVR2 源组件"
+      "title": "SeedVR2 source components"
     }
   },
   "3": {
@@ -69,7 +69,7 @@
       "enable_debug": false
     },
     "_meta": {
-      "title": "SeedVR2 视频超分"
+      "title": "SeedVR2 video upscale"
     }
   },
   "6": {
@@ -92,7 +92,7 @@
       "codec": "none"
     },
     "_meta": {
-      "title": "SeedVR2 视频合成"
+      "title": "SeedVR2 video compose"
     }
   },
   "7": {
@@ -107,7 +107,7 @@
       "codec": "auto"
     },
     "_meta": {
-      "title": "SeedVR2 视频输出"
+      "title": "SeedVR2 video output"
     }
   }
 }

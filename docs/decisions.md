@@ -2179,3 +2179,34 @@ submitted a run, and produced a 4096×4096 PNG node.
 `workflows/registry.json`, `infinite-canvas/web/src/services/api/workflows.ts`,
 `infinite-canvas/web/src/services/api/image.ts`,
 `infinite-canvas/web/src/components/canvas/canvas-node-super-resolve-dialog.tsx`.
+
+## 66. Everything under `workflows/` is English
+
+**Decision** The graphs, `registry.json` and their defaults contain no Chinese. Chinese for a shipped
+workflow lives in `i18n/locales/zh-CN.ts` under `gateway.models.<id>.label`, keyed by the id the
+gateway sends (#8 already said this; the registry just had not caught up).
+
+**What was mixed** Three unrelated kinds of Chinese in the directory:
+
+- *Copy we author*: RIFE's `label`, its `multiplier` label and description, and the angle workflow's
+  default prompt. This is the actual violation — data we ship, in one language, shown to both UIs.
+  `video-rife` gained a `gateway.models` entry so the Chinese UI still says "RIFE 帧插值", and the
+  angle default is now English because the canvas overrides it with `canvas.generation.anglePrompt`
+  anyway: the default only reaches a caller that sends no prompt at all.
+- *ComfyUI node titles* (`_meta.title`): cosmetic labels the author typed, never read by the gateway
+  and never shown by the canvas — the only titles we write are our own (`Gateway Ref 1`, `Gateway
+  Load 2`). Translated anyway, because a reader opening a shipped workflow should not have to guess
+  what "① 单采 SelfLift（日常版参数）" means, and a half-translated file is worse than either.
+- *A real path*: `image-qwen21-outpaint.json` names its LoRA `Qwen-功能2.1/Qwen21-图像扩展…safetensors`,
+  and `resources/index.json` installs it at exactly that path. **Left alone** — that string is a
+  filename on disk, not copy.
+
+**Cost** A workflow re-imported from an author's file comes back with its Chinese titles; the same
+pass has to be applied again. The registry is the part that matters, and it is machine-written.
+
+**Also found** `resources/index.json` is still Chinese-only: pack labels and descriptions render
+verbatim in the resource panel, with no key indirection. Making it English is a bigger change than
+this one — it needs the same `gateway.*` dictionary treatment the model labels just got — so it is
+left as the open question rather than half-done here.
+
+**Where** `workflows/*.json`, `workflows/registry.json`, `infinite-canvas/web/src/i18n/locales/zh-CN.ts`.
