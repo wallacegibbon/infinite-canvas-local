@@ -119,7 +119,8 @@ export function CanvasNodePromptPanel({
     const captionRunning = mode === "text" && captionStatus === "running";
     const captionResult = mode === "text" ? node.metadata?.captionPrompt || "" : "";
     const captionError = mode === "text" ? node.metadata?.captionError || "" : "";
-    // Captioning has exactly one path: an OpenAI-compatible endpoint, which may point at a local llama.cpp.
+    // Captioning has exactly one path now: the connected agent reads the image and answers. There is no
+    // separate vision endpoint to configure.
     const canCaption = mode === "text" && imageReferences.length > 0 && !isRunning && !captionRunning;
     const hasMediaReferences = mentionReferences.some((reference) => reference.kind !== "text");
     const textVideoHasReferences = isH3T2V && hasMediaReferences;

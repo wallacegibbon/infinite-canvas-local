@@ -73,7 +73,7 @@ export type AiConfig = {
     params?: Record<string, unknown>;
 };
 
-export type ConfigTabKey = "channels" | "preferences" | "prompt-sources" | "local-storage" | "resources";
+export type ConfigTabKey = "channels" | "preferences" | "local-storage" | "resources";
 
 const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
 const CHANNEL_MODEL_SEPARATOR = "::";

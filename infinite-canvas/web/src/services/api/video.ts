@@ -36,13 +36,6 @@ type VideoInterpolateSource = VideoUpscaleSource;
 type VideoInterpolateParams = { multiplier: 2 | 3 };
 export type VideoPreview = { url: string; mime?: string; step?: number; total?: number };
 type WaitOptions = RequestOptions & { onPreview?: (preview: VideoPreview | null) => void; onSteps?: (steps: { step: number; total: number }) => void };
-type GeminiInlineData = { bytesBase64Encoded: string; mimeType: string };
-type GeminiVideoOperation = {
-    name?: string;
-    done?: boolean;
-    error?: { message?: string };
-    response?: { generateVideoResponse?: { generatedSamples?: Array<{ video?: { uri?: string } }> } };
-};
 type VideoGenerationTaskState = { status: "pending"; preview?: VideoPreview; steps?: { step: number; total: number } } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
 /**
