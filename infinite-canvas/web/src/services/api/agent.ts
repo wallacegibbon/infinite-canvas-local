@@ -29,14 +29,17 @@ type AgentEvent = {
 /**
  * Connect: start an agent and keep it, so the model list is on screen before anything is asked.
  *
- * The gateway holds the process and returns the agent's own startup broadcast; the next send names
- * this session and the same process answers it, then it is gone.
+ * `canvasId` is the name the process is filed under. It is the canvas's own id, which is what makes a
+ * reload find the agent it left instead of starting a second one — the gateway holds one process per
+ * name and keeps it until it is told to let go.
  */
-export async function requestAgentConnect(config: AiConfig, options?: { signal?: AbortSignal }): Promise<void> {
+export async function requestAgentConnect(config: AiConfig, canvasId: string, options?: { signal?: AbortSignal }): Promise<void> {
     // The same root every other service uses: the channel address without its legacy `/v1`.
     const root = gatewayProtocolRoot(config.baseUrl);
     try {
-        const response = await fetch(`${root}/api/agent/connect`, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}` }, signal: options?.signal });
+        const formData = new FormData();
+        formData.set("session", canvasId);
+        const response = await fetch(`${root}/api/agent/connect`, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}` }, body: formData, signal: options?.signal });
         if (!response.ok) throw new Error(apiText("requestFailed"));
         const payload = (await response.json()) as { sessionId?: string; state?: AgentEvent };
         if (payload.state) rememberAgentEvent(payload.state);

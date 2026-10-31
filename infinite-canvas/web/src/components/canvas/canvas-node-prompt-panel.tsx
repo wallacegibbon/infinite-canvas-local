@@ -31,6 +31,8 @@ export type CanvasNodeGenerationMode = CanvasGenerationMode;
 
 type CanvasNodePromptPanelProps = {
     node: CanvasNodeData;
+    /** The canvas this node lives in: the name its agent is filed under. */
+    canvasId: string;
     isRunning: boolean;
     onPromptChange: (nodeId: string, prompt: string) => void;
     onConfigChange: (nodeId: string, patch: Partial<CanvasNodeData["metadata"]>) => void;
@@ -51,6 +53,7 @@ type CanvasNodePromptPanelProps = {
 export function CanvasNodePromptPanel({
     node,
     nodes,
+    canvasId,
     isRunning,
     onPromptChange,
     onConfigChange,
@@ -260,7 +263,7 @@ export function CanvasNodePromptPanel({
     const connectAgent = async () => {
         setConnecting(true);
         try {
-            await requestAgentConnect(config);
+            await requestAgentConnect(config, canvasId);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
         } finally {

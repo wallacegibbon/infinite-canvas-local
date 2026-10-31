@@ -30,9 +30,11 @@ type CanvasConfigNodePanelProps = {
     onOpenMaskEditor?: (nodeId: string) => void;
     onOpenOutpaintEditor?: (nodeId: string) => void;
     onOpenMossLayoutEditor?: (nodeId: string) => void;
+    /** The canvas this node lives in: the name its agent is filed under. */
+    canvasId: string;
 };
 
-export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigChange, onGenerate, onStop, onComposerToggle, onOpenMaskEditor, onOpenOutpaintEditor, onOpenMossLayoutEditor }: CanvasConfigNodePanelProps) {
+export function CanvasConfigNodePanel({ node, canvasId, isRunning, inputSummary, onConfigChange, onGenerate, onStop, onComposerToggle, onOpenMaskEditor, onOpenOutpaintEditor, onOpenMossLayoutEditor }: CanvasConfigNodePanelProps) {
     const { t } = useTranslation();
     const globalConfig = useEffectiveConfig();
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
@@ -46,7 +48,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
     const connectAgent = async () => {
         setConnecting(true);
         try {
-            await requestAgentConnect(config);
+            await requestAgentConnect(config, canvasId);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
         } finally {
