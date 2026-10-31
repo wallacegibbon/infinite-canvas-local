@@ -252,7 +252,6 @@ type Entry struct {
 	Label            string
 	Description      string
 	Category         string
-	Hidden           bool
 	MinMedia         int
 	BackgroundPrompt string
 
@@ -332,7 +331,6 @@ type rawEntry struct {
 	Label             string                      `json:"label"`
 	Description       string                      `json:"description"`
 	Category          string                      `json:"category"`
-	Hidden            bool                        `json:"hidden"`
 	MinMedia          int                         `json:"minMedia"`
 	BackgroundPrompt  string                      `json:"backgroundPrompt"`
 	Accepts           *Accepts                    `json:"accepts,omitempty"`

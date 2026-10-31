@@ -2103,3 +2103,37 @@ are rejected as unknown inputs, while the self-named `seed` is still accepted. E
 workflow's schema was re-read through the live gateway.
 
 **Where** `internal/workflow/inputs.go`, `docs/protocol.md`.
+
+## 64. The model list belongs to the client
+
+**Decision** `registry.json` has no `hidden` flag any more, and neither do `/api/workflows` rows or
+the availability scan. The gateway registers workflows and reports two facts about each: what it
+accepts, and whether it can run here. Which of them appear in a model dropdown is decided by the
+canvas (`lib/canvas/tool-workflows.ts`), because the canvas is the only client.
+
+**What `hidden` was doing** Four unrelated jobs at once: keeping a workflow out of the model list,
+excluding it from the availability totals and the "what is missing" list, refusing the user's own
+visibility toggle, and overlapping with `category: "upscale"`. Only the first is a real need, and it
+is not a fact about the workflow — it is a fact about our UI. The result was the bug this session
+started from: the panel read "14/14 available" while two upscalers were missing three node classes.
+
+**What replaced it** The canvas already knew which workflows it invokes from a button; those ids are
+now one exported list, used by the buttons, the request builders and the model-list filter. An id
+cannot drift between "the button submits this" and "this appears in the dropdown" because it is the
+same constant.
+
+**Also deleted with it: three dead workflows.** `video-esrgan_2x` and `image-seedvr2-upscale` had no
+caller left (no button, no model, nothing in the canvas referenced them), and
+`image-krea2-aesthetics` was retired — its only trace was a migration shim that remapped a saved
+selection to `image-krea2-turbo`. The shim is gone too: the generic "pick the first available model"
+fallback covers it. The `upscale` pack lost those two workflows and the 7B SeedVR2 DiT resource only
+they used, so the panel no longer offers an 8.5GB download for a workflow nobody can invoke.
+
+**Tested** `internal/server/setup_report_test.go`: a workflow whose node class is missing appears in
+the setup status totals and in `missing.nodes` (models and tools alike), and a workflow row carries no
+`hidden` field. `tests/tool-workflows.test.ts` pins the client-side list. The live gateway's
+`/api/setup/status` and `/api/workflows` were re-read after the change.
+
+**Where** `internal/workflow/entry.go`, `internal/workflow/render.go`, `internal/setup/scan.go`,
+`internal/server/routes_admin.go`, `internal/resource/status.go`, `workflows/registry.json`,
+`resources/index.json`, `infinite-canvas/web/src/lib/canvas/tool-workflows.ts`.

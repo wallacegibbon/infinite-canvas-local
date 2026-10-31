@@ -133,12 +133,9 @@ func (m *Manager) Scan() (Status, error) {
 		available := len(problems) == 0
 		availability[entry.ID] = &Availability{Available: available, Problems: problems}
 
-		// Hidden helper workflows still get validated, so tooling endpoints cannot
-		// advertise an upscaler whose node is not installed. They just do not count
-		// toward the totals the user sees.
-		if entry.Hidden {
-			continue
-		}
+		// Every registered workflow is reported, tool or model alike: a missing node behind a
+		// toolbar button is still missing, and hiding it from the totals is how an install page
+		// ends up all green while half the buttons fail.
 		for _, problem := range problems {
 			switch problem.Type {
 			case "model":

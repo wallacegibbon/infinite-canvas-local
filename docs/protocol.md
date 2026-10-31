@@ -17,6 +17,10 @@ criterion.
   returns several). Audio is already an adapter on the same execution path.
 - Done: `inputs` is typed and checked at submission (closed key set, types, ranges, `required`,
   output container), with `GET /api/workflows/{id}/schema` publishing the same contract.
+- Done: the gateway no longer decides what belongs in a model list. A workflow is a workflow; the
+  canvas — the only client — offers the ones with a prompt as models and drives the rest from the
+  buttons that supply their media. Every workflow is reported by the availability scan, so a missing
+  node behind a tool is as visible as one behind a model.
 - Done: **the canvas's audio, image and video nodes use this protocol.** They submit a run, keep its
   id on the node, drive the step ring from the run's own progress, resume polling after a reload, and
   cancel the run when the user stops it. An image batch is one run with `count`, so its outputs are

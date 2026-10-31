@@ -18,6 +18,7 @@ import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { fitNodeSize } from "@/lib/canvas/canvas-node-size";
+import { IMAGE_UPSCALE_WORKFLOW } from "@/lib/canvas/tool-workflows";
 import { VIDEO_NODE_MAX_HEIGHT, VIDEO_NODE_MAX_WIDTH, applyGeneratedVideo } from "@/lib/canvas/canvas-generated-video";
 import { NODE_STATUS_ERROR, NODE_STATUS_IDLE, NODE_STATUS_LOADING, NODE_STATUS_SUCCESS } from "@/lib/canvas/canvas-node-status";
 import { useContentIngress } from "@/pages/canvas/hooks/use-content-ingress";
@@ -2787,7 +2788,7 @@ function InfiniteCanvasPage() {
                         dataUrl={upscaleNode.metadata.content}
                         open={Boolean(upscaleNode)}
                         config={effectiveConfig}
-                        preferredWorkflowId="image-esrgan-upscale"
+                        preferredWorkflowId={IMAGE_UPSCALE_WORKFLOW}
                         title={t("canvas.superResolve.fastTitle")}
                         actionLabel={t("canvas.editors.upscale")}
                         note={t("canvas.superResolve.fastNote")}

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026.10.31-30",
+  "version": "2026.10.31-32",
   "channel": "stable",
   "updatedAt": "2026-10-31",
   "packs": [
@@ -331,15 +331,32 @@
       }
     },
     {
+      "id": "interp",
+      "label": "RIFE 插帧",
+      "description": "把已有片段补帧到 2×/3×。节点从 GitHub 安装，权重由节点自己下载；只影响「插帧」按钮。",
+      "resources": [
+        "frame_interpolation_node"
+      ],
+      "optionalResources": [],
+      "workflows": [
+        "video-rife"
+      ],
+      "optional": true,
+      "workflowDependencies": {
+        "video-rife": [
+          "frame_interpolation_node"
+        ]
+      }
+    },
+    {
       "id": "upscale",
       "label": "超分",
-      "description": "快速放大（ESRGAN）与 SeedVR2 图片/视频超分。节点随包自动安装，运行库与权重按工作流下载；3B/7B DiT 是选下内容。",
+      "description": "快速放大（ESRGAN）与 SeedVR2 视频超分。节点随包自动安装，运行库与权重按工作流下载；SeedVR2 3B DiT 是选下内容。",
       "resources": [
         "esrgan_x2plus",
         "esrgan_x4plus",
         "esrgan_anime6b",
         "seedvr2_3b_dit",
-        "seedvr2_7b_dit",
         "seedvr2_vae"
       ],
       "optionalResources": [
@@ -347,26 +364,16 @@
         "esrgan_x4plus",
         "esrgan_anime6b",
         "seedvr2_3b_dit",
-        "seedvr2_7b_dit",
         "seedvr2_vae"
       ],
       "workflows": [
         "image-esrgan-upscale",
-        "video-esrgan_2x",
-        "image-seedvr2-upscale",
         "video-seedvr2-upscale"
       ],
       "optional": true,
       "workflowDependencies": {
         "image-esrgan-upscale": [
           "esrgan_x2plus"
-        ],
-        "video-esrgan_2x": [
-          "esrgan_x2plus"
-        ],
-        "image-seedvr2-upscale": [
-          "seedvr2_7b_dit",
-          "seedvr2_vae"
         ],
         "video-seedvr2-upscale": [
           "seedvr2_3b_dit",
@@ -1005,6 +1012,19 @@
       "sources": []
     },
     {
+      "id": "frame_interpolation_node",
+      "type": "node",
+      "label": "Frame Interpolation (RIFE)",
+      "target": "custom_nodes/ComfyUI-Frame-Interpolation",
+      "provides": [
+        "RIFE VFI"
+      ],
+      "note": "RIFE 插帧节点，从 GitHub 安装（不随包复制）；权重 rife49.pth 由该节点包在首次运行时自行下载到自己的 ckpts 目录，不走 models/，所以没有单独的模型条目。装完重启 ComfyUI。",
+      "sources": [
+        "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation/archive/refs/heads/main.zip"
+      ]
+    },
+    {
       "id": "seedvr2_3b_dit",
       "type": "model",
       "label": "SeedVR2 3B DiT（视频）",
@@ -1016,20 +1036,6 @@
       "sources": [
         "https://hf-mirror.com/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors",
         "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors"
-      ]
-    },
-    {
-      "id": "seedvr2_7b_dit",
-      "type": "model",
-      "label": "SeedVR2 7B DiT（图片）",
-      "target": "SEEDVR2/seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
-      "size": 8466296338,
-      "sha256": "3d68b5ec0b295ae28092e355c8cad870edd00b817b26587d0cb8f9dd2df19bb2",
-      "license": "Apache-2.0",
-      "note": "SeedVR2 图片超分 7B DiT；约 8.5GB。",
-      "sources": [
-        "https://hf-mirror.com/AInVFX/SeedVR2_comfyUI/resolve/main/seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
-        "https://huggingface.co/AInVFX/SeedVR2_comfyUI/resolve/main/seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors"
       ]
     },
     {

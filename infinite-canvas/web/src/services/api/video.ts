@@ -3,6 +3,7 @@ import { isLocalGatewayUrl } from "@/constant/app-mode";
 import { apiErrorMessage, httpBlob, httpJson, httpVoid, isCancelled, readApiErrorMessage } from "@/services/api/http";
 import { dataUrlToFile, readFileAsDataUrl } from "@/lib/image-utils";
 import { clampVideoSeconds, computeVideoSize, inferVideoRatio } from "@/lib/media-size";
+import { VIDEO_INTERPOLATE_WORKFLOW, VIDEO_UPSCALE_WORKFLOW } from "@/lib/canvas/tool-workflows";
 import { getMediaBlob, resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
 import { cancelRun, createRun, downloadRunOutput, uploadMedia, waitForRun, RunFailedError, type Run } from "@/services/api/runs";
@@ -144,9 +145,6 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     return createOpenAIVideoTask(requestConfig, selectedModel, prompt, references, options);
 }
 
-/** The upscale workflow; the canvas offers it as a toolbar action rather than as a model. */
-const VIDEO_UPSCALE_WORKFLOW = "video-seedvr2-upscale";
-
 /**
  * Upscale a clip: one uploaded video, one run, one artifact.
  *
@@ -168,9 +166,6 @@ export async function createVideoUpscaleTask(config: AiConfig, source: VideoUpsc
         throw new Error(apiErrorMessage(error, apiText("videoTaskCreateFailed")));
     }
 }
-
-/** The interpolation workflow; raising a clip's frame rate is one run, like any other. */
-const VIDEO_INTERPOLATE_WORKFLOW = "video-rife";
 
 /**
  * Interpolate a clip: the RIFE workflow with the clip in the `video` role.

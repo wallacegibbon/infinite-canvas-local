@@ -224,7 +224,7 @@ Metadata and management:
 | --- | --- | --- |
 | `GET` | `/health` | Liveness, ComfyUI reachability, counts. |
 | `GET` | `/v1/models` | Registered workflows as OpenAI models. |
-| `GET` | `/api/workflows` | Full workflow list with availability. |
+| `GET` | `/api/workflows` | Full workflow list with availability. Every registered workflow, tool or model. |
 | `GET` | `/api/resources/status` | Model and node install status. |
 | `POST` | `/api/resources/install` | Start an install job. |
 | `POST` | `/api/resources/refresh` | The only rescan: reloads the resource index, re-scans ComfyUI (nodes, models, availability, new workflow graphs) and returns the resource status. This is the panel's refresh button. |

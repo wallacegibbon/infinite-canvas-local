@@ -167,7 +167,6 @@ func (r *Registry) buildEntry(raw json.RawMessage, file string) (*Entry, error) 
 		Label:             decoded.Label,
 		Description:       decoded.Description,
 		Category:          decoded.Category,
-		Hidden:            decoded.Hidden,
 		MinMedia:          decoded.MinMedia,
 		BackgroundPrompt:  decoded.BackgroundPrompt,
 		Accepts:           decoded.Accepts,

@@ -236,7 +236,7 @@ func (s *Server) handleWorkflows(ctx *httpx.Ctx) error {
 	for _, entry := range projected {
 		rows = append(rows, row{
 			PublicEntry:  entry,
-			Enabled:      !entry.Hidden && !s.visibility.IsHidden(entry.ID),
+			Enabled:      !s.visibility.IsHidden(entry.ID),
 			Availability: s.setup.WorkflowStatus(entry.ID),
 		})
 	}
@@ -278,9 +278,6 @@ func (s *Server) handleWorkflowVisibility(ctx *httpx.Ctx) error {
 	entry := s.registry.Resolve(ctx.R.PathValue("id"))
 	if entry == nil {
 		return httpx.NotFound("workflow_not_found", "workflow not found")
-	}
-	if entry.Hidden {
-		return httpx.NewError(http.StatusBadRequest, "workflow_internal", "this workflow is hidden by a built-in rule and cannot be changed")
 	}
 	enabled := true
 	if value, ok := body["enabled"].(bool); ok && !value {
@@ -341,7 +338,7 @@ func (s *Server) handleModels(ctx *httpx.Ctx) error {
 	data := make([]map[string]any, 0)
 	for _, descriptor := range s.registry.ListModels(loaderOptions) {
 		entry := descriptor.Entry
-		if !s.setup.IsAvailable(descriptor.BaseID) || entry.Hidden || entry.Category == "upscale" {
+		if !s.setup.IsAvailable(descriptor.BaseID) {
 			continue
 		}
 		if s.visibility.IsHidden(entry.ID) {

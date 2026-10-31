@@ -4,6 +4,7 @@ import { buildApiUrl, channelModelOf, modelImageInputs, modelOptionName, resolve
 import { nanoid } from "nanoid";
 import { dataUrlToFile, readFileAsDataUrl } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
+import { IMAGE_ANGLE_WORKFLOW } from "@/lib/canvas/tool-workflows";
 import { imageToDataUrl } from "@/services/image-storage";
 import { imageSizePresets } from "@/lib/media-size";
 import { apiErrorMessage, httpJson } from "@/services/api/http";
@@ -863,9 +864,6 @@ type ImageAngleParams = {
     cameraDistance: number;
     wideAngle: boolean;
 };
-
-/** The multi-angle workflow is a gateway workflow like any other; only its id is fixed. */
-const IMAGE_ANGLE_WORKFLOW = "image-qwen21-angle";
 
 /**
  * Re-render one image from a new camera angle.

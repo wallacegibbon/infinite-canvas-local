@@ -13,7 +13,6 @@ type PublicEntry struct {
 	Label         string            `json:"label"`
 	Description   string            `json:"description"`
 	Category      *string           `json:"category"`
-	Hidden        bool              `json:"hidden"`
 	File          string            `json:"file"`
 	Bindings      map[string]any    `json:"bindings"`
 	Defaults      map[string]any    `json:"defaults"`
@@ -54,7 +53,6 @@ func PublicProjection(entry *Entry) PublicEntry {
 		Type:          entry.Type,
 		Label:         defaultString(entry.Label, entry.Name),
 		Description:   entry.Description,
-		Hidden:        entry.Hidden,
 		File:          entry.File,
 		Bindings:      rawBindingsToMap(entry.RawBindings),
 		Defaults:      nonNilMap(entry.Defaults),

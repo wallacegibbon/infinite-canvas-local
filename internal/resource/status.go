@@ -770,7 +770,6 @@ func (m *Manager) workflowDependencies(pack *Pack, byID map[string]*Item, byReso
 		if entry != nil {
 			label = defaultString(entry.Label, entry.Name)
 			variantLabels = entry.VariantLabelsMap()
-			modelVisible = !entry.Hidden
 		}
 
 		var missingSize int64

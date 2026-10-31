@@ -2,6 +2,7 @@ import { useEffect } from "react";
 
 import { isLocalGatewayUrl, LOCAL_GATEWAY_BASE_URL } from "@/constant/app-mode";
 import { gatewayModelCapability } from "@/lib/gateway-capability";
+import { isToolWorkflow } from "@/lib/canvas/tool-workflows";
 import { markGatewayUp, noteGatewayError } from "@/services/api/gateway-status";
 import { encodeChannelModel, modelOptionsFromChannels, useConfigStore, type ModelCapability } from "@/stores/use-config-store";
 
@@ -52,7 +53,9 @@ export function useLocalGatewaySync() {
                             variantLabels: meta.variantLabels && typeof meta.variantLabels === "object" ? meta.variantLabels : undefined,
                         };
                     })
-                    .filter((model) => Boolean(model.name) && Boolean(model.capability));
+                    // The gateway reports every registered workflow; which of them are models is a
+                    // presentation choice, and the ones the canvas drives from a button are not.
+                    .filter((model) => Boolean(model.name) && Boolean(model.capability) && !isToolWorkflow(model.name));
                 if (synced.length) {
                     const state = useConfigStore.getState();
                     const config = state.config;
@@ -85,14 +88,7 @@ export function useLocalGatewaySync() {
                             const videoOptions = channels.flatMap((item) => item.models.filter((model) => model.capability === "video").map((model) => encodeChannelModel(item.id, model.name)));
                             const audioOptions = channels.flatMap((item) => item.models.filter((model) => model.capability === "audio").map((model) => encodeChannelModel(item.id, model.name)));
                             const pick = (current: string, options: string[]) => (options.includes(current) ? current : options[0] || "");
-                            const pickImage = (current: string) => {
-                                if (imageOptions.includes(current)) return current;
-                                if (String(current).endsWith("::image-krea2-aesthetics")) {
-                                    const turbo = imageOptions.find((option) => option.endsWith("::image-krea2-turbo"));
-                                    if (turbo) return turbo;
-                                }
-                                return pick(current, imageOptions);
-                            };
+                            const pickImage = (current: string) => pick(current, imageOptions);
                             useConfigStore.setState({
                                 config: {
                                     ...config,
