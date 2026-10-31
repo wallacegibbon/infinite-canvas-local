@@ -11,14 +11,23 @@ import (
 	"comfyui-gateway/internal/httpx"
 )
 
-// routesAgent registers the one agent route.
+// routesAgent registers the agent routes.
 //
-// A prompt and a command are the same kind of thing to AlayaCore — frames on its stdin — so they are
-// one route and one stream: what the request carries is written to the agent, and what the agent says
-// comes back. The old `/api/prompts/*` recipes are untouched and keep running for now.
+// They are two kinds of thing, and the route is what says which. The canvas holds one agent per
+// canvas for as long as the user keeps it open (`connect` + `chat`): it keeps a history, it can call
+// tools, and it grows the more that canvas is worked on. A prompt rewrite or a caption is the other
+// kind (`once`): one question, one process, gone when it is answered.
+//
+// The separation is the point, not an accident of routing. A one-shot question is handed a process of
+// its own and no session at all, so a button that rewrites a prompt cannot reach — let alone spend —
+// the agent the user is working with.
+//
+// A prompt and a command are the same kind of thing to AlayaCore — frames on its stdin — so `chat`
+// carries both: what the request holds is written to the agent, and what the agent says comes back.
 func (s *Server) routesAgent(mux *http.ServeMux) {
 	s.route(mux, "POST /api/agent/connect", s.handleAgentConnect)
 	s.route(mux, "POST /api/agent/chat", s.handleAgentChat)
+	s.route(mux, "POST /api/agent/once", s.handleAgentOnce)
 	s.route(mux, "DELETE /api/agent/session/{id}", s.handleAgentDisconnect)
 }
 
@@ -67,16 +76,10 @@ func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 	if err != nil {
 		return err
 	}
-	files := orderedPromptImages(ctx.Files())
+	request := agentRequest(body, ctx.Files())
 	sessionID := httpx.String(body, "session")
-	request := agent.Request{
-		Prompt:  httpx.String(body, "prompt"),
-		Images:  promptImageURLs(files),
-		Command: httpx.String(body, "command"),
-		Args:    httpx.String(body, "args"),
-	}
 	started := time.Now()
-	s.logger.Info("agent: request command=%q args=%q prompt=%q images=%d", request.Command, request.Args, truncateText(request.Prompt, 120), len(files))
+	s.logger.Info("agent: request command=%q args=%q prompt=%q images=%d", request.Command, request.Args, truncateText(request.Prompt, 120), len(request.Images))
 
 	// A session that is gone has to be reported before the stream starts: once the headers are out, an
 	// error can only be a broken event.
@@ -90,12 +93,13 @@ func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 		}
 	}
 
-	emit := startEventStream(ctx.W)
 	counts := map[string]int{}
+	emit := startEventStream(ctx.W)
 	relay := func(event agent.Event) {
 		counts[event.Type]++
 		emit(event)
 	}
+	var runErr error
 	switch {
 	case session != nil && hasPrompt(request):
 		// The send half of the button: the question spends the connection, and the process with it.
@@ -103,25 +107,69 @@ func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 		if !connected {
 			return httpx.NewError(http.StatusConflict, "session_not_connected", "this agent session is no longer connected")
 		}
-		err = agent.Continue(ctx.R.Context(), proc, state, request, relay)
+		runErr = agent.Continue(ctx.R.Context(), proc, state, request, relay)
 		s.logger.Info("agent: session=%s answered and released", sessionID)
 	case session != nil:
 		// A setting change: the same connection answers it and stays connected.
-		err = session.Command(ctx.R.Context(), request, relay)
+		runErr = session.Command(ctx.R.Context(), request, relay)
 		s.agentSessions.Touch(sessionID)
 		s.logger.Info("agent: session=%s command=%q stayed connected", sessionID, request.Command)
 	default:
-		err = agent.Run(ctx.R.Context(), s.agentOptions(), request, relay)
+		runErr = agent.Run(ctx.R.Context(), s.agentOptions(), request, relay)
 	}
+	return s.finishAgent(ctx, started, counts, runErr)
+}
+
+// handleAgentOnce implements POST /api/agent/once: one question, one process, released when the
+// answer ends.
+//
+// There is no session on this route and no way to name one. What it is for — a rewritten prompt, a
+// caption — is a single answer that nothing follows, so the process that produces it belongs to the
+// request and dies with it. Naming a session here would be meaningless, and reading one would be
+// worse than meaningless: it is the one way a shortcut could take the agent a canvas is holding.
+func (s *Server) handleAgentOnce(ctx *httpx.Ctx) error {
+	body, err := bodyOrEmpty(ctx)
 	if err != nil {
-		s.logger.Warn("agent: request failed after %dms: %v", time.Since(started).Milliseconds(), err)
 		return err
 	}
-	if ctx.R.Context().Err() != nil {
-		s.logger.Info("agent: request cancelled after %dms (events: %s)", time.Since(started).Milliseconds(), eventCounts(counts))
-		return nil
+	request := agentRequest(body, ctx.Files())
+	started := time.Now()
+	s.logger.Info("agent: once command=%q args=%q prompt=%q images=%d", request.Command, request.Args, truncateText(request.Prompt, 120), len(request.Images))
+
+	counts := map[string]int{}
+	emit := startEventStream(ctx.W)
+	runErr := agent.Run(ctx.R.Context(), s.agentOptions(), request, func(event agent.Event) {
+		counts[event.Type]++
+		emit(event)
+	})
+	return s.finishAgent(ctx, started, counts, runErr)
+}
+
+// agentRequest is the body as one request: the words to send, the images before them, and optionally
+// one of AlayaCore's own commands. Both routes take the same shape — only the process they reach
+// differs, which is why the shape is read in one place.
+func agentRequest(body map[string]any, files []httpx.File) agent.Request {
+	return agent.Request{
+		Prompt:  httpx.String(body, "prompt"),
+		Images:  promptImageURLs(orderedPromptImages(files)),
+		Command: httpx.String(body, "command"),
+		Args:    httpx.String(body, "args"),
 	}
-	s.logger.Info("agent: request done in %dms (events: %s)", time.Since(started).Milliseconds(), eventCounts(counts))
+}
+
+// finishAgent logs how a request ended, which is what a reader needs to tell a finished answer from a
+// refusal without scrolling the transcript.
+func (s *Server) finishAgent(ctx *httpx.Ctx, started time.Time, counts map[string]int, err error) error {
+	elapsed := time.Since(started).Milliseconds()
+	switch {
+	case err != nil:
+		s.logger.Warn("agent: request failed after %dms: %v", elapsed, err)
+		return err
+	case ctx.R.Context().Err() != nil:
+		s.logger.Info("agent: request cancelled after %dms (events: %s)", elapsed, eventCounts(counts))
+	default:
+		s.logger.Info("agent: request done in %dms (events: %s)", elapsed, eventCounts(counts))
+	}
 	return nil
 }
 

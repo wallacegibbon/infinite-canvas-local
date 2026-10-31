@@ -144,6 +144,54 @@ func TestAgentChatStreamsTheAnswer(t *testing.T) {
 	}
 }
 
+// TestAgentOnceNeverTouchesAConnectedAgent is the reason `/api/agent/once` exists.
+//
+// A canvas holds one agent for as long as the user keeps it open, and its history is the user's work.
+// The buttons that rewrite a prompt or caption an image are single answers, so they must not be able
+// to reach that agent — and the shape of the guarantee is that this route has no session at all. Here
+// a session is handed to it anyway, which is what a buggy caller would do: the one-shot has to ignore
+// it, spawn its own process, and leave the connected one still able to answer.
+func TestAgentOnceNeverTouchesAConnectedAgent(t *testing.T) {
+	gateway := startAgentGateway(t)
+
+	response, err := http.Post(gateway.URL+"/api/agent/connect", "application/json", nil)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer response.Body.Close()
+	var connected struct {
+		SessionID string `json:"sessionId"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&connected); err != nil {
+		t.Fatalf("decode connect: %v", err)
+	}
+	if connected.SessionID == "" {
+		t.Fatal("connect returned no session")
+	}
+
+	events := postForm(t, gateway.URL+"/api/agent/once", map[string]string{"prompt": "hi", "session": connected.SessionID})
+	if !answeredWith(events, "hello world") {
+		t.Fatalf("once events = %v, want the one-shot's own answer", events)
+	}
+
+	// Still connected, and still answering: a one-shot that had spent the session would fail here
+	// with `session_not_connected`.
+	events = postForm(t, gateway.URL+"/api/agent/chat", map[string]string{"prompt": "hi", "session": connected.SessionID})
+	if !answeredWith(events, "hello world") {
+		t.Fatalf("chat events = %v, want the connected agent to still answer", events)
+	}
+}
+
+// answeredWith reports whether the stream carried this answer to its end.
+func answeredWith(events []map[string]any, want string) bool {
+	for _, event := range events {
+		if event["type"] == "done" && event["text"] == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestAgentCommandRelaysTheAgentsAnswer(t *testing.T) {
 	gateway := startAgentGateway(t)
 

@@ -176,12 +176,20 @@ back what AlayaCore says. The gateway owns no wording, no model choice and no st
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/agent/chat` | Write one request to an agent process and stream its frames back. |
+| `POST` | `/api/agent/chat` | Write one request to a connected agent process and stream its frames back. |
+| `POST` | `/api/agent/once` | Ask one question of a process of its own, released when the answer ends. |
 
-`POST /api/agent/chat` takes `prompt` (and images), or `command` + `args` (one of AlayaCore's own
-commands, forwarded verbatim), or both, and answers with an event stream: `models`, `delta`,
-`reasoning`, `model`, `reasoning_level`, `command`, `done`, `error`. Every request spawns one
-`alayacore --rawio` process and releases it when the answer ends.
+Both take `prompt` (and images), or `command` + `args` (one of AlayaCore's own commands, forwarded
+verbatim), or both, and answer with an event stream: `models`, `delta`, `reasoning`, `model`,
+`reasoning_level`, `command`, `done`, `error`.
+
+They are two kinds of thing, and the difference is lifetime. `/api/agent/chat` with a `session` writes
+into a process the canvas is holding — one per canvas, alive until the user closes it — so its history
+accumulates and its tools can be used. Changing a model or a reasoning level goes the same way: it is a
+frame to that process, not a question. `/api/agent/once` names no session and reads none: it spawns
+`alayacore --rawio`, asks, and releases the process when the answer ends. That split is what keeps a
+prompt rewrite or a caption — a single answer that nothing follows — from spending the history of the
+agent the user is working with.
 
 A music graph needs two texts, and both are ordinary `registry.json` bindings (`prompt`, `lyrics`), so
 a run carries them as inputs like any other parameter. `response_format`-style container selection is
@@ -226,10 +234,11 @@ carries reaches a node.
 
 ### Prompt models are the agent's
 
-The gateway has no prompt model of its own: `/api/agent/chat` spawns AlayaCore, and every question
-about models — which exist, which is active, how hard it should think — is answered by the agent's own
-`model.conf` and its `reasoning_0/1/2` blocks. Nothing here configures a provider, negotiates a
-thinking parameter or retries a rejected field: AlayaCore does, and the gateway relays what it says.
+The gateway has no prompt model of its own: `/api/agent/chat` and `/api/agent/once` spawn AlayaCore,
+and every question about models — which exist, which is active, how hard it should think — is answered
+by the agent's own `model.conf` and its `reasoning_0/1/2` blocks. Nothing here configures a provider,
+negotiates a thinking parameter or retries a rejected field: AlayaCore does, and the gateway relays
+what it says.
 
 ## Architecture
 
