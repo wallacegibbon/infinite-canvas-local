@@ -2748,10 +2748,11 @@ no-reference path is the same expression it was before this change.
 ## 80. An agent's life belongs to the client that opened it
 
 **Decision** A connected agent is one process per client-chosen name, held until that client disconnects.
-Nothing expires. `POST /api/agent/connect` is idempotent: the same name returns the same process, which
-is how a reloaded page finds the conversation it left. `POST /api/agent/chat` requires a name and writes
-into that process without ever spending it; `POST /api/agent/once` has no name at all and releases its
-process when the answer ends (see #81 for why that split is structural).
+Nothing expires. Opening it again under the same name is idempotent: the same name returns the same
+process, which is how a reloaded page finds the conversation it left. The conversation route requires a
+name and writes into that process without ever spending it; `POST /api/agent/once` has no name at all and
+releases its process when the answer ends (see #81 for why that split is structural, and #82 for the
+transport that carries it).
 
 **Why** A conversation is the point of this process: an agent that forgot what it had done while the
 user was thinking would be worse than no agent. An idle timer cannot know the difference between "the
@@ -2795,7 +2796,7 @@ The e2e tests state the idempotency, the second turn and the tool relay against 
 **Decision** The words the canvas asks for without continuing — a text node's body, a rewritten prompt, a
 caption — go to `POST /api/agent/once`, which names no session and reads none. It spawns
 `alayacore --rawio`, asks, and releases. The canvas's own agent is reached only through
-`/api/agent/chat`, which requires a name.
+the conversation's own route, which requires a name (#82).
 
 **Why** One function used to do both, and it read the session out of the store, so every one-shot
 question was sent to whichever agent the canvas happened to hold — and the gateway spent it when the
@@ -2819,3 +2820,50 @@ for a name that was never connected is `409 session_not_connected`; a prompt on 
 session id answers, leaves that session connected, and the session still answers afterwards. From the
 browser, clicking 优化提示词 logged `POST /api/agent/once 200` with 20 deltas, and the process exited by
 itself (`lived=14886ms`) — a one-shot agent does not outlive its answer.
+
+## 82. The conversation is a socket; a shortcut stays a POST
+
+**Decision** The canvas agent is a WebSocket, one per canvas, at `GET /api/agent/socket/{session}`. Both
+directions are messages on it: prompts, settings commands, `cancel`, `close` up; the agent's own frames
+down. `POST /api/agent/connect`, `/api/agent/chat` and `DELETE /api/agent/session/{id}` are gone. The
+one-shot route keeps its own shape — a POST that streams, and a process released when the answer ends.
+
+**Why this and not SSE** Three shapes of SSE were proposed and each one added a concept instead of
+removing one: a stream per turn needed "when does a turn end" and "which request owns the stream"; a
+stream per turn with injection needed a lock; one downstream plus N upstream POSTs needed status codes
+for "queued" and a separate lifetime for the downstream. The third would have worked (it is the
+WebSocket topology expressed in HTTP), but the sequence itself was the argument: a transport that needs
+a new shape for every requirement is the wrong transport. The agent is a bidirectional stream; so is a
+socket. See #80 for the lifetime this carries, and #81 for why the one-shot must not share it.
+
+**No dependency** `go.mod` still has no `require`. `internal/ws` is ~250 lines: the handshake accepted
+instead of asked for, masked frames read, unmasked written, fragmentation reassembled, ping answered.
+`internal/comfy` already spoke the same framing as a client, and the tests drive the new server with
+that client — an independent implementation rather than the server's own reflection.
+
+**What it cost** `curl -N` no longer watches a conversation; `websocat` does. Two things had to be fixed
+to make the upgrade possible at all, and both were silent bugs: `statusRecorder` in `internal/httpx`
+wrapped the response writer without forwarding `Hijack`, so every upgrade failed with a 400, and without
+forwarding `Flush` — which meant the SSE that `/api/agent/once` still uses had *never* actually flushed:
+every event sat in the response buffer until the handler returned. The first event of a one-shot answer
+now arrives at 0.03s instead of at the end.
+
+**Origin** A handshake is a `GET` that becomes a write channel the moment it is accepted, so `Guard`
+now treats an upgrade as a write and applies the cross-site check it applies to POSTs. Without that, the
+one route that speaks to a canvas's agent would have been open to any page the user had loaded.
+
+**One watcher, one reader** The pump that reads the agent's stdout belongs to the session, not to a
+socket: it starts with the process and runs until the process ends. A socket attaches as the watcher and
+detaches when it goes away; the pump keeps reading and dropping. This is not decoration — a read blocked
+in a syscall cannot be cancelled, so a reader that lived and died with a socket would be stuck holding
+half a frame when the user reloaded the page, and the next socket would corrupt the stream.
+
+**Tested** Against a real AlayaCore on `:8191`, in a browser: the panel opened the socket
+(`socket open … spawned=true`); a prompt answered "收到" and a follow-up "刚才让你回复什么" answered from
+history; `@` on a node sent `【画布引用】` with that node's id and prompt, and the agent answered "茶壶";
+the model select sent `model_set` and the display became `qwen3.8-flash`; `结束对话` logged
+`released … reason=closed by the client`; a page reload reattached with `spawned=false` and the agent
+still remembered "新开". Dragging the panel moved it and left the canvas viewport untouched; a wheel over
+it did not zoom. The Go tests cover the same ground without a model: idempotent open, one watcher per
+name, second turn on one socket, tool relay, `close` releasing, a dropped socket keeping the agent, a
+killed process reporting itself, and the one-shot never reaching a conversation.

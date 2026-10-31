@@ -1,22 +1,25 @@
 package server
 
 // The agent routes, through the HTTP layer. The fake agent speaks the same wire the real one does, so
-// these tests describe the translation: frames in, events out, and nothing invented on the way.
+// these tests describe the translation: frames in, messages out, and nothing invented on the way.
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
-	"io"
-	"mime/multipart"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"comfyui-gateway/internal/comfy"
 )
 
 const fakeAgentScript = `#!/bin/sh
+printf '%s\n' "$$" >> "$FAKE_SPAWN_LOG"
 printf 'SM{"type":"version","data":{"message_version":18,"core_version":"fake-1"}}\n'
 printf 'SM{"type":"model_list","data":{"models":[{"id":1,"name":"Fake / one","protocol_type":"openai","base_url":"http://127.0.0.1:1/v1","api_key":"secret-key","model_name":"m","context_limit":1000},{"id":2,"name":"Fake / two","protocol_type":"openai","base_url":"http://127.0.0.1:1/v1","api_key":"secret-key-2","model_name":"m2","context_limit":2000}]}}\n'
 printf 'SM{"type":"model","data":{"active_id":1,"active_name":"Fake / one","context_limit":1000}}\n'
@@ -32,7 +35,7 @@ while IFS= read -r line; do
         *)
           printf 'CO{"command_id":"1","is_error":true,"result":{"code":"REQUEST_MODEL_UNKNOWN","message":"model_set: model not found: 99"}}\n' ;;
       esac ;;
-    UX*die*)
+    UX*'die'*)
       exit 0 ;;
     UE)
       printf 'SM{"type":"task","data":{"in_progress":true,"current_step":1,"context_tokens":5}}\n'
@@ -46,200 +49,194 @@ while IFS= read -r line; do
 done
 `
 
-// startAgentGateway is a gateway whose agent is the fake binary.
-func startAgentGateway(t *testing.T) *httptest.Server {
+// startAgentGateway is a gateway whose agent is the fake binary, plus the file it appends its pid to.
+func startAgentGateway(t *testing.T) (*httptest.Server, string) {
 	t.Helper()
-	binary := filepath.Join(t.TempDir(), "fake-agent")
+	dir := t.TempDir()
+	binary := filepath.Join(dir, "fake-agent")
 	if err := os.WriteFile(binary, []byte(fakeAgentScript), 0o755); err != nil {
 		t.Fatalf("write fake agent: %v", err)
 	}
+	spawnLog := filepath.Join(dir, "spawned")
+	t.Setenv("FAKE_SPAWN_LOG", spawnLog)
 	// config.Load reads these; newTestGateway builds the config inside the call below.
 	t.Setenv("ALAYACORE_BIN", binary)
 	t.Setenv("AGENT_CONFIG_PATH", t.TempDir())
 
 	gateway := httptest.NewServer(newTestGateway(t, newFakeComfy(t)).Handler())
 	t.Cleanup(gateway.Close)
-	return gateway
+	return gateway, spawnLog
 }
 
-// postForm sends a multipart form and returns the event stream, decoded.
-func postForm(t *testing.T, url string, fields map[string]string) []map[string]any {
+// spawns counts how many agent processes this gateway has started.
+func spawns(t *testing.T, path string) int {
 	t.Helper()
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	for key, value := range fields {
-		if err := writer.WriteField(key, value); err != nil {
-			t.Fatalf("write field %s: %v", key, err)
-		}
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close writer: %v", err)
-	}
-	request, err := http.NewRequest(http.MethodPost, url, &body)
+	raw, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("new request: %v", err)
+		return 0
 	}
-	request.Header.Set("Content-Type", writer.FormDataContentType())
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatalf("post %s: %v", url, err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d", response.StatusCode)
-	}
-	if got := response.Header.Get("Content-Type"); !strings.HasPrefix(got, "text/event-stream") {
-		t.Fatalf("content-type = %q, want an event stream", got)
-	}
-	raw, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Fatalf("read stream: %v", err)
-	}
-
-	var events []map[string]any
-	for _, block := range strings.Split(string(raw), "\n\n") {
-		block = strings.TrimSpace(block)
-		if block == "" {
-			continue
-		}
-		data, ok := strings.CutPrefix(block, "data: ")
-		if !ok {
-			t.Fatalf("an event block is not `data: ...`: %q", block)
-		}
-		var event map[string]any
-		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			t.Fatalf("event is not JSON: %v (%q)", err, data)
-		}
-		events = append(events, event)
-	}
-	return events
+	return len(strings.Split(strings.TrimSpace(string(raw)), "\n"))
 }
 
-// postStatus sends a form and returns only the status: for the cases where the answer is that there is
-// no answer.
-func postStatus(t *testing.T, url string, fields map[string]string) int {
+// openSocket dials the conversation and drains the startup broadcast, which is what a client does
+// before it says anything.
+func openSocket(t *testing.T, gateway *httptest.Server, session string) *comfy.WSConn {
 	t.Helper()
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	for key, value := range fields {
-		if err := writer.WriteField(key, value); err != nil {
-			t.Fatalf("write field %s: %v", key, err)
+	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/" + session
+	conn, err := comfy.DialWS(context.Background(), url)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	if first := nextEvent(t, conn); first["type"] != "models" {
+		t.Fatalf("first message = %v, want the agent's startup broadcast", first)
+	}
+	return conn
+}
+
+// nextEvent reads one message from the socket.
+func nextEvent(t *testing.T, conn *comfy.WSConn) map[string]any {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	raw, err := conn.ReadMessage(ctx)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	var event map[string]any
+	if err := json.Unmarshal(raw, &event); err != nil {
+		t.Fatalf("message is not JSON: %v (%q)", err, raw)
+	}
+	return event
+}
+
+// until reads messages until one of this type arrives, and returns everything it saw.
+func until(t *testing.T, conn *comfy.WSConn, kind string) []map[string]any {
+	t.Helper()
+	var seen []map[string]any
+	for i := 0; i < 200; i++ {
+		event := nextEvent(t, conn)
+		seen = append(seen, event)
+		if event["type"] == kind {
+			return seen
 		}
 	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close writer: %v", err)
-	}
-	response, err := http.Post(url, writer.FormDataContentType(), &body)
-	if err != nil {
-		t.Fatalf("post %s: %v", url, err)
-	}
-	_, _ = io.Copy(io.Discard, response.Body)
-	response.Body.Close()
-	return response.StatusCode
+	t.Fatalf("no %q among %v", kind, seen)
+	return nil
 }
 
-// connect names an agent and returns the session id, which is the name itself: a canvas connects by
-// saying who it is.
-func connect(t *testing.T, url, name string) string {
+func send(t *testing.T, conn *comfy.WSConn, message map[string]any) {
 	t.Helper()
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	if err := writer.WriteField("session", name); err != nil {
-		t.Fatalf("write field: %v", err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close writer: %v", err)
-	}
-	response, err := http.Post(url+"/api/agent/connect", writer.FormDataContentType(), &body)
+	payload, err := json.Marshal(message)
 	if err != nil {
-		t.Fatalf("connect: %v", err)
+		t.Fatalf("encode: %v", err)
 	}
-	defer response.Body.Close()
-	var connected struct {
-		SessionID string `json:"sessionId"`
-	}
-	if err := json.NewDecoder(response.Body).Decode(&connected); err != nil {
-		t.Fatalf("decode connect: %v", err)
-	}
-	if connected.SessionID == "" {
-		t.Fatal("connect returned no session")
-	}
-	return connected.SessionID
-}
-
-func TestAgentConnectIsTheSameAgentEveryTime(t *testing.T) {
-	gateway := startAgentGateway(t)
-
-	// A canvas asks for its agent twice — the second time is a reloaded page looking for the
-	// conversation it left. It has to be the same process, or the history is gone.
-	first := connect(t, gateway.URL, "canvas-1")
-	second := connect(t, gateway.URL, "canvas-1")
-	if first != second {
-		t.Fatalf("connect returned %q then %q, want one agent per name", first, second)
-	}
-
-	// And a different name is a different agent.
-	if other := connect(t, gateway.URL, "canvas-2"); other == first {
-		t.Fatalf("two names shared the agent %q", other)
+	if err := conn.WriteText(payload); err != nil {
+		t.Fatalf("write: %v", err)
 	}
 }
 
-func TestAgentChatStreamsTheAnswer(t *testing.T) {
-	gateway := startAgentGateway(t)
-	session := connect(t, gateway.URL, "canvas-1")
-	events := postForm(t, gateway.URL+"/api/agent/chat", map[string]string{"prompt": "hi", "session": session})
+func TestSocketStartsWithTheModelList(t *testing.T) {
+	gateway, _ := startAgentGateway(t)
+	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/canvas-1"
+	conn, err := comfy.DialWS(context.Background(), url)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+
+	event := nextEvent(t, conn)
+	if event["type"] != "models" {
+		t.Fatalf("first message = %v, want models", event)
+	}
+	models, _ := event["models"].([]any)
+	if len(models) != 2 {
+		t.Errorf("models = %v, want the agent's list", models)
+	}
+	if active, _ := event["active"].(map[string]any); active["name"] != "Fake / one" {
+		t.Errorf("active = %v, want the agent's own choice", event["active"])
+	}
+	// The agent's keys travel in SM model_list and must not reach the canvas.
+	encoded, _ := json.Marshal(event)
+	if strings.Contains(string(encoded), "secret-key") || strings.Contains(string(encoded), "127.0.0.1:1") {
+		t.Errorf("credentials reached the client: %s", encoded)
+	}
+}
+
+func TestSocketAnswersAPrompt(t *testing.T) {
+	gateway, _ := startAgentGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+
+	send(t, conn, map[string]any{"prompt": "hi"})
+	seen := until(t, conn, "done")
 
 	var text string
-	var sawModels, sawDone bool
-	for _, event := range events {
-		switch event["type"] {
-		case "models":
-			sawModels = true
-			models, _ := event["models"].([]any)
-			if len(models) != 2 {
-				t.Errorf("models = %v, want the agent's list", models)
-			}
-		case "delta":
+	for _, event := range seen {
+		if event["type"] == "delta" {
 			text += event["text"].(string)
-		case "done":
-			sawDone = true
-			if event["text"] != "hello world" {
-				t.Errorf("done text = %v", event["text"])
-			}
 		}
 	}
-	if !sawModels || !sawDone || text != "hello world" {
-		t.Fatalf("events = %v, want models, two deltas and done", events)
+	if text != "hello world" {
+		t.Fatalf("deltas = %q, want the answer", text)
 	}
-
-	// The agent's keys travel in SM model_list and must not reach the canvas.
-	encoded, _ := json.Marshal(events)
-	if strings.Contains(string(encoded), "secret-key") || strings.Contains(string(encoded), "127.0.0.1:1") {
-		t.Errorf("credentials reached the events: %s", encoded)
+	if seen[len(seen)-1]["text"] != "hello world" {
+		t.Fatalf("done = %v, want the whole answer", seen[len(seen)-1])
 	}
 }
 
-// TestAgentAnswersAgainOnTheSameSession is what the process living means: the second question goes to
-// the process the first one used, so the conversation carries on instead of starting over.
-func TestAgentAnswersAgainOnTheSameSession(t *testing.T) {
-	gateway := startAgentGateway(t)
-	session := connect(t, gateway.URL, "canvas-1")
+// TestSocketAnswersAgainOnTheSameConnection is what a conversation is: the second message goes to the
+// same process, so the agent still has the first in front of it.
+func TestSocketAnswersAgainOnTheSameConnection(t *testing.T) {
+	gateway, spawnLog := startAgentGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
 
 	for turn := 1; turn <= 2; turn++ {
-		events := postForm(t, gateway.URL+"/api/agent/chat", map[string]string{"prompt": "hi", "session": session})
-		if !answeredWith(events, "hello world") {
-			t.Fatalf("turn %d events = %v, want an answer", turn, events)
+		send(t, conn, map[string]any{"prompt": "hi"})
+		seen := until(t, conn, "done")
+		last := seen[len(seen)-1]
+		if last["text"] != "hello world" {
+			t.Fatalf("turn %d done = %v", turn, last)
 		}
+	}
+	if got := spawns(t, spawnLog); got != 1 {
+		t.Fatalf("spawned %d agents for one conversation, want 1", got)
 	}
 }
 
-func TestAgentCommandRelaysTheAgentsAnswer(t *testing.T) {
-	gateway := startAgentGateway(t)
-	session := connect(t, gateway.URL, "canvas-1")
+// TestSocketIsOnePerCanvas: a second connection to the same name is refused with a message, because two
+// readers would take half the frames each.
+func TestSocketIsOnePerCanvas(t *testing.T) {
+	gateway, _ := startAgentGateway(t)
+	first := openSocket(t, gateway, "canvas-1")
 
-	events := postForm(t, gateway.URL+"/api/agent/chat", map[string]string{"command": "model_set", "args": "2", "session": session})
+	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/canvas-1"
+	second, err := comfy.DialWS(context.Background(), url)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer second.Close()
+
+	event := nextEvent(t, second)
+	if event["type"] != "error" {
+		t.Fatalf("second socket got %v, want a refusal", event)
+	}
+
+	// The first connection is unaffected: it is still the one being answered.
+	send(t, first, map[string]any{"prompt": "hi"})
+	if last := until(t, first, "done"); last[len(last)-1]["text"] != "hello world" {
+		t.Fatalf("first connection stopped working: %v", last)
+	}
+}
+
+func TestSocketRelaysASettingChange(t *testing.T) {
+	gateway, _ := startAgentGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+
+	send(t, conn, map[string]any{"command": "model_set", "args": "2"})
+	seen := until(t, conn, "command")
+
 	var announced, answered bool
-	for _, event := range events {
+	for _, event := range seen {
 		switch event["type"] {
 		case "model":
 			active, _ := event["active"].(map[string]any)
@@ -249,92 +246,29 @@ func TestAgentCommandRelaysTheAgentsAnswer(t *testing.T) {
 		}
 	}
 	if !announced || !answered {
-		t.Fatalf("events = %v, want the agent's SM model and a successful CO", events)
+		t.Fatalf("messages = %v, want the agent's SM model and a successful CO", seen)
 	}
 
-	// A rejection is relayed as the agent worded it; the gateway has no opinion to add. The second
-	// command also proves a setting change left the agent connected, as it must.
-	events = postForm(t, gateway.URL+"/api/agent/chat", map[string]string{"command": "model_set", "args": "99", "session": session})
-	var message string
-	for _, event := range events {
-		if event["type"] == "command" {
-			message, _ = event["message"].(string)
-		}
-	}
+	// A rejection is relayed as the agent worded it; the gateway has no opinion to add.
+	send(t, conn, map[string]any{"command": "model_set", "args": "99"})
+	seen = until(t, conn, "command")
+	message, _ := seen[len(seen)-1]["message"].(string)
 	if !strings.Contains(message, "model not found: 99") {
-		t.Fatalf("events = %v, want the agent's rejection", events)
+		t.Fatalf("messages = %v, want the agent's rejection", seen)
 	}
 }
 
-// TestAgentChatRefusesANameThatIsNotConnected is the other half of "one agent per canvas": a name that
-// was never connected, or was closed, has to be reported before a stream starts.
-func TestAgentChatRefusesANameThatIsNotConnected(t *testing.T) {
-	gateway := startAgentGateway(t)
+// TestSocketRelaysTheToolItUsed: a built-in tool runs inside AlayaCore, so the call and its result are
+// both frames coming back. The gateway neither answers nor interprets them — it draws them.
+func TestSocketRelaysTheToolItUsed(t *testing.T) {
+	gateway, _ := startAgentGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
 
-	// Once with no session at all, and once with a session that is not connected.
-	for _, session := range []string{"", "canvas-never-connected"} {
-		fields := map[string]string{"prompt": "hi"}
-		if session != "" {
-			fields["session"] = session
-		}
-		if status := postStatus(t, gateway.URL+"/api/agent/chat", fields); status != http.StatusConflict {
-			t.Errorf("session %q: status = %d, want 409", session, status)
-		}
-	}
-}
-
-// TestAgentSessionEndsWhenTheProcessDoes: the process outliving the turn is what makes a conversation,
-// so the one thing that must not happen is a session that is left filed after its process is gone. A
-// write to a dead agent fails before any read would notice, and that is the case this pins down.
-func TestAgentSessionEndsWhenTheProcessDoes(t *testing.T) {
-	gateway := startAgentGateway(t)
-	session := connect(t, gateway.URL, "canvas-1")
-
-	// The fake agent exits on this prompt, which is what a crash looks like from the gateway's side.
-	postStatus(t, gateway.URL+"/api/agent/chat", map[string]string{"prompt": "die", "session": session})
-
-	// The session is no longer filed, so the next question is refused instead of written into a pipe
-	// with nothing on the other end.
-	if status := postStatus(t, gateway.URL+"/api/agent/chat", map[string]string{"prompt": "hi", "session": session}); status != http.StatusConflict {
-		t.Fatalf("status = %d, want 409 once the process is gone", status)
-	}
-}
-
-// TestAgentOnceNeverTouchesAConnectedAgent is the reason `/api/agent/once` exists.
-//
-// A canvas holds one agent for as long as the user keeps it open, and its history is the user's work.
-// The buttons that rewrite a prompt or caption an image are single answers, so they must not be able
-// to reach that agent — and the shape of the guarantee is that this route has no session at all. Here
-// a session is handed to it anyway, which is what a buggy caller would do: the one-shot has to ignore
-// it, spawn its own process, and leave the connected one still able to answer.
-func TestAgentOnceNeverTouchesAConnectedAgent(t *testing.T) {
-	gateway := startAgentGateway(t)
-
-	session := connect(t, gateway.URL, "canvas-1")
-
-	events := postForm(t, gateway.URL+"/api/agent/once", map[string]string{"prompt": "hi", "session": session})
-	if !answeredWith(events, "hello world") {
-		t.Fatalf("once events = %v, want the one-shot's own answer", events)
-	}
-
-	// Still connected, and still answering: a one-shot that had spent the session would fail here
-	// with `session_not_connected`.
-	events = postForm(t, gateway.URL+"/api/agent/chat", map[string]string{"prompt": "hi", "session": session})
-	if !answeredWith(events, "hello world") {
-		t.Fatalf("chat events = %v, want the connected agent to still answer", events)
-	}
-}
-
-// TestAgentRelaysTheToolItUsed: a built-in tool runs inside AlayaCore, so the call and its result are
-// both frames coming back. The gateway neither answers nor interprets them — it draws them, because a
-// turn that reads a file is worth seeing.
-func TestAgentRelaysTheToolItUsed(t *testing.T) {
-	gateway := startAgentGateway(t)
-	session := connect(t, gateway.URL, "canvas-1")
-	events := postForm(t, gateway.URL+"/api/agent/chat", map[string]string{"prompt": "read it", "session": session})
+	send(t, conn, map[string]any{"prompt": "read it"})
+	seen := until(t, conn, "done")
 
 	var named, withInput, result bool
-	for _, event := range events {
+	for _, event := range seen {
 		switch event["type"] {
 		case "tool_call":
 			if event["name"] == "read_file" {
@@ -348,16 +282,122 @@ func TestAgentRelaysTheToolItUsed(t *testing.T) {
 		}
 	}
 	if !named || !withInput || !result {
-		t.Fatalf("events = %v, want the call, its arguments and its result", events)
+		t.Fatalf("messages = %v, want the call, its arguments and its result", seen)
 	}
 }
 
-// answeredWith reports whether the stream carried this answer to its end.
-func answeredWith(events []map[string]any, want string) bool {
-	for _, event := range events {
-		if event["type"] == "done" && event["text"] == want {
-			return true
+// TestSocketCloseReleasesTheAgent: closing the conversation is the one thing that ends an agent, and the
+// only way a canvas can say "I am done with this" rather than "I am not looking right now".
+func TestSocketCloseReleasesTheAgent(t *testing.T) {
+	gateway, spawnLog := startAgentGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+	if got := spawns(t, spawnLog); got != 1 {
+		t.Fatalf("spawned %d agents, want 1", got)
+	}
+
+	send(t, conn, map[string]any{"close": true})
+	// The socket ends, and the process with it.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := conn.ReadMessage(ctx); err == nil {
+		t.Fatal("the socket stayed open after close")
+	}
+
+	// A new connection to the same name starts a new agent, which is what releasing it means.
+	openSocket(t, gateway, "canvas-1")
+	if got := spawns(t, spawnLog); got != 2 {
+		t.Fatalf("spawned %d agents after closing, want a new one", got)
+	}
+}
+
+// TestSocketGoingAwayKeepsTheAgent is the other half: a connection that simply drops is not the user
+// closing the conversation, so the process — and its history — is still there for the next one.
+func TestSocketGoingAwayKeepsTheAgent(t *testing.T) {
+	gateway, spawnLog := startAgentGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+	if got := spawns(t, spawnLog); got != 1 {
+		t.Fatalf("spawned %d agents, want 1", got)
+	}
+
+	_ = conn.Close()
+	time.Sleep(200 * time.Millisecond)
+
+	openSocket(t, gateway, "canvas-1")
+	if got := spawns(t, spawnLog); got != 1 {
+		t.Fatalf("spawned %d agents after a dropped connection, want the same one", got)
+	}
+}
+
+// TestSocketReportsADeadProcess: an agent killed under a live conversation has to be reported, not
+// waited on.
+func TestSocketReportsADeadProcess(t *testing.T) {
+	gateway, _ := startAgentGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+
+	// The fake agent exits on this prompt, which is what a crash looks like from here.
+	send(t, conn, map[string]any{"prompt": "die"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for {
+		if _, err := conn.ReadMessage(ctx); err != nil {
+			return // the socket closed: the conversation is over and the client knows
 		}
 	}
-	return false
+}
+
+func TestAgentOnceSpawnsAProcessAndReleasesIt(t *testing.T) {
+	gateway, spawnLog := startAgentGateway(t)
+
+	response := postOnce(t, gateway, map[string]string{"prompt": "hi"})
+	if response != http.StatusOK {
+		t.Fatalf("status = %d", response)
+	}
+	// The process was started for this request and is gone by the time the answer is complete, which is
+	// what "released when the answer ends" means — and it never touched a session.
+	if got := spawns(t, spawnLog); got != 1 {
+		t.Fatalf("spawned %d agents for one one-shot request, want 1", got)
+	}
+}
+
+// TestAgentOnceNeverSpeaksToAConversation is the reason the one-shot has its own route: a canvas's agent
+// holds the user's history, and a button that rewrites a prompt must not be able to reach it.
+func TestAgentOnceNeverSpeaksToAConversation(t *testing.T) {
+	gateway, spawnLog := startAgentGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+
+	// Whatever the one-shot carries, it names no conversation: the route has no session field.
+	postOnce(t, gateway, map[string]string{"prompt": "hi", "session": "canvas-1"})
+
+	// The conversation is untouched and still answering.
+	send(t, conn, map[string]any{"prompt": "hi"})
+	if last := until(t, conn, "done"); last[len(last)-1]["text"] != "hello world" {
+		t.Fatalf("the conversation stopped working: %v", last)
+	}
+	if got := spawns(t, spawnLog); got != 2 {
+		t.Fatalf("spawned %d agents, want the conversation's one and the one-shot's one", got)
+	}
+}
+
+// postOnce sends a one-shot question and returns the status, draining the stream.
+func postOnce(t *testing.T, gateway *httptest.Server, fields map[string]string) int {
+	t.Helper()
+	var body strings.Builder
+	boundary := "test-boundary"
+	for key, value := range fields {
+		fmt.Fprintf(&body, "--%s\r\nContent-Disposition: form-data; name=%q\r\n\r\n%s\r\n", boundary, key, value)
+	}
+	fmt.Fprintf(&body, "--%s--\r\n", boundary)
+	response, err := http.Post(gateway.URL+"/api/agent/once", "multipart/form-data; boundary="+boundary, strings.NewReader(body.String()))
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer response.Body.Close()
+	buffer := make([]byte, 4096)
+	for {
+		if _, err := response.Body.Read(buffer); err != nil {
+			break
+		}
+	}
+	return response.StatusCode
 }

@@ -9,30 +9,29 @@ import (
 
 	"comfyui-gateway/internal/agent"
 	"comfyui-gateway/internal/httpx"
+	"comfyui-gateway/internal/ws"
 )
 
-// routesAgent registers the agent routes.
+// routesAgent registers two things that are two kinds of thing.
 //
-// They are two kinds of thing, and the route is what says which. The canvas holds one agent per
-// canvas for as long as the user keeps it open (`connect` + `chat`): it keeps a history, it can call
-// tools, and it grows the more that canvas is worked on. A prompt rewrite or a caption is the other
-// kind (`once`): one question, one process, gone when it is answered.
+// A conversation is a socket: one connection per canvas, open for as long as the user keeps it, both
+// directions, for as long as the agent keeps working. A prompt rewrite or a caption is one answer that
+// nothing follows, so it is a plain POST that spawns a process and releases it.
 //
 // The separation is the point, not an accident of routing. A one-shot question is handed a process of
-// its own and no session at all, so a button that rewrites a prompt cannot reach — let alone spend —
-// the agent the user is working with.
-//
-// A prompt and a command are the same kind of thing to AlayaCore — frames on its stdin — so `chat`
-// carries both: what the request holds is written to the agent, and what the agent says comes back.
+// its own and no socket at all, so a button that rewrites a prompt cannot reach — let alone spend — the
+// agent the user is working with.
 func (s *Server) routesAgent(mux *http.ServeMux) {
-	s.route(mux, "POST /api/agent/connect", s.handleAgentConnect)
-	s.route(mux, "POST /api/agent/chat", s.handleAgentChat)
+	s.route(mux, "GET /api/agent/socket/{session}", s.handleAgentSocket)
 	s.route(mux, "POST /api/agent/once", s.handleAgentOnce)
-	s.route(mux, "DELETE /api/agent/session/{id}", s.handleAgentDisconnect)
 }
 
 // agentOptions is what every spawn needs. The wording (skills) and the tools are passed through from
 // configuration: the gateway has no opinion about either.
+//
+// Both routes get the same options. A one-shot question needs `read_file` as much as a conversation
+// does — the H3 prompt rewrite works by reading a `SKILL.md` — so the difference between the two is
+// lifetime, not capability.
 func (s *Server) agentOptions() agent.SpawnOptions {
 	return agent.SpawnOptions{
 		Binary:     s.cfg.AgentBin,
@@ -43,77 +42,119 @@ func (s *Server) agentOptions() agent.SpawnOptions {
 	}
 }
 
-// handleAgentConnect implements POST /api/agent/connect: start an agent and keep it, so the canvas can
-// show the model list before anyone asks a question.
+// socketMessage is what a client may say on the socket. One of them per message: a prompt, a setting,
+// a cancel, or the end of the conversation.
+type socketMessage struct {
+	Prompt  string   `json:"prompt"`
+	Images  []string `json:"images"`
+	Command string   `json:"command"`
+	Args    string   `json:"args"`
+	Cancel  bool     `json:"cancel"`
+	// Close ends the conversation: the agent is released, history and all. Closing the tab is not this
+	// — a socket that goes away leaves the process running, which is what makes coming back a
+	// continuation rather than a fresh start.
+	Close bool `json:"close"`
+}
+
+// handleAgentSocket implements GET /api/agent/socket/{session}: the conversation.
 //
-// `session` is the name the client files the process under — the canvas id, in practice — and it is the
-// whole of the idempotency: connecting again with the same name returns the same process, which is how
-// a reloaded page finds the conversation it left. The gateway does not know what the name means.
-//
-// The response is the agent's own startup broadcast. The process stays until the client disconnects, or
-// until it dies.
-func (s *Server) handleAgentConnect(ctx *httpx.Ctx) error {
-	body, err := bodyOrEmpty(ctx)
+// Everything after the upgrade is a message, in both directions. That is why this route reports its
+// failures as messages rather than status codes — once the header is out, a status code has nowhere to
+// go, and a gateway that pretended otherwise would be lying with a 200.
+func (s *Server) handleAgentSocket(ctx *httpx.Ctx) error {
+	// Origin is checked before the upgrade by the middleware, which treats an upgrade as the write it
+	// becomes: a cross-site page must not be able to talk to a canvas's agent.
+	conn, err := ws.Accept(ctx.W, ctx.R)
 	if err != nil {
-		return err
+		// Nothing has been hijacked, so this is still an ordinary failed request.
+		return httpx.NewError(http.StatusBadRequest, "not_a_websocket", err.Error())
 	}
-	started := time.Now()
-	session, spawned, err := s.agentSessions.Connect(ctx.R.Context(), httpx.String(body, "session"), s.agentOptions())
+	defer conn.Close()
+	go conn.KeepAlive()
+
+	id := ctx.R.PathValue("session")
+	send := func(event agent.Event) error {
+		payload, err := json.Marshal(event)
+		if err != nil {
+			return nil // an event that cannot be encoded is not worth closing a conversation over
+		}
+		return conn.WriteText(payload)
+	}
+
+	connected, err := s.agentSessions.Connect(ctx.R.Context(), id, s.agentOptions())
 	if err != nil {
-		s.logger.Warn("agent: connect failed after %dms: %v", time.Since(started).Milliseconds(), err)
-		return httpx.NewError(http.StatusBadGateway, "agent_unavailable", err.Error())
+		if s.logger != nil {
+			s.logger.Warn("agent: socket %q could not connect: %v", id, err)
+		}
+		_ = send(agent.Event{Type: "error", Message: err.Error()})
+		return nil
 	}
-	if s.logger != nil && !spawned {
-		s.logger.Info("agent: connect reused session=%s", session.ID)
+	session := connected.Session
+	if !session.Watch(send) {
+		// A second tab on the same canvas: the agent is already being read, and two readers would split
+		// every answer between them.
+		_ = send(agent.Event{Type: "error", Message: "这个画布在另一个连接里已经打开了"})
+		if s.logger != nil {
+			s.logger.Warn("agent: socket %q refused, already watched", id)
+		}
+		return nil
 	}
-	okJSON(ctx.W, map[string]any{"sessionId": session.ID, "state": session.State()})
+	defer session.Unwatch()
+	if s.logger != nil {
+		s.logger.Info("agent: socket open session=%s spawned=%t", session.ID, connected.Spawned)
+	}
+
+	// The agent's own startup broadcast first, so the model list is there before anything is asked.
+	if err := send(connected.Startup); err != nil {
+		return nil
+	}
+
+	// One goroutine, and it is the reading half of the conversation: what the agent says reaches this
+	// socket through the pump, and what the user says is applied here until the socket ends.
+	s.readSocket(conn, session, send)
+
+	// The socket is gone. The agent has nobody reading it any more, so its current turn is asked to wind
+	// down — otherwise it would write into a pipe until it blocked. The process itself stays: closing a
+	// tab is not closing the agent.
+	_ = session.Cancel()
+	if s.logger != nil {
+		s.logger.Info("agent: socket closed session=%s", session.ID)
+	}
 	return nil
 }
 
-// handleAgentDisconnect releases a session the client closed.
-//
-// This is the only way an agent ends. Nothing expires, so a canvas that never comes back leaves its
-// process running — which is the trade for a conversation that survives a reload, and the client's
-// close button is what makes it explicit rather than accidental.
-func (s *Server) handleAgentDisconnect(ctx *httpx.Ctx) error {
-	s.agentSessions.Close(ctx.R.PathValue("id"), "disconnect")
-	okJSON(ctx.W, map[string]any{})
-	return nil
-}
-
-// handleAgentChat implements POST /api/agent/chat.
-//
-// The body is whatever should be written to the agent: `command`/`args` for a setting change,
-// `prompt` (and images) for a question, or both. Nothing is interpreted on the way — this is a
-// transcription of two streams, not an API with opinions.
-//
-// `session` names the agent, and it is required: this route speaks to a process the client is holding.
-// A question with no session to hold it belongs on `/api/agent/once`.
-func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
-	body, err := bodyOrEmpty(ctx)
-	if err != nil {
-		return err
+// readSocket applies what the user says, one message at a time, until the socket ends.
+func (s *Server) readSocket(conn *ws.Conn, session *agent.Session, send func(agent.Event) error) {
+	for {
+		raw, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		var message socketMessage
+		if err := json.Unmarshal(raw, &message); err != nil {
+			_ = send(agent.Event{Type: "error", Message: "无法解析这条消息"})
+			continue
+		}
+		switch {
+		case message.Close:
+			s.agentSessions.Close(session.ID, "closed by the client")
+			_ = conn.Close()
+			return
+		case message.Cancel:
+			if err := session.Cancel(); err != nil {
+				return
+			}
+		default:
+			request := agent.Request{Prompt: message.Prompt, Images: message.Images, Command: message.Command, Args: message.Args}
+			if s.logger != nil {
+				s.logger.Info("agent: socket in session=%s command=%q prompt=%q images=%d", session.ID, request.Command, truncateText(request.Prompt, 120), len(request.Images))
+			}
+			if err := session.Send(request); err != nil {
+				_ = send(agent.Event{Type: "error", Message: "连接已经断开"})
+				return
+			}
+		}
 	}
-	request := agentRequest(body, ctx.Files())
-	sessionID := httpx.String(body, "session")
-	started := time.Now()
-	s.logger.Info("agent: request session=%q command=%q args=%q prompt=%q images=%d", sessionID, request.Command, request.Args, truncateText(request.Prompt, 120), len(request.Images))
-
-	// A session that is gone has to be reported before the stream starts: once the headers are out, an
-	// error can only be a broken event.
-	session, ok := s.agentSessions.Get(sessionID)
-	if !ok {
-		s.logger.Warn("agent: session %q is not connected", sessionID)
-		return httpx.NewError(http.StatusConflict, "session_not_connected", "this agent session is no longer connected")
-	}
-
-	counts := map[string]int{}
-	emit := startEventStream(ctx.W)
-	runErr := session.Chat(ctx.R.Context(), request, func(event agent.Event) {
-		counts[event.Type]++
-		emit(event)
-	})
-	return s.finishAgent(ctx, started, counts, runErr)
 }
 
 // handleAgentOnce implements POST /api/agent/once: one question, one process, released when the
@@ -121,8 +162,8 @@ func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 //
 // There is no session on this route and no way to name one. What it is for — a rewritten prompt, a
 // caption — is a single answer that nothing follows, so the process that produces it belongs to the
-// request and dies with it. Naming a session here would be meaningless, and reading one would be
-// worse than meaningless: it is the one way a shortcut could take the agent a canvas is holding.
+// request and dies with it. Naming a session here would be meaningless, and reading one would be worse
+// than meaningless: it is the one way a shortcut could take the agent a canvas is holding.
 func (s *Server) handleAgentOnce(ctx *httpx.Ctx) error {
 	body, err := bodyOrEmpty(ctx)
 	if err != nil {
@@ -142,8 +183,7 @@ func (s *Server) handleAgentOnce(ctx *httpx.Ctx) error {
 }
 
 // agentRequest is the body as one request: the words to send, the images before them, and optionally
-// one of AlayaCore's own commands. Both routes take the same shape — only the process they reach
-// differs, which is why the shape is read in one place.
+// one of AlayaCore's own commands.
 func agentRequest(body map[string]any, files []httpx.File) agent.Request {
 	return agent.Request{
 		Prompt:  httpx.String(body, "prompt"),
@@ -169,16 +209,11 @@ func (s *Server) finishAgent(ctx *httpx.Ctx, started time.Time, counts map[strin
 	return nil
 }
 
-// hasPrompt reports whether this request asks a question rather than only changing a setting.
-func hasPrompt(request agent.Request) bool {
-	return strings.TrimSpace(request.Prompt) != "" || len(request.Images) > 0
-}
-
 // eventCounts renders what was relayed, which is what a reader needs to tell a finished answer from a
 // refusal without scrolling the transcript.
 func eventCounts(counts map[string]int) string {
 	parts := make([]string, 0, len(counts))
-	for _, kind := range []string{"models", "delta", "reasoning", "model", "reasoning_level", "command", "done", "error"} {
+	for _, kind := range []string{"models", "delta", "reasoning", "model", "reasoning_level", "command", "tool_call", "tool_result", "done", "error"} {
 		if counts[kind] > 0 {
 			parts = append(parts, fmt.Sprintf("%s=%d", kind, counts[kind]))
 		}
@@ -187,16 +222,6 @@ func eventCounts(counts map[string]int) string {
 		return "none"
 	}
 	return strings.Join(parts, " ")
-}
-
-// truncateText keeps a prompt's head for the log: a full one can be a page long, and the first line is
-// what identifies it.
-func truncateText(text string, limit int) string {
-	runes := []rune(text)
-	if len(runes) <= limit {
-		return text
-	}
-	return string(runes[:limit]) + fmt.Sprintf("… (%d runes)", len(runes))
 }
 
 // startEventStream answers with an event stream and returns the function that writes one event.
@@ -221,4 +246,14 @@ func startEventStream(w http.ResponseWriter) func(agent.Event) {
 			flusher.Flush()
 		}
 	}
+}
+
+// truncateText keeps a prompt's head for the log: a full one can be a page long, and the first line is
+// what identifies it.
+func truncateText(text string, limit int) string {
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	return string(runes[:limit]) + fmt.Sprintf("… (%d runes)", len(runes))
 }

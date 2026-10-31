@@ -1,7 +1,9 @@
 package httpx
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
@@ -64,6 +66,28 @@ func (s *statusRecorder) WriteHeader(status int) {
 	s.ResponseWriter.WriteHeader(status)
 }
 
+// Flush forwards to the writer underneath.
+//
+// Embedding the interface hides this method, and a hidden Flush is a silent bug: the event writer asks
+// `w.(http.Flusher)`, gets nothing, and every event stays in the response buffer until enough of them
+// fill it. The stream still arrives — all at once, at the end, which is the one thing a stream is not
+// allowed to do.
+func (s *statusRecorder) Flush() {
+	if flusher, ok := s.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// Hijack forwards to the writer underneath, for the one route that stops being HTTP: a WebSocket
+// upgrade takes the connection over, and a wrapper that hides this turns a working upgrade into a 400.
+func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := s.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("this response writer cannot be taken over")
+	}
+	return hijacker.Hijack()
+}
+
 func (s *statusRecorder) Write(data []byte) (int, error) {
 	if !s.wroteHeader {
 		s.WriteHeader(http.StatusOK)
@@ -112,6 +136,13 @@ func Guard(cfg *config.Config) Middleware {
 			}
 			switch r.Method {
 			case http.MethodGet, http.MethodHead, http.MethodOptions:
+				// A WebSocket handshake is a GET that becomes a write channel the moment it is accepted,
+				// so it gets the check a write gets. Skipping it here would leave the one route that
+				// speaks to a canvas's agent open to any page the user happens to have loaded.
+				if !isUpgrade(r) {
+					break
+				}
+				fallthrough
 			default:
 				origin := r.Header.Get("Origin")
 				site := r.Header.Get("Sec-Fetch-Site")
@@ -123,6 +154,12 @@ func Guard(cfg *config.Config) Middleware {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// isUpgrade reports whether this request is asking to become something other than one exchange — a
+// WebSocket, today.
+func isUpgrade(r *http.Request) bool {
+	return strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
 }
 
 // Recover keeps a single panicking request from taking down the process.

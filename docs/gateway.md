@@ -176,27 +176,34 @@ back what AlayaCore says. The gateway owns no wording, no model choice and no st
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/agent/connect` | Start an agent under a name, or return the one already filed there. |
-| `POST` | `/api/agent/chat` | Write one request to that agent and stream its frames back. |
+| `GET` | `/api/agent/socket/{session}` | The conversation: a WebSocket, one per canvas, both directions. |
 | `POST` | `/api/agent/once` | Ask one question of a process of its own, released when the answer ends. |
-| `DELETE` | `/api/agent/session/{name}` | Release an agent. This is the only thing that ends one. |
 
-Both chat routes take `prompt` (and images), or `command` + `args` (one of AlayaCore's own commands,
-forwarded verbatim), or both, and answer with an event stream: `models`, `delta`, `reasoning`, `model`,
-`reasoning_level`, `command`, `tool_call`, `tool_result`, `done`, `error`.
+`/api/agent/once` takes `prompt` (and images) — one of AlayaCore's own commands may travel too — and
+answers with an event stream: `models`, `delta`, `reasoning`, `model`, `reasoning_level`, `command`,
+`tool_call`, `tool_result`, `done`, `error`.
 
-They are two kinds of thing, and the difference is lifetime. `/api/agent/chat` requires a `session` and
-writes into the process filed under that name — one per canvas, alive until the client disconnects, so
-its history accumulates and its tools can be used. Changing a model or a reasoning level goes the same
-way: a frame to that process, not a question that spends it. `/api/agent/once` names no session and reads
-none: it spawns `alayacore --rawio`, asks, and releases the process when the answer ends. That split is
-what keeps a prompt rewrite or a caption — a single answer that nothing follows — from spending the
-history of the agent the user is working with.
+The socket carries the same events as messages, and takes four kinds of message: `{"prompt":…}` (with
+optional `images`), `{"command":…,"args":…}` for one of AlayaCore's own settings, `{"cancel":true}` to
+wind the current task down, and `{"close":true}` to end the conversation and release the agent. The
+first message the gateway sends is the agent's own startup broadcast, which is where the model list
+comes from.
 
-The name on `connect` is the client's to choose (the canvas id, in practice). Connecting again with the
+They are two kinds of thing, and the difference is lifetime. The socket names a session and is one per
+canvas: a process alive until the client closes it, so its history accumulates and its tools can be used.
+Changing a model or a reasoning level is a message on that socket, not a question that spends anything.
+`/api/agent/once` names no session and reads none: it spawns `alayacore --rawio`, asks, and releases the
+process when the answer ends. That split is what keeps a prompt rewrite or a caption — a single answer
+that nothing follows — from spending the history of the agent the user is working with.
+
+The name on the socket is the client's to choose (the canvas id, in practice). Opening it again with the
 same name returns the same process, which is how a reloaded page finds the conversation it left, and it
 means the gateway can stay ignorant of what a canvas is. Nothing expires: a process lives until the
-client releases it, or until it dies — see [`decisions.md`](decisions.md) #80 for the cost of that.
+client closes the conversation or the socket says `{"close":true}`, or until it dies — see
+[`decisions.md`](decisions.md) #80 for the cost of that, and #82 for the transport.
+
+A second connection to the same name is refused with an `error` message: one conversation has one set of
+eyes, and two readers would take half the frames each.
 
 A built-in tool (`read_file`, enabled for the skills the agent loads) runs inside AlayaCore, so the call
 and its result arrive as frames and the gateway relays both without answering either.
