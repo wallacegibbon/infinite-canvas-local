@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Image as ImageIcon, LoaderCircle, MessageSquare, Play, Settings2, Square, Video } from "lucide-react";
+import { Image as ImageIcon, LoaderCircle, MessageSquare, Play, ScanText, Settings2, Square, Video } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
 
@@ -102,16 +102,33 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
 
             <div className="mb-2 grid min-w-0 cursor-default grid-cols-[minmax(0,1fr)_148px] items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
                 <div className="flex min-w-0 flex-col gap-1">
-                    <WorkflowModelPicker
-                        className="canvas-compact-control h-10"
-                        config={config}
-                        value={config.model}
-                        onChange={(model) => onConfigChange(node.id, mode === "video" ? videoModelModePatch(config, model) : { model })}
-                        capability={mode}
-                        onMissingConfig={() => openConfigDialog(true)}
-                        fullWidth
-                    />
-                    <BaseModelPicker className="canvas-compact-control h-10" config={config} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} fullWidth />
+                    {/* Text is answered by the prompt endpoint, not by a workflow: there is no text
+                        model to pick, only that endpoint's model to go and configure. */}
+                    {mode === "text" ? (
+                        <button
+                            type="button"
+                            className="canvas-compact-control flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm"
+                            title={t("canvas.configNode.promptModel")}
+                            onMouseDown={(event) => event.stopPropagation()}
+                            onClick={() => openConfigDialog(true, "cloud-api")}
+                        >
+                            <ScanText className="size-3.5 shrink-0" />
+                            <span className="truncate">{config.promptCloudModel || t("canvas.configNode.promptModelMissing")}</span>
+                        </button>
+                    ) : (
+                        <>
+                            <WorkflowModelPicker
+                                className="canvas-compact-control h-10"
+                                config={config}
+                                value={config.model}
+                                onChange={(model) => onConfigChange(node.id, mode === "video" ? videoModelModePatch(config, model) : { model })}
+                                capability={mode}
+                                onMissingConfig={() => openConfigDialog(true)}
+                                fullWidth
+                            />
+                            <BaseModelPicker className="canvas-compact-control h-10" config={config} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} fullWidth />
+                        </>
+                    )}
                 </div>
                 {mode === "video" ? (
                     <CanvasVideoSettingsPopover

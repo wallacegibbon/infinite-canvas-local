@@ -289,6 +289,80 @@ overall_soundscape:
 	}
 }
 
+// TestCompleteSendsNoSystemTurnWhenNoneIsGiven pins the one thing this endpoint decides for the
+// caller: a caller without a system message must not have an empty one invented for it.
+func TestCompleteSendsNoSystemTurnWhenNoneIsGiven(t *testing.T) {
+	var captured map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&captured)
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"an answer"},"finish_reason":"stop"}]}`))
+	}))
+	defer server.Close()
+
+	optimizer, _ := newLoggedOptimizer(t)
+	result, err := optimizer.Complete(context.Background(), ChatRequest{
+		Prompt: "  what is this?  ",
+		Cloud:  CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"},
+	})
+	if err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if result["text"] != "an answer" {
+		t.Errorf("text = %v", result["text"])
+	}
+	if result["model"] != "m" {
+		t.Errorf("model = %v", result["model"])
+	}
+
+	messages, _ := captured["messages"].([]any)
+	if len(messages) != 1 {
+		t.Fatalf("messages = %v, want one user turn", messages)
+	}
+	user, _ := messages[0].(map[string]any)
+	// The prompt is trimmed: leading whitespace is not part of what the caller asked.
+	if user["role"] != "user" || user["content"] != "what is this?" {
+		t.Errorf("user turn = %v", user)
+	}
+}
+
+func TestCompleteSendsTheSystemMessageFirst(t *testing.T) {
+	var captured map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&captured)
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}]}`))
+	}))
+	defer server.Close()
+
+	optimizer, _ := newLoggedOptimizer(t)
+	if _, err := optimizer.Complete(context.Background(), ChatRequest{
+		Prompt: "hello",
+		System: "be brief",
+		Cloud:  CloudConfig{BaseURL: server.URL, APIKey: "k", Model: "m"},
+	}); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+
+	messages, _ := captured["messages"].([]any)
+	if len(messages) != 2 {
+		t.Fatalf("messages = %v, want system then user", messages)
+	}
+	system, _ := messages[0].(map[string]any)
+	if system["role"] != "system" || system["content"] != "be brief" {
+		t.Errorf("system turn = %v", system)
+	}
+}
+
+func TestCompleteRejectsABlankPrompt(t *testing.T) {
+	optimizer, _ := newLoggedOptimizer(t)
+	if _, err := optimizer.Complete(context.Background(), ChatRequest{Prompt: " \n "}); err == nil {
+		t.Fatal("expected an error for a blank prompt")
+	}
+	long := strings.Repeat("字", 8001)
+	if _, err := optimizer.Complete(context.Background(), ChatRequest{Prompt: long}); err == nil {
+		t.Fatal("expected an error for an oversized prompt")
+	}
+}
+
 func TestChatLogsMissingConfiguration(t *testing.T) {
 	optimizer, logs := newLoggedOptimizer(t)
 	_, _, _, err := optimizer.chat(context.Background(), "optimize/t2va", "s", "u", nil,

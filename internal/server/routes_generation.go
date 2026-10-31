@@ -17,6 +17,7 @@ func (s *Server) routesGeneration(mux *http.ServeMux) {
 	s.route(mux, "POST /api/prompts/optimize", s.handlePromptOptimize)
 	s.route(mux, "POST /api/prompts/optimize-image", s.handlePromptOptimizeImage)
 	s.route(mux, "POST /api/prompts/caption", s.handlePromptCaption)
+	s.route(mux, "POST /api/prompts/chat", s.handlePromptChat)
 	s.route(mux, "GET /api/previews/{promptId}", s.handlePreview)
 	s.route(mux, "GET /api/progress/{requestId}", s.handleProgress)
 	s.route(mux, "GET /files/{name}", s.handleFile)
@@ -41,11 +42,7 @@ func (s *Server) runPromptRoute(ctx *httpx.Ctx, imageOnly bool) error {
 	requestCtx, cleanup := s.withCancel(ctx.R, ctx.RequestID)
 	defer cleanup()
 
-	cloud := prompt.CloudConfig{
-		BaseURL: httpx.String(body, "cloudBaseUrl"),
-		APIKey:  httpx.String(body, "cloudApiKey"),
-		Model:   httpx.String(body, "cloudModel"),
-	}
+	cloud := promptCloud(body)
 
 	var result map[string]any
 
@@ -59,17 +56,13 @@ func (s *Server) runPromptRoute(ctx *httpx.Ctx, imageOnly bool) error {
 		})
 	} else {
 		files := orderedPromptImages(ctx.Files())
-		images := make([]string, 0, len(files))
-		for _, file := range files {
-			images = append(images, "data:"+defaultMime(file.Mimetype)+";base64,"+base64.StdEncoding.EncodeToString(file.Bytes))
-		}
 		result, err = s.optimizer.Optimize(requestCtx, prompt.OptimizeRequest{
 			Prompt:        httpx.String(body, "prompt"),
 			Mode:          httpx.String(body, "mode"),
 			Duration:      httpx.Number(body, "duration", httpx.Number(body, "seconds", 0)),
 			ReferenceNote: defaultStringOf(httpx.String(body, "referenceNote"), httpx.String(body, "reference_note")),
 			Language:      httpx.String(body, "language"),
-			CloudImages:   images,
+			CloudImages:   promptImageURLs(files),
 			ImageCount:    len(files),
 			Cloud:         cloud,
 		})
@@ -95,9 +88,7 @@ func (s *Server) handlePromptCaption(ctx *httpx.Ctx) error {
 		return httpx.NewError(http.StatusBadRequest, "missing_reference_image", "caption request is missing an image")
 	}
 
-	images := []string{
-		"data:" + defaultMime(files[0].Mimetype) + ";base64," + base64.StdEncoding.EncodeToString(files[0].Bytes),
-	}
+	images := promptImageURLs(files[:1])
 
 	requestCtx, cleanup := s.withCancel(ctx.R, ctx.RequestID)
 	defer cleanup()
@@ -106,11 +97,7 @@ func (s *Server) handlePromptCaption(ctx *httpx.Ctx) error {
 		images,
 		httpx.String(body, "language"),
 		httpx.String(body, "instruction"),
-		prompt.CloudConfig{
-			BaseURL: httpx.String(body, "cloudBaseUrl"),
-			APIKey:  httpx.String(body, "cloudApiKey"),
-			Model:   httpx.String(body, "cloudModel"),
-		})
+		promptCloud(body))
 	if err != nil {
 		if requestCtx.Err() != nil {
 			return nil
@@ -119,6 +106,59 @@ func (s *Server) handlePromptCaption(ctx *httpx.Ctx) error {
 	}
 	okJSON(ctx.W, result)
 	return nil
+}
+
+// handlePromptChat implements POST /api/prompts/chat.
+//
+// One prompt in, one answer out. The gateway owns no wording for this route — no skill text, no
+// sanitiser, no H3 field check — because the caller is the one who knows what it wants asked; the
+// configured endpoint and its credentials are the only thing it borrows. Images are optional and
+// are attached as ordinary form files, so a vision model can describe them.
+func (s *Server) handlePromptChat(ctx *httpx.Ctx) error {
+	body, err := bodyOrEmpty(ctx)
+	if err != nil {
+		return err
+	}
+
+	requestCtx, cleanup := s.withCancel(ctx.R, ctx.RequestID)
+	defer cleanup()
+
+	result, err := s.optimizer.Complete(requestCtx, prompt.ChatRequest{
+		Prompt: httpx.String(body, "prompt"),
+		System: httpx.String(body, "system"),
+		Images: promptImageURLs(orderedPromptImages(ctx.Files())),
+		Cloud:  promptCloud(body),
+	})
+	if err != nil {
+		if requestCtx.Err() != nil {
+			return nil
+		}
+		return err
+	}
+	okJSON(ctx.W, result)
+	return nil
+}
+
+// promptCloud reads the prompt endpoint's address, key and model from a request body.
+//
+// They travel per request, not as gateway configuration: the endpoint belongs to the browser's
+// settings, and the gateway is only the party that sends the request (the browser never contacts
+// llama-server directly).
+func promptCloud(body map[string]any) prompt.CloudConfig {
+	return prompt.CloudConfig{
+		BaseURL: httpx.String(body, "cloudBaseUrl"),
+		APIKey:  httpx.String(body, "cloudApiKey"),
+		Model:   httpx.String(body, "cloudModel"),
+	}
+}
+
+// promptImageURLs turns uploaded files into the data URLs the prompt endpoint accepts.
+func promptImageURLs(files []httpx.File) []string {
+	images := make([]string, 0, len(files))
+	for _, file := range files {
+		images = append(images, "data:"+defaultMime(file.Mimetype)+";base64,"+base64.StdEncoding.EncodeToString(file.Bytes))
+	}
+	return images
 }
 
 // handlePreview implements GET /api/previews/{promptId}.

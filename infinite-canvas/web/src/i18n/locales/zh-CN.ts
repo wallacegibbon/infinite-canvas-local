@@ -710,6 +710,8 @@ export default {
             items: "{{count}} 个",
             images: "{{count}} 张",
             compose: "组装提示词",
+            promptModel: "提示词接口",
+            promptModelMissing: "未配置提示词接口",
             stop: "停止",
             generate: "开始生成",
         },

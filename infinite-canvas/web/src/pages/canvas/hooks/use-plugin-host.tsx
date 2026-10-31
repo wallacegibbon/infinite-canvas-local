@@ -2,11 +2,12 @@ import { gatewayRoot } from "@/constant/app-mode";
 import { useCallback, useEffect, useMemo, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 
-import { requestEdit, requestGeneration, requestImageQuestion, type AiTextMessage } from "@/services/api/image";
+import { requestEdit, requestGeneration } from "@/services/api/image";
+import { requestPromptChat } from "@/services/api/prompts";
 import { resolveMediaUrl } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
 import { requestVideoGeneration, storeGeneratedVideo } from "@/services/api/video";
-import { decodeChannelModel, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
+import { decodeChannelModel, promptEndpointReady, selectableModelsByCapability, type AiConfig, type ConfigTabKey, type ModelCapability } from "@/stores/use-config-store";
 import { buildGenerationConfig } from "@/lib/canvas/canvas-generation-helpers";
 import { buildNodeContext } from "@/lib/canvas/plugin-node-context";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
@@ -21,7 +22,7 @@ type CanvasTheme = (typeof canvasThemes)[keyof typeof canvasThemes];
 type PluginHostParams = {
     effectiveConfig: AiConfig;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
-    openConfigDialog: (open: boolean) => void;
+    openConfigDialog: (open: boolean, tab?: ConfigTabKey) => void;
     theme: CanvasTheme;
     nodesRef: MutableRefObject<CanvasNodeData[]>;
     connectionsRef: MutableRefObject<CanvasConnection[]>;
@@ -80,9 +81,14 @@ export function usePluginHost(params: PluginHostParams) {
             },
             generateText: async (prompt, options) => {
                 const config = { ...buildGenerationConfig(effectiveConfig, undefined, "text"), ...(options?.model ? { model: options.model } : {}) };
-                ensureReady(config);
-                const messages: AiTextMessage[] = [...(options?.system ? [{ role: "system" as const, content: options.system }] : []), { role: "user" as const, content: prompt }];
-                const text = await requestImageQuestion(config, messages, (delta) => options?.onDelta?.(delta), { signal: options?.signal });
+                // Words come from the prompt endpoint; no workflow stands behind them.
+                if (!promptEndpointReady(config)) {
+                    openConfigDialog(true, "cloud-api");
+                    throw new Error(t("canvas.plugins.aiConfigRequired"));
+                }
+                const text = await requestPromptChat(config, { prompt, system: options?.system }, { signal: options?.signal });
+                // The gateway answers whole, so a plugin that asked for deltas gets the answer once.
+                options?.onDelta?.(text);
                 return { text };
             },
             // List configured models for a capability; labels use the model name without the channel prefix.

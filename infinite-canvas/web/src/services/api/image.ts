@@ -1,13 +1,13 @@
 import i18n from "@/i18n";
 import { LOCAL_GATEWAY_BASE_URL, isLocalGatewayUrl } from "@/constant/app-mode";
-import { buildApiUrl, channelModelOf, modelImageInputs, modelOptionName, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
+import { channelModelOf, modelImageInputs, modelOptionName, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
 import { nanoid } from "nanoid";
 import { dataUrlToFile, readFileAsDataUrl } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { IMAGE_ANGLE_WORKFLOW } from "@/lib/canvas/tool-workflows";
 import { imageToDataUrl } from "@/services/image-storage";
 import { imageSizePresets } from "@/lib/media-size";
-import { apiErrorMessage, httpJson } from "@/services/api/http";
+import { apiErrorMessage } from "@/services/api/http";
 import { createRun, downloadRunOutputs, uploadMedia, waitForRun, type Run } from "@/services/api/runs";
 import { requestWorkflows } from "@/services/api/workflows";
 import { publishStepProgress } from "@/services/api/step-progress";
@@ -15,45 +15,6 @@ import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
-export type AiTextMessage = {
-    role: "system" | "user" | "assistant";
-    content: string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
-};
-
-type ResponseToolCall = {
-    id: string;
-    type: "function";
-    function: { name: string; arguments: string };
-    thoughtSignature?: string;
-};
-
-type ResponseInputMessage = AiTextMessage | { type: "function_call"; call_id: string; name: string; arguments: string; thoughtSignature?: string } | { role: "tool"; tool_call_id: string; content: string };
-
-type ToolResponseResult = {
-    content: string;
-    toolCalls: ResponseToolCall[];
-};
-
-type ResponseMessageContent = AiTextMessage["content"] | string;
-type ResponseInputContent = { type: "input_text"; text: string } | { type: "input_image"; image_url: string };
-type ResponseInputItem = { role: "system" | "user" | "assistant"; content: string | ResponseInputContent[] } | { type: "function_call"; call_id: string; name: string; arguments: string } | { type: "function_call_output"; call_id: string; output: string };
-type ResponseApiOutputItem = { type?: "message"; content?: Array<{ type?: string; text?: string }> } | { type?: "function_call"; id?: string; call_id?: string; name?: string; arguments?: string };
-type ResponseApiPayload = {
-    id?: string;
-    output?: ResponseApiOutputItem[];
-    output_text?: string;
-    error?: { message?: string };
-    code?: number;
-    msg?: string;
-};
-type ResponseStreamState = { buffer: string; text: string; payload?: ResponseApiPayload; error?: string };
-
-type ImageApiResponse = {
-    data?: Array<Record<string, unknown>>;
-    error?: { message?: string };
-    code?: number;
-    msg?: string;
-};
 type RequestOptions = {
     signal?: AbortSignal;
     params?: Record<string, unknown>;
@@ -166,170 +127,9 @@ function resolveRequestSize(size: string) {
     throw new Error(apiText("invalidImageSizeFormat"));
 }
 
-function readStatusError(status: number | undefined, fallback: string) {
-    if (status === 401 || status === 403) return apiText("authenticationFailed");
-    if (status === 429) return apiText("rateLimited");
-    if (status === 404) return apiText("notFound");
-    if (status === 502) return apiText("badGateway");
-    if (status === 503) return apiText("serviceBusy");
-    return status ? apiText("httpFailed", { status }) : fallback;
-}
-
 function withSystemPrompt(config: AiConfig, prompt: string) {
     const systemPrompt = config.systemPrompt.trim();
     return systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-}
-
-function aiApiUrl(config: AiConfig, path: string) {
-    return buildApiUrl(config.baseUrl, path);
-}
-
-function aiHeaders(config: AiConfig, contentType?: string) {
-    return {
-        Authorization: `Bearer ${config.apiKey}`,
-        ...(contentType ? { "Content-Type": contentType } : {}),
-    };
-}
-
-function withSystemMessage<T extends ResponseInputMessage>(config: AiConfig, messages: T[]): ResponseInputMessage[] {
-    const systemPrompt = config.systemPrompt.trim();
-    return systemPrompt ? [{ role: "system" as const, content: systemPrompt }, ...messages] : messages;
-}
-
-function toResponseInput(messages: ResponseInputMessage[]): ResponseInputItem[] {
-    return messages.flatMap((message): ResponseInputItem[] => {
-        if ("type" in message) return [message];
-        if (message.role === "tool") return [{ type: "function_call_output", call_id: message.tool_call_id, output: message.content }];
-        return [{ role: message.role, content: toResponseContent(message.content || "") }];
-    });
-}
-
-function toResponseContent(content: ResponseMessageContent): string | ResponseInputContent[] {
-    if (!Array.isArray(content)) return String(content || "");
-    return content.map((item) => (item.type === "text" ? { type: "input_text" as const, text: item.text } : { type: "input_image" as const, image_url: item.image_url.url }));
-}
-
-function parseToolResponse(payload: ResponseApiPayload): ToolResponseResult {
-    const output = payload.output || [];
-    const content =
-        payload.output_text ||
-        output
-            .flatMap((item) => (item.type === "message" ? item.content || [] : []))
-            .map((item) => item.text || "")
-            .join("");
-    const toolCalls = output
-        .filter((item): item is Extract<ResponseApiOutputItem, { type?: "function_call" }> => item.type === "function_call")
-        .map((item) => ({
-            id: item.call_id || item.id || "",
-            type: "function" as const,
-            function: { name: item.name || "", arguments: item.arguments || "{}" },
-        }))
-        .filter((item) => item.id && item.function.name);
-    return { content, toolCalls };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function responseErrorMessage(value: unknown) {
-    if (!isRecord(value)) return "";
-    const error = isRecord(value.error) ? value.error : undefined;
-    const response = isRecord(value.response) ? value.response : undefined;
-    const responseError = response && isRecord(response.error) ? response.error : undefined;
-    return stringValue(value.msg) || stringValue(error?.message) || stringValue(responseError?.message);
-}
-
-function stringValue(value: unknown) {
-    return typeof value === "string" ? value : "";
-}
-
-function validateResponsePayload(payload: ResponseApiPayload) {
-    if (typeof payload.code === "number" && payload.code !== 0) throw new Error(payload.msg || apiText("requestFailed"));
-    if (payload.error?.message) throw new Error(payload.error.message);
-}
-
-async function readFetchError(response: Response, fallback: string) {
-    const text = await response.text();
-    if (!text) return readStatusError(response.status, fallback);
-    try {
-        return responseErrorMessage(JSON.parse(text)) || readStatusError(response.status, fallback);
-    } catch {
-        return text.slice(0, 300) || readStatusError(response.status, fallback);
-    }
-}
-
-function consumeResponseStreamBlock(block: string, state: ResponseStreamState, onDelta?: (text: string) => void) {
-    const data = block
-        .split(/\r?\n/)
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).replace(/^ /, ""))
-        .join("\n")
-        .trim();
-    if (!data || data === "[DONE]") return;
-    const event = JSON.parse(data) as Record<string, unknown>;
-    const type = stringValue(event.type);
-    const errorMessage = responseErrorMessage(event);
-    if (errorMessage) state.error = errorMessage;
-    if (type === "response.output_text.delta" && typeof event.delta === "string") {
-        state.text += event.delta;
-        onDelta?.(state.text);
-    }
-    if (type === "response.output_text.done" && !state.text && typeof event.text === "string") {
-        state.text = event.text;
-        onDelta?.(state.text);
-    }
-    if (type === "response.completed" && isRecord(event.response)) {
-        state.payload = event.response as ResponseApiPayload;
-    } else if (Array.isArray(event.output)) {
-        state.payload = event as ResponseApiPayload;
-    }
-}
-
-function consumeResponseStreamText(state: ResponseStreamState, text: string, onDelta?: (text: string) => void, flush = false) {
-    state.buffer += text;
-    for (;;) {
-        const match = state.buffer.match(/\r?\n\r?\n/);
-        if (!match) break;
-        const index = match.index ?? 0;
-        consumeResponseStreamBlock(state.buffer.slice(0, index), state, onDelta);
-        state.buffer = state.buffer.slice(index + match[0].length);
-    }
-    if (flush && state.buffer.trim()) {
-        consumeResponseStreamBlock(state.buffer, state, onDelta);
-        state.buffer = "";
-    }
-}
-
-async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
-    const response = await fetch(aiApiUrl(config, "/responses"), {
-        method: "POST",
-        headers: { ...aiHeaders(config, "application/json"), Accept: "text/event-stream" },
-        body: JSON.stringify({ ...body, stream: true }),
-        signal: options?.signal,
-    });
-    if (!response.ok) throw new Error(await readFetchError(response, apiText("requestFailed")));
-    if (!response.body) {
-        const payload = (await response.json()) as ResponseApiPayload;
-        validateResponsePayload(payload);
-        return parseToolResponse(payload);
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    const state: ResponseStreamState = { buffer: "", text: "" };
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        consumeResponseStreamText(state, decoder.decode(value, { stream: true }), onDelta);
-        if (state.error) throw new Error(state.error);
-    }
-    consumeResponseStreamText(state, decoder.decode(), onDelta, true);
-    if (state.error) throw new Error(state.error);
-    if (!state.payload) return { content: state.text, toolCalls: [] };
-    validateResponsePayload(state.payload);
-    const result = parseToolResponse(state.payload);
-    return { ...result, content: state.text || result.content };
 }
 
 async function requestGatewayImages(input: {
@@ -434,8 +234,6 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     });
 }
 
-export type PromptOptimizeMode = "全参考模式(Reference to Video)" | "文生视频(T2VA)" | "首帧图生视频(I2VA)" | "首尾帧视频(FL2VA)" | "尾帧图生视频(L2VA)";
-
 type ImageAngleParams = {
     horizontalAngle: number;
     pitchAngle: number;
@@ -468,120 +266,6 @@ export async function requestImageAngle(config: AiConfig, prompt: string, params
     });
 }
 
-type PromptOptimizeResult = { prompt: string; mode: string; duration: number };
-
-export async function requestPromptOptimize(
-    config: AiConfig,
-    params: { prompt: string; mode: PromptOptimizeMode; duration?: number; referenceNote?: string; language?: "zh" | "en"; images?: ReferenceImage[]; engine?: "local" | "cloud"; cloud?: { baseUrl?: string; apiKey?: string; model?: string } },
-    options?: RequestOptions,
-): Promise<PromptOptimizeResult> {
-    const requestConfig = resolveModelRequestConfig(config, config.model || config.videoModel);
-    const root = localGatewayRoot(requestConfig.baseUrl);
-    if (!root) throw new Error(apiText("promptOptimizeLocalOnly"));
-    const formData = new FormData();
-    formData.set("prompt", params.prompt);
-    formData.set("mode", params.mode);
-    formData.set("duration", String(params.duration || 5));
-    if (params.referenceNote) formData.set("referenceNote", params.referenceNote);
-    if (params.language) formData.set("language", params.language);
-    if (params.engine) formData.set("engine", params.engine);
-    if (params.cloud?.baseUrl) formData.set("cloudBaseUrl", params.cloud.baseUrl);
-    if (params.cloud?.apiKey) formData.set("cloudApiKey", params.cloud.apiKey);
-    if (params.cloud?.model) formData.set("cloudModel", params.cloud.model);
-    const images = params.images || [];
-    const files = await Promise.all(images.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
-    files.forEach((file, index) => formData.append(index === 0 ? "image" : `image${index + 1}`, file));
-    try {
-        const payload = await httpJson<PromptOptimizeResult>(`${root}/api/prompts/optimize`, {
-            method: "POST",
-            headers: aiHeaders(requestConfig),
-            body: formData,
-            signal: options?.signal,
-            timeout: 240000,
-        });
-        if (!payload?.prompt) throw new Error(apiText("promptOptimizeEmpty"));
-        return payload;
-    } catch (error) {
-        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
-    }
-}
-
-type ImagePromptOptimizeResult = { prompt: string; mode: string };
-
-export async function requestImagePromptOptimize(
-    config: AiConfig,
-    params: { prompt: string; mode?: "text" | "image"; language?: "zh" | "en"; images?: ReferenceImage[]; imageCount?: number; engine?: "local" | "cloud"; cloud?: { baseUrl?: string; apiKey?: string; model?: string } },
-    options?: RequestOptions,
-): Promise<ImagePromptOptimizeResult> {
-    const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
-    const root = localGatewayRoot(requestConfig.baseUrl);
-    if (!root) throw new Error(apiText("promptOptimizeLocalOnly"));
-    const formData = new FormData();
-    formData.set("prompt", params.prompt);
-    if (params.mode) formData.set("mode", params.mode);
-    if (params.language) formData.set("language", params.language);
-    if (params.engine) formData.set("engine", params.engine);
-    if (params.cloud?.baseUrl) formData.set("cloudBaseUrl", params.cloud.baseUrl);
-    if (params.cloud?.apiKey) formData.set("cloudApiKey", params.cloud.apiKey);
-    if (params.cloud?.model) formData.set("cloudModel", params.cloud.model);
-    const images = params.images || [];
-    formData.set("imageCount", String(params.imageCount ?? images.length));
-    if (params.engine !== "cloud") {
-        const files = await Promise.all(images.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
-        files.forEach((file, index) => formData.append(index === 0 ? "image" : `image${index + 1}`, file));
-    }
-    try {
-        const payload = await httpJson<ImagePromptOptimizeResult>(`${root}/api/prompts/optimize-image`, {
-            method: "POST",
-            headers: aiHeaders(requestConfig),
-            body: formData,
-            signal: options?.signal,
-            timeout: 240000,
-        });
-        if (!payload?.prompt) throw new Error(apiText("promptOptimizeEmpty"));
-        return payload;
-    } catch (error) {
-        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
-    }
-}
-
-export type ImageCaptionEngine = "qwen35" | "florence" | "cloud";
-type ImageCaptionResult = { prompt: string; engine?: ImageCaptionEngine; promptId?: string; elapsedMs?: number };
-
-export async function requestImageCaption(
-    config: AiConfig,
-    params: { images: ReferenceImage[]; language?: "zh" | "en"; instruction?: string; engine?: ImageCaptionEngine; cloud?: { baseUrl: string; apiKey: string; model: string } },
-    options?: RequestOptions,
-): Promise<ImageCaptionResult> {
-    const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
-    const root = localGatewayRoot(requestConfig.baseUrl);
-    if (!root) throw new Error(apiText("promptOptimizeLocalOnly"));
-    const image = params.images[0];
-    if (!image) throw new Error(apiText("requestFailed"));
-    const formData = new FormData();
-    if (params.language) formData.set("language", params.language);
-    if (params.instruction) formData.set("instruction", params.instruction);
-    if (params.engine) formData.set("engine", params.engine);
-    if (params.cloud?.baseUrl) formData.set("cloudBaseUrl", params.cloud.baseUrl);
-    if (params.cloud?.apiKey) formData.set("cloudApiKey", params.cloud.apiKey);
-    if (params.cloud?.model) formData.set("cloudModel", params.cloud.model);
-    const file = await dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) });
-    formData.append("image", file);
-    try {
-        const payload = await httpJson<ImageCaptionResult>(`${root}/api/prompts/caption`, {
-            method: "POST",
-            headers: aiHeaders(requestConfig),
-            body: formData,
-            signal: options?.signal,
-            timeout: 240000,
-        });
-        if (!payload?.prompt) throw new Error(apiText("promptOptimizeEmpty"));
-        return payload;
-    } catch (error) {
-        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
-    }
-}
-
 type UpscaleOptions = { workflowId: string; params?: Record<string, unknown>; signal?: AbortSignal };
 
 /**
@@ -611,36 +295,6 @@ export async function requestUpscale(config: AiConfig, image: ReferenceImage, op
                 dataUrl: await readFileAsDataUrl(new File([file.blob], `upscaled-${index + 1}.png`, { type: file.mime || file.blob.type || "image/png" })),
             })),
         );
-    } catch (error) {
-        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
-    }
-}
-
-/**
- * Stream a text answer from a chat model (OpenAI Responses shape).
- *
- * The gateway has no text endpoint, so in this build the only models a text node can reach are the
- * ones the channel lists — image/video/audio workflows, which do not answer here. It is kept because
- * the canvas's text node still offers it; see docs/known-issues.md.
- */
-export async function requestImageQuestion(config: AiConfig, messages: AiTextMessage[], onDelta: (text: string) => void, options?: RequestOptions) {
-    const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
-    try {
-        const answer =
-            (
-                await requestStreamingResponse(
-                    requestConfig,
-                    {
-                        model: requestConfig.model,
-                        input: toResponseInput(withSystemMessage(requestConfig, messages)),
-                        ...(requestConfig.reasoningEffort === "auto" ? {} : { reasoning: { effort: requestConfig.reasoningEffort } }),
-                    },
-                    onDelta,
-                    options,
-                )
-            ).content || apiText("noContent");
-        if (answer === apiText("noContent")) onDelta(answer);
-        return answer;
     } catch (error) {
         throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
     }

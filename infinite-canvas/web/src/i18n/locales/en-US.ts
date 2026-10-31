@@ -701,6 +701,8 @@ export default {
             items: "{{count}} items",
             images: "{{count}} images",
             compose: "Compose prompt",
+            promptModel: "Prompt endpoint",
+            promptModelMissing: "No prompt endpoint",
             stop: "Stop",
             generate: "Generate",
         },

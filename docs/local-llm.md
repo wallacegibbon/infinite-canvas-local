@@ -27,10 +27,10 @@ root [`../README.md`](../README.md).
 
 ---
 
-## All three `/api/prompts/*` endpoints are `/chat/completions`
+## All four `/api/prompts/*` endpoints are `/chat/completions`
 
 The names invite confusion: the "image" in `optimize-image` means **a prompt for an image
-model**, not "optimize an image". All three are **gateway-specific** (OpenAI has none of
+model**, not "optimize an image". All four are **gateway-specific** (OpenAI has none of
 them) and all end up in the same `cloudChat()`. Each request sends exactly one
 `POST /chat/completions` to the base URL; the differences are the system prompt and whether
 an image is attached:
@@ -40,9 +40,11 @@ an image is attached:
 | `/api/prompts/optimize` | Video (H3) prompts | `prompts/skills/h3-prompt-writing/`, **≈ 4500 tokens** | Optional, up to 8 |
 | `/api/prompts/optimize-image` | Image prompts | `CLOUD_IMAGE_SYSTEM_PROMPT`, ≈ 200 tokens | **No, text only** |
 | `/api/prompts/caption` | Image → text (captioning) | Caption template | **Always exactly 1** |
+| `/api/prompts/chat` | Plain chat (text nodes, plugins) | **None** — the caller sends its own | Optional, up to 8 |
 
 Mapping to the canvas: the "optimize" button on an H3 node uses the first, the "optimize"
-button on an image node uses the second, and the "caption" button on an image node uses the third.
+button on an image node uses the second, the "caption" button on an image node uses the third, and
+every text node — plus a plugin's `generateText` — uses `chat`.
 
 So `optimize-image` is the easiest smoke test (text only, short prompt, instant answer),
 while `/api/prompts/optimize` needs a large `-c` because of that 4500-token system prompt.
@@ -145,6 +147,10 @@ curl -s -X POST http://127.0.0.1:8190/api/prompts/caption $C \
 # H3 video prompt (system prompt ≈ 4500 tokens, the context must be big enough)
 curl -s -X POST http://127.0.0.1:8190/api/prompts/optimize $C \
   -F 'prompt=a black cat on a windowsill watching the rain' -F 'mode=文生视频(T2VA)' -F 'language=zh' -F 'duration=5'
+
+# Plain chat: no skill, no sanitiser, just an answer (this is what a text node sends)
+curl -s -X POST http://127.0.0.1:8190/api/prompts/chat $C \
+  -F 'prompt=用一句话介绍你自己'          # -F 'system=...' and -F 'image=@...' are optional
 ```
 
 Testing llama.cpp directly, without the gateway:

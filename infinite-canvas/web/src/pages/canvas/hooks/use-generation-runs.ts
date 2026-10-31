@@ -5,10 +5,11 @@ import { nanoid } from "nanoid";
 
 import { toast } from "@/components/kit/toast";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
-import { isGatewayImageModel, requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
+import { isGatewayImageModel, requestEdit, requestGeneration } from "@/services/api/image";
+import { requestPromptChat } from "@/services/api/prompts";
 import { downloadRunOutput, downloadRunOutputs, waitForRun, type Run, type RunProgress } from "@/services/api/runs";
 import { isVideoTaskFailed } from "@/services/api/video";
-import { resolveModelRequestConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { promptEndpointReady, resolveModelRequestConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { readFileAsDataUrl } from "@/lib/image-utils";
 import { uploadImage } from "@/services/image-storage";
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
@@ -16,7 +17,7 @@ import { fitNodeSize, nodeSizeFromRatio } from "@/lib/canvas/canvas-node-size";
 import { audioMetadata, buildAudioGenerationMetadata, buildImageGenerationMetadata, imageMetadata } from "@/lib/canvas/canvas-node-factory";
 import { buildGenerationConfig, findRetrySourceNode, generationReferenceUrls, getGenerationCount, hasResumableVideoTask, isGenerationCanceled, resolveMetadataReferences, sourceNodeReferenceImages } from "@/lib/canvas/canvas-generation-helpers";
 import { NODE_STATUS_ERROR, NODE_STATUS_IDLE, NODE_STATUS_LOADING, NODE_STATUS_SUCCESS } from "@/lib/canvas/canvas-node-status";
-import { buildNodeGenerationContext, buildNodeResponseMessages, hydrateNodeGenerationContext } from "@/components/canvas/canvas-node-generation";
+import { buildNodeGenerationContext, hydrateNodeGenerationContext } from "@/components/canvas/canvas-node-generation";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeImage, type CanvasNodeText } from "@/types/canvas";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
@@ -511,31 +512,9 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             const controller = rootId === nodeId ? runController : startGenerationRequest(rootId, nodeId, nodeId, runController);
             const results = await Promise.all(
                 textIds.map(async (textId): Promise<CanvasNodeText | null> => {
-                    let streamed = "";
                     try {
-                        const answer = await requestImageQuestion(
-                            generationConfig,
-                            buildNodeResponseMessages({ ...generationContext, prompt: effectivePrompt }),
-                            (text) => {
-                                streamed = text;
-                                setNodes((prev) =>
-                                    prev.map((node) =>
-                                        node.id === rootId
-                                            ? {
-                                                  ...node,
-                                                  metadata: {
-                                                      ...node.metadata,
-                                                      ...(node.metadata?.primaryTextId === textId ? { content: text } : {}),
-                                                      texts: node.metadata?.texts?.map((item) => (item.id === textId ? { ...item, content: text } : item)),
-                                                  },
-                                              }
-                                            : node,
-                                    ),
-                                );
-                            },
-                            { signal: controller.signal },
-                        );
-                        const content = answer || streamed;
+                        // One prompt, one answer: the gateway answers whole, so the node is written when it does.
+                        const content = await requestPromptChat(generationConfig, { prompt: effectivePrompt, images: generationContext.referenceImages }, { signal: controller.signal });
                         setNodes((prev) =>
                             prev.map((node) =>
                                 node.id === rootId
@@ -618,8 +597,9 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                           count: "1",
                       }
                     : { ...buildGenerationConfig(effectiveConfig, sourceNode, node.type === CanvasNodeType.Text ? "text" : node.type === CanvasNodeType.Video ? "video" : node.type === CanvasNodeType.Audio ? "audio" : "image"), count: "1" };
-            if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
+            // A text node retries against the prompt endpoint, not against a workflow.
+            if (node.type === CanvasNodeType.Text ? !promptEndpointReady(generationConfig) : !isAiConfigReady(generationConfig, generationConfig.model)) {
+                openConfigDialog(true, node.type === CanvasNodeType.Text ? "cloud-api" : undefined);
                 return;
             }
 
@@ -676,17 +656,8 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             try {
                 if (node.type === CanvasNodeType.Text) {
                     if (!context) return;
-                    let streamed = "";
-                    const answer = await requestImageQuestion(
-                        generationConfig,
-                        buildNodeResponseMessages({ ...context, prompt }),
-                        (text) => {
-                            streamed = text;
-                            setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, type: CanvasNodeType.Text, metadata: { ...item.metadata, content: text, status: NODE_STATUS_LOADING } } : item)));
-                        },
-                        { signal: controller.signal },
-                    );
-                    setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, type: CanvasNodeType.Text, metadata: { ...item.metadata, content: answer || streamed, prompt, status: NODE_STATUS_SUCCESS } } : item)));
+                    const answer = await requestPromptChat(generationConfig, { prompt, images: context.referenceImages }, { signal: controller.signal });
+                    setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, type: CanvasNodeType.Text, metadata: { ...item.metadata, content: answer, prompt, status: NODE_STATUS_SUCCESS } } : item)));
                     return;
                 }
                 if (node.type === CanvasNodeType.Video) {

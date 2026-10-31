@@ -158,7 +158,7 @@ calls.
 |---|---|
 | `/api/runs`, `/api/uploads` | Produce media (submit, poll, download, cancel) and stage its inputs |
 | `/api/workflows/*`, `/api/setup/*` | Workflow metadata, schemas, ComfyUI scanning |
-| `/api/prompts/optimize`, `/api/prompts/optimize-image`, `/api/prompts/caption` | Prompt optimization, image captioning |
+| `/api/prompts/{optimize,optimize-image,caption,chat}` | Prompt optimization, image captioning, plain chat |
 | `/api/resources/*` | Download models, install custom nodes |
 | `/api/system/*`, `/api/loras`, `/api/tasks`, `/files/:name`, `/health` | System status and artifacts |
 

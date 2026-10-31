@@ -273,6 +273,17 @@ function isAiConfigReady(config: AiConfig, model: string) {
     return Boolean(match && match.channel.baseUrl.trim() && match.channel.apiKey.trim());
 }
 
+/**
+ * Whether text can be generated.
+ *
+ * Words come from the prompt endpoint, not from a workflow: there is no text model to pick, and the
+ * gateway has none to run. So a text node asks a different question than an image node — is the
+ * endpoint configured — and the answer has nothing to do with the channel list.
+ */
+export function promptEndpointReady(config: AiConfig) {
+    return Boolean((config.promptCloudBaseUrl || "").trim() && (config.promptCloudApiKey || "").trim() && (config.promptCloudModel || "").trim());
+}
+
 function suggestPromptCloudApiName(baseUrl: string, model: string) {
     const value = `${baseUrl || ""} ${model || ""}`.toLowerCase();
     if (value.includes("deepseek")) return "DeepSeek";
@@ -653,11 +664,4 @@ function defaultBaseUrl() {
 
 function uniqueModelOptions(models: string[]) {
     return Array.from(new Set((models || []).map((model) => model.trim()).filter(Boolean)));
-}
-
-export function buildApiUrl(baseUrl: string, path: string) {
-    const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
-    const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
-    const apiBaseUrl = lowerBaseUrl.endsWith("/v1") ? normalizedBaseUrl : `${normalizedBaseUrl}/v1`;
-    return `${apiBaseUrl}${path}`;
 }

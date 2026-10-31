@@ -178,6 +178,15 @@ The prompt services are the only generation-adjacent routes left; every kind of 
 | `POST` | `/api/prompts/optimize` | Rewrite a prompt for H3 video. |
 | `POST` | `/api/prompts/optimize-image` | Rewrite a prompt for image generation. |
 | `POST` | `/api/prompts/caption` | Reverse-engineer a prompt from an image. |
+| `POST` | `/api/prompts/chat` | Ask the configured model for words. |
+
+All four take the endpoint's address, key and model in the request
+(`cloudBaseUrl` / `cloudApiKey` / `cloudModel`): they are browser settings, not gateway configuration,
+and the browser never contacts the model itself. Three of them carry wording of their own (a skill, a
+template, a caption instruction). `/api/prompts/chat` does not — the caller supplies the `prompt` and,
+optionally, a `system` message and images as form files — which is what makes it usable by anything in
+the canvas that needs an answer rather than a picture. It answers once, in JSON: there is no streaming,
+and one request produces one text.
 
 A music graph needs two texts, and both are ordinary `registry.json` bindings (`prompt`, `lyrics`), so
 a run carries them as inputs like any other parameter. `response_format`-style container selection is

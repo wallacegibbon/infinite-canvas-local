@@ -2389,10 +2389,11 @@ for a suffix nothing needed.
 address enters the app (the injected value and a persisted channel). The call sites now use the value
 directly, which is what makes "there is no `/v1`" true rather than maintained by convention.
 
-**Kept deliberately** `buildApiUrl` still appends `/v1` for the prompt-API endpoint. That is a
-*different* service (llama-server, any OpenAI-compatible chat endpoint), not the gateway; it is also
-the only remaining caller of the canvas's chat path, which has no gateway endpoint behind it (see
-docs/known-issues.md).
+**Kept deliberately, then removed** `buildApiUrl` appended `/v1` for the prompt-API endpoint. It was
+the last caller of the canvas's chat path, which had no gateway endpoint behind it; decision 73 gave
+that path a real endpoint (`POST /api/prompts/chat`) and `buildApiUrl` went with the client it served.
+The model server's own `/v1/chat/completions` is now reached only by the gateway, from the base URL
+the settings hold.
 
 **Cost** A hand-written channel entry that points at a path like `https://host/openai/v1` loses the
 suffix. Nothing in this build talks to such an endpoint: the gateway and the prompt API are configured
@@ -2408,3 +2409,54 @@ network capture shows every gateway request on `/api/...` with no `/v1` path any
 `infinite-canvas/web/src/components/canvas/canvas-system-status.tsx`,
 `infinite-canvas/web/src/pages/canvas/hooks/use-plugin-host.tsx`,
 `infinite-canvas/web/src/stores/use-config-store.ts`.
+
+## 73. Text is a prompt route, not a model
+
+**Decision** `POST /api/prompts/chat` answers one prompt with one text: `prompt` (required), `system`
+and images (optional), plus the endpoint's `cloudBaseUrl` / `cloudApiKey` / `cloudModel`. The gateway
+adds no wording of its own and answers once — no streaming.
+
+**Why the canvas needed it** The text node and the plugin API's `generateText` called OpenAI's
+*Responses* API (`POST /v1/responses`) straight at the channel address. The gateway has never served
+that path — it went with the rest of `/v1` — so in this build every text generation was a 404. The
+canvas was carrying a whole Responses client (SSE parsing, tool calls, `input_text` / `input_image`
+conversion) with nothing on the other end.
+
+**Why not OpenAI compatibility** Serving `/v1/responses` or `/v1/chat/completions` would have meant the
+gateway re-implementing another protocol for one feature. The host that actually answers is the
+configured model server; the gateway's only job there is to be the party that sends the request.
+`/api/prompts/chat` is that job and nothing else: it reads the prompt, hands it to the same `chat()`
+the other three prompt routes use, and returns `{text, model, elapsedMs}`.
+
+**The one thing it decides** An empty `system` is omitted rather than sent as an empty turn: a model
+that receives a blank system role may answer it instead of the prompt. `Optimize`, `OptimizeImage` and
+`Caption` all pass a system message, so nothing else changed.
+
+**What the canvas lost** The streaming consumer, the tool-call types and `buildApiUrl`. A text node
+shows "generating" and then the answer, which is what a non-streaming route can report, and a plugin's
+`onDelta` fires once with the whole answer. Text nodes still ask for several variants (`textCount`):
+the canvas sends N requests, so the gateway's contract stays one in, one out.
+
+**What replaced the model guard** Text used to be gated on a channel model (`isAiConfigReady`), and no
+workflow has a text capability, so a text node could never start — the click opened the settings and
+nothing else. The gate is now `promptEndpointReady(config)` (the endpoint's base URL, key and model),
+which sends the user to the prompt-API tab, and the config node's empty "pick a model" shows the
+endpoint's model instead: the only model that answers.
+
+**Tested** `make check`, `make test-race`, `npm run check` (lint, types, i18n, exports), `npx vitest
+run` (124). New: `internal/server/prompt_chat_e2e_test.go` (the configured endpoint and the one user
+turn, system plus image parts, unconfigured settings, the endpoint's own error, an empty prompt),
+three `Optimizer.Complete` cases, `tests/api-prompts.test.ts` (7) for the form the canvas builds. In
+the browser, against a real model (`qwen3.8-27b` on `172.16.9.7:9999`, configured through the settings
+UI): a text node holding "写一句关于海边灯塔的诗，不超过二十个字" produced "灯塔守夜，潮声吻着星光"; the
+gateway log shows `POST /api/prompts/chat 200` and one `POST /v1/chat/completions` to the model server,
+and the browser's own capture shows no `/v1` path on the gateway.
+
+**Where** `internal/prompt/optimizer.go` (`ChatRequest`, `Complete`, `chatMessages`),
+`internal/server/routes_generation.go` (`handlePromptChat`, `promptCloud`, `promptImageURLs`),
+`infinite-canvas/web/src/services/api/prompts.ts` (the four prompt routes, moved out of `image.ts`),
+`infinite-canvas/web/src/services/api/image.ts`,
+`infinite-canvas/web/src/pages/canvas/hooks/{use-generation-runs,use-plugin-host}.tsx`,
+`infinite-canvas/web/src/pages/canvas/project.tsx`,
+`infinite-canvas/web/src/stores/use-config-store.ts`,
+`infinite-canvas/web/src/components/canvas/{canvas-config-node-panel,canvas-node-prompt-panel}.tsx`.

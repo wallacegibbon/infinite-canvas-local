@@ -63,6 +63,18 @@ type CloudConfig struct {
 	Model   string
 }
 
+// ChatRequest is the normalized input of a plain chat completion: a prompt, optionally a
+// system message and images, and where to send it.
+//
+// Nothing here is a skill: the gateway owns no wording for this endpoint. That is what makes it
+// usable by anything in the canvas that needs a model's words rather than an image.
+type ChatRequest struct {
+	Prompt string
+	System string
+	Images []string
+	Cloud  CloudConfig
+}
+
 // OptimizeRequest is the normalized input of prompt optimization.
 type OptimizeRequest struct {
 	Prompt        string
@@ -501,6 +513,37 @@ func (o *Optimizer) Caption(ctx context.Context, images []string, language, inst
 	}, nil
 }
 
+// Complete answers one prompt. The caller supplies the system message, or none at all.
+//
+// This is the endpoint the canvas's text node and plugins use: the answer is the model's own
+// words, so there is no sanitiser and no H3 field check here — only the two limits that keep a
+// stray binding from turning into an unbounded request.
+func (o *Optimizer) Complete(ctx context.Context, req ChatRequest) (map[string]any, error) {
+	text := strings.TrimSpace(req.Prompt)
+	if text == "" {
+		return nil, httpx.BadRequest("missing_prompt", "prompt is required")
+	}
+	if len([]rune(text)) > 8000 {
+		return nil, httpx.BadRequest("prompt_too_long", "prompt is too long")
+	}
+	images := req.Images
+	if len(images) > 8 {
+		images = images[:8]
+	}
+
+	// An empty system message is dropped in chat() rather than here: the omission belongs to the
+	// request shape, not to this endpoint.
+	content, model, elapsed, err := o.chat(ctx, "chat", req.System, text, images, req.Cloud)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"text":      content,
+		"model":     model,
+		"elapsedMs": elapsed,
+	}, nil
+}
+
 // chat calls the configured OpenAI-compatible endpoint.
 //
 // Every call is logged with the resolved URL, and every failure carries the
@@ -553,11 +596,8 @@ func (o *Optimizer) chat(ctx context.Context, purpose, system, userText string, 
 	}
 
 	requested := map[string]any{
-		"model": model,
-		"messages": []any{
-			map[string]any{"role": "system", "content": system},
-			map[string]any{"role": "user", "content": content},
-		},
+		"model":       model,
+		"messages":    chatMessages(system, content),
 		"temperature": 0.6,
 		"max_tokens":  o.maxTokens,
 	}
@@ -668,6 +708,17 @@ func (o *Optimizer) chat(ctx context.Context, purpose, system, userText string, 
 			fmt.Sprintf("the prompt endpoint returned an empty message (finish_reason=%s)", call.finishReason))
 	}
 	return call.text, model, elapsed, nil
+}
+
+// chatMessages builds the turn list. An empty system message is omitted rather than sent as an
+// empty turn: /api/prompts/chat has no wording of its own, and a model that receives a blank
+// system role may answer it instead of the prompt.
+func chatMessages(system string, content any) []any {
+	messages := make([]any, 0, 2)
+	if trimmed := strings.TrimSpace(system); trimmed != "" {
+		messages = append(messages, map[string]any{"role": "system", "content": trimmed})
+	}
+	return append(messages, map[string]any{"role": "user", "content": content})
 }
 
 // chatExchange is one parsed request/response round trip.
