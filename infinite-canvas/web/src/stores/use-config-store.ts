@@ -125,6 +125,34 @@ export const defaultConfig: AiConfig = {
 };
 
 /**
+ * Settings that used to live in this config and do not any more.
+ *
+ * A persisted blob keeps whatever it was written with, and the merge below spreads it over the
+ * defaults — so a name deleted from `AiConfig` would ride along in state and be written out again on
+ * the next change, forever. Dropping them at the merge is the whole cleanup: nothing reads them, and
+ * the values themselves need no migration. (docs/decisions.md #76, #77)
+ */
+const RETIRED_CONFIG_KEYS = new Set([
+    "apiFormat",
+    "channelMode",
+    "nodeRegenerateBehavior",
+    "promptApiKey",
+    "promptBaseUrl",
+    "promptCloudApiId",
+    "promptCloudApiKey",
+    "promptCloudApis",
+    "promptCloudBaseUrl",
+    "promptCloudModel",
+    "promptEndpointId",
+    "promptEndpoints",
+    "promptModel",
+    "reasoningEffort",
+    "videoInterpolation",
+]);
+
+const withoutRetiredKeys = (config: Partial<AiConfig>): Partial<AiConfig> => Object.fromEntries(Object.entries(config).filter(([key]) => !RETIRED_CONFIG_KEYS.has(key))) as Partial<AiConfig>;
+
+/**
  * What the agent last said about itself (`SM model_list`, `SM model`, `SM reasoning_level`).
  *
  * The gateway keeps no state, so this is the canvas's memory of the last stream it read: the list a
@@ -294,7 +322,7 @@ export const useConfigStore = create<ConfigStore>()(
             merge: (persisted, current) => {
                 const persistedState = (persisted || {}) as Partial<ConfigStore>;
                 const persistedConfig = (persistedState.config || {}) as Partial<AiConfig>;
-                const config = { ...defaultConfig, ...persistedConfig };
+                const config = { ...defaultConfig, ...withoutRetiredKeys(persistedConfig) };
                 if (!Array.isArray(persistedConfig.channels)) config.channels = [];
                 {
                     try {

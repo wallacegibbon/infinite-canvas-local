@@ -2683,3 +2683,10 @@ browser against `:8191`: an image node with content and no references showed onl
 参考内容 (the "原图" chip is gone), pressing 生成 kept the node count at 26 and replaced that node's image
 through `image-z-image-turbo` — a plain generation, no edit workflow, so no source image was sent — and
 the preferences page no longer lists the option.
+
+**The sediment, and where it went** A persisted blob keeps whatever it was written with, and the store's
+merge spread it over the defaults — so every field deleted from `AiConfig` (`promptEndpoints`,
+`reasoningEffort`, `nodeRegenerateBehavior`, and the `promptCloud*` / `channelMode` / `apiFormat` /
+`videoInterpolation` names before them) stayed in state and was written out again on the next change.
+`use-config-store.ts` now drops those names at the merge, from one list, with the reason attached.
+Nothing reads them and the values need no migration: the setting they describe is gone.
