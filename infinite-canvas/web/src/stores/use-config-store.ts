@@ -275,7 +275,9 @@ export const useConfigStore = create<ConfigStore>()(
             agent: { models: [] },
             updateAgent: (patch) => set((state) => ({ agent: { ...state.agent, ...patch } })),
             agentSession: null,
-            setAgentSession: (agentSession) => set({ agentSession }),
+            // The list belongs to a connection: without one there is nothing to show, and a stale list
+            // would offer a model the user cannot reach (the button says Connect).
+            setAgentSession: (agentSession) => set((state) => ({ agentSession, agent: agentSession ? state.agent : { models: [] } })),
             isConfigOpen: false,
             configTab: "channels",
             shouldPromptContinue: false,

@@ -841,7 +841,7 @@ export default {
             connect: "Connect",
             connecting: "Connecting…",
             connectFailed: "Could not connect to the agent",
-            noModel: "No model yet — run it once",
+            noModel: "Not connected",
             reasoningOff: "No thinking",
             reasoningNormal: "Normal",
             reasoningMax: "Deep",

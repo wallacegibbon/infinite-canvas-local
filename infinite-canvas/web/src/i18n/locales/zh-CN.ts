@@ -849,7 +849,7 @@ export default {
             connect: "连接",
             connecting: "连接中…",
             connectFailed: "连接 agent 失败",
-            noModel: "还没有模型信息，先生成一次",
+            noModel: "未连接",
             reasoningOff: "不思考",
             reasoningNormal: "普通思考",
             reasoningMax: "深度思考",
