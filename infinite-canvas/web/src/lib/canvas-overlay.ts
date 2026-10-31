@@ -22,6 +22,11 @@
 
 const OWN_OVERLAY = "[data-canvas-overlay]";
 const OWN_NO_ZOOM = "[data-canvas-no-zoom]";
+/**
+ * Wheel-only: content that scrolls itself (a text node's body) keeps the wheel, but a click inside it
+ * still reaches the canvas, so it must not join the click guard.
+ */
+const OWN_SCROLL = "[data-canvas-scroll]";
 
 const anyOf = (...selectors: string[]) => selectors.join(",");
 
@@ -29,7 +34,7 @@ const anyOf = (...selectors: string[]) => selectors.join(",");
 export const CANVAS_CLICK_GUARD = anyOf(OWN_OVERLAY, OWN_NO_ZOOM);
 
 /** Wheel guard: stop canvas zoom and page scroll from firing inside these. */
-export const CANVAS_WHEEL_GUARD = anyOf(OWN_OVERLAY, OWN_NO_ZOOM);
+export const CANVAS_WHEEL_GUARD = anyOf(OWN_OVERLAY, OWN_NO_ZOOM, OWN_SCROLL);
 
 /** A click inside this must not dismiss a menu already open on top of it. */
 export const CANVAS_DISMISS_GUARD = OWN_OVERLAY;
