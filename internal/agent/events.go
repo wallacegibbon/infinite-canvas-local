@@ -39,6 +39,9 @@ type Model struct {
 	ContextLimit int    `json:"contextLimit,omitempty"`
 }
 
+// Startup is the model information the agent broadcasts before it accepts input.
+type Startup = startup
+
 // startup is the model information the agent broadcasts before it accepts input.
 type startup struct {
 	models         []Model

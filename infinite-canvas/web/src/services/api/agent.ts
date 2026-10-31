@@ -26,6 +26,27 @@ type AgentEvent = {
     message?: string;
 };
 
+/**
+ * Connect: start an agent and keep it, so the model list is on screen before anything is asked.
+ *
+ * The gateway holds the process and returns the agent's own startup broadcast; the next send names
+ * this session and the same process answers it, then it is gone.
+ */
+export async function requestAgentConnect(config: AiConfig, options?: { signal?: AbortSignal }): Promise<void> {
+    const baseUrl = String(config.baseUrl || "").trim();
+    const root = localGatewayRoot(baseUrl);
+    if (!root) throw new Error(apiText("promptOptimizeLocalOnly"));
+    try {
+        const response = await fetch(`${root}/api/agent/connect`, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}` }, signal: options?.signal });
+        if (!response.ok) throw new Error(apiText("requestFailed"));
+        const payload = (await response.json()) as { sessionId?: string; state?: AgentEvent };
+        if (payload.state) rememberAgentEvent(payload.state);
+        useConfigStore.getState().setAgentSession(payload.sessionId || null);
+    } catch (error) {
+        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
+    }
+}
+
 type AgentRequest = {
     prompt?: string;
     images?: ReferenceImage[];
@@ -49,6 +70,10 @@ export async function requestAgentStream(config: AiConfig, request: AgentRequest
     if (request.prompt) formData.set("prompt", request.prompt);
     if (request.command) formData.set("command", request.command);
     if (request.args !== undefined) formData.set("args", request.args);
+    // A connected agent answers this request and is gone afterwards; without one the gateway spawns a
+    // process for this request alone.
+    const session = useConfigStore.getState().agentSession;
+    if (session) formData.set("session", session);
     const files = await Promise.all((request.images || []).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file, index) => formData.append(index === 0 ? "image" : `image${index + 1}`, file));
 
@@ -86,6 +111,9 @@ export async function requestAgentStream(config: AiConfig, request: AgentRequest
         return answer;
     } catch (error) {
         throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
+    } finally {
+        // The session answered exactly one prompt: whatever happened, the button goes back to Connect.
+        if (useConfigStore.getState().agentSession) useConfigStore.getState().setAgentSession(null);
     }
 }
 

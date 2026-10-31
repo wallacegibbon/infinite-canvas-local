@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"comfyui-gateway/internal/agent"
 	"comfyui-gateway/internal/comfy"
 	"comfyui-gateway/internal/config"
 	"comfyui-gateway/internal/generate"
@@ -44,8 +45,10 @@ type Server struct {
 	registry   *workflow.Registry
 	tasks      *task.Store
 	uploads    *upload.Store
-	setup      *setup.Manager
-	resources  *resource.Manager
+	// agentSessions holds agents a connect started, waiting for their one prompt.
+	agentSessions *agent.Sessions
+	setup         *setup.Manager
+	resources     *resource.Manager
 
 	requests sync.Map // request id -> context.CancelFunc
 
@@ -131,22 +134,23 @@ func New(cfg *config.Config, logger *logx.Logger) (*Server, error) {
 	hub := generate.NewHub(cfg.ComfyURL, logger)
 
 	server := &Server{
-		cfg:        cfg,
-		logger:     logger,
-		comfy:      comfyClient,
-		hub:        hub,
-		runner:     generate.NewRunner(comfyClient, hub, logger, cfg.RequestTimeoutMs, cfg.PollIntervalMs),
-		stats:      sysinfo.NewReader(),
-		sessions:   store.NewSessions(time.Duration(cfg.SessionStaleSec) * time.Second),
-		skins:      skins,
-		visibility: visibility,
-		mainModels: mainModels,
-		registry:   registry,
-		tasks:      tasks,
-		uploads:    uploads,
-		setup:      setupManager,
-		resources:  resources,
-		startedAt:  time.Now(),
+		cfg:           cfg,
+		logger:        logger,
+		comfy:         comfyClient,
+		hub:           hub,
+		runner:        generate.NewRunner(comfyClient, hub, logger, cfg.RequestTimeoutMs, cfg.PollIntervalMs),
+		stats:         sysinfo.NewReader(),
+		sessions:      store.NewSessions(time.Duration(cfg.SessionStaleSec) * time.Second),
+		skins:         skins,
+		visibility:    visibility,
+		mainModels:    mainModels,
+		registry:      registry,
+		tasks:         tasks,
+		uploads:       uploads,
+		setup:         setupManager,
+		resources:     resources,
+		agentSessions: agent.NewSessions(logger),
+		startedAt:     time.Now(),
 	}
 
 	if cfg.ScanOnStart {

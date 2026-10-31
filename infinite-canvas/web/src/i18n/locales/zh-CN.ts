@@ -846,6 +846,9 @@ export default {
             interact: "交互",
         },
         agent: {
+            connect: "连接",
+            connecting: "连接中…",
+            connectFailed: "连接 agent 失败",
             noModel: "还没有模型信息，先生成一次",
             reasoningOff: "不思考",
             reasoningNormal: "普通思考",

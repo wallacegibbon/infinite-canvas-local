@@ -20,7 +20,7 @@ import { CanvasTextSettingsPopover } from "./canvas-text-settings-popover";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { resolveCanvasReferenceImages } from "@/lib/canvas/canvas-resource-references";
-import { requestAgentStream } from "@/services/api/agent";
+import { requestAgentConnect, requestAgentStream } from "@/services/api/agent";
 import type { PromptOptimizeMode } from "@/services/api/prompts";
 import { videoModelForWorkflow, videoModelModePatch, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasNodeReferenceBar } from "./canvas-node-reference-bar";
@@ -118,6 +118,8 @@ export function CanvasNodePromptPanel({
               }
             : null;
     const promptImageReferences = sourceImageReference ? [sourceImageReference, ...imageReferences.filter((reference) => reference.nodeId !== node.id)] : imageReferences;
+    const agentSession = useConfigStore((state) => state.agentSession);
+    const [connecting, setConnecting] = useState(false);
     const optimizeStatus = node.metadata?.promptOptimizeStatus;
     const optimizeRunning = optimizeStatus === "running";
     const optimizeResult = node.metadata?.promptOptimizePrompt || "";
@@ -256,6 +258,18 @@ export function CanvasNodePromptPanel({
     // ✨ starts immediately: there is nothing to configure first — the agent has its own model and
     // its own skills, and the instruction below is all this button has to say.
     const startOptimize = (run: () => void) => void run();
+
+    // The first click starts an agent so its model list can be shown; the next asks the question.
+    const connectAgent = async () => {
+        setConnecting(true);
+        try {
+            await requestAgentConnect(config);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
+        } finally {
+            setConnecting(false);
+        }
+    };
 
     const optimizePrompt = async () => {
         const text = draft.trim();
@@ -538,22 +552,20 @@ export function CanvasNodePromptPanel({
                 ) : null}
                 <Button
                     type="primary"
-                    className={`${mode === "text" ? "" : "ml-auto"} !h-10 shrink-0 !rounded-full ${isRunning ? "!min-w-10 !px-2" : "!min-w-16 !px-3"}`}
+                    className={`${mode === "text" ? "" : "ml-auto"} !h-10 shrink-0 !rounded-full ${isRunning || connecting ? "!min-w-10 !px-2" : "!min-w-16 !px-3"}`}
                     danger={isRunning}
-                    disabled={!isRunning && !draft.trim()}
+                    disabled={!isRunning && !connecting && (mode === "text" && !agentSession ? false : !draft.trim())}
                     title={isRunning ? t("canvas.promptPanel.stop") : undefined}
-                    onClick={() => (isRunning ? onStop(node.id) : submit())}
-                    aria-label={t(isRunning ? "canvas.promptPanel.stop" : "canvas.promptPanel.generate")}
+                    onClick={() => {
+                        if (isRunning) return onStop(node.id);
+                        // Text: the first click starts an agent (so the model list appears), the next asks.
+                        if (mode === "text" && !agentSession) return void connectAgent();
+                        submit();
+                    }}
+                    aria-label={t(isRunning ? "canvas.promptPanel.stop" : mode === "text" && !agentSession ? "canvas.agent.connect" : "canvas.promptPanel.generate")}
                 >
                     <span className="flex items-center gap-1.5">
-                        {isRunning ? (
-                            <>
-                                <LoaderCircle className="size-4 animate-spin" />
-                                <Square className="size-3.5 fill-current" />
-                            </>
-                        ) : (
-                            <ArrowUp className="size-4" />
-                        )}
+                        {isRunning || connecting ? <LoaderCircle className="size-4 animate-spin" /> : mode === "text" && !agentSession ? <span className="text-xs">{t("canvas.agent.connect")}</span> : <ArrowUp className="size-4" />}
                     </span>
                 </Button>
             </div>

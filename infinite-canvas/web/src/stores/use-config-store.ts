@@ -139,10 +139,15 @@ export const defaultConfig: AiConfig = {
 export type AgentModel = { id: number; name: string; protocolType?: string; contextLimit?: number };
 type AgentState = { models: AgentModel[]; active?: AgentModel; level?: number; coreVersion?: string };
 
+/** A connected agent waiting for its one prompt. The gateway keeps the process; this names it. */
+type AgentSession = string | null;
+
 type ConfigStore = {
     config: AiConfig;
     agent: AgentState;
     updateAgent: (patch: Partial<AgentState>) => void;
+    agentSession: AgentSession;
+    setAgentSession: (session: AgentSession) => void;
     isConfigOpen: boolean;
     configTab: ConfigTabKey;
     shouldPromptContinue: boolean;
@@ -269,6 +274,8 @@ export const useConfigStore = create<ConfigStore>()(
             config: defaultConfig,
             agent: { models: [] },
             updateAgent: (patch) => set((state) => ({ agent: { ...state.agent, ...patch } })),
+            agentSession: null,
+            setAgentSession: (agentSession) => set({ agentSession }),
             isConfigOpen: false,
             configTab: "channels",
             shouldPromptContinue: false,

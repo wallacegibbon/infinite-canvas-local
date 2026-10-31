@@ -838,6 +838,9 @@ export default {
             interact: "Interact",
         },
         agent: {
+            connect: "Connect",
+            connecting: "Connecting…",
+            connectFailed: "Could not connect to the agent",
             noModel: "No model yet — run it once",
             reasoningOff: "No thinking",
             reasoningNormal: "Normal",

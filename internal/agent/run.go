@@ -26,11 +26,41 @@ type Request struct {
 // sentence, and the answer ends where the agent's task ends. It only decides when to stop reading.
 func Run(ctx context.Context, opts SpawnOptions, req Request, emit func(Event)) error {
 	return withAgent(ctx, opts, func(proc *Process, state *startup, emit func(Event)) error {
+		return converse(ctx, proc, state, req, emit, false)
+	}, emit)
+}
+
+// Continue runs a request on a process a connect already started, and releases it when the answer
+// ends: the send button owns that process from here on.
+func Continue(ctx context.Context, proc *Process, state startup, req Request, emit func(Event)) error {
+	defer proc.Release()
+	// The list the connect already showed is re-emitted so a client that reconnected mid-flow still
+	// renders it; it is the same startup broadcast.
+	emit(state.event())
+	stopped := make(chan struct{})
+	defer close(stopped)
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = proc.Write(TagCmdInput, `{"command_id":"cancel","name":"cancel"}`)
+		case <-stopped:
+		}
+	}()
+	return converse(ctx, proc, &state, req, emit, true)
+}
+
+// converse is the loop both paths share: the choices and the prompt go out, the agent's frames come
+// back, and the answer ends where the agent says the task ended.
+//
+// `ready` is the one thing they differ on: a freshly spawned agent still has to announce that it
+// accepts input, while a connected one already did before the connect response was written.
+func converse(ctx context.Context, proc *Process, state *startup, req Request, emit func(Event), ready bool) error {
+	{
 		started := time.Now()
 		var answer strings.Builder
 		hasPrompt := strings.TrimSpace(req.Prompt) != "" || len(req.Images) > 0
 
-		if err := waitReady(proc, state, emit, func() error {
+		send := func() error {
 			if req.Command != "" {
 				payload, err := json.Marshal(map[string]any{"command_id": commandID, "name": req.Command, "args": req.Args})
 				if err != nil {
@@ -44,7 +74,12 @@ func Run(ctx context.Context, opts SpawnOptions, req Request, emit func(Event)) 
 				return sendPrompt(proc, req)
 			}
 			return nil
-		}); err != nil {
+		}
+		if ready {
+			if err := send(); err != nil {
+				return err
+			}
+		} else if err := waitReady(proc, state, emit, send); err != nil {
 			return err
 		}
 
@@ -100,7 +135,7 @@ func Run(ctx context.Context, opts SpawnOptions, req Request, emit func(Event)) 
 				}
 			}
 		}
-	}, emit)
+	}
 }
 
 // commandID tags the command this request carries, so its CO is told apart from anything else.

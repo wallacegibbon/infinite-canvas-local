@@ -1,13 +1,15 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { Image as ImageIcon, LoaderCircle, MessageSquare, Play, Settings2, Square, Video } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/kit/button";
+import { toast } from "@/components/kit/toast";
 import { Segmented } from "@/components/kit/segmented";
 import { BaseModelPicker, WorkflowModelPicker } from "@/components/model-picker";
 import { defaultConfig, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 
+import { requestAgentConnect } from "@/services/api/agent";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { videoModelForWorkflow, videoModelModePatch, videoWorkflowId, isNoVdnWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -34,10 +36,23 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
     const { t } = useTranslation();
     const globalConfig = useEffectiveConfig();
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+    const agentSession = useConfigStore((state) => state.agentSession);
+    const [connecting, setConnecting] = useState(false);
     const theme = useCanvasTheme();
     const mode = node.metadata?.generationMode || "image";
     const config = buildNodeConfig(globalConfig, node, mode);
     const chipStyle = { background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text };
+    // The first click starts an agent so its model list can be shown; the second asks the question.
+    const connectAgent = async () => {
+        setConnecting(true);
+        try {
+            await requestAgentConnect(config);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
+        } finally {
+            setConnecting(false);
+        }
+    };
     const frameMode: "first" | "last" | "both" = node.metadata?.frameMode === "last" || node.metadata?.frameMode === "both" || node.metadata?.frameMode === "first" ? node.metadata.frameMode : inputSummary.imageCount >= 2 ? "both" : "first";
     const changeVideoMode = (value: "text" | "frames" | "reference") => {
         const baseId = value === "reference" ? "video-h3-ref2va" : value === "frames" ? "video-h3-frames" : "video-h3-t2v";
@@ -167,21 +182,26 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
                 type="primary"
                 className="mt-auto !h-9 !w-full !cursor-pointer !rounded-lg"
                 danger={isRunning}
-                disabled={!isRunning && !canGenerate}
+                disabled={!isRunning && !canGenerate && !(mode === "text" && !agentSession)}
                 onMouseDown={(event) => event.stopPropagation()}
-                onClick={() => (isRunning ? onStop(node.id) : onGenerate(node.id))}
+                onClick={() => {
+                    if (isRunning) return onStop(node.id);
+                    // Text is answered by an agent, so the first click starts one and the second asks.
+                    if (mode === "text" && !agentSession) return void connectAgent();
+                    onGenerate(node.id);
+                }}
             >
                 <span className="inline-flex items-center gap-1.5">
-                    {isRunning ? (
+                    {isRunning || connecting ? (
                         <>
                             <LoaderCircle className="size-4 animate-spin" />
-                            <Square className="size-3.5 fill-current" />
-                            <span>{t("canvas.configNode.stop")}</span>
+                            {isRunning ? <Square className="size-3.5 fill-current" /> : null}
+                            <span>{t(isRunning ? "canvas.configNode.stop" : "canvas.agent.connecting")}</span>
                         </>
                     ) : (
                         <>
                             <Play className="size-4" />
-                            <span>{t("canvas.configNode.generate")}</span>
+                            <span>{t(mode === "text" && !agentSession ? "canvas.agent.connect" : "canvas.configNode.generate")}</span>
                         </>
                     )}
                 </span>

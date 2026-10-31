@@ -24,7 +24,7 @@ func testCore(t *testing.T) string {
 }
 
 // readStartup reads frames until the session reports ready, returning the system messages it saw.
-func readStartup(t *testing.T, proc *Process) []map[string]any {
+func collectStartup(t *testing.T, proc *Process) []map[string]any {
 	t.Helper()
 	var messages []map[string]any
 	for {
@@ -59,7 +59,7 @@ func TestSpawnStartsTheAgentAndReportsItsModel(t *testing.T) {
 	}
 	defer proc.Release()
 
-	messages := readStartup(t, proc)
+	messages := collectStartup(t, proc)
 
 	var version, model map[string]any
 	for _, message := range messages {

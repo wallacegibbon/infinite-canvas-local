@@ -17,7 +17,9 @@ import (
 // one route and one stream: what the request carries is written to the agent, and what the agent says
 // comes back. The old `/api/prompts/*` recipes are untouched and keep running for now.
 func (s *Server) routesAgent(mux *http.ServeMux) {
+	s.route(mux, "POST /api/agent/connect", s.handleAgentConnect)
 	s.route(mux, "POST /api/agent/chat", s.handleAgentChat)
+	s.route(mux, "DELETE /api/agent/session/{id}", s.handleAgentDisconnect)
 }
 
 // agentOptions is what every spawn needs. The wording (skills) and the tools are passed through from
@@ -32,6 +34,29 @@ func (s *Server) agentOptions() agent.SpawnOptions {
 	}
 }
 
+// handleAgentConnect implements POST /api/agent/connect: start an agent and keep it, so the canvas can
+// show the model list before anyone asks a question.
+//
+// The response is the agent's own startup broadcast. The process stays until the prompt that follows
+// (or an idle timeout, or an explicit disconnect) releases it.
+func (s *Server) handleAgentConnect(ctx *httpx.Ctx) error {
+	started := time.Now()
+	session, err := s.agentSessions.Connect(ctx.R.Context(), s.agentOptions())
+	if err != nil {
+		s.logger.Warn("agent: connect failed after %dms: %v", time.Since(started).Milliseconds(), err)
+		return httpx.NewError(http.StatusBadGateway, "agent_unavailable", err.Error())
+	}
+	okJSON(ctx.W, map[string]any{"sessionId": session.ID, "state": session.State()})
+	return nil
+}
+
+// handleAgentDisconnect releases a session the client walked away from.
+func (s *Server) handleAgentDisconnect(ctx *httpx.Ctx) error {
+	s.agentSessions.Close(ctx.R.PathValue("id"), "disconnect")
+	okJSON(ctx.W, map[string]any{})
+	return nil
+}
+
 // handleAgentChat implements POST /api/agent/chat.
 //
 // The body is whatever should be written to the agent: `command`/`args` for a setting change,
@@ -43,6 +68,7 @@ func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 		return err
 	}
 	files := orderedPromptImages(ctx.Files())
+	sessionID := httpx.String(body, "session")
 	request := agent.Request{
 		Prompt:  httpx.String(body, "prompt"),
 		Images:  promptImageURLs(files),
@@ -52,12 +78,32 @@ func (s *Server) handleAgentChat(ctx *httpx.Ctx) error {
 	started := time.Now()
 	s.logger.Info("agent: request command=%q args=%q prompt=%q images=%d", request.Command, request.Args, truncateText(request.Prompt, 120), len(files))
 
+	// The send half of the connect/send button takes the process a connect left behind. A session that
+	// is gone has to be answered before the stream starts: once the headers are out, an error can only
+	// be a broken event.
+	var proc *agent.Process
+	connected := false
+	var state agent.Startup
+	if sessionID != "" {
+		proc, state, connected = s.agentSessions.Take(sessionID)
+		if !connected {
+			s.logger.Warn("agent: session %s is not connected", sessionID)
+			return httpx.NewError(http.StatusConflict, "session_not_connected", "this agent session is no longer connected")
+		}
+	}
+
 	emit := startEventStream(ctx.W)
 	counts := map[string]int{}
-	err = agent.Run(ctx.R.Context(), s.agentOptions(), request, func(event agent.Event) {
+	relay := func(event agent.Event) {
 		counts[event.Type]++
 		emit(event)
-	})
+	}
+	if connected {
+		err = agent.Continue(ctx.R.Context(), proc, state, request, relay)
+		s.logger.Info("agent: session=%s answered and released", sessionID)
+	} else {
+		err = agent.Run(ctx.R.Context(), s.agentOptions(), request, relay)
+	}
 	if err != nil {
 		s.logger.Warn("agent: request failed after %dms: %v", time.Since(started).Milliseconds(), err)
 		return err
