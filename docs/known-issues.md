@@ -59,15 +59,7 @@ to the dialog's cancel button in `onPointerDown` of the trigger. Not done: both 
 
 ---
 
-## 4. `ComfyUI-MiniMaxH3-TimelineDirector` is unaccounted for
-
-The directory exists in ComfyUI's `custom_nodes`, but no resource in `resources.json` references it
-(0 matches), so the panel neither installs nor removes it and its origin is unverified. Either add it to the
-index or leave a note about where it came from.
-
----
-
-## 5. Narrower test coverage than it looks: `internal/logx` has no test
+## 4. Narrower test coverage than it looks: `internal/logx` has no test
 
 `internal/logx` has no `_test.go`: it formats a timestamp, a level and a message, and nothing else in the
 package is worth a test. It is covered indirectly (every other test's output goes through it), which is
@@ -78,7 +70,7 @@ direct tests now (`paths_test.go`, `scan_test.go`, `sysinfo_test.go`).
 
 ---
 
-## 6. A few strings stay Chinese in the source, on purpose — and they are data, not copy
+## 5. A few strings stay Chinese in the source, on purpose — and they are data, not copy
 
 Every string of *UI copy* goes through `t()`. What is still written in Chinese in the source is a short
 list, and each line is data the gateway or the agent parses rather than text a user reads:
@@ -109,11 +101,10 @@ not exhaustive.
 
 ---
 
-## 7. Chinese prose remains in the vendored canvas and plugin subtree
+## 6. Chinese prose remains in the canvas plugin subtree
 
-**Where** `canvas/plugins/` — 63 tracked files, 454 Chinese lines: plugin `README.md`s, plugin
-components, the SDK, the build scripts, the `SKILL.md` agent instructions and `packages.json` metadata.
-Plus `canvas/CHANGELOG.md` (265 Chinese lines of release history).
+**Where** `canvas/plugins/` — 55 tracked files, 411 Chinese lines: plugin `README.md`s, plugin components,
+the SDK and the build scripts.
 
 **Why it is listed** [`decisions.md`](decisions.md) #17 requires English for documentation and comments.
 These files came in with the upstream canvas subtree and predate the rule. The READMEs and the ~163
@@ -121,34 +112,13 @@ comment/JSDoc lines describe the plugin API — the part a third-party plugin au
 own UI strings are compiled into `web/public/plugins/*.js`, which the canvas dictionaries cannot translate
 because each plugin ships as a standalone bundle.
 
-**Fix** Translate the comments and READMEs first (mechanical). The plugin UI copy needs a decision before
-code moves: either the plugins grow their own copy table (one per bundle, chosen from the canvas locale) or
-the strings become English only. `CHANGELOG.md` is release history — leave the existing entries as written,
-write new ones in English.
+**Fix** Translate the comments and READMEs first (mechanical). The plugin UI copy needs a decision before code
+moves: either the plugins grow their own copy table (one per bundle, chosen from the canvas locale) or the
+strings become English only.
 
-**Not affected** The `SKILL.md` files (agent input, same reasoning as #9), the LoRA name filter in
+**Not affected** The LoRA name filter in
 `workflows/registry.json` (`mj风格` and friends are patterns matched against real file names),
 `web/src/i18n/locales/zh-CN.ts` and everything under `internal/prompt`.
-
----
-
-## 8. Repository history is larger than the tree (operational)
-
-The tracked tree is small, but the pack file is not: `git count-objects -vH` reports `size-pack` ≈ 15 MiB
-over ~3,200 objects, and most of it is history of files that are no longer here (the upstream vendored
-`web/dist` bundles, a ModelScope zip, a tokenizer directory). Cloning costs that once; nothing else does.
-
-**Fix, if it ever matters** Keep the history and strip those paths:
-
-```bash
-pip install --user git-filter-repo
-git filter-repo --invert-paths \
-  --path canvas/web/dist \
-  --path-glob '*/T5_tokenizer/*'
-```
-
-Deleting `.git` and re-initialising also works, but loses the history that documents why the code looks
-the way it does.
 
 ---
 

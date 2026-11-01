@@ -277,11 +277,11 @@ audience that reads English. Writing the rule down is the only way to stop the n
 contribution from adding one more.
 
 **Cost** Chinese prose that predates the rule has to be translated (tracked in
-`docs/known-issues.md` #10), and a reviewer has to reject inline copy even when it works in
+`docs/known-issues.md` #6), and a reviewer has to reject inline copy even when it works in
 the current UI language.
 
 **Where** `README.md` (Language), `docs/gateway.md` (Language policy),
-`docs/known-issues.md` #6 and #10, decisions #8 and #9.
+`docs/known-issues.md` #5 and #6, decisions #8 and #9.
 
 ---
 
@@ -4750,3 +4750,39 @@ claims a licence file says something it does not is worse than one that says not
 holds — a Chinese check over the file returns the one pre-existing protocol example.
 
 **Where** `README.md`, `canvas/LICENSE`, `docs/decisions.md`.
+
+## 142. The third-party agent plugin goes, and the browser keys stay
+
+**Decision** `canvas/plugins/infinite-canvas/` is deleted. The browser storage keys and the export marker keep the
+old name. `docs/known-issues.md` loses two entries: the `ComfyUI-MiniMaxH3-TimelineDirector` note (that node is
+somebody else's install, not this project's business) and the history-size note (the purge it described is done).
+
+**Why the plugin goes** It is a manifest for **Codex and ZCode**, not for this application: `.codex-plugin/` and
+`.zcode-plugin/` declare a marketplace entry, and `.mcp.json` runs `npx -y @basketikun/canvas-agent@latest mcp` —
+someone else's npm package as the MCP server. Nothing in this repository loads it: the canvas reads
+`/plugins/index.json`, which is built from `canvas/web/public/plugins/`, and a grep for `canvas-agent`,
+`marketplace.json` and `plugins/infinite-canvas` across the tree returns only the plugin itself and this log.
+
+**What replaced it** This project has its own agent, and it does not need a plugin to reach the canvas. AlayaCore is
+spawned per request (`internal/agent`), and the gateway is its **MCP server**: `POST /mcp/{workspace}` answers
+`tools/list` and `tools/call`, routes each call down the browser socket, and advertises one workspace per session
+(#… "the agent's hands"). Keeping the upstream plugin would mean shipping a second, unmaintained vocabulary that
+calls a package we do not build — the canvas would have two agents with two ideas about how to touch it.
+
+**Why the browser keys stay, again** `infinite-canvas:canvas_store`, `:asset_store`, `:ai_config_store`,
+`:plugin_store`, `:theme_store`, `:locale`, the localforage databases `infinite-canvas` / `infinite-canvas-plugins`,
+and `app: "infinite-canvas"` inside export files are **addresses, not labels**: they are where the browser and the
+importers find data that already exists. Renaming them without a migration means the app opens empty — every
+canvas, asset, setting, theme and language reset — and every previously exported file refuses to import. Nothing
+the user sees is affected by leaving them, which is why they were left (#140).
+
+**What a rename would cost, if it is ever wanted** A startup shim: read the old key, write the new one, keep
+reading the old one as a fallback for a release. IndexedDB is the hard half — the records have to be copied
+database to database, and a half-finished copy is a half-empty app. The export marker needs the importer to accept
+both values forever, because exported files outlive the app.
+
+**Tested** `go test ./internal/...`, `tsc --noEmit`, 134 canvas tests, `git status` clean. The plugin's 63 files
+leave no dangling reference: `canvas/plugins/` still builds its five official plugins, and the Chinese-prose entry
+in `known-issues.md` was re-measured (55 files, 411 lines).
+
+**Where** `canvas/plugins/infinite-canvas/` (deleted), `docs/known-issues.md`, `docs/decisions.md`, `README.md`.

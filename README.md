@@ -84,7 +84,7 @@ are data or user-facing copy rather than prose:
 
 The reasoning and the exact exceptions: [`docs/decisions.md`](docs/decisions.md) #8, #9, #17, #20.
 Chinese prose that still predates the rule is listed in
-[`docs/known-issues.md`](docs/known-issues.md) #10.
+[`docs/known-issues.md`](docs/known-issues.md) #6.
 
 ## Quick start
 
