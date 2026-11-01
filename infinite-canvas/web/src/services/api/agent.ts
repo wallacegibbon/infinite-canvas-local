@@ -251,7 +251,7 @@ export function sendAgentMessage(name: string, message: AgentMessage): boolean {
  * This is what a rewrite, a caption and a text node's body all are: one question on the session the
  * surface already has. Nothing here opens a second connection or a second process.
  */
-export async function askAgentSession(name: string, request: { prompt: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
+async function askAgentSession(name: string, request: { prompt: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
     const live = sessions.get(name);
     if (!live || live.socket.readyState !== WebSocket.OPEN) throw new Error(apiText("requestFailed"));
 
@@ -283,6 +283,21 @@ export async function askAgentSession(name: string, request: { prompt: string; i
     }
 }
 
+/**
+ * Ask one question on a session that exists for that answer alone, and release the agent afterwards.
+ *
+ * This is what a node panel's agent is: connect starts it, the model is chosen on it, one answer comes
+ * back, and it is gone. Asking again means pressing connect again — which is honest, because a second
+ * answer would otherwise be a second turn in a conversation nobody asked to continue.
+ */
+export async function askOnceAgentSession(name: string, request: { prompt: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
+    try {
+        return await askAgentSession(name, request, options);
+    } finally {
+        endAgentSession(name);
+    }
+}
+
 /** Stop the answer being written. The session keeps its history. */
 export function cancelAgentSession(name: string): void {
     sendAgentMessage(name, { cancel: true });
@@ -309,4 +324,3 @@ export function endAgentSession(name: string): void {
     // session cannot be mistaken for a live one.
     setTimeout(() => closeAgentSession(name), 1000);
 }
-

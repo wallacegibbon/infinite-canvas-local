@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Image as ImageIcon, LoaderCircle, MessageSquare, Play, Settings2, Square, Video } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
@@ -9,7 +9,7 @@ import { Segmented } from "@/components/kit/segmented";
 import { BaseModelPicker, WorkflowModelPicker } from "@/components/model-picker";
 import { defaultConfig, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 
-import { endAgentSession, nodeAgent, openAgentSession } from "@/services/api/agent";
+import { agentSession, endAgentSession, nodeAgent, openAgentSession, subscribeAgentSessions } from "@/services/api/agent";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { videoModelForWorkflow, videoModelModePatch, videoWorkflowId, isNoVdnWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -38,10 +38,10 @@ export function CanvasConfigNodePanel({ node, canvasId, isRunning, inputSummary,
     const { t } = useTranslation();
     const globalConfig = useEffectiveConfig();
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
-    // This panel's own agent, like a text node's: connecting starts it, and the panel going away
-    // releases it.
+    // This panel's own agent, like a text node's: connecting starts it, the answer releases it, and the
+    // button follows the session rather than a flag beside it.
     const agentName = nodeAgent(node.id);
-    const [agentConnected, setAgentConnected] = useState(false);
+    const agentConnected = useSyncExternalStore(subscribeAgentSessions, () => agentSession(agentName).connected);
     const [connecting, setConnecting] = useState(false);
     const theme = useCanvasTheme();
     const mode = node.metadata?.generationMode || "image";
@@ -52,7 +52,6 @@ export function CanvasConfigNodePanel({ node, canvasId, isRunning, inputSummary,
         setConnecting(true);
         try {
             await openAgentSession(config, agentName);
-            setAgentConnected(true);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
         } finally {

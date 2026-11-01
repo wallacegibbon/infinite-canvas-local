@@ -2884,8 +2884,9 @@ canvas panel's is `canvas`, a node panel's is `node:<id>`. A session is created 
 that panel, announces its own model list, is told which model it is on, and answers on it. Nothing about
 a session is stored in the application: `agentSession` and the `agent` blob are gone from the config
 store, and there is no per-node model field either. The canvas panel's session lives until it is closed;
-a node panel's is released when the panel goes away. `GET /api/agent/once` is deleted with the last of
-the nameless one-question processes.
+a node panel's is released **the moment its answer ends** — not when the panel closes — and asking again
+means pressing connect again, which is what makes one panel one turn. `GET /api/agent/once` is deleted
+with the last of the nameless one-question processes.
 
 **Why** The application had been keeping a mirror of state the agent already owns — which models exist,
 which one is in effect, how hard it is thinking — in a single global slot. One slot for many processes
@@ -2896,8 +2897,9 @@ for one fact. A session's own process is the owner, and the client only ever rea
 **Why this is the simple shape, not the big one** The processes are small and there can be as many as
 there are panels open. Refusing to start one per panel is what produced the shared slot in the first
 place; the alternative — one agent shared by every node — is not cheaper, it is a different and wrong
-product. A node that is not being worked on holds no process, and the canvas's own agent is the one thing
-that outlives its socket, because the user asked for that.
+product. A node holds no process between answers — the release is part of the answer, so nothing at all is
+running for a node nobody is asking. The canvas's own agent is the one thing that outlives its socket,
+because the user asked for that.
 
 **What it fixes** Pressing connect on a second node now shows connect, because that node has asked
 nothing of anyone yet; the model select in each panel shows *that session's* model; and text generation
@@ -2906,5 +2908,7 @@ asks the session of the node whose button was pressed, not a new node's name.
 **Tested** In a browser against a real AlayaCore: two config nodes in text mode, the first connected
 (`socket open session=node:config-1793445940295-nk65u spawned=true`, model list shown, button became
 send) while the second still read 未连接 / 连接; pressing send on the first logged
-`socket in session=node:config-…` and the answer landed in a new text node. The client tests hold the
+`socket in session=node:config-…`, the answer landed in a new text node, and the gateway logged
+`released session=node:config-… reason=close` with the button back to 连接 and no `alayacore` process
+left running. The client tests hold the
 other half: a session's model does not leak into another's, and asking for words opens no second socket.

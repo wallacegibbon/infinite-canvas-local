@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowUp, ChevronRight, LoaderCircle, Maximize2, ScanText, Sparkles, Square, X } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
@@ -20,7 +20,7 @@ import { SentPromptDisclosure } from "./sent-prompt-disclosure";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { resolveCanvasReferenceImages } from "@/lib/canvas/canvas-resource-references";
-import { askAgentSession, endAgentSession, nodeAgent, openAgentSession } from "@/services/api/agent";
+import { askOnceAgentSession, agentSession, endAgentSession, nodeAgent, openAgentSession, subscribeAgentSessions } from "@/services/api/agent";
 import type { PromptOptimizeMode } from "@/services/api/prompts";
 import { videoModelForWorkflow, videoModelModePatch, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasNodeReferenceBar } from "./canvas-node-reference-bar";
@@ -111,7 +111,9 @@ export function CanvasNodePromptPanel({
     // This panel's own agent. Connecting starts it; the panel going away releases it, so a node that is
     // not being worked on holds no process at all.
     const agentName = nodeAgent(node.id);
-    const [agentConnected, setAgentConnected] = useState(false);
+    // The button reflects the session, not a flag beside it: this panel is connected exactly while its
+    // agent is alive, and the agent is released when the answer ends.
+    const agentConnected = useSyncExternalStore(subscribeAgentSessions, () => agentSession(agentName).connected);
     const [connecting, setConnecting] = useState(false);
     const optimizeStatus = node.metadata?.promptOptimizeStatus;
     const optimizeRunning = optimizeStatus === "running";
@@ -271,7 +273,6 @@ export function CanvasNodePromptPanel({
         setConnecting(true);
         try {
             await openAgentSession(config, agentName);
-            setAgentConnected(true);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
         } finally {
@@ -291,7 +292,7 @@ export function CanvasNodePromptPanel({
             const images = defaults.selectedRefs.length ? await resolveCanvasReferenceImages(defaults.selectedRefs, nodes) : [];
             const note = defaults.referenceNote ? `\n参考素材说明：${defaults.referenceNote}` : "";
             const instruction = `把下面这段需求改写成一条 MiniMax H3 视频生成提示词。任务类型：${defaults.taskType}；时长：${defaults.duration} 秒；输出语言：${optimizeLanguage === "en" ? "英文" : "中文"}。${note}\n\n${text}`;
-            const result = await askAgentSession(
+            const result = await askOnceAgentSession(
                 agentName,
                 { prompt: instruction, images },
                 {
@@ -320,7 +321,7 @@ export function CanvasNodePromptPanel({
         onConfigChange(node.id, { promptOptimizeStatus: "running", promptOptimizeKind: "image", promptOptimizeSource: text, promptOptimizePrompt: undefined, promptOptimizeError: undefined });
         try {
             const instruction = `把下面这段需求改写为一条可直接用于生图模型的提示词，只输出提示词本身。输出语言：${optimizeLanguage === "en" ? "英文" : "中文"}。${selectedRefs.length ? `参考图片 ${selectedRefs.length} 张。` : ""}\n\n${text}`;
-            const result = await askAgentSession(
+            const result = await askOnceAgentSession(
                 agentName,
                 { prompt: instruction },
                 {
@@ -372,7 +373,7 @@ export function CanvasNodePromptPanel({
         try {
             const images = await resolveCanvasReferenceImages(imageReferences.slice(0, 1), nodes);
             if (!images.length) throw new Error(t("canvas.promptPanel.captionNoImage"));
-            const result = await askAgentSession(
+            const result = await askOnceAgentSession(
                 agentName,
                 { prompt: "用一段话描述这张图片，输出可以直接当作生图提示词的描述，只输出描述本身。", images },
                 {

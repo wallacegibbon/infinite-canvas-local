@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, type Dispatch, type MutableRefObject, 
 import { useTranslation } from "react-i18next";
 
 import { requestEdit, requestGeneration } from "@/services/api/image";
-import { endAgentSession } from "@/services/api/agent";
 import { requestPromptChat } from "@/services/api/prompts";
 import { resolveMediaUrl } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
@@ -86,12 +85,8 @@ export function usePluginHost(params: PluginHostParams) {
                 // the same mechanism, with the shortest lifetime there is.
                 const name = `plugin:${Math.random().toString(36).slice(2, 10)}`;
                 const config = buildGenerationConfig(effectiveConfig, undefined, "text");
-                try {
-                    const text = await requestPromptChat(name, config, { prompt }, { signal: options?.signal, onDelta: options?.onDelta });
-                    return { text };
-                } finally {
-                    endAgentSession(name);
-                }
+                const text = await requestPromptChat(name, config, { prompt }, { signal: options?.signal, onDelta: options?.onDelta });
+                return { text };
             },
             // List configured models for a capability; labels use the model name without the channel prefix.
             listModels: (capability) => selectableModelsByCapability(effectiveConfig, capability as ModelCapability | undefined).map((value) => ({ value, label: decodeChannelModel(value)?.model || value })),

@@ -11,7 +11,7 @@ vi.mock("@/i18n", () => ({ default: { t: (key: string) => key } }));
 vi.mock("@/services/api/gateway-status", () => ({ noteGatewayError: () => undefined }));
 vi.mock("@/services/image-storage", () => ({ imageToDataUrl: async () => "data:image/png;base64,AAAA" }));
 
-const { openAgentSession, agentSession, endAgentSession } = await import("@/services/api/agent");
+const { openAgentSession, agentSession } = await import("@/services/api/agent");
 const { requestPromptChat } = await import("@/services/api/prompts");
 type Config = Parameters<typeof openAgentSession>[0];
 
@@ -159,9 +159,19 @@ describe("agent sessions", () => {
         expect(second.url).toContain("/api/agent/socket/node%3Asix");
     });
 
-    it("releases the session on request, by asking the agent to end it", async () => {
+    it("releases the agent when the answer ends", async () => {
         const socket = await connectedSession("node:seven");
-        endAgentSession("node:seven");
+
+        const pending = requestPromptChat("node:seven", config(), { prompt: "hi" });
+        await settle();
+        socket.emit({ type: "delta", text: "ok" });
+        socket.emit({ type: "done" });
+        await pending;
+
+        // The session existed for that one answer: its release is the last thing said on it, and the
+        // gateway closes the socket in reply — which is what puts the panel back to "connect".
         expect(socket.lastSent().close).toBe(true);
+        socket.onclose?.();
+        expect(agentSession("node:seven").connected).toBe(false);
     });
 });
