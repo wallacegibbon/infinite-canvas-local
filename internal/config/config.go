@@ -49,7 +49,6 @@ type Config struct {
 	TaskRetentionDays int
 	MaxStoredTasks    int
 	CleanupIntervalMs int
-	SessionStaleSec   int
 
 	// The agent. Its own config directory holds model.conf and the skills the user installs; the
 	// gateway names it and never reads or writes it. An empty AgentBin means "find it" (see
@@ -132,7 +131,6 @@ func Load(opts ...Option) (*Config, error) {
 		TaskRetentionDays:   countValue(os.Getenv("TASK_RETENTION_DAYS")),
 		MaxStoredTasks:      countValue(os.Getenv("MAX_STORED_TASKS")),
 		CleanupIntervalMs:   intValue(os.Getenv("CLEANUP_INTERVAL_MS"), 60*60*1000),
-		SessionStaleSec:     intValue(os.Getenv("SESSION_STALE_SEC"), 120),
 		MaxUploadBytes:      int64(intValue(os.Getenv("MAX_UPLOAD_BYTES"), 50*1024*1024)),
 		MaxWorkflowBytes:    int64(intValue(os.Getenv("MAX_WORKFLOW_BYTES"), 5*1024*1024)),
 		MaxImageCount:       intValue(os.Getenv("MAX_IMAGE_COUNT"), 15),

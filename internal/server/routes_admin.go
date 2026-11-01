@@ -9,7 +9,6 @@ import (
 
 	"comfyui-gateway/internal/config"
 	"comfyui-gateway/internal/httpx"
-	"comfyui-gateway/internal/store"
 	"comfyui-gateway/internal/sysinfo"
 	"comfyui-gateway/internal/util"
 	"comfyui-gateway/internal/workflow"
@@ -47,9 +46,6 @@ func (s *Server) routesAdmin(mux *http.ServeMux) {
 	s.route(mux, "GET /api/system/stats", s.handleSystemStats)
 	s.route(mux, "POST /api/system/free-memory", s.handleFreeMemory)
 
-	s.route(mux, "POST /api/session/open", s.handleSessionTouch)
-	s.route(mux, "POST /api/session/heartbeat", s.handleSessionTouch)
-	s.route(mux, "POST /api/session/close", s.handleSessionClose)
 }
 
 // handleHealth implements GET /health, the canvas's liveness probe.
@@ -419,44 +415,6 @@ func (s *Server) handleFreeMemory(ctx *httpx.Ctx) error {
 		"durationMs":    time.Since(started).Milliseconds(),
 	})
 	return nil
-}
-
-// handleSessionTouch implements open/heartbeat.
-func (s *Server) handleSessionTouch(ctx *httpx.Ctx) error {
-	body, err := bodyOrEmpty(ctx)
-	if err != nil {
-		return err
-	}
-	status := s.sessions.Touch(httpx.String(body, "id"))
-	okJSON(ctx.W, sessionPayload(status))
-	return nil
-}
-
-// handleSessionClose implements POST /api/session/close.
-func (s *Server) handleSessionClose(ctx *httpx.Ctx) error {
-	body, err := bodyOrEmpty(ctx)
-	if err != nil {
-		return err
-	}
-	status := s.sessions.Close(httpx.String(body, "id"))
-	okJSON(ctx.W, sessionPayload(status))
-	return nil
-}
-
-// sessionPayload renders a session snapshot without relying on struct tags.
-func sessionPayload(status store.SessionStatus) map[string]any {
-	payload := map[string]any{
-		"count":     status.Count,
-		"seen":      status.Seen,
-		"idleMs":    status.IdleMs,
-		"staleMs":   status.StaleMs,
-		"startedAt": status.StartedAt,
-		"closedAt":  status.ClosedAt,
-	}
-	if status.LastSeenAt != nil {
-		payload["lastSeenAt"] = *status.LastSeenAt
-	}
-	return payload
 }
 
 // comfyHostStats asks ComfyUI about its own machine. Nil means it did not answer usefully.

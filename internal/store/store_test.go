@@ -4,50 +4,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"comfyui-gateway/internal/logx"
 )
 
 func quietLogger() *logx.Logger { return logx.NewWithWriter("test", os.Stderr) }
-
-func TestSessionsTrackAndExpire(t *testing.T) {
-	sessions := NewSessions(30 * time.Millisecond)
-
-	status := sessions.Touch("tab-1")
-	if status.Count != 1 || !status.Seen {
-		t.Fatalf("after touch: %+v", status)
-	}
-	if status.LastSeenAt == nil {
-		t.Error("lastSeenAt should be set")
-	}
-
-	// Two tabs, then one closes.
-	sessions.Touch("tab-2")
-	if got := sessions.Status().Count; got != 2 {
-		t.Errorf("count = %d, want 2", got)
-	}
-	if got := sessions.Close("tab-2").Count; got != 1 {
-		t.Errorf("count after close = %d, want 1", got)
-	}
-
-	// Idle beyond the stale window: the heartbeat-less tab is dropped.
-	time.Sleep(60 * time.Millisecond)
-	expired := sessions.Status()
-	if expired.Count != 0 {
-		t.Errorf("count = %d, want 0 after the stale window", expired.Count)
-	}
-	if expired.IdleMs < 0 {
-		t.Errorf("idleMs = %d, want non-negative", expired.IdleMs)
-	}
-}
-
-func TestSessionsIgnoreEmptyID(t *testing.T) {
-	sessions := NewSessions(time.Minute)
-	if got := sessions.Touch("  ").Count; got != 0 {
-		t.Errorf("count = %d, an empty id must not create a session", got)
-	}
-}
 
 func TestVisibilityPersists(t *testing.T) {
 	dir := t.TempDir()

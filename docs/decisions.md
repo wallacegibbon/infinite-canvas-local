@@ -3526,15 +3526,13 @@ What each one duplicated, and what answers the same question now:
 | `POST /api/resources/packs/{id}/main-model` | nothing — the panel stopped offering the picker (decisions #37) |
 | `GET`/`DELETE /api/workflows/{id}` | `GET /api/workflows` and `POST /api/workflows/{id}/visibility` |
 | `GET /api/uploads` | upload ids travel in the run that references them |
-| `GET /api/session/status` | nothing; see the cost below |
+| `GET /api/session/status` | nothing — the tracker behind it had no other reader, so it went too (#109) |
 
 **Cost** The main-model override store (`internal/store/preferences.go`) still loads and is still read by
 the registry and the resource status, but after this its write path has no production caller — the panel
 cannot set an override, so "already using a chosen model" can only come from a file edited by hand. Either
 the feature comes back with a picker or the store goes; that is a product decision, not this one (the same
-one #37 left open). The session tracker is now write-only for the same reason: `POST /api/session/*` keeps
-counting heartbeats that `GET /api/session/status` used to report, and nothing reads the count — the next
-step is deleting the tracker, its four (now three) routes and `web/src/lib/local-session.ts` together.
+one #37 left open). The session tracker this route reported went with it — see #109.
 
 **Tested** `make check` and `make test-race`. Each deleted path answers `404 not_found` from the mux's
 catch-all rather than a handler's error, while `/health`, `/api/workflows`, `/api/workflows/{id}/schema`,
@@ -3542,7 +3540,8 @@ catch-all rather than a handler's error, while `/health`, `/api/workflows`, `/ap
 before (the upgrade relaying a real agent's `models` and `history` frames). In a browser against that
 build, the canvas loaded its 42 nodes and the complete request log was `/api/workflows`,
 `/api/resources/status`, `/api/skin-unlocks`, `/api/system/stats` and `/api/session/{open,heartbeat}` —
-every one `200`, and not a single `404`: the client really did not call any of the twelve.
+every one `200`, and not a single `404`: the client really did not call any of the twelve. (Those three
+session posts were the last thing #109 removed; the same page now makes no request to them at all.)
 `TestSetupReportsToolWorkflowProblems` kept its scan assertions and lost the HTTP half that pointed at the
 deleted route; `TestTaskNotFoundShape` went with the route it tested.
 
@@ -3570,3 +3569,46 @@ flushed. One test is new: a detached watcher makes the pump drop events rather t
 **How verified** `make check` and `make test-race`. The ported tests run the live path
 (`Connect` → `Watch` → `Send` → events), so a regression in the translation fails the suite exactly where
 it would fail in a browser.
+
+---
+
+## 109. A presence signal nobody reads is a timer, so it is gone
+
+**Decision** The canvas-tab tracker is deleted whole: `internal/store/sessions.go` (the map, the stale
+window, the idle clock), `Server.sessions`, `POST /api/session/{open,heartbeat,close}`,
+`sessionPayload`, the `SESSION_STALE_SEC` environment variable, `web/src/lib/local-session.ts`, and the
+`startLocalSession()` call in `main.tsx`. Nothing posts a heartbeat any more.
+
+**Why** Every five seconds, per tab, the canvas posted to the gateway, which wrote a timestamp into a map,
+pruned entries older than 120 s, and answered with a snapshot of that map. Nothing read it. The two
+readers it was built for do not exist here: the upstream fork's desktop launcher (which stopped the Node
+backend when the last page closed — the comment in `local-session.ts` says so in as many words) was never
+part of this repository, and the VRAM idea recorded in `store/sessions.go` ("'idle' from 'nobody is
+looking', which governs whether it is safe to free VRAM") was never wired into `POST /api/system/free-memory`
+— that button asks ComfyUI, not the tracker. #107 removed the one route that exposed the map, which
+turned the heartbeat into pure noise traffic; this removes the noise.
+
+**Why a heartbeat at all, for the record** Presence cannot be sent reliably: a tab that is killed, a
+laptop that sleeps and a dropped network all fail to POST "I am leaving". A last-seen timestamp with a TTL
+is the honest way to infer it, and 120 s against a 5 s beat is a sane margin. The mechanism was fine; the
+consumer was missing. If VRAM release ever wants this fact, the run queue already has it — "nothing is
+queued and nothing is running" is a question the gateway can answer about itself, without a browser.
+
+**Cost** With this, nothing in the gateway knows whether a browser is open. Nothing did before either —
+the count was reported to a route nobody called — so the only thing that changes is 17,280 requests a day
+per tab that no longer happen, and a config knob that no longer exists. A deployment that set
+`SESSION_STALE_SEC` can delete the line; the variable is simply ignored now.
+
+**Checked together, as the change asks** Code: the `store` package keeps its other three stores and its
+package comment moved to `preferences.go`, corrected (it used to name "canvas sessions" as one of the
+things the package holds). Tests: the two `TestSessions*` cases went with the type; `config_test.go` no
+longer isolates `SESSION_STALE_SEC`. Frontend: `main.tsx` lost both the import and the call, and
+`check:exports` reports 182 modules instead of 183 with no unused export. Docs: `gateway.md` and
+`protocol.md` never listed the three routes (`/api/session/*` was mentioned once in protocol.md's
+"unchanged" line, already dropped in #107); `README.md`'s endpoint table never had them. Comments that
+described the trackers — the `local-session.ts` header, `store/sessions.go`'s two paragraphs, and the
+inline "Register the canvas session…" — went with their files.
+
+**Tested** `make check`, `make test-race`, `npm run check`, `npx vitest run` (132 cases), and the rebuilt
+bundle in a browser: the canvas loads, and the network log contains no `/api/session/*` request at all
+(where the previous build posted `/api/session/open` and a heartbeat every five seconds).

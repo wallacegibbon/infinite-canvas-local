@@ -34,7 +34,6 @@ type Server struct {
 	comfy      *comfy.Client
 	hub        *generate.Hub
 	runner     *generate.Runner
-	sessions   *store.Sessions
 	skins      *store.Skins
 	visibility *store.Visibility
 	mainModels *store.MainModels
@@ -133,7 +132,6 @@ func New(cfg *config.Config, logger *logx.Logger) (*Server, error) {
 		comfy:         comfyClient,
 		hub:           hub,
 		runner:        generate.NewRunner(comfyClient, hub, logger, cfg.RequestTimeoutMs, cfg.PollIntervalMs),
-		sessions:      store.NewSessions(time.Duration(cfg.SessionStaleSec) * time.Second),
 		skins:         skins,
 		visibility:    visibility,
 		mainModels:    mainModels,

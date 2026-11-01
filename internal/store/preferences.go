@@ -1,3 +1,6 @@
+// Package store holds the gateway's small JSON-backed state: the three user preference files
+// (skins, workflow visibility, main models). Nothing here runs anything; it remembers what the user
+// chose.
 package store
 
 import (
