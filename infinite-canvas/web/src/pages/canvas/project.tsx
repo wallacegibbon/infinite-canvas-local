@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Bot } from "lucide-react";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
@@ -61,6 +62,7 @@ import { AssetPickerModal, type InsertAssetPayload } from "@/components/canvas/a
 import { CanvasAgentPanel } from "@/components/canvas/canvas-agent-panel";
 import { CanvasSidePanel } from "@/components/canvas/canvas-side-panel";
 import { CanvasZoomControls } from "@/components/canvas/canvas-zoom-controls";
+import { useCanvasAgentStore } from "@/stores/canvas/use-canvas-agent-store";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { usePluginHost } from "@/pages/canvas/hooks/use-plugin-host";
 import { holdsResult } from "@/lib/canvas/node-prompt-field";
@@ -231,6 +233,8 @@ function InfiniteCanvasPage() {
     const deleteProjects = useCanvasStore((state) => state.deleteProjects);
     const currentProject = useCanvasStore((state) => state.projects.find((project) => project.id === projectId));
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const agentOpen = useCanvasAgentStore((state) => state.open);
+    const toggleAgent = useCanvasAgentStore((state) => state.toggle);
     const [nodes, setNodes] = useState<CanvasNodeData[]>([]);
     const [connections, setConnections] = useState<CanvasConnection[]>([]);
     const [chatSessions, setChatSessions] = useState<CanvasAssistantSession[]>([]);
@@ -2543,6 +2547,18 @@ function InfiniteCanvasPage() {
                 onInsertAsset={handleAssetInsert}
             />
             <section className="relative min-w-0 flex-1 overflow-hidden">
+                {agentOpen ? null : (
+                    <button
+                        type="button"
+                        data-canvas-overlay=""
+                        onClick={toggleAgent}
+                        aria-label={t("canvas.agent.title")}
+                        className="absolute bottom-4 right-4 z-[95] grid size-12 place-items-center rounded-full border shadow-lg backdrop-blur transition hover:opacity-90"
+                        style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+                    >
+                        <Bot className="size-5" />
+                    </button>
+                )}
                 <CanvasAgentPanel canvasId={projectId} nodes={nodes} onFocusNode={focusNode} onPickNode={pickNodeForAgent} />
                 <CanvasManagerDialog />
                 <AssetsManagerDialog />

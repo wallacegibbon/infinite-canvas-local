@@ -3158,3 +3158,23 @@ to save typing, not to interrupt it.
 **Tested** In a browser: typing "看看 @" then clicking the kettle node left `看看 @a rusty copper kettle on a
 dark  ` in the box, `document.activeElement` a TEXTAREA, and `selectionStart` 37 — the end of what was
 inserted. Escaping a pick left `看看 @ 再看 @` untouched with the caret at 9, still in the box.
+
+## 94. The agent panel is the user's window: it opens from the corner it sits in, and it resizes
+
+**Decision** The button that opens the agent panel is a round button in the canvas's bottom-right corner — where
+the panel itself opens — not one of the small icons in the top bar. The panel can be resized by dragging its
+bottom-right corner, clamped to 320×280 at the least and to the canvas (minus a 16px margin) at the most. The
+size is not persisted, for the same reason the position is not (#83's list of things that are not the canvas's):
+a window's shape belongs to the window. The open button is shown only while the panel is closed, because when it
+is open it covers that corner and carries its own close button.
+
+**Why** The panel is the one surface that is not the canvas: it is a card you move, read in and put away, so it
+should behave like one — and a card that can only be the size it was born at cannot hold a long answer or a
+transcript you want to scan. The opening button belongs to the panel, so it lives where the panel appears; in the
+top bar it was a small icon among other small icons, next to the sidebar's own collapse control, and it read as
+part of the canvas's chrome rather than as "the assistant is over there".
+
+**Tested** In a browser: the button rendered at (1653, 670) in a 1717×734 canvas — bottom-right — and clicking it
+opened the panel; closing the panel showed the button again in the same corner. Dragging the new corner grip
+took the panel from 380×480 to 536×446, and a drag towards the top-left clamped it at 320×360 (the minimum
+width), with the size in the panel's own inline style rather than the class list.

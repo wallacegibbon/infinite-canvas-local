@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type MouseEvent, type PointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ScanText } from "lucide-react";
 
@@ -16,6 +16,17 @@ import { agentSession, sendAgentMessage, subscribeAgentSessions, type AgentSessi
  * `session` is which agent is being configured. Each surface has its own, and they do not share a model
  * choice: a node panel's session is not the canvas's.
  */
+/**
+ * What a popup has to say about itself while it hangs over the canvas: it is a floating layer, and a pointer
+ * inside it belongs to it, not to the canvas underneath (lib/canvas-overlay). Without this the canvas reads the
+ * click on an option as a click on its background and the option is never picked.
+ */
+const OVER_CANVAS = {
+    "data-canvas-no-zoom": "",
+    onPointerDown: (event: PointerEvent) => event.stopPropagation(),
+    onMouseDown: (event: MouseEvent) => event.stopPropagation(),
+} as const;
+
 export function AgentSettingsControls({ session, className }: { session: string; className?: string }) {
     const { t } = useTranslation();
     const state = useSyncExternalStore(subscribeAgentSessions, () => agentSession(session));
@@ -35,7 +46,7 @@ export function AgentSettingsControls({ session, className }: { session: string;
                     <ScanText className="size-3.5 shrink-0" />
                     <SelectValue placeholder={state.active?.name || t("canvas.agent.noModel")} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent {...OVER_CANVAS}>
                     {state.models.map((model) => (
                         <SelectItem key={model.id} value={String(model.id)}>
                             {model.name}
@@ -47,7 +58,7 @@ export function AgentSettingsControls({ session, className }: { session: string;
                 <SelectTrigger className="canvas-compact-control !h-10 w-[130px] gap-2 rounded-lg px-2 text-sm">
                     <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent {...OVER_CANVAS}>
                     {levels.map((level) => (
                         <SelectItem key={level.value} value={level.value}>
                             {level.label}

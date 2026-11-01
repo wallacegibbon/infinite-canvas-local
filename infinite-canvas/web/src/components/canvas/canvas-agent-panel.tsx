@@ -59,6 +59,8 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
     const config = useEffectiveConfig();
     const open = useCanvasAgentStore((state) => state.open);
     const position = useCanvasAgentStore((state) => state.position);
+    const size = useCanvasAgentStore((state) => state.size);
+    const setSize = useCanvasAgentStore((state) => state.setSize);
     const setOpen = useCanvasAgentStore((state) => state.setOpen);
     const setPosition = useCanvasAgentStore((state) => state.setPosition);
 
@@ -192,6 +194,32 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         (event.target as HTMLElement).releasePointerCapture?.(event.pointerId);
     };
 
+    // --- size -------------------------------------------------------------------------------------------
+    const width = size?.width ?? 380;
+    const height = size?.height ?? 480;
+    const resizeRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+    const startResize = (event: React.PointerEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        resizeRef.current = { x: event.clientX, y: event.clientY, width, height };
+        (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+    };
+    const moveResize = (event: React.PointerEvent) => {
+        const grip = resizeRef.current;
+        if (!grip) return;
+        const host = cardRef.current?.parentElement?.getBoundingClientRect();
+        // The panel is the window's: it may be made as big as the canvas it floats in, and no bigger.
+        const limit = (value: number, min: number, max: number) => Math.min(Math.max(min, value), Math.max(min, max));
+        setSize({
+            width: limit(grip.width + event.clientX - grip.x, 320, (host?.width || window.innerWidth) - 16),
+            height: limit(grip.height + event.clientY - grip.y, 280, (host?.height || window.innerHeight) - 16),
+        });
+    };
+    const endResize = (event: React.PointerEvent) => {
+        resizeRef.current = null;
+        (event.target as HTMLElement).releasePointerCapture?.(event.pointerId);
+    };
+
     // --- citations --------------------------------------------------------------------------------------
     /** The `@` a pick is answering, so the label lands where it was typed. */
     const pickAtRef = useRef<number>(-1);
@@ -278,8 +306,8 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         <div
             ref={cardRef}
             data-canvas-overlay=""
-            className="absolute z-[95] flex w-[380px] max-w-[calc(100%-16px)] flex-col overflow-hidden rounded-2xl border shadow-2xl backdrop-blur"
-            style={{ ...style, height: 480, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+            className="absolute z-[95] flex max-w-[calc(100%-16px)] flex-col overflow-hidden rounded-2xl border shadow-2xl backdrop-blur"
+            style={{ ...style, width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
         >
             <div className="flex cursor-grab items-center gap-2 border-b px-3 py-2 active:cursor-grabbing" style={{ borderColor: theme.toolbar.border }} onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}>
                 <Bot className="size-4 shrink-0" style={{ color: theme.node.activeStroke }} />
@@ -377,6 +405,11 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
                         <ArrowUp className="size-4" />
                     </button>
                 </div>
+            </div>
+
+            {/* Drag the corner and the panel is the size you left it — for this session, like its position. */}
+            <div data-canvas-agent-grip="" className="absolute bottom-0 right-0 z-10 size-4 cursor-nwse-resize" onPointerDown={startResize} onPointerMove={moveResize} onPointerUp={endResize} onPointerCancel={endResize} aria-hidden>
+                <div className="absolute bottom-1 right-1 size-2 rounded-br-sm border-b-2 border-r-2 opacity-40" style={{ borderColor: theme.node.text }} />
             </div>
         </div>
     );

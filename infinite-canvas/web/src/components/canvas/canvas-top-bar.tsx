@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Check, ChevronDown, Download, Images, LayoutGrid, Menu, PanelLeftClose, PanelLeftOpen, Plus, Pencil, Redo2, Trash2, Undo2, Upload } from "lucide-react";
+import { Check, ChevronDown, Download, Images, LayoutGrid, Menu, PanelLeftClose, PanelLeftOpen, Plus, Pencil, Redo2, Trash2, Undo2, Upload } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
 
@@ -9,7 +9,6 @@ import { Tooltip } from "@/components/kit/tooltip";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { CanvasSystemStatus } from "@/components/canvas/canvas-system-status";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { useCanvasAgentStore } from "@/stores/canvas/use-canvas-agent-store";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useCanvasPanelStore } from "@/stores/canvas/use-canvas-panel-store";
 import { useCanvasSidePanelStore } from "@/stores/canvas/use-canvas-side-panel-store";
@@ -59,8 +58,6 @@ export function CanvasTopBar({
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const sidePanelOpen = useCanvasSidePanelStore((state) => state.panelOpen);
     const toggleSidePanel = useCanvasSidePanelStore((state) => state.togglePanel);
-    const agentOpen = useCanvasAgentStore((state) => state.open);
-    const toggleAgent = useCanvasAgentStore((state) => state.toggle);
     const projects = useCanvasStore((state) => state.projects);
     // The list and the asset library are panels over the canvas, not routes.
     const openManager = useCanvasPanelStore((state) => state.setCanvasManagerOpen);
@@ -95,18 +92,6 @@ export function CanvasTopBar({
                             style={{ color: theme.node.text }}
                         >
                             {sidePanelOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
-                        </button>
-                    </Tooltip>
-                    <Tooltip title={t("canvas.agent.title")}>
-                        <button
-                            type="button"
-                            onClick={toggleAgent}
-                            aria-label={t("canvas.agent.title")}
-                            aria-pressed={agentOpen}
-                            className="grid size-7 place-items-center rounded-full transition hover:bg-black/5 dark:hover:bg-white/10"
-                            style={{ color: agentOpen ? theme.node.activeStroke : theme.node.text }}
-                        >
-                            <Bot className="size-4" />
                         </button>
                     </Tooltip>
                     <Dropdown
