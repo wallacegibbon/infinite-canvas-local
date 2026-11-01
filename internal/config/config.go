@@ -28,7 +28,6 @@ type Config struct {
 
 	ComfyURL         string
 	InstallIntoComfy bool // INSTALL_INTO_COMFY=1; installs are refused without it (internal/resource/install_policy.go)
-	ComfyFrontendDir string
 
 	ScanOnStart bool
 
@@ -86,9 +85,6 @@ func WithDataDir(dir string) Option { return func(c *Config) { c.DataDir = dir }
 // WithOutputDir overrides the output directory.
 func WithOutputDir(dir string) Option { return func(c *Config) { c.OutputDir = dir } }
 
-// WithComfyFrontendDir overrides the ComfyUI frontend directory.
-func WithComfyFrontendDir(dir string) Option { return func(c *Config) { c.ComfyFrontendDir = dir } }
-
 // WithoutScanOnStart disables the startup scan (tests).
 func WithoutScanOnStart() Option {
 	return func(c *Config) { c.ScanOnStart = false }
@@ -116,8 +112,8 @@ func Load(opts ...Option) (*Config, error) {
 		GatewayHost:      stringOr(os.Getenv("GATEWAY_HOST"), "127.0.0.1"),
 		ComfyURL:         stringOr(os.Getenv("COMFY_URL"), "http://127.0.0.1:8188"),
 		InstallIntoComfy: boolValue(os.Getenv("INSTALL_INTO_COMFY")),
-		ComfyFrontendDir: strings.TrimSpace(os.Getenv("COMFY_FRONTEND_DIR")),
 		ScanOnStart:      os.Getenv("SCAN_ON_START") != "0",
+		PublicBaseURL:    strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL")),
 		CorsOrigins: listValue(os.Getenv("CORS_ORIGINS"),
 			"http://localhost:3000,http://127.0.0.1:3000,http://localhost:8188,http://127.0.0.1:8188"),
 		RequestTimeoutMs:    intValue(os.Getenv("REQUEST_TIMEOUT_MS"), 10*60*1000),
@@ -159,7 +155,6 @@ func Load(opts ...Option) (*Config, error) {
 	cfg.WorkflowDir = absPath(cfg.WorkflowDir)
 	cfg.DataDir = absPath(cfg.DataDir)
 	cfg.OutputDir = absPath(cfg.OutputDir)
-	cfg.ComfyFrontendDir = absPath(cfg.ComfyFrontendDir)
 	cfg.ComfyURL = strings.TrimRight(cfg.ComfyURL, "/")
 
 	if cfg.PublicBaseURL == "" {

@@ -3815,3 +3815,41 @@ adding a template with an undeclared prefix fails it ("没有声明的动态 key
 turning `include` on surfaced ten real type errors in the test files, all fixed. `npm run check` and
 `npx vitest run` (133 cases) are green, and the payload-import gate from #113 covers the fourth blind spot
 (vendored packs).
+
+---
+
+## 116. Startup repairs what a kill left behind, and every knob is documented
+
+**Decision** Three gaps found by walking the tree against its own documents:
+
+1. `COMFY_FRONTEND_DIR` is gone. It was read, trimmed, made absolute — and never used by anything.
+2. `PUBLIC_BASE_URL` is now actually read from the environment. `gateway.md` had documented it since the
+   port, but only `WithPublicBaseURL` (a test option) could set it, so the documented knob did nothing.
+3. Every variable the code reads is in `gateway.md`'s table: `COMFY_RETRY_ATTEMPTS`,
+   `COMFY_RETRY_DELAY_MS`, `CLEANUP_INTERVAL_MS`, `MAX_IMAGE_COUNT` and `MAX_WORKFLOW_BYTES` were read by
+   the gateway and documented nowhere — findable only by reading `config.go`.
+
+**Startup hygiene, in the same pass** Two kinds of file accumulated in `DATA_DIR` with nothing to remove
+them:
+
+- **Directories from the layout before #100** (`DATA_DIR/agent/canvas-7aa15835/`): one config copy per
+  session, named by the session alone. `clearAgentWorkspaces` only cleared the current `workspaces/`
+  subtree, so these sat there forever. It now removes every directory under `agent/` except `workspaces`
+  and `sessions` — conversations are still never touched.
+- **`util.WriteFileAtomic` leftovers** (`tasks.json.1793441001953777902.tmp`): a kill between the write
+  and the rename leaves one behind, and this tree had five. `util.SweepTempFiles(dir)` removes files
+  matching `<name>.<nanoseconds>.tmp` directly in `DATA_DIR` and `OUTPUT_DIR` at startup — only files, only
+  that shape, so a broad `*.tmp` delete never happens in a directory of user data.
+
+**Why startup, not a janitor** Both facts are only true when nothing is running: no session exists yet, and
+no atomic write is in flight. Doing it in `server.New` costs two `ReadDir`s and cannot race.
+
+**Cost** A `.tmp` file an operator deliberately put in `DATA_DIR` with that exact name would be removed. It
+would also be indistinguishable from the leftovers, which is why the pattern is that narrow.
+
+**Tested** `internal/util/util_test.go` (the sweep takes the two leftovers, leaves `tasks.json`,
+`notes.tmp`, `output.png`, a `.bak` and a *directory* that matches the pattern);
+`internal/server/agent_workspace_test.go` (the legacy directory and `workspaces/` go, `sessions/` and
+`tasks.json` stay). End to end on `:8191`: a planted `setup-status.json.<nanos>.tmp` and
+`agent/canvas-legacy01/` were gone after the restart, `data/agent/` held only `sessions/`, and `/health`
+answered.

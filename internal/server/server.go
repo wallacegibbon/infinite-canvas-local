@@ -53,6 +53,10 @@ type Server struct {
 func New(cfg *config.Config, logger *logx.Logger) (*Server, error) {
 	// Sessions do not survive a restart, so neither do the directories their agents worked in.
 	clearAgentWorkspaces(cfg.DataDir)
+	// A gateway that was killed mid-write leaves its temporary file next to the target; nothing reads it
+	// again, so startup is the one moment it can be swept safely.
+	util.SweepTempFiles(cfg.DataDir)
+	util.SweepTempFiles(cfg.OutputDir)
 
 	comfyClient, err := comfy.New(comfy.Options{
 		BaseURL:       cfg.ComfyURL,

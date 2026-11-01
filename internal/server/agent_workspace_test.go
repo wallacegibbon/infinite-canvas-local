@@ -1,6 +1,8 @@
 package server
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -44,5 +46,46 @@ func TestAgentWorkspaceKeyIsBoundedAndUnique(t *testing.T) {
 	}
 	if strings.HasPrefix(awkward, ".") {
 		t.Errorf("key = %q, must not start with a dot", awkward)
+	}
+}
+
+// Startup clears what per-session config copies are worth clearing: the workspace tree of the current
+// layout, and any per-session directory a previous layout left behind. Conversations survive — they are
+// the user's words — and nothing else in the data directory is touched.
+func TestClearAgentWorkspacesKeepsConversationsAndDropsOldLayouts(t *testing.T) {
+	dataDir := t.TempDir()
+	agentDir := filepath.Join(dataDir, "agent")
+	files := []string{
+		filepath.Join(agentDir, "workspaces", "canvas-1-abcd1234", "model.conf"),
+		filepath.Join(agentDir, "sessions", "canvas-1-abcd1234.session"),
+		filepath.Join(agentDir, "canvas-7aa15835", "mcp.conf"), // the layout from before #100
+		filepath.Join(dataDir, "tasks.json"),
+	}
+	for _, file := range files {
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", file, err)
+		}
+		if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+			t.Fatalf("write %s: %v", file, err)
+		}
+	}
+
+	clearAgentWorkspaces(dataDir)
+
+	for _, gone := range []string{
+		filepath.Join(agentDir, "workspaces"),
+		filepath.Join(agentDir, "canvas-7aa15835"),
+	} {
+		if _, err := os.Stat(gone); !os.IsNotExist(err) {
+			t.Errorf("%s survived startup", gone)
+		}
+	}
+	for _, kept := range []string{
+		filepath.Join(agentDir, "sessions", "canvas-1-abcd1234.session"),
+		filepath.Join(dataDir, "tasks.json"),
+	} {
+		if _, err := os.Stat(kept); err != nil {
+			t.Errorf("%s should have been kept: %v", kept, err)
+		}
 	}
 }

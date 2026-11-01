@@ -73,7 +73,7 @@ Every variable is optional; the defaults match the previous implementation.
 | `WORKFLOW_DIR`       | `<root>/workflows`                 | Registry directory.                                                                                                                                                |
 | `DATA_DIR`           | `<root>/data`                      | Tasks, locks, preferences.                                                                                                                                         |
 | `OUTPUT_DIR`         | `<data>/outputs`                   | Generated files served under `/files/`.                                                                                                                            |
-| `PUBLIC_BASE_URL`    | `http://GATEWAY_HOST:GATEWAY_PORT` | Absolute prefix for returned URLs.                                                                                                                                 |
+| `PUBLIC_BASE_URL`    | `http://GATEWAY_HOST:GATEWAY_PORT` | Absolute prefix for the URLs the gateway returns (run outputs, previews). Set it when a proxy publishes the gateway under another address. |
 | `CORS_ORIGINS`       | canvas + ComfyUI origins           | Extra allow list for canvases on another host. A canvas on the gateway's own host is allowed by rule. `*` is refused.                                              |
 
 `GATEWAY_HOST` is not a policy switch: `GATEWAY_HOST=192.168.3.232` binds the LAN address exactly
@@ -100,6 +100,11 @@ So the honest statement is: **bind it to loopback, or put it on a network whose 
 Reaching it from elsewhere is a job for an SSH tunnel or a reverse proxy that terminates
 authentication; there is no configuration in this gateway that makes an untrusted network safe.
 | `REQUEST_TIMEOUT_MS` | `600000` | Image generation timeout. |
+| `COMFY_RETRY_ATTEMPTS` | `3` | How many times a **GET** to ComfyUI is retried. A POST is never retried: it can enqueue the same job twice. |
+| `COMFY_RETRY_DELAY_MS` | `500` | Base delay between those retries; it grows linearly with the attempt number. |
+| `CLEANUP_INTERVAL_MS` | `3600000` | How often finished runs (and expired uploads) are pruned. Only runs when `TASK_RETENTION_DAYS` or `MAX_STORED_TASKS` is set. |
+| `MAX_IMAGE_COUNT` | `15` | Cap on `count` for an image run — more than this is refused at submission. |
+| `MAX_WORKFLOW_BYTES` | `5242880` | How large one file under `workflows/` may be; a bigger graph is refused at scan time. |
 | `VIDEO_TIMEOUT_MS` | `0` | Video timeout; `0` means no limit. |
 | `AUDIO_TIMEOUT_MS` | `0` | Audio/music timeout; `0` means no limit. A song is the same order of work as a short video, so it gets the same default. |
 | `POLL_INTERVAL_MS` | `750` | ComfyUI history poll interval. |

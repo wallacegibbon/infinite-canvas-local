@@ -192,3 +192,35 @@ func TestRandomIDsAreUnique(t *testing.T) {
 		}
 	}
 }
+
+// A killed process leaves `<name>.<nanoseconds>.tmp` next to a target nothing reads again. The sweep takes
+// exactly those, and nothing else in the directory.
+func TestSweepTempFilesTakesOnlyAtomicLeftovers(t *testing.T) {
+	dir := t.TempDir()
+	keep := []string{"tasks.json", "notes.tmp", "output.png", "status.json.bak"}
+	drop := []string{"tasks.json.1793441001953777902.tmp", "setup-status.json.1793466186600214164.tmp"}
+	for _, name := range append(append([]string{}, keep...), drop...) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(dir, "sub.123456.tmp"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	SweepTempFiles(dir)
+
+	for _, name := range drop {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s survived the sweep", name)
+		}
+	}
+	for _, name := range keep {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("%s should have been left alone: %v", name, err)
+		}
+	}
+	if info, err := os.Stat(filepath.Join(dir, "sub.123456.tmp")); err != nil || !info.IsDir() {
+		t.Error("a directory that happens to match the pattern must not be removed")
+	}
+}

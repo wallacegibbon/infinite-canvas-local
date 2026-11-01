@@ -102,8 +102,25 @@ func (s *Server) mcpURL(workspace string) string {
 // Conversations are not removed. They are the user's words, they cost a few kilobytes, and the whole
 // point of the file is that reopening a canvas finds what was said in it — a gateway restart is not a
 // reason to forget.
+//
+// Neither are the two directories of the current layout, and everything else under `agent/` is a copy
+// from a layout that no longer exists (one directory per session, named by the session alone, before the
+// workspace/session split of #100). Those are never read again and nothing else deletes them.
 func clearAgentWorkspaces(dataDir string) {
-	_ = os.RemoveAll(workspacesRoot(dataDir))
+	if err := os.RemoveAll(workspacesRoot(dataDir)); err != nil {
+		return
+	}
+	entries, err := os.ReadDir(filepath.Join(dataDir, "agent"))
+	if err != nil {
+		return
+	}
+	keep := map[string]bool{"workspaces": true, "sessions": true}
+	for _, entry := range entries {
+		if !entry.IsDir() || keep[entry.Name()] {
+			continue
+		}
+		_ = os.RemoveAll(filepath.Join(dataDir, "agent", entry.Name()))
+	}
 }
 
 // sessionFile is where this session's conversation is kept, created if this is the first time.

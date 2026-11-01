@@ -243,6 +243,27 @@ func WriteFileAtomic(file string, data []byte) error {
 	return nil
 }
 
+// SweepTempFiles removes the leftovers of an interrupted WriteFileAtomic: a temporary file whose name is
+// `<something>.<nanoseconds>.tmp`, written next to its target and renamed over it. A process that is
+// killed between the two leaves it behind, and nothing would ever read it again — they accumulate in
+// DATA_DIR one per kill (five had piled up in this tree before anything looked).
+//
+// Only files directly in dir are touched, and only ones matching that shape: a directory of user data is
+// not a place to run a broad `*.tmp` delete.
+func SweepTempFiles(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	temp := regexp.MustCompile(`\.\d{6,}\.tmp$`)
+	for _, entry := range entries {
+		if entry.IsDir() || !temp.MatchString(entry.Name()) {
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, entry.Name()))
+	}
+}
+
 // Exists reports whether the path is an existing regular file.
 func Exists(file string) bool {
 	info, err := os.Stat(file)
