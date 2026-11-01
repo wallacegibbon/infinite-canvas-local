@@ -397,8 +397,10 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
                 }}
             >
                 {messages.length === 0 ? <p className="text-xs opacity-50">{t("canvas.agent.hint")}</p> : null}
+                {/* One left edge for everything. A user message is already told apart by its box, and
+                    pushing it to the right only made the transcript read in two columns. */}
                 {messages.map((message) => (
-                    <div key={message.id} className={message.role === "user" ? "ml-6 rounded-xl px-3 py-2" : "mr-2"} style={message.role === "user" ? { background: theme.node.fill, border: `1px solid ${theme.node.stroke}` } : undefined}>
+                    <div key={message.id} className={message.role === "user" ? "rounded-xl px-3 py-2" : "mr-2"} style={message.role === "user" ? { background: theme.node.fill, border: `1px solid ${theme.node.stroke}` } : undefined}>
                         {message.tools.length ? (
                             <div className="mb-1 space-y-0.5 text-[11px] opacity-60">
                                 {message.tools.map((step) => (
