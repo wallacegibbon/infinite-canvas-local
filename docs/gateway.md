@@ -22,8 +22,8 @@ The Go implementation is a port of that Node gateway.
 
 - Go 1.26+ (build only)
 - A running ComfyUI (default `http://127.0.0.1:8188`)
-- Optional: `ffprobe` (character-swap workflows read the source video length),
-  `zenity` (the "pick a model file" dialog), `nvidia-smi` (GPU panel)
+- Optional: `ffprobe` (character-swap workflows read the source video length) and `zenity` (the
+  "pick a model file" dialog). The system panel needs neither: its numbers come from ComfyUI.
 
 ## Platforms
 
@@ -36,13 +36,13 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o comfyui-gateway.exe .
 CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64 go build -o comfyui-gateway-mac .
 ```
 
-Linux is the target that is actually run and tested. Three probes lean on Linux facilities
-and degrade on their own elsewhere rather than failing the process:
+Linux is the target that is actually run and tested. Two things lean on facilities a container or
+another OS may not have, and both degrade on their own rather than failing the process:
 
-| Probe                      | On Linux        | Elsewhere                                                              |
+| What                       | Needs           | Without it                                                             |
 | -------------------------- | --------------- | ---------------------------------------------------------------------- |
-| RAM usage                  | `/proc/meminfo` | panel shows nothing (returns an empty record)                          |
 | "Pick a model file" dialog | `zenity`        | the request fails with a message telling you to type the relative path |
+| Character-swap duration    | `ffprobe`       | the run falls back to the workflow's default duration, and says so      |
 
 `start.sh` is a bash script, so Windows needs WSL or Git Bash; running `bin/comfyui-gateway`
 by hand works anywhere.
@@ -331,6 +331,16 @@ Metadata and management:
 | `POST` | `/api/resources/install` | Start an install job.                                                                                                                                                                                                                                                       |
 | `POST` | `/api/resources/refresh` | The only rescan: reloads the resource index, re-scans ComfyUI (nodes, models, availability, new workflow graphs) and returns the resource status. This is the panel's refresh button.                                                                                       |
 | `GET`  | `/api/system/stats`      | VRAM and RAM **of the machine running ComfyUI** (read from ComfyUI's own `/system_stats`), plus the last OOM. `available: false` when ComfyUI does not report its devices — the panel then shows nothing, because the gateway host's own memory is somebody else's machine. |
+| `GET`  | `/api/workflows/{id}/schema` | The typed inputs, media roles and outputs of one workflow — the contract `POST /api/runs` validates against. |
+| `POST` | `/api/workflows/{id}/visibility` | Show or hide a workflow in the canvas's model picker. |
+| `GET`  | `/api/resources/jobs/{id}` | One install job: what it is downloading and how far it has got. |
+| `POST` | `/api/resources/jobs/{id}/cancel` | Stop that job. Files already written stay. |
+| `POST` | `/api/resources/pick-replacement` | Open the operator's file dialog on a model directory, and answer with the file chosen. |
+| `POST` | `/api/resources/replacement` | Point a resource at a file that is already installed (the alias the panel's "choose replacement" writes). |
+| `GET` / `POST` | `/api/skin-unlocks` | Which canvas skins this install has unlocked. |
+| `GET`  | `/api/loras`             | The LoRA files ComfyUI reports, filtered by `?q=`. |
+| `POST` | `/api/system/free-memory` | Ask ComfyUI to free VRAM, then report what that freed. `503` when ComfyUI is unreachable. |
+| `GET`  | `/files/{name}`          | A file from `data/outputs` by name — the export path, not a generation one. |
 
 A run carries its own `preview` (`{url, mime}` with a timestamp) and its own `progress` in the
 payload, so a client polling a run needs no second endpoint for either — there is no `/api/previews`
@@ -361,14 +371,14 @@ internal/task            the run queue: persistence, progress, cancel, multi-out
 internal/upload          uploaded media: bytes on disk, index, cached ComfyUI reference
 internal/resource        resources/index.json, install jobs, main-model override
 internal/prompt          H3 prompt rewriting, speaker tags, MOSS layout prompts
-internal/store           sessions, skins, workflow visibility, main models
-internal/sysinfo         GPU and memory sampling
+internal/store           skins, workflow visibility, main-model overrides
+internal/sysinfo         ComfyUI's /system_stats, as the panel's units
 internal/server          route table and wiring
 ```
 
 Three design notes worth knowing before changing anything:
 
-- **Graphs are generic JSON.** There are nineteen ComfyUI graphs and they carry node
+- **Graphs are generic JSON.** There are seventeen ComfyUI graphs and they carry node
   classes this codebase will never model. `internal/workflow` offers typed accessors
   (`Node.ClassType()`, `Node.Inputs()`) and everything above it is typed.
 - **Bindings keep their raw JSON.** `registry.json` is user-editable, so a binding
@@ -476,15 +486,17 @@ Two things stay Chinese on purpose, because they are _data_ rather than messagin
 ## Testing
 
 ```bash
-make check        # gofmt check + go vet + full suite with -race
-make test         # fast suite
+make check        # gofmt check + go vet + the suite
+make test-race    # the same suite under the race detector (needs a C toolchain)
 make verify-static
+cd infinite-canvas/web && npm run check && npx vitest run   # the canvas
 ```
 
 The suite covers binding application, LoRA injection, prompt sanitising, registry
 loading, the task queue (including cancellation and retention), configuration
-validation, resource index validation, and an end-to-end HTTP test that drives real
-image generation against an in-process fake ComfyUI.
+validation, resource index validation, the vendored packs' own relative imports
+(#113), and an end-to-end HTTP test that drives real image generation against an
+in-process fake ComfyUI.
 
 ## Intentional differences from the Node gateway
 
@@ -492,8 +504,9 @@ image generation against an in-process fake ComfyUI.
   and regularly corrupted it. `/api/resources/status` now reports `runtimeDeps` and
   the UI shows the exact command to run instead.
 - **No remote resource index.** The panel reads `resources/index.json` only.
-- **Memory is reported as `MemAvailable`.** Using `MemFree` made "used" read as
-  almost the whole machine and made the freed-bytes figure meaningless.
+- **Memory is ComfyUI's, not this host's.** The panel used to read `/proc/meminfo` and shell out to
+  `nvidia-smi` on the gateway's machine; since #99 it reports what ComfyUI says about the machine that
+  actually does the work, and nothing at all when ComfyUI does not answer.
 - **`mainModel.options` ordering** may differ slightly from `localeCompare` in the
   old build. The option set is identical; only the dropdown order varies.
 - **Bake artifacts** (`type: "bake"`) are never installed. They need a local merge, so the

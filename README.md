@@ -26,7 +26,7 @@ Maintained here: the workflow graphs and `registry.json`, the resource index and
 - **Local plugins**: LoRA strength card, ComfyUI parameter card.
 - **Prompts come from AlayaCore**: one `alayacore --rawio` process per request, its frames relayed to the canvas; the model, the skills and the wording are the agent's.
 - **System panel**: VRAM / RAM / GPU / ComfyUI status, one-click VRAM release.
-- **Local-only by construction**: there is no cloud mode and no flag to re-enable one. The image/video/prompt workbenches, cloud model channels and the prompt library are deleted, not hidden; the prompt optimizer's "prompt API" tab stays, because it accepts any OpenAI-compatible endpoint including `127.0.0.1`.
+- **Local-only by construction**: there is no cloud mode and no flag to re-enable one. The image/video/prompt workbenches, the cloud model channels, the prompt library and the prompt-API settings tab are deleted, not hidden: there is one channel, it is the gateway that served the page, and prompts are the agent's (`docs/decisions.md` #71, #76).
 
 ## Layout
 

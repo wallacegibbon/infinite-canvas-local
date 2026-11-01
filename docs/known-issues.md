@@ -1,234 +1,44 @@
 # Known issues
 
-Open problems, verified against the current tree. Each entry says what breaks, why, and
-what the fix is, so nobody has to rediscover it. Fixes that only need a command are
-written out as commands.
+Open problems, verified against the current tree. Each entry says what breaks, why, and what the fix
+is, so nobody has to rediscover it. Fixes that only need a command are written out as commands.
+
+Fixed entries are not kept here: they are in [`decisions.md`](decisions.md), which is where the reason
+for the fix lives. The last section lists the ones this file used to carry.
 
 ---
 
-## 1. SeedVR2 node pack did not import *(fixed — the payload was incomplete)*
+## 1. H3 video prompts ignore the requested output language
 
-**Was** `video-seedvr2-upscale` was unavailable and ComfyUI's log showed `IMPORT FAILED` for
-`ComfyUI-SeedVR2_VideoUpscaler`, with the canvas reporting a missing node class. The first diagnosis
-blamed the *installed* copy and said to reinstall from the source — which could not have helped: the
-vendored pack in `resources/payload/custom_nodes/` was itself missing `src/data/`, and reinstalling
-copies that same directory. `src/core/generation_utils.py` imports
-`..data.image.transforms.{divisible_crop,na_resize}` on its first lines, so the pack raised
-`ModuleNotFoundError` before registering a single node.
+**Symptom** The prompt asks for Chinese (`输出语言：字段正文全部使用中文`) and the generated prompt still
+comes back in English.
 
-**Fix (applied)** `src/data/image/transforms/` is restored from the upstream pack
-(`numz/ComfyUI-SeedVR2_VideoUpscaler`, the same 2.5.24 tree the rest of the vendored copy comes from):
-`area_resize.py`, `divisible_crop.py`, `na_resize.py`, `side_resize.py`. The index entry's size was
-recomputed (it had drifted from the tree it described) and its note no longer claims the gateway installs
-the Python dependencies — it reports the pip command instead.
+**State** Reproduced on a local `qwen3.8-27b` endpoint with thinking disabled in the model's `model.conf`:
+the instruction is in the request, and it is not followed. Not diagnosed beyond that — either the model
+ignores it or the H3 skill does not carry enough weight.
 
-**The gate that was missing** `internal/resource/payload_imports_test.go` now resolves every relative
-import in every vendored pack against the files actually shipped, so a pack that cannot import fails
-`make check` instead of failing on a user's machine. Removing `src/data/` again makes it fail with the two
-imports above.
-
-**Still true** The Python dependencies the pack needs (`diffusers` / `rotary_embedding_torch` / `omegaconf`
-/ `opencv-python` / `einops`) must be installed with ComfyUI's own pip; see
-[`runtime-deps.md`](runtime-deps.md). `huggingface-hub` has to stay `<2` for `transformers 5.15` — the
-pin that was worked out here is still the right one.
-
-**Follow-up worth deciding** Interpolating a clip with **no audio track** fails inside VHS
-(`VHS failed to extract audio`). Clips the canvas produces always carry audio; an imported silent clip
-does not. Detaching the audio input when the source has none would fix it at the cost of never carrying
-audio through.
+**Next step** Ask through the agent socket (`GET /api/agent/socket/{session}`, `?history=1` for a panel's
+conversation) and read the frame log (`agent << SM`, `agent >> UX`): the instruction is in the prompt, so
+the difference between the two outcomes is the skill's wording. The fix belongs in
+`prompts/skills/h3-prompt-writing/`, which is the agent's to load.
 
 ---
 
-## 2. Two recorded videos play audio only in the browser
+## 2. Interpolating a silent clip fails inside VHS
 
-**Symptom** Some clips from before the H.264 switch play sound but show no picture in the
-canvas or in a browser.
+**Symptom** `video-rife` on a clip with no audio track fails with `VHS failed to extract audio`. Clips the
+canvas produces always carry audio; an imported or trimmed silent clip does not.
 
-**Cause** They are 10-bit HEVC (`hevc, Main 10, yuv420p10le`), which browsers other than
-Safari cannot decode. The three workflow files were changed to `format: "video/h264-mp4"` +
-`pix_fmt: "yuv420p"` (`h3-ref2va-drama`, `h3-ref2va-drama-vdn`, `h3-character-swap-vdn`), but
-files recorded earlier keep the old codec.
-
-Still affected in `data/outputs/` (checked with `ffprobe`):
-
-```
-task_dcd0fb5a-9ff6-49f5-a580-dc5d98efdec2.mp4   hevc, Main 10, yuv420p10le
-task_ec533830-dd05-4839-8f4f-6495d3138e9b.mp4   hevc, Main 10, yuv420p10le
-```
-
-**Fix** Transcode in place:
-
-```bash
-ffmpeg -i in.mp4 -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p \
-  -c:a copy -movflags +faststart out.mp4
-```
-
-`internal/workflow/browser_playback_test.go` guards the shipped workflows against
-reintroducing 10/12-bit or H.265, but it cannot cover already-written files.
+**Fix to decide** Detach the audio input when the source has no audio stream, at the cost of never carrying
+audio through the interpolation. `sourceVideoFrames` and the rest of the media plan are declared in
+`registry.json` (`video-rife`), so this is a `accepts`/binding question, not a code branch.
 
 ---
 
-## 3. H3 video prompts ignore the requested output language
+## 3. Radix hides the page from assistive tech while a focused button sits in it
 
-**Symptom** The prompt asks for Chinese (`输出语言：字段正文全部使用中文`) and the generated
-prompt still comes back in English.
-
-**Cause** Not diagnosed. It was observed with a local `qwen3.8-27b` endpoint with thinking
-disabled (thinking disabled in the model's `model.conf`), so the instruction is being sent but is not being
-followed — either the model ignores it or the system prompt in
-`prompts/skills/h3-prompt-writing/` does not carry enough weight.
-
-**Next step** Reproduce through `/api/agent/chat` and read the frame log (`agent << SM`,
-`agent >> UX`): the instruction is in the prompt, so either the model ignores it or the H3 skill in
-`prompts/skills/h3-prompt-writing/` does not carry enough weight. The fix belongs in the skill, which is
-the agent's to load.
-
----
-
-## 4. "Restart needed" is shown for a missing custom node *(fixed — decisions #48)*
-
-**Where** `infinite-canvas/web/src/components/settings/resource-center-panel.tsx`, the workflow
-status tag:
-
-```tsx
-workflow.missing ? <Tag>{copy.missing} {workflow.missing}</Tag>
-  : workflow.available ? <Tag>{copy.workflowReady}</Tag>
-  : <Tag>{copy.workflowRestart}</Tag>          // ← every other "not available" case
-```
-
-**Problem** The last branch is the fallback for *any* unavailable workflow, so a workflow
-blocked by an uninstalled custom node reads "Restart needed". The label promises a restart,
-which will not help.
-
-**Fix** *(applied)* A workflow carrying `problems` now reports `workflowBlocked` ("Load failed")
-and only a genuinely pending restart reads "Restart needed".
-
----
-
-## 5. "Canvas entry" tag is shown inverted *(fixed — decisions #48)*
-
-**Where** Same file. The `canvasEntry` tag renders when `workflow.modelVisible === false`,
-i.e. exactly when the workflow is *hidden* from the model picker.
-
-**Fix** *(applied)* The label now says what the condition is — "Hidden from picker" — rather than
-inverting the condition, which would have changed behaviour on a guess about intent.
-
----
-
-## 6. Thirteen lines of Chinese stay hardcoded, on purpose
-
-**Was** 55 strings of UI copy written inline, showing Chinese in the English UI, plus
-`resource-center-panel.tsx` keeping its own `zh`/`en` copy object.
-
-**Now** Every one of those strings goes through `t()`, and the panel's 102 strings moved to
-`resources.panel.*` (decisions #39). What is left is 13 lines, and each is data rather than copy:
-
-```
- 6  components/canvas/canvas-node-prompt-panel.tsx   protocol: PromptOptimizeMode + referenceNote
- 2  components/canvas/canvas-node.tsx                art: mascot slogans, paired with their English line
- 2  components/canvas/canvas-node-moss-layout-dialog.tsx  data: caption regex + prefix the gateway parses
- 1  services/api/image.ts                           protocol: PromptOptimizeMode union
- 1  components/layout/user-status-actions.tsx       endonym: 「中」 on the language switcher
- 1  components/layout/app-config-modal.tsx          endonym: 中文 in the language picker
-```
-
-**Why these are not a violation** #17 asks for user-visible copy to live in the dictionaries. The
-protocol values are form fields the gateway matches or feeds to a workflow (#9); the MOSS regex and
-prefix are an agreement about the shape of the gateway's output; the mascot slogans are set in a CJK
-font stack and printed next to their own English line, so translating them would show the sentence
-twice; and a language name is written in the language it names.
-
-**Not verified** The remaining risk is a raw key or a `zh` fallback appearing in a surface nobody
-clicked through. The DOM scan covers every route in both locales, but dialogs, drawers and
-context menus are opened by hand and are not exhaustive.
-
----
-
-## 7. Three packages have no tests
-
-`internal/setup`, `internal/sysinfo` and `internal/logx` have no `_test.go`. They are covered
-indirectly (the server end-to-end test drives setup, and the resource tests now build a real
-setup manager), but the parsing code has no direct tests:
-
-- `setup/paths.go` — `extra_model_paths.yaml` parsing, path validation
-- `sysinfo` — `/proc/meminfo` parsing, `nvidia-smi` CSV parsing
-- `logx` — formatting
-
----
-
-## 8. `ComfyUI-MiniMaxH3-TimelineDirector` is unaccounted for
-
-The directory exists in ComfyUI's `custom_nodes`, but no resource in
-`resources/index.json` references it (0 matches), so the panel neither installs nor removes it
-and its origin is unverified. Either add it to the index or leave a note about where it came
-from.
-
----
-
-## 9. Repository size is dominated by history (operational)
-
-`.git` is ~78 MB, but the tracked tree is small. The bulk lives in four large files plus
-`infinite-canvas/web/dist` blobs that were committed before it was ignored:
-
-```
-16.1 MB  comfyui-gateway/resources/nodes/unpacked/TE_MAN/.../T5_tokenizer/tokenizer.json
- 9.3 MB  resources/vae_approx/taeh3.safetensors
- 4.4 MB  comfyui-gateway/resources/nodes/ComfyUI-qwenmultiangle.zip
- 4.3 MB  .../TE_MAN/.../T5_tokenizer/spiece.model
- 4.1 MB × N  infinite-canvas/web/dist/assets/index-*.js
-```
-
-**Fix** Keep the history and strip those paths:
-
-```bash
-pip install --user git-filter-repo
-git filter-repo --invert-paths \
-  --path infinite-canvas/web/dist \
-  --path resources/vae_approx/taeh3.safetensors \
-  --path comfyui-gateway/resources/nodes/ComfyUI-qwenmultiangle.zip \
-  --path-glob '*/T5_tokenizer/*'
-```
-
-Deleting `.git` and re-initialising also works, but loses 292 commits of history.
-
-
----
-
-## 10. Chinese prose remains in the vendored canvas and plugin subtree
-
-**Where** `infinite-canvas/plugins/` — 36 files, 454 Chinese lines:
-
-| Lines | Comments | File kind |
-| --- | --- | --- |
-| 161 | 3 | plugin `README.md` files |
-| 132 | 71 | plugin components (`src/*.tsx`) |
-| 92 | 73 | plugin SDK (`sdk/src/*.ts`) |
-| 26 | 19 | build scripts (`build.mjs`) |
-| 35 | 0 | `SKILL.md` agent instructions |
-| 8 | 0 | `packages.json` metadata |
-
-Plus `infinite-canvas/CHANGELOG.md` (265 Chinese lines of release history).
-
-**Why it is listed** [decisions.md #17](decisions.md) requires English for documentation and
-comments. These files came in with the upstream canvas subtree and predate the rule. Note that
-the 163 comment/JSDoc lines and the READMEs describe the plugin API, i.e. the part a third-party
-plugin author reads, and that the plugins' own UI strings are compiled into
-`web/public/plugins/*.js` — the canvas dictionaries cannot translate them because each plugin
-ships as a standalone bundle.
-
-**Fix** Translate the comments and READMEs first (mechanical). The plugin UI copy needs a
-decision before code moves: either the plugins grow their own copy table (one per bundle, chosen
-from the canvas locale) or the strings become English only. `CHANGELOG.md` is release history —
-leave the existing entries as written, write new ones in English.
-
-**Not affected** The `SKILL.md` files (agent input, same reasoning as decisions #9), the LoRA
-name filter in `workflows/registry.json` (`mj风格` and friends are patterns matched against real
-file names), `web/src/i18n/locales/zh-CN.ts` and everything under `internal/prompt`.
-
-## 11. Radix hides the page from assistive tech while a focused button sits in it
-
-**Symptom** Opening a confirmation (`kit/confirm`, which is radix's `AlertDialog`) over a button
-that currently has focus logs a browser warning:
+**Symptom** Opening a confirmation (`kit/confirm`, radix's `AlertDialog`) over a button that currently has
+focus logs a browser warning:
 
 ```
 Blocked aria-hidden on an element because its descendant retained focus.
@@ -236,81 +46,125 @@ Element with focus: <button ... border-red-300 ...>        (the danger button th
 Ancestor with aria-hidden: <div class="flex h-dvh ...">
 ```
 
-**Cause** Radix sets `aria-hidden` on the rest of the document when a modal layer opens, and it
-does so before focus has moved into the layer. Chrome therefore blocks the attribute (which is the
-outcome we want — the page stays readable) and warns. Reproduced from the config page's delete
-buttons; it is not specific to any one call site.
+**Cause** Radix sets `aria-hidden` on the rest of the document when a modal layer opens, and does it before
+focus has moved into the layer. Chrome therefore blocks the attribute (which is the outcome we want — the
+page stays readable) and warns. Reproduced from the config page's delete buttons; not specific to one call
+site.
 
-**Effect right now** None that a user can see: the dialog is operable and focus lands in it. The
-warning is once per open and only in the console.
+**Effect right now** None that a user can see: the dialog is operable and focus lands in it. The warning is
+once per open and only in the console.
 
-**Fix** Either upgrade radix once it uses `inert` instead of `aria-hidden` for `hideOthers`, or move
-focus to the dialog's cancel button in `onPointerDown` of the trigger. Not done, because both are
-larger than the symptom.
-
----
-
-## 12. Corrupt persisted state destroyed the data it could not read *(fixed — decisions #49)*
-
-**Was** Neither `use-canvas-store` nor `use-asset-store` guarded its `JSON.parse`. An unreadable
-blob threw inside `getItem`, zustand caught it into `onRehydrateStorage`, that listener ignored the
-error and set `hydrated: true`, and the app booted on empty defaults. The write-refusal check in the
-canvas store (`if (queuedPersistState && ...)`) was bypassed because `queuedPersistState` is only
-assigned after a successful parse, so the empty state was persisted over the unreadable one within
-400 ms. Reproduced on the test origin: a 2314-byte store holding one canvas became a 378-byte store
-holding an empty one, the original canvas vanished from the list, and the console stayed empty.
-
-**Now** Both adapters catch the parse, copy the raw bytes to
-`<key>.corrupt-<timestamp>`, record the failure, return `null` so hydration proceeds deliberately,
-and refuse to write while the failure stands. A banner over the canvas says what happened, offers
-the raw bytes as a download, offers a retry, and offers a "clear and start over" that re-enables
-writing and rewrites the main key.
-
-**The other half, now also fixed** Neither `persist` configuration had a `version` or a `migrate`.
-zustand's `merge` is `{...currentState, ...persistedState}` — shallow — so `projects[]` was taken
-from disk verbatim and any field added inside a project came back `undefined`. A viewport without
-`k` is `NaN` in every coordinate calculation on the canvas.
-
-Three things were added: `version: 1` on both stores so what we write is labelled; a `migrate` pass
-that backfills per-project fields (this is the part zustand's shallow merge could not do); and a
-shape assertion after migration, so a blob that cannot be brought to the current shape throws and
-takes the same recovery path as invalid JSON — copied aside, write refused, banner shown.
-
-The check lives in `getItem` rather than in zustand's own `migrate` hook on purpose. That hook runs
-*after* `getItem`, so a failure there cannot reuse this app's recovery; zustand logs and discards,
-and the empty state is persisted over the blob — the same data-loss path as the first half, with one
-exception: a *version mismatch* with no `migrate` would have gone straight through even with the
-write refusal in place, because `getItem` succeeded.
-
-Covered by `tests/persist-migration.test.ts` (14 cases): versionless blobs, missing `lastProjectId`,
-missing per-project fields, a viewport with no `k`, a zero zoom, a blob from a newer build,
-malformed JSON, and assets with no `data`.
-
+**Fix** Either upgrade radix once it uses `inert` instead of `aria-hidden` for `hideOthers`, or move focus
+to the dialog's cancel button in `onPointerDown` of the trigger. Not done: both are larger than the symptom.
 
 ---
 
-## 13. The repo is not formatted with its own Prettier config
+## 4. `ComfyUI-MiniMaxH3-TimelineDirector` is unaccounted for
 
-**Symptom** `npx prettier --check src` reports `Code style issues found in 78 files`.
+The directory exists in ComfyUI's `custom_nodes`, but no resource in `resources/index.json` references it
+(0 matches), so the panel neither installs nor removes it and its origin is unverified. Either add it to the
+index or leave a note about where it came from.
 
-**Cause** `.prettierrc.json` sets `printWidth: 255`, which is what the very long single-line import
-statements in this repo match. But 78 files contain lines prettier would still reflow — import lists
-over 255 characters, and callsites it would collapse or split differently. Whatever produced that
-style, it was not `npm run format`.
+---
 
-**Why it matters** `npm run format` exists and `npm run format:check` exists, but neither is part of
-`npm run check`, so the drift is invisible until somebody runs it — and then `--write` produces a
-2400-line diff across 45 files, which buries whatever change they actually wanted to make. That
-happened during decisions #50 and had to be reverted.
+## 5. Narrower test coverage than it looks: `internal/logx` has no test
 
-**Fixed** `npm run format` was run once as its own commit (`0a20e8f`, 81 files), and
-`format:check` is now the third gate in `npm run check`. Two things were needed to make it stick:
+`internal/logx` has no `_test.go`: it formats a timestamp, a level and a message, and nothing else in the
+package is worth a test. It is covered indirectly (every other test's output goes through it), which is
+the reason it has stayed this way.
 
-- `public/plugins` is in `.prettierignore`. `comfyui-lora.js` and `comfyui-params.js` have no source
-  anywhere else in the repo, are served to the browser as plugin code, and are not part of the app
-  build, so they are assets rather than source — the same reasoning that already excludes `dist`.
-- The reformat is provably semantic-null: the built bundle hash is identical before and after
-  (`index-rG39eRfp.js`, 694725 bytes), and `globals.css` keeps its 133/133 brace balance.
+`internal/setup` and `internal/sysinfo` were in this entry with it and no longer belong here — both have
+direct tests now (`paths_test.go`, `scan_test.go`, `sysinfo_test.go`).
 
-The gate was checked in both directions: appending one badly formatted line to a source file makes
-`npm run check` exit 1, and reverting it makes it exit 0.
+---
+
+## 6. A few strings stay Chinese in the source, on purpose — and they are data, not copy
+
+Every string of *UI copy* goes through `t()`. What is still written in Chinese in the source is a short
+list, and each line is data the gateway or the agent parses rather than text a user reads:
+
+| Lines | File | What it is |
+| --- | --- | --- |
+| 10 | `components/canvas/canvas-node-prompt-panel.tsx` | the `PromptOptimizeMode` values sent to the agent |
+| 3 | `lib/canvas/agent-references.ts` | the `【画布引用】` marker the citation block is built from |
+| 2 | `components/canvas/canvas-node.tsx` | mascot slogans, printed beside their own English line |
+| 2 | `components/canvas/canvas-node-moss-layout-dialog.tsx` | the caption prefix/regex the MOSS workflow parses |
+| 2 | `lib/canvas/node-title.ts` | old default titles the migration recognises (`图片`, `音频`, …) |
+| 1 | `services/api/prompts.ts` | the same `PromptOptimizeMode` union, as a type |
+| 1 | `components/layout/user-status-actions.tsx` | the endonym on the language switcher |
+| 56 | `lib/resource-copy-zh.ts` | the resource panel's **Chinese copy**, kept beside the panel by #67 |
+
+**Why these are not a violation** #17 asks for user-visible copy to live in the dictionaries. The protocol
+values are fields the gateway matches or feeds to a workflow (#9); the MOSS regex and prefix are an
+agreement about the shape of the gateway's output; the mascot slogans are set in a CJK font stack and
+printed next to their own English line, so translating them would show the sentence twice; a language name
+is written in the language it names; and the migration titles are strings *stored in old blobs*, which is
+the whole reason they are recognised. `resource-copy-zh.ts` is not copy that escaped: #67 decided the
+resource panel's Chinese lives beside it as data, and `tests/resource-copy-zh.test.ts` keeps the two
+languages in step.
+
+**Not verified** The residual risk is a raw key or a `zh` fallback in a surface nobody clicked through. The
+DOM scan covers every route in both locales; dialogs, drawers and context menus are opened by hand and are
+not exhaustive.
+
+---
+
+## 7. Chinese prose remains in the vendored canvas and plugin subtree
+
+**Where** `infinite-canvas/plugins/` — 63 tracked files, 454 Chinese lines: plugin `README.md`s, plugin
+components, the SDK, the build scripts, the `SKILL.md` agent instructions and `packages.json` metadata.
+Plus `infinite-canvas/CHANGELOG.md` (265 Chinese lines of release history).
+
+**Why it is listed** [`decisions.md`](decisions.md) #17 requires English for documentation and comments.
+These files came in with the upstream canvas subtree and predate the rule. The READMEs and the ~163
+comment/JSDoc lines describe the plugin API — the part a third-party plugin author reads — and the plugins'
+own UI strings are compiled into `web/public/plugins/*.js`, which the canvas dictionaries cannot translate
+because each plugin ships as a standalone bundle.
+
+**Fix** Translate the comments and READMEs first (mechanical). The plugin UI copy needs a decision before
+code moves: either the plugins grow their own copy table (one per bundle, chosen from the canvas locale) or
+the strings become English only. `CHANGELOG.md` is release history — leave the existing entries as written,
+write new ones in English.
+
+**Not affected** The `SKILL.md` files (agent input, same reasoning as #9), the LoRA name filter in
+`workflows/registry.json` (`mj风格` and friends are patterns matched against real file names),
+`web/src/i18n/locales/zh-CN.ts` and everything under `internal/prompt`.
+
+---
+
+## 8. Repository history is larger than the tree (operational)
+
+The tracked tree is small, but the pack file is not: `git count-objects -vH` reports `size-pack` ≈ 15 MiB
+over ~3,200 objects, and most of it is history of files that are no longer here (the upstream vendored
+`web/dist` bundles, a ModelScope zip, a tokenizer directory). Cloning costs that once; nothing else does.
+
+**Fix, if it ever matters** Keep the history and strip those paths:
+
+```bash
+pip install --user git-filter-repo
+git filter-repo --invert-paths \
+  --path infinite-canvas/web/dist \
+  --path-glob '*/T5_tokenizer/*'
+```
+
+Deleting `.git` and re-initialising also works, but loses the history that documents why the code looks
+the way it does.
+
+---
+
+## Fixed, and where the reason is
+
+- **SeedVR2 pack did not import** — the vendored payload was missing `src/data/`; restored, and
+  `internal/resource/payload_imports_test.go` now fails on any pack that imports what it does not ship.
+  #113.
+- **Old 10-bit HEVC clips played audio only** — the two files this entry named are no longer in
+  `data/outputs`, and the three H3 workflows have written `h264` / `yuv420p` since then; the guard is
+  `internal/workflow/browser_playback_test.go`.
+- **"Restart needed" for a missing custom node**, and **the inverted "canvas entry" tag** — labels fixed in
+  #48.
+- **Corrupt persisted state destroyed what it could not read** — `preserveUnreadable`, the recovery banner
+  and the per-project migration; #49 and `tests/persist-migration.test.ts`.
+- **The repo was not formatted with its own Prettier config** — `npm run format` once, and
+  `format:check` is a gate; #50.
+- **Thirteen routes with no caller, the one-shot agent path, the heartbeat, the unused locals and
+  translation keys** — #107–#109, #114. The gates that let them live (#115) now fail on the next one.

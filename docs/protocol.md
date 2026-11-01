@@ -177,8 +177,9 @@ And once it is done:
 }
 ```
 
-One download route for every kind of artifact. There is no base64 mode, no `/files/{name}`
-side channel and no per-media content endpoint.
+One download route for every kind of artifact. There is no base64 mode and no per-media content
+endpoint. (`GET /files/{name}` exists, but it is the export path — a file from `data/outputs` by name —
+not a way to fetch an artifact.)
 
 ## Errors
 

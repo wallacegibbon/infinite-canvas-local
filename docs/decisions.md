@@ -2309,10 +2309,10 @@ model's _name_: `<type>_WORKFLOW` regexes (`image-`, `video-`, `audio-`). A base
 request to `/v1/images/generations` — a route that no longer exists. The channel is the only thing that
 decides which contract a request speaks, so the three predicates are now `isLocalGatewayUrl(baseUrl)`.
 
-**What the canvas still has** The `/v1`-shaped request builders (`/images/generations`,
-`/v1/videos/{id}`, `/audio/speech`) stay: they are the OpenAI contract for _other_ channels, and the
-channel editor allows a base URL that is not this gateway. They are unreachable for the local gateway,
-which is the point.
+**What the canvas still had, and lost** The `/v1`-shaped request builders
+(`/images/generations`, `/v1/videos/{id}`, `/audio/speech`) once stayed on the theory that another
+channel might speak OpenAI. #71 removed the second channel, so those builders had no caller and went
+with them: the gateway's `/api/runs` is the only path any node takes.
 
 **Cost** The gateway can no longer serve a client that speaks OpenAI. That was the goal: it never spoke
 it honestly — one route was `/v1/images/upscale`, another took a `params` JSON string, and every media
@@ -2370,6 +2370,34 @@ browser: the existing canvas, created in Chinese, shows "Audio" and "Local Comfy
 `infinite-canvas/web/src/pages/canvas/hooks/use-image-editors.ts`,
 `infinite-canvas/web/src/pages/canvas/project.tsx`.
 
+## 71. There is one channel, and it is the gateway the page came from
+
+**Decision** The canvas has exactly one model channel. Its address is the gateway that served the page
+(`constant/app-mode.ts`), its model list is whatever `GET /api/workflows` reports, and the channel editor
+keeps only two things: a name and a per-model capability override. "Add a channel", "choose a provider"
+and the address field are gone.
+
+**Why** A channel was a cloud provider: an address, an API key, a model list typed in by hand. This build
+talks to one gateway and to nothing else, so the list could only ever hold one entry whose fields were all
+either fixed or derivable — and a second entry would be a way to point the canvas at something that is not
+this gateway, which is the one thing the local-only rule forbids. The capability override survives because
+it is the only field with information the gateway does not have: a workflow whose `type` is not what the
+user wants it to be.
+
+**Cost** Pointing the canvas at another gateway is a `dist/config.js` / `START.sh` job
+(`LOCAL_GATEWAY_URL`), not a settings-screen job. A saved config from a build with channels is repaired
+on read: the first channel that points at this gateway wins, the rest are dropped, and a backup of the
+original blob is left in `localStorage` under `…:pre-local-only-backup`.
+
+**Where** `infinite-canvas/web/src/constant/app-mode.ts`,
+`infinite-canvas/web/src/stores/use-config-store.ts` (`merge`),
+`infinite-canvas/web/src/components/settings/channel-editor-drawer.tsx`,
+`infinite-canvas/web/src/components/layout/client-root-init.tsx`.
+
+**Tested** `npm run check`, `npx vitest run` (the config-store merge cases), and in the browser: a cleared
+config syncs the gateway's workflow list, the editor shows one channel, and its address field does not
+exist.
+
 ## 72. The gateway address has no `/v1`
 
 **Decision** `LOCAL_GATEWAY_BASE_URL` is the gateway's **root** (`http://host:8190`), and
@@ -2402,10 +2430,11 @@ network capture shows every gateway request on `/api/...` with no `/v1` path any
 
 **Where** `infinite-canvas/web/src/constant/app-mode.ts`, `start.sh`,
 `infinite-canvas/web/src/services/api/{runs,resources}.ts`,
-`infinite-canvas/web/src/lib/local-session.ts`,
 `infinite-canvas/web/src/components/canvas/canvas-system-status.tsx`,
 `infinite-canvas/web/src/pages/canvas/hooks/use-plugin-host.tsx`,
-`infinite-canvas/web/src/stores/use-config-store.ts`.
+`infinite-canvas/web/src/stores/use-config-store.ts`. (The `lib/local-session.ts` this list used to
+name went in #109, and `POST /api/prompts/chat` — the endpoint #73 gave the prompt path — went in #76
+when prompts became the agent's socket.)
 
 ## 73. Text is a prompt route, not a model
 
@@ -3615,6 +3644,36 @@ bundle in a browser: the canvas loads, and the network log contains no `/api/ses
 (where the previous build posted `/api/session/open` and a heartbeat every five seconds).
 
 ---
+
+## 110. There is no token, because the client that would send it cannot keep one
+
+**Decision** `GATEWAY_TOKEN`, the `X-Gateway-Token` branch in `Guard`, and the variable's row in
+`gateway.md`/`README.md` are gone. The startup warning stays, and says what it knows: a bind that is not
+loopback means anyone who can reach the port can run workflows, read their artifacts and drive a canvas's
+agent.
+
+**Why** The token protected `/api/*` and nothing else, which is not where the risk is: `/mcp/{workspace}`
+was never inside that prefix, and that is the route that makes the canvas *do* things. It was also
+unsendable by the only client — the canvas speaks `Authorization: Bearer local` and has nowhere to read
+`X-Gateway-Token` from — so setting the variable turned every request into a 401 and the UI into a wall of
+"missing a valid gateway token". A protection that breaks the product when enabled and omits the dangerous
+route when it works is worse than an honest absence, especially with #19 and #75 leaning on it.
+
+What actually protects the gateway is unchanged and is one rule: a **browser** may write only from an
+allowed origin, which is what stops a random page from driving the gateway through the user's session.
+Nothing protects it from a non-browser client that can reach the port, and `gateway.md` now says so in a
+section of its own — including what such a client gets (`POST /api/runs`, the artifacts under
+`data/outputs`, and `/api/agent/socket/{name}`, which spawns AlayaCore with `read_file` enabled). The one
+dangerous write with its own lock is `POST /api/resources/install` (`INSTALL_INTO_COMFY`), fail-closed.
+
+**Cost** An operator who wants to expose the port to an untrusted network has no built-in answer. The
+documented one is an SSH tunnel or a reverse proxy that terminates authentication; a token in the page
+would not have been that answer either. `GATEWAY_TOKEN` in an existing `.env` is now ignored.
+
+**Tested** `make check`, `make test-race`; the two `httpx` tests that existed for the token went with it
+(one of them still asserted `/v1/*`, a surface deleted in #69). Against the rebuilt binary on `:8192`,
+`/api/workflows` answers `200` with and without the header even with `GATEWAY_TOKEN` set in its
+environment, while a cross-site `POST /api/resources/refresh` still gets `403` from the origin guard.
 
 ## 111. A session's name becomes a file name, so the readable part is capped
 
