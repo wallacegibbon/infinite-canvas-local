@@ -41,7 +41,7 @@ describe("httpJson", () => {
 
     it("throws ApiError with the status and the parsed body on a non-2xx", async () => {
         vi.stubGlobal("fetch", async () => json({ error: { message: "model not found" } }, 404));
-        const error = await httpJson("http://example.test/x").catch((caught) => caught);
+        const error = (await httpJson("http://example.test/x").catch((caught) => caught)) as InstanceType<typeof ApiError>;
         expect(error).toBeInstanceOf(ApiError);
         expect(error.status).toBe(404);
         expect(apiErrorMessage(error, "fallback")).toBe("model not found");

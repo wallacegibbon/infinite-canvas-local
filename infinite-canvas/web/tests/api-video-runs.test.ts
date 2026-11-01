@@ -206,7 +206,7 @@ describe("waitForVideoGenerationTask", () => {
         const previews: Array<{ url: string } | null> = [];
         const result = await waitForVideoGenerationTask(
             gateway(),
-            { id: "task_video_1", provider: "run", model: "video-h3-frames" },
+            { id: "task_video_1", model: "video-h3-frames" },
             {
                 onSteps: (value) => steps.push(value),
                 onPreview: (value) => previews.push(value),
@@ -223,7 +223,7 @@ describe("waitForVideoGenerationTask", () => {
     it("turns a failed run into a video task failure so the node stops polling it", async () => {
         stubGateway({ status: () => json(run({ status: "failed", error: { code: "comfy_execution_failed", message: "Prompt outputs failed validation" } })) });
 
-        const error = await waitForVideoGenerationTask(gateway(), { id: "task_video_1", provider: "run", model: "video-h3-frames" }).catch((caught) => caught);
+        const error = await waitForVideoGenerationTask(gateway(), { id: "task_video_1", model: "video-h3-frames" }).catch((caught) => caught);
 
         expect(error.name).toBe("VideoTaskFailed");
         expect(error.message).toBe("Prompt outputs failed validation");
@@ -232,7 +232,7 @@ describe("waitForVideoGenerationTask", () => {
     it("cancels the run only when the user stopped it", async () => {
         const { calls } = stubGateway({});
         const controller = new AbortController();
-        const watching = waitForVideoGenerationTask(gateway(), { id: "task_video_1", provider: "run", model: "video-h3-frames" }, { signal: controller.signal });
+        const watching = waitForVideoGenerationTask(gateway(), { id: "task_video_1", model: "video-h3-frames" }, { signal: controller.signal });
         controller.abort("user-stop");
 
         await expect(watching).rejects.toMatchObject({ name: "AbortError" });
@@ -242,7 +242,7 @@ describe("waitForVideoGenerationTask", () => {
     it("leaves the run alone when the page goes away", async () => {
         const { calls } = stubGateway({});
         const controller = new AbortController();
-        const watching = waitForVideoGenerationTask(gateway(), { id: "task_video_1", provider: "run", model: "video-h3-frames" }, { signal: controller.signal });
+        const watching = waitForVideoGenerationTask(gateway(), { id: "task_video_1", model: "video-h3-frames" }, { signal: controller.signal });
         controller.abort();
 
         await expect(watching).rejects.toMatchObject({ name: "AbortError" });

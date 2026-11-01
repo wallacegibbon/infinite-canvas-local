@@ -124,7 +124,7 @@ describe("canvas store format", () => {
         });
         const [only] = readCanvasPersisted(raw).projects;
         // The workflow's own inputs are untouched, including the size the pill is read back from.
-        expect(only.nodes[0].metadata.params).toEqual({ editCanvasSize: "1792x1024", resolution: 1024, seed: 7 });
+        expect(only.nodes[0].metadata?.params).toEqual({ editCanvasSize: "1792x1024", resolution: 1024, seed: 7 });
         // A node with nothing stored is left exactly as it was.
         expect(only.nodes[1]).toMatchObject({ id: "n2", title: "Other" });
     });

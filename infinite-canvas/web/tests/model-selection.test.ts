@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "vitest";
-import type { AiConfig, ModelCapability } from "../src/stores/use-config-store";
+import type { AiConfig } from "../src/stores/use-config-store";
 import type { CanvasNodeData } from "../src/types/canvas";
 
 // Config and i18n use browser storage during module initialization.
@@ -31,7 +31,6 @@ const config: AiConfig = {
             name: "Replacement",
             baseUrl: "https://example.com",
             apiKey: "test-key",
-            apiFormat: "openai",
             models: [
                 { name: "video-b", capability: "video" },
                 { name: "video-a", capability: "video" },
@@ -48,7 +47,7 @@ const videoNode = (model: string): CanvasNodeData => ({
     position: { x: 0, y: 0 },
     width: 320,
     height: 180,
-    metadata: { model, videoTaskId: "original-task", videoTaskProvider: "openai", seconds: "4" },
+    metadata: { model, videoTaskId: "original-task", seconds: "4" },
 });
 
 test("task recovery rejects a missing provider instead of querying the first provider", () => {

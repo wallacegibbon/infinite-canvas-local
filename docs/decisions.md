@@ -3719,3 +3719,40 @@ that feeds a format-3 blob with a chat session and asserts both keys are gone wh
 survive). In a browser against `:8191`: the same canvas opened with its 42 nodes and no console error,
 which is the migration running on a real stored blob; the built bundle contains `chatSessions` exactly
 once — inside the migration that deletes it.
+
+---
+
+## 115. The three gates that could not see, and what they see now
+
+**Decision** The frontend's checks grew three teeth:
+
+1. **`tsc` covers `tests/`** (`tsconfig.json`'s `include`), with `noUnusedLocals` and `noUnusedParameters`
+   on for `src` as well. Dead locals are now a compile error, and a test that drifts from the types it
+   exercises fails `npm run check`.
+2. **`check-exports.cjs` counts a test as a reader of nothing.** A reference from `tests/` no longer makes
+   an export "used": exports used only by tests are a failure, and the three that legitimately are
+   (`modelsOf`, `ApiError`, `readApiErrorMessage`) are listed in `TEST_ONLY` with a reason each. This is
+   the same blind spot that kept `agent.Run` alive in Go (#108) — a test importing a function is evidence
+   that the function is *tested*, not that anything calls it.
+3. **`check-i18n.cjs` no longer lets one template exempt a namespace.** It reads the literal candidates out
+   of a template's expressions (`${mode === "image" ? "editImage" : mode}` yields `image`, `editImage`,
+   `text`, `editText`) and marks only those; a segment that comes from data has to be declared in
+   `DYNAMIC_PREFIXES`, either with the values it can take or with a reason why they cannot be enumerated.
+   An undeclared dynamic prefix fails the check, which is what keeps the next blind spot from opening
+   silently.
+
+**Why** Each of the three was expensive in the same way: the suite was green while the tree carried code
+and copy that nothing reached. Thirteen i18n keys lived under `canvas.promptPanel` because one template
+argument marked the whole namespace as used; thirty-one unused locals (mostly `video.ts`'s cloud-era
+shapes) were invisible because nothing asked; and the dead-export rule was satisfied by tests.
+
+**Cost** `DYNAMIC_PREFIXES` is a list a human maintains — twelve entries today, each with the reason it
+cannot be resolved. When one is added, the reason is the review. Tests are now type-checked, so a fixture
+that uses a field a type no longer has fails the build instead of passing silently (ten such drifts were
+found the moment the include changed).
+
+**Tested in both directions** Adding an orphan key under `canvas.promptPanel` fails the check (1 dead key);
+adding a template with an undeclared prefix fails it ("没有声明的动态 key 拼接: canvas.someNewNamespace");
+turning `include` on surfaced ten real type errors in the test files, all fixed. `npm run check` and
+`npx vitest run` (133 cases) are green, and the payload-import gate from #113 covers the fourth blind spot
+(vendored packs).

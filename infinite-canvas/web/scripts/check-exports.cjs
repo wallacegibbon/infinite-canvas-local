@@ -4,9 +4,13 @@
 // 这个检查用 TypeScript 的 language service（`findReferences`），不是 grep —— 后者分不清
 // "导出后本文件自己在用"和"外面在 import"，也跟不上 barrel 重导出。
 //
-// 两类问题：
+// 三类问题：
 //   A. 完全没人引用      → 应该删掉
 //   B. 只有本文件在用    → 应该去掉 `export`
+//   C. 只有测试在用      → 要么去掉 export（测试改用公开入口），要么在 TEST_ONLY 里写明理由
+//
+// C 是刻意算作问题的：测试不是产品代码，一个只有测试 import 的导出说明这个函数/类型
+// 没有真正的调用者，`agent.Run` 就是这么活了一个版本的（Go 那边，同样的盲点）。
 //
 // 豁免：`src/types/canvas-plugin.ts` 是**发布出去的插件契约**，由
 // `../plugins/canvas/sdk/src/types.ts` 镜像。插件作者会 import 这些类型，
@@ -22,6 +26,13 @@ const WEB = path.resolve(__dirname, "..");
 const PLUGINS = path.resolve(WEB, "../plugins");
 
 const EXEMPT = new Set([path.join(WEB, "src/types/canvas-plugin.ts"), path.join(WEB, "src/vite-env.d.ts")]);
+
+// 只被测试引用的导出，逐条写明理由。这里每多一行，就说明产品代码少一个调用者。
+const TEST_ONLY = new Map([
+    ["src/lib/gateway-models.ts:modelsOf", "一个 workflow → 若干候选条目的映射，本身就是被测单元；gatewayModels 只是它的 fold"],
+    ["src/services/api/http.ts:ApiError", "http.ts 抛出的错误类型，测试用它断言 status/body 的形状"],
+    ["src/services/api/http.ts:readApiErrorMessage", "解析器本身是被测单元：表格用例覆盖 msg/message/error/detail/序列化 JSON/HTML 六种形状；从 apiErrorMessage 走会混进状态码兜底"],
+]);
 
 function walk(dir, out = []) {
     if (!fs.existsSync(dir)) return out;
@@ -77,6 +88,7 @@ const checker = program.getTypeChecker();
 
 const unused = [];
 const localOnly = [];
+const testOnly = [];
 
 for (const file of srcFiles) {
     if (EXEMPT.has(file)) continue;
@@ -113,6 +125,7 @@ for (const file of srcFiles) {
         const groups = service.findReferences(declaringFile, nameNode.getStart()) || [];
         let external = 0;
         let own = 0;
+        let tests = 0;
         const seen = new Set();
         for (const group of groups) {
             for (const ref of group.references) {
@@ -121,20 +134,23 @@ for (const file of srcFiles) {
                 if (seen.has(key)) continue;
                 seen.add(key);
                 if (ref.fileName === declaringFile) own += 1;
+                else if (ref.fileName.includes(`${path.sep}tests${path.sep}`)) tests += 1;
                 else external += 1;
             }
         }
 
+        const relative = path.relative(WEB, declaringFile);
         const entry = {
             name: exported.getName(),
-            where: `${path.relative(WEB, declaringFile)}:${declaration.getSourceFile().getLineAndCharacterOfPosition(declaration.getStart()).line + 1}`,
+            where: `${relative}:${declaration.getSourceFile().getLineAndCharacterOfPosition(declaration.getStart()).line + 1}`,
         };
-        if (external === 0 && own === 0) unused.push(entry);
-        else if (external === 0) localOnly.push(entry);
+        if (external === 0 && own === 0 && tests === 0) unused.push(entry);
+        else if (external === 0 && tests === 0) localOnly.push(entry);
+        else if (external === 0 && tests > 0 && !TEST_ONLY.has(`${relative}:${entry.name}`)) testOnly.push(entry);
     }
 }
 
-if (unused.length || localOnly.length) {
+if (unused.length || localOnly.length || testOnly.length) {
     if (unused.length) {
         console.error(`没人引用的导出（应当删除）共 ${unused.length} 个:`);
         for (const item of unused) console.error(`    ${item.where}  ${item.name}`);
@@ -142,6 +158,10 @@ if (unused.length || localOnly.length) {
     if (localOnly.length) {
         console.error(`只在声明文件内部使用的导出（应当去掉 export）共 ${localOnly.length} 个:`);
         for (const item of localOnly) console.error(`    ${item.where}  ${item.name}`);
+    }
+    if (testOnly.length) {
+        console.error(`只被测试引用的导出（去掉 export，或在 TEST_ONLY 里写明理由）共 ${testOnly.length} 个:`);
+        for (const item of testOnly) console.error(`    ${item.where}  ${item.name}`);
     }
     process.exit(1);
 }

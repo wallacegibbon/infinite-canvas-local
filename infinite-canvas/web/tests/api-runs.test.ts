@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Run } from "@/services/api/runs";
+
 /**
  * The run protocol client.
  *
@@ -25,7 +27,7 @@ const json = (body: unknown, status = 200) =>
         headers: { "Content-Type": "application/json" },
     });
 
-const run = (overrides: Record<string, unknown> = {}) => ({
+const run = (overrides: Partial<Run> = {}): Run => ({
     id: "task_1",
     workflow: "audio-minimax-music-3",
     status: "running",
@@ -75,7 +77,7 @@ describe("waitForRun", () => {
         const fetchMock = vi
             .fn()
             .mockResolvedValueOnce(json(run({ progress: { step: 3, total: 10 } })))
-            .mockResolvedValueOnce(json(run({ status: "succeeded", progress: { step: 10, total: 10 }, outputs: [{ index: 0, url: "/api/runs/task_1/outputs/0" }] })));
+            .mockResolvedValueOnce(json(run({ status: "succeeded", progress: { step: 10, total: 10 }, outputs: [{ index: 0, kind: "audio", mime: "audio/mpeg", bytes: 3, filename: "t.mp3", url: "/api/runs/task_1/outputs/0" }] })));
         vi.stubGlobal("fetch", fetchMock);
 
         const steps: Array<{ step: number; total: number }> = [];
@@ -129,7 +131,7 @@ describe("downloadRunOutput", () => {
         const fetchMock = vi.fn(async () => new Response(new Blob(["MP3"], { type: "audio/mpeg" }), { status: 200 }));
         vi.stubGlobal("fetch", fetchMock);
 
-        const blob = await downloadRunOutput(config, run({ status: "succeeded", outputs: [{ index: 0, url: "/api/runs/task_1/outputs/0" }] }));
+        const blob = await downloadRunOutput(config, run({ status: "succeeded", outputs: [{ index: 0, kind: "audio", mime: "audio/mpeg", bytes: 3, filename: "t.mp3", url: "/api/runs/task_1/outputs/0" }] }));
 
         expect(await blob.text()).toBe("MP3");
         const [url] = fetchMock.mock.calls[0] as unknown as [string];

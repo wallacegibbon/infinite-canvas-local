@@ -5,6 +5,10 @@
         "allowJs": true,
         "skipLibCheck": true,
         "strict": true,
+        // 死代码是第一道门：没人读的局部变量/参数在这里就不许存在。
+        // 曾经有 31 处（video.ts 的云时代残留等）靠人工发现，现在由 tsc 负责。
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
         "noEmit": true,
         "esModuleInterop": true,
         "module": "esnext",
@@ -17,6 +21,6 @@
             "@/*": ["./src/*"]
         }
     },
-    "include": ["vite.config.ts", "src/**/*.ts", "src/**/*.tsx"],
+    "include": ["vite.config.ts", "src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"],
     "exclude": ["node_modules"]
 }

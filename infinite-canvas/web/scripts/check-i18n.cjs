@@ -69,10 +69,85 @@ const HAND_RESOLVED = [
     "config.preferences.defaultAudioModel",
 ];
 
+// 模板拼接的命名空间，逐条声明。两种写法：
+//   values: [...]  后缀只可能是这几个（节点模式、位置……），只有它们算"在用"——多出来的 key 照旧算死 key
+//   不给 values    后缀来自数据表（无法静态读出），整个命名空间豁免；理由必须写清楚
+// 没有声明的动态拼接会让检查失败：这就是"一个模板藏掉一整个命名空间"的补丁不许再开一个口子。
+const DYNAMIC_PREFIXES = new Map([
+    [
+        "canvas.promptPanel",
+        {
+            values: ["image", "video", "audio", "text"],
+            why: "`canvas.promptPanel.${mode}` 的 mode 是节点的生成方式；editImage/editText 由模板自己的字面量分支给出",
+        },
+    ],
+    ["assets.kinds", { why: "后缀是资产自身的 kind 字段，静态读不出" }],
+    ["canvas.sidePanel.filter", { why: "后缀是 NODE_FILTER_VALUES 里的节点类型" }],
+    ["canvas.composer.resources", { why: "后缀是输入节点的类型（image/video/audio/text/group）" }],
+    ["canvas.toolbar", { why: "后缀是当前画布工具（select/pan）" }],
+    ["gateway.models", { why: "后缀是 registry 里的模型 id；中文标签由 chinese() 只查 zh 字典，见 known-issues #10" }],
+    ["gateway.variants", { why: "同上：registry 里 variant 模式 id → 中文标签" }],
+    ["settingsPanels.video", { why: "后缀是数据表里的 labelKey（尺寸、速度档、模式提示）" }],
+    ["settingsPanels.video.modes", { why: "后缀是数据表里的模式 labelKey，外加两个提示分支的字面量" }],
+    ["settingsPanels.model.capabilities", { why: "后缀是 ModelCapability 联合类型，值在类型里" }],
+    ["config.channelEditor.capabilities", { why: "同上，来自 ModelCapability 数组" }],
+    ["config.preferences.cardSkins", { why: "后缀是皮肤 id 的数据表，.label/.description 都是表格字段" }],
+    ["config.preferences.progressRingSkins", { why: "同上，进度环皮肤的数据表" }],
+    ["config.localStorage.stores", { why: "后缀是 localStorage 的 store key 表" }],
+    ["canvas.videoFrames", { why: "后缀是 first/last/both 三种位置加 Title 后缀，模板读不出" }],
+    ["apiErrors", { why: "apiText(key) 的后缀是各服务自己的错误码常量" }],
+]);
+
+const undeclared = [];
 const reachable = new Set(HAND_RESOLVED);
 const prefixes = new Set();
 const unsound = [];
 const stripDot = (s) => (s.endsWith(".") ? s.slice(0, -1) : s);
+
+/**
+ * 模板字符串里能静态读出的那些候选值。
+ *
+ * `t(`canvas.promptPanel.${mode === "image" ? "editImage" : mode}`)` 以前被当成"整个命名空间都在用"，
+ * 结果 `canvas.promptPanel.*` 下 13 个死 key 藏了一个版本。现在只承认字面量候选（以及条件/拼接里
+ * 能读出的分支）；只要有一处是变量、就返回 dynamic，让调用点进"无法静态解析"的清单，由人核对。
+ */
+function templateCandidates(prefix, expression) {
+    const found = new Set();
+    let dynamic = false;
+    const walk = (node) => {
+        if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+            found.add(`${prefix}.${node.text}`);
+            return;
+        }
+        if (ts.isParenthesizedExpression(node)) return walk(node.expression);
+        if (ts.isConditionalExpression(node)) {
+            walk(node.whenTrue);
+            walk(node.whenFalse);
+            return;
+        }
+        if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+            walk(node.left);
+            walk(node.right);
+            return;
+        }
+        dynamic = true;
+    };
+    walk(expression);
+    for (const key of found) reachable.add(key);
+    if (!dynamic) return true;
+
+    const declared = DYNAMIC_PREFIXES.get(prefix);
+    if (!declared) {
+        undeclared.push(prefix);
+        return false;
+    }
+    if (declared.values) {
+        for (const value of declared.values) reachable.add(`${prefix}.${value}`);
+    } else {
+        prefixes.add(prefix);
+    }
+    return true;
+}
 
 function classify(node) {
     if (ts.isParenthesizedExpression(node)) return classify(node.expression);
@@ -81,12 +156,16 @@ function classify(node) {
         return true;
     }
     if (ts.isTemplateExpression(node)) {
-        prefixes.add(stripDot(node.head.text));
-        return true;
+        const head = stripDot(node.head.text);
+        let sound = true;
+        for (const span of node.templateSpans) {
+            if (!templateCandidates(head, span.expression)) sound = false;
+        }
+        return sound;
     }
     if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken && ts.isStringLiteral(node.left)) {
-        prefixes.add(stripDot(node.left.text));
-        return true;
+        const head = stripDot(node.left.text);
+        return templateCandidates(head, node.right);
     }
     if (ts.isConditionalExpression(node)) return classify(node.whenTrue) && classify(node.whenFalse);
     return false;
@@ -147,6 +226,10 @@ if (onlyEn.length) problems.push(`只有 en-US 有:\n${onlyEn.map((k) => `    ${
 if (unsound.length) {
     console.warn(`注意：${unsound.length} 处 t(变量) 无法静态解析，需与 HAND_RESOLVED 人工核对:`);
     for (const site of unsound) console.warn(`    ${site}`);
+}
+
+if (undeclared.length) {
+    problems.push(`没有声明的动态 key 拼接（在 DYNAMIC_PREFIXES 里写明值或理由）:\n${[...new Set(undeclared)].map((prefix) => `    ${prefix}`).join("\n")}`);
 }
 
 if (problems.length) {
