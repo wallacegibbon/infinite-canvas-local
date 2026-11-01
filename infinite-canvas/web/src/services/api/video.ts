@@ -1,28 +1,15 @@
 import i18n from "@/i18n";
-import { apiErrorMessage, httpBlob, isCancelled, readApiErrorMessage } from "@/services/api/http";
-import { dataUrlToFile, readFileAsDataUrl } from "@/lib/image-utils";
+import { apiErrorMessage, isCancelled } from "@/services/api/http";
+import { dataUrlToFile } from "@/lib/image-utils";
 import { clampVideoSeconds, computeVideoSize, inferVideoRatio } from "@/lib/media-size";
 import { VIDEO_INTERPOLATE_WORKFLOW, VIDEO_UPSCALE_WORKFLOW } from "@/lib/canvas/tool-workflows";
 import { getMediaBlob, resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
 import { cancelRun, createRun, downloadRunOutput, uploadMedia, waitForRun, RunFailedError, type Run } from "@/services/api/runs";
-import { boolConfig, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
+import { resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
-type VideoResponse = {
-    id: string;
-    status?: string;
-    error?: { message?: string };
-    url?: string;
-    result_url?: string;
-    video_url?: string;
-    content?: { video_url?: string; url?: string } | null;
-    preview?: { url?: string; mime?: string; step?: number; total?: number };
-    steps?: { step?: number; total?: number };
-};
-type ApiVideoResponse = VideoResponse | { code?: number | string; data?: VideoResponse | null; msg?: string; message?: string; error?: { message?: string } };
-type ApiEnvelope<T> = T | { code?: number | string; data?: T | null; msg?: string; message?: string; error?: { message?: string } };
 type RequestOptions = { signal?: AbortSignal; params?: Record<string, unknown> };
 type VideoMediaOptions = RequestOptions & { videos?: ReferenceVideo[]; audios?: ReferenceAudio[] };
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -36,20 +23,11 @@ type VideoInterpolateSource = VideoUpscaleSource;
 type VideoInterpolateParams = { multiplier: 2 | 3 };
 export type VideoPreview = { url: string; mime?: string; step?: number; total?: number };
 type WaitOptions = RequestOptions & { onPreview?: (preview: VideoPreview | null) => void; onSteps?: (steps: { step: number; total: number }) => void };
-type VideoGenerationTaskState = { status: "pending"; preview?: VideoPreview; steps?: { step: number; total: number } } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
-
 /**
  * A video run renders for minutes, so it is polled slower than an image: the step count and the
  * preview frame are the only things a poll adds, and both change slowly.
  */
 const VIDEO_RUN_INTERVAL_MS = 1500;
-
-function aiHeaders(config: AiConfig, contentType?: string) {
-    return {
-        Authorization: `Bearer ${config.apiKey}`,
-        ...(contentType ? { "Content-Type": contentType } : {}),
-    };
-}
 
 export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], options?: VideoMediaOptions): Promise<VideoGenerationResult> {
     return waitForVideoGenerationTask(config, await createVideoGenerationTask(config, prompt, references, options), options);
@@ -262,17 +240,6 @@ function resolvePreviewUrl(config: AiConfig, url: string) {
         return url;
     }
 }
-async function videoResultFromUrl(url: string, options?: RequestOptions): Promise<VideoGenerationResult> {
-    try {
-        const blob = await httpBlob(url, { signal: options?.signal });
-        await assertVideoBlob(blob);
-        return { blob };
-    } catch (error) {
-        if (isCancelled(error) || options?.signal?.aborted) throw error;
-        return { url, mimeType: "video/mp4" };
-    }
-}
-
 async function referenceMediaToFile(item: { name: string; type?: string; url?: string; storageKey?: string }, fallbackName: string, errorKey: "invalidReferenceVideo" | "invalidReferenceAudio", options?: RequestOptions) {
     let blob = item.storageKey ? await getMediaBlob(item.storageKey) : null;
     if (!blob) {
@@ -287,18 +254,6 @@ async function referenceMediaToFile(item: { name: string; type?: string; url?: s
     }
     if (!blob.size) throw new Error(apiText(errorKey));
     return new File([blob], item.name || fallbackName, { type: item.type || blob.type || "application/octet-stream" });
-}
-
-async function assertVideoBlob(blob: Blob) {
-    if (!blob.type.includes("json")) return;
-    let payload: { code?: number; msg?: string; error?: { message?: string } };
-    try {
-        payload = JSON.parse(await blob.text()) as { code?: number; msg?: string; error?: { message?: string } };
-    } catch {
-        return;
-    }
-    if (typeof payload.code === "number" && payload.code !== 0) throw new Error(readApiErrorMessage(payload) || apiText("videoDownloadFailed"));
-    if (payload.error?.message) throw new Error(readApiErrorMessage(payload.error.message) || payload.error.message);
 }
 
 function assertVideoConfig(config: AiConfig, model: string) {
@@ -322,29 +277,4 @@ function normalizeVideoSize(value: string, resolution?: string) {
     // A stale pixel size must not override the selected 480/720/1080 tier.
     const ratio = inferVideoRatio(value);
     return computeVideoSize(selectedResolution, ratio === "auto" ? "16:9" : ratio);
-}
-
-function normalizeVideoResolution(value: string) {
-    if (value === "low") return "480p";
-    if (value === "auto" || value === "high" || value === "medium") return "720p";
-    const resolution = value.replace(/p$/i, "") || "720";
-    return `${resolution}p`;
-}
-
-function delay(ms: number, signal?: AbortSignal) {
-    return new Promise<void>((resolve, reject) => {
-        if (signal?.aborted) {
-            reject(new DOMException("Aborted", "AbortError"));
-            return;
-        }
-        const timer = setTimeout(resolve, ms);
-        signal?.addEventListener(
-            "abort",
-            () => {
-                clearTimeout(timer);
-                reject(new DOMException("Aborted", "AbortError"));
-            },
-            { once: true },
-        );
-    });
 }

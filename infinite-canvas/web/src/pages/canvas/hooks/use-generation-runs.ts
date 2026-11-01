@@ -272,7 +272,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
             setSelectedConnectionId(null);
             setDialogNodeId(nodeId);
 
-            const controller = startGenerationRequest(rootId, nodeId, nodeId, runController, count);
+            const controller = startGenerationRequest(rootId, nodeId, nodeId, runController);
             let hasSuccess = false;
             let hasFailure = false;
             let firstError = "";

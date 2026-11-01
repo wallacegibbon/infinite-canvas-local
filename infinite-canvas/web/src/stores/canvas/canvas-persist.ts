@@ -13,7 +13,7 @@ import type { CanvasProject } from "@/stores/canvas/use-canvas-store";
  * handed to `preserveUnreadable`, which copies it aside, refuses further writes, and tells the
  * user. `version` is still set on the store so that what we *write* is labelled.
  */
-export const CANVAS_PERSIST_VERSION = 3;
+export const CANVAS_PERSIST_VERSION = 4;
 
 type PersistedCanvasState = {
     projects: CanvasProject[];
@@ -49,7 +49,7 @@ export function readCanvasPersisted(raw: string): PersistedCanvasState {
  * over the array.
  */
 function migrateCanvasState(state: unknown, from: number) {
-    if (from !== 0 && from !== 1 && from !== 2) throw new Error(`no migration from format version ${from}`);
+    if (from !== 0 && from !== 1 && from !== 2 && from !== 3) throw new Error(`no migration from format version ${from}`);
     const source = asRecord(state);
     const projects = Array.isArray(source.projects) ? source.projects : [];
     return {
@@ -63,9 +63,7 @@ function migrateCanvasState(state: unknown, from: number) {
 function backfillProject(raw: unknown): unknown {
     const project = asRecord(raw);
     return {
-        ...project,
-        chatSessions: Array.isArray(project.chatSessions) ? project.chatSessions : [],
-        activeChatId: typeof project.activeChatId === "string" ? project.activeChatId : null,
+        ...withoutRetiredProjectFields(project),
         backgroundMode: typeof project.backgroundMode === "string" ? (project.backgroundMode as CanvasBackgroundMode) : "lines",
         showImageInfo: typeof project.showImageInfo === "boolean" ? project.showImageInfo : false,
         viewport: backfillViewport(project.viewport),
@@ -75,6 +73,21 @@ function backfillProject(raw: unknown): unknown {
 
 function backfillNode(raw: unknown): unknown {
     return withoutUiOnlyParams(backfillNodeTitle(raw));
+}
+
+/**
+ * Drop the fields the abandoned canvas-chat model left in every stored project (format 3 → 4).
+ *
+ * `chatSessions` and `activeChatId` described a chat whose messages the canvas kept itself. The agent
+ * panel does not keep them any more — the conversation is the agent's session file — so nothing ever wrote
+ * a message, and the two keys only travelled: persisted on every edit, restored on every open, carried
+ * through the undo history. Removing them here is the whole migration; a canvas saved by an older build is
+ * repaired the next time it is read.
+ */
+function withoutRetiredProjectFields(project: Record<string, unknown>): Record<string, unknown> {
+    if (!("chatSessions" in project) && !("activeChatId" in project)) return project;
+    const { chatSessions: _sessions, activeChatId: _active, ...rest } = project;
+    return rest;
 }
 
 /**

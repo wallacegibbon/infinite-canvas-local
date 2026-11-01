@@ -1,6 +1,6 @@
 import i18n from "@/i18n";
 import { LOCAL_GATEWAY_BASE_URL, isLocalGatewayUrl } from "@/constant/app-mode";
-import { channelModelOf, modelImageInputs, modelOptionName, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
+import { channelModelOf, modelImageInputs, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import { nanoid } from "nanoid";
 import { dataUrlToFile, readFileAsDataUrl } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
@@ -9,8 +9,6 @@ import { imageToDataUrl } from "@/services/image-storage";
 import { imageSizePresets } from "@/lib/media-size";
 import { apiErrorMessage } from "@/services/api/http";
 import { createRun, downloadRunOutputs, uploadMedia, waitForRun, type Run } from "@/services/api/runs";
-import { requestWorkflows } from "@/services/api/workflows";
-import { publishStepProgress } from "@/services/api/step-progress";
 import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -42,9 +40,6 @@ const IMAGE_MIN_PIXELS = 655360;
 const IMAGE_MAX_PIXELS = 8294400;
 const IMAGE_MAX_EDGE = 3840;
 const IMAGE_MAX_RATIO = 3;
-const IMAGE_OUTPUT_FORMAT = "png";
-// Matches the image-storage download timeout, so a hung endpoint does not leave the node stuck in "generating".
-const IMAGE_REQUEST_TIMEOUT_MS = 10 * 60_000;
 
 export function localGatewayRoot(baseUrl: string) {
     const url = String(baseUrl || "")

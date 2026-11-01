@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowUp, ChevronRight, LoaderCircle, Maximize2, ScanText, Sparkles, Square, X } from "lucide-react";
+import { ArrowUp, ChevronRight, LoaderCircle, Maximize2, ScanText, Sparkles, X } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
 
@@ -33,7 +33,6 @@ export type CanvasNodeGenerationMode = CanvasGenerationMode;
 type CanvasNodePromptPanelProps = {
     node: CanvasNodeData;
     /** The canvas this node lives in: the name its agent is filed under. */
-    canvasId: string;
     isRunning: boolean;
     onPromptChange: (nodeId: string, prompt: string) => void;
     onConfigChange: (nodeId: string, patch: Partial<CanvasNodeData["metadata"]>) => void;
@@ -54,7 +53,6 @@ type CanvasNodePromptPanelProps = {
 export function CanvasNodePromptPanel({
     node,
     nodes,
-    canvasId,
     isRunning,
     onPromptChange,
     onConfigChange,

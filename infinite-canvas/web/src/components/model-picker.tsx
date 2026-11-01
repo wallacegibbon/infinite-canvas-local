@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/kit/select-primitive";
 import { cn } from "@/lib/utils";
-import { baseModelOptions, channelModelOf, modelOptionLabel, modelOptionName, selectableModelsByCapability, workflowModelOptions, workflowModelValue, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
+import { baseModelOptions, channelModelOf, modelOptionLabel, selectableModelsByCapability, workflowModelOptions, workflowModelValue, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 
 type ModelPickerExtraOption = { value: string; label: string; disabled?: boolean };
 

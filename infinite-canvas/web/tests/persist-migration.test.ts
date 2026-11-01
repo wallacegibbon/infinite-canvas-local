@@ -16,8 +16,6 @@ const project = (overrides: Record<string, unknown> = {}) => ({
     updatedAt: "2026-01-01T00:00:00.000Z",
     nodes: [],
     connections: [],
-    chatSessions: [],
-    activeChatId: null,
     backgroundMode: "lines",
     showImageInfo: false,
     viewport: { x: 10, y: 20, k: 0.5 },
@@ -44,10 +42,25 @@ describe("canvas store format", () => {
             state: { projects: [{ id: "P1", title: "Canvas", nodes: [], connections: [], viewport: { x: 1, y: 2, k: 1 } }] },
         });
         const [only] = readCanvasPersisted(raw).projects;
-        expect(only.chatSessions).toEqual([]);
-        expect(only.activeChatId).toBeNull();
         expect(only.backgroundMode).toBe("lines");
         expect(only.showImageInfo).toBe(false);
+    });
+
+    it("drops the abandoned chat fields a format-3 blob still carries", () => {
+        const raw = JSON.stringify({
+            version: 3,
+            state: {
+                projects: [{ ...project(), chatSessions: [{ id: "chat-1", title: "old", messages: [] }], activeChatId: "chat-1" }],
+                deletedProjects: [],
+                lastProjectId: "P1",
+            },
+        });
+        const [only] = readCanvasPersisted(raw).projects;
+        expect("chatSessions" in only).toBe(false);
+        expect("activeChatId" in only).toBe(false);
+        // Everything the canvas does use survives the drop.
+        expect(only.nodes).toEqual([]);
+        expect(only.viewport).toEqual({ x: 10, y: 20, k: 0.5 });
     });
 
     it("repairs a viewport with no zoom, which would otherwise be NaN across the canvas", () => {

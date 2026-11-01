@@ -3686,3 +3686,36 @@ makes it fail with exactly the two imports `generation_utils.py` needs. The rest
 2.5.24 tree (`area_resize`, `divisible_crop`, `na_resize`, `side_resize`), byte-identical to it, and
 `python3 -m py_compile` accepts them — importing them for real needs torch, so the compile check is as far
 as this repository can go without ComfyUI's interpreter.
+
+---
+
+## 114. The chat the panel stopped keeping, and the code that still carried it
+
+**Decision** Out of the canvas frontend: `chatSessions` / `activeChatId` (persisted in every project,
+carried through the undo history, restored on every open), the four `CanvasAssistant*` types, the
+`hydrateAssistantImages` pass, thirteen dead translation keys, the `step-progress` bus
+(`bindStepProgress` / `unbindStepProgress` / `publishStepProgress`), and the thirty-one unused locals and
+cloud-era leftovers that `tsc --noUnusedLocals` lists (mostly `services/api/video.ts`: `ApiVideoResponse`,
+`ApiEnvelope`, `VideoGenerationTaskState`, `aiHeaders`, `videoResultFromUrl`, `assertVideoBlob`,
+`normalizeVideoResolution`, `delay`).
+
+**Why** $4 held a conversation the panel drew itself. When the panel became a socket over the agent's own
+session file (#104) that model lost its writer: nothing ever pushed a message, so the two fields only
+travelled — written on every edit, read on every open, cloned into every undo step. The types, the
+hydration pass and the store plumbing existed to move them. The rest is the same shape of leftover: the
+step ring is driven by a run's own progress now (`waitForRun`'s `onSteps`, and `updateVideoSteps`), so
+`publishStepProgress` had no caller and every `bindStepProgress` registered a handler nothing invoked; and
+`video.ts` still carried the request/response shapes of the cloud API that #69 deleted, kept alive only by
+each other.
+
+**Cost** A stored blob is now format 4: `backfillProject` drops the two keys on read (the migration is a
+destructuring, like the `editCanvasRatio` one in #102), so an older canvas opens without them. An undo
+entry and a project are now `nodes + connections + backgroundMode + showImageInfo` — less to copy per edit.
+`stepProgress` itself stays: the ring is real, its source is the run.
+
+**Tested** `npm run check` (i18n 1031/1013 keys, no dead key; 181 modules, no invalid export; prettier;
+`tsc --noUnusedLocals --noUnusedParameters` clean) and `npx vitest run` (133 cases, including a new one
+that feeds a format-3 blob with a chat session and asserts both keys are gone while nodes and viewport
+survive). In a browser against `:8191`: the same canvas opened with its 42 nodes and no console error,
+which is the migration running on a real stored blob; the built bundle contains `chatSessions` exactly
+once — inside the migration that deletes it.

@@ -22,8 +22,6 @@ export function CanvasTopBar({
     onStartTitleEditing,
     onFinishTitleEditing,
     onCancelTitleEditing,
-    canUndo,
-    canRedo,
     onSwitchProject,
     onCreateProject,
     onDeleteProject,
@@ -36,8 +34,6 @@ export function CanvasTopBar({
     onStartTitleEditing: () => void;
     onFinishTitleEditing: () => void;
     onCancelTitleEditing: () => void;
-    canUndo: boolean;
-    canRedo: boolean;
     onSwitchProject: (id: string) => void;
     onCreateProject: () => void;
     onDeleteProject: () => void;

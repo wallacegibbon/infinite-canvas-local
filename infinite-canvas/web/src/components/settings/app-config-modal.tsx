@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, ChevronDown, Lock, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Lock, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,7 +10,6 @@ import { Input } from "@/components/kit/input";
 import { Tabs } from "@/components/kit/nav";
 import { Select } from "@/components/kit/select";
 import { toast } from "@/components/kit/toast";
-import { confirm } from "@/components/kit/confirm";
 import { ModelPicker, WorkflowModelPicker } from "@/components/model-picker";
 import { imageAspectOptions } from "@/components/image-settings-panel";
 import { videoResolutionOptions } from "@/components/video-settings-panel";
@@ -25,10 +24,6 @@ import { isCardSkinLocked, verifySkinPassword } from "@/lib/canvas/skin-unlocks"
 import { persistSkinUnlock } from "@/services/api/skin-unlocks";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { channelName, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
-
-type PromptEndpointDraft = { name: string; baseUrl: string; apiKey: string; model: string };
-
-const EMPTY_PROMPT_ENDPOINT: PromptEndpointDraft = { name: "", baseUrl: "", apiKey: "", model: "" };
 
 type ModelGroup = {
     capability: ModelCapability;

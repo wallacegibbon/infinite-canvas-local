@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowUp, Bot, LoaderCircle, Square, Wrench, X } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-import { canvasThemes } from "@/lib/canvas-theme";
-import { CANVAS_DIALOG_CONTENT } from "@/lib/canvas-overlay";
 import { referenceBlock, referenceEntries, referenceLine, withoutReferences } from "@/lib/canvas/agent-references";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { AgentSettingsControls } from "./agent-settings-controls";
