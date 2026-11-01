@@ -2,7 +2,7 @@ package workflow
 
 // Guards for the shipped audio workflow: the graph must parse as an API export, be
 // inferred as audio (not image, even though it samples with a KSampler), and expose the
-// caption/lyrics split the /v1/audio/speech route relies on.
+// caption/lyrics split that `audio-minimax-music-3` declares in its bindings.
 
 import (
 	"encoding/json"
@@ -12,6 +12,13 @@ import (
 )
 
 const musicWorkflowID = "audio-minimax-music-3"
+
+// registryFile mirrors the on-disk registry document, which is what these tests read instead of going
+// through the gateway: the workflow files are the thing under test.
+type registryFile struct {
+	Version   int               `json:"version"`
+	Workflows []json.RawMessage `json:"workflows"`
+}
 
 func loadShippedEntry(t *testing.T, id string) (*Entry, Graph) {
 	t.Helper()

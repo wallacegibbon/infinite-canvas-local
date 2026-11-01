@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"comfyui-gateway/internal/agent"
 	"comfyui-gateway/internal/httpx"
@@ -219,21 +218,6 @@ func (s *Server) readSocket(conn *ws.Conn, session *agent.Session, send func(age
 			}
 		}
 	}
-}
-
-// eventCounts renders what was relayed, which is what a reader needs to tell a finished answer from a
-// refusal without scrolling the transcript.
-func eventCounts(counts map[string]int) string {
-	parts := make([]string, 0, len(counts))
-	for _, kind := range []string{"models", "delta", "reasoning", "model", "reasoning_level", "command", "tool_call", "tool_result", "done", "error"} {
-		if counts[kind] > 0 {
-			parts = append(parts, fmt.Sprintf("%s=%d", kind, counts[kind]))
-		}
-	}
-	if len(parts) == 0 {
-		return "none"
-	}
-	return strings.Join(parts, " ")
 }
 
 // truncateText keeps a prompt's head for the log: a full one can be a page long, and the first line is

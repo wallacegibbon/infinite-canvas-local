@@ -834,25 +834,6 @@ func (r *Registry) hasID(id string) bool {
 	return exists
 }
 
-// mergeBindings overlays explicit bindings on top of inferred ones, keeping the
-// inferred ordering for keys the author did not touch.
-func mergeBindings(inferred, override OrderedMap[OrderedMap[any]]) OrderedMap[OrderedMap[any]] {
-	out := OrderedMap[OrderedMap[any]]{Values: map[string]OrderedMap[any]{}}
-	seen := map[string]bool{}
-	for _, key := range inferred.Keys {
-		out.Keys = append(out.Keys, key)
-		out.Values[key] = inferred.Values[key]
-		seen[key] = true
-	}
-	for _, key := range override.Keys {
-		if !seen[key] {
-			out.Keys = append(out.Keys, key)
-		}
-		out.Values[key] = override.Values[key]
-	}
-	return out
-}
-
 func nonNilMap(value map[string]any) map[string]any {
 	if value == nil {
 		return map[string]any{}

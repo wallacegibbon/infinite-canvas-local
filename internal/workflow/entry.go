@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
@@ -351,10 +350,4 @@ type rawEntry struct {
 	VariantLabels     OrderedMap[string]          `json:"variantLabels"`
 	ImportedAt        string                      `json:"importedAt"`
 	Source            *Source                     `json:"source"`
-}
-
-// registryFile mirrors the on-disk registry document.
-type registryFile struct {
-	Version   int               `json:"version"`
-	Workflows []json.RawMessage `json:"workflows"`
 }

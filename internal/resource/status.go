@@ -568,22 +568,17 @@ func (m *Manager) Status() *Status {
 
 	// Bake dependencies are resolved against other resources, so compute non-bake
 	// rows first and fill bakes afterwards.
-	var ordered []*Item
 	for _, resource := range index.Resources {
 		if resource.Type == "bake" {
 			continue
 		}
-		item := m.itemStatus(resource, root, map[string]*Item{})
-		byID[resource.ID] = item
-		ordered = append(ordered, item)
+		byID[resource.ID] = m.itemStatus(resource, root, map[string]*Item{})
 	}
 	for _, resource := range index.Resources {
 		if resource.Type != "bake" {
 			continue
 		}
-		item := m.itemStatus(resource, root, byID)
-		byID[resource.ID] = item
-		ordered = append(ordered, item)
+		byID[resource.ID] = m.itemStatus(resource, root, byID)
 	}
 
 	// Preserve index order in the response.

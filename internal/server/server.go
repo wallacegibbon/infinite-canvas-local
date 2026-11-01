@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"comfyui-gateway/internal/agent"
@@ -48,10 +46,7 @@ type Server struct {
 	setup         *setup.Manager
 	resources     *resource.Manager
 
-	startedAt   time.Time
-	lastOOM     sync.Mutex
-	lastOOMAt   string
-	lastOOMText string
+	startedAt time.Time
 }
 
 // New constructs the whole gateway. Everything is loaded before the first request,
@@ -237,12 +232,6 @@ func bodyOrEmpty(ctx *httpx.Ctx) (map[string]any, error) {
 	return body, nil
 }
 
-// matchesImageField reports whether a form field carries an image or a video frame.
-func matchesImageField(field string) bool {
-	lowered := strings.ToLower(field)
-	return strings.Contains(lowered, "image") || strings.Contains(lowered, "frame")
-}
-
 func defaultMime(value string) string {
 	if value == "" {
 		return "image/png"
@@ -297,20 +286,6 @@ func (s *Server) enrichParameters(parameters []any) []any {
 		out = append(out, copied)
 	}
 	return out
-}
-
-// probeVideoFrames counts the frames of an uploaded video, 0 when unknown.
-func (s *Server) probeVideoFrames(file httpx.File) int {
-	if len(file.Bytes) == 0 {
-		return 0
-	}
-	extension := util.ExtFromMime(file.Mimetype, file.Filename, "mp4")
-	temporary := filepath.Join(os.TempDir(), "comfy-probe-"+util.UUIDShort()+"."+extension)
-	if err := os.WriteFile(temporary, file.Bytes, 0o644); err != nil {
-		return 0
-	}
-	defer os.Remove(temporary)
-	return s.probeVideoFile(temporary)
 }
 
 // probeVideoPath reads the length of a video that is already on disk (an upload).
@@ -380,14 +355,6 @@ func (s *Server) probeVideoFile(temporary string) int {
 		return 1
 	}
 	return frames
-}
-
-// recordOOM remembers the last out-of-memory failure for /api/system/stats.
-func (s *Server) recordOOM(message string) {
-	s.lastOOM.Lock()
-	defer s.lastOOM.Unlock()
-	s.lastOOMAt = util.NowIso()
-	s.lastOOMText = message
 }
 
 // serveFile writes a local file from the output directory.

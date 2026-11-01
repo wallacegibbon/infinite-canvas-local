@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 )
 
 // Graph is a ComfyUI API-format graph: node id -> node object.
@@ -197,42 +196,7 @@ func DecodeGraph(data []byte) (Graph, error) {
 	return Graph(decoded), nil
 }
 
-// linkNodeID extracts the source node id from a ComfyUI link value like ["12", 0].
-func linkNodeID(value any) (string, bool) {
-	list, ok := value.([]any)
-	if !ok || len(list) < 1 {
-		return "", false
-	}
-	switch typed := list[0].(type) {
-	case string:
-		return typed, true
-	case float64:
-		return fmt.Sprintf("%d", int64(typed)), true
-	}
-	return "", false
-}
-
-// linkSlot extracts the source output slot from a link value.
-func linkSlot(value any) (int, bool) {
-	list, ok := value.([]any)
-	if !ok || len(list) < 2 {
-		return 0, false
-	}
-	switch typed := list[1].(type) {
-	case float64:
-		return int(typed), true
-	case int:
-		return typed, true
-	}
-	return 0, false
-}
-
 // asLink builds a ComfyUI link value: [nodeID, slot].
 func asLink(nodeID string, slot int) []any {
 	return []any{nodeID, slot}
-}
-
-// normalizeSlashes is the shared model-path comparison form.
-func normalizeSlashes(value string) string {
-	return strings.ReplaceAll(value, `\`, "/")
 }

@@ -323,25 +323,19 @@ func (s *Server) handleSystemStats(ctx *httpx.Ctx) error {
 	defer cancel()
 	sample, _ := s.comfyHostStats(requestCtx)
 
-	s.lastOOM.Lock()
-	lastOOM := map[string]any(nil)
-	if s.lastOOMAt != "" {
-		lastOOM = map[string]any{"at": s.lastOOMAt, "message": s.lastOOMText}
-	}
-	s.lastOOM.Unlock()
-
-	if lastOOM == nil {
-		for _, stored := range s.tasks.List() {
-			if stored.Error == nil || !isOOM(*stored.Error) {
-				continue
-			}
-			at := ""
-			if stored.CompletedAt != nil {
-				at = *stored.CompletedAt
-			}
-			lastOOM = map[string]any{"at": at, "message": *stored.Error}
-			break
+	// The last out-of-memory failure among the runs the gateway remembers. Nothing in this process
+	// can see ComfyUI's log, so a run's recorded error is the only place that fact survives.
+	var lastOOM map[string]any
+	for _, stored := range s.tasks.List() {
+		if stored.Error == nil || !isOOM(*stored.Error) {
+			continue
 		}
+		at := ""
+		if stored.CompletedAt != nil {
+			at = *stored.CompletedAt
+		}
+		lastOOM = map[string]any{"at": at, "message": *stored.Error}
+		break
 	}
 
 	payload := map[string]any{
