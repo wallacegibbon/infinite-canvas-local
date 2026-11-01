@@ -3633,3 +3633,29 @@ what the hash is for. Nothing reads the prefix back.
 **Tested** `internal/server/agent_workspace_test.go`: a 500-character name yields a key of at most 49 bytes
 with an 8-hex suffix, deterministically; two names that agree for their first 499 characters still differ;
 and a name carrying `/`, `:`, `*`, `?` and CJK becomes dashes without starting with a dot.
+
+---
+
+## 112. A spawn is not worth the whole gateway's lock
+
+**Decision** `Sessions.Connect` looks the name up, spawns **outside** the mutex, and files the result under
+the lock with a second check. Losing that race releases the process it started and answers with the
+session that exists. The session's own startup state gained an `RWMutex` (`snapshot`), because a second
+connection now reads it while the pump writes it.
+
+**Why** `Connect` held the sessions lock across the spawn **and** across `readStartup`, which waits for the
+agent's `session ready` — i.e. until the model list is loaded, which on a real AlayaCore is seconds. The
+same mutex is what `List()` takes, and `List()` is on every MCP tool call's path (`sessionForWorkspace`),
+so one canvas opening its panel froze tool calls for every other panel and blocked every other connect.
+The old comment claimed the cost was "a handful of milliseconds"; the `TestListDoesNotWaitForASpawn` test
+that now guards it holds a fake agent at `ready` for a second, and `List` must still return inside 200 ms.
+
+**Cost** Two connects for one name can each spawn a process; one is released immediately. That is a wasted
+spawn on a race that needs two sockets to open in the same milliseconds, against a global stall on a
+routine one — and the observable contract ("one session per name") is unchanged, which
+`TestConcurrentConnectsFileOneSession` states.
+
+**The race this exposed** The startup broadcast was documented as needing no lock ("only the pump changes
+it"), but `Connect` read it for a *second* caller while that pump was writing. `-race` never saw it because
+no test connected twice; `TestConnectWhileATurnStreamsReadsTheState` does, and the guard is now a lock
+rather than a comment.

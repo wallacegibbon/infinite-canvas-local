@@ -27,9 +27,10 @@ type Session struct {
 
 	proc *Process
 
-	// state is the startup broadcast as the agent last restated it. Only the pump changes it, and a
-	// session has one pump, so it needs no lock of its own.
-	state startup
+	// state is the startup broadcast as the agent last restated it: written by the pump, and read by a
+	// second connection asking what this session is, so it has a lock of its own.
+	stateMu sync.RWMutex
+	state   startup
 
 	// write keeps frames whole: two messages writing at once would interleave halves of two frames and
 	// the agent would read nonsense.
@@ -85,12 +86,13 @@ func (s *Sessions) Connect(ctx context.Context, id string, opts SpawnOptions) (C
 	if id == "" {
 		id = newSessionID()
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if existing, ok := s.list[id]; ok {
-		return Connected{Session: existing, Startup: existing.state.event()}, nil
+	if existing, ok := s.lookup(id); ok {
+		return Connected{Session: existing, Startup: snapshotEvent(existing)}, nil
 	}
+
+	// The spawn is outside the lock on purpose. It ends at the agent's `ready`, which is model loading,
+	// not milliseconds — and this lock is also what `List` takes, which is how every MCP tool call finds
+	// its session. Holding it here would stop the whole gateway while one canvas's agent starts.
 	proc, err := Spawn(opts)
 	if err != nil {
 		return Connected{}, err
@@ -100,15 +102,38 @@ func (s *Sessions) Connect(ctx context.Context, id string, opts SpawnOptions) (C
 		proc.Release()
 		return Connected{}, err
 	}
+
 	session := &Session{ID: id, proc: proc, state: state, pending: map[string]chan toolAnswer{}}
 	session.gone = func(reason string) { s.Close(id, reason) }
+
+	// Two connects can now race for one name. The first to file owns it and the other releases what it
+	// started and answers with the session that exists — the contract is "one session per name", not
+	// "one spawn per connect".
+	s.mu.Lock()
+	if existing, ok := s.list[id]; ok {
+		s.mu.Unlock()
+		proc.Release()
+		if s.Log != nil {
+			s.Log.Info("agent: connect session=%s raced; keeping pid=%d", id, existing.proc.Cmd.Process.Pid)
+		}
+		return Connected{Session: existing, Startup: snapshotEvent(existing)}, nil
+	}
 	s.list[id] = session
+	s.mu.Unlock()
 	go session.pump()
 
 	if s.Log != nil {
 		s.Log.Info("agent: connected session=%s pid=%d models=%d active=%q", id, proc.Cmd.Process.Pid, len(state.models), activeName(state))
 	}
 	return Connected{Session: session, Startup: state.event(), History: history, Spawned: true}, nil
+}
+
+// lookup returns the session filed under this name, if there is one.
+func (s *Sessions) lookup(id string) (*Session, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.list[id]
+	return session, ok
 }
 
 // List is every connected session. The MCP route uses it to find the session that owns a workspace,
@@ -151,6 +176,19 @@ func (s *Session) Watch(sink func(Event) error) bool {
 	}
 	s.sink = sink
 	return true
+}
+
+// snapshotEvent is the startup broadcast of a live session, read under its own lock.
+func snapshotEvent(session *Session) Event {
+	state := session.snapshot()
+	return state.event()
+}
+
+// snapshot is the session's current startup broadcast, safe to read while the pump is running.
+func (s *Session) snapshot() startup {
+	s.stateMu.RLock()
+	defer s.stateMu.RUnlock()
+	return s.state
 }
 
 // Unwatch detaches the connection. The pump keeps reading until the process is released — a reader that
@@ -272,7 +310,10 @@ func (s *Session) pump() {
 		}
 		// The end of a turn is a marker, not a second copy of the answer: the deltas already carried it,
 		// and two strings that agree until they do not are worse than one.
-		if turnStep(&s.state, frame, true, s.publish) {
+		s.stateMu.Lock()
+		ended := turnStep(&s.state, frame, true, s.publish)
+		s.stateMu.Unlock()
+		if ended {
 			s.publish(Event{Type: "done"})
 		}
 	}

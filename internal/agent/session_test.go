@@ -78,9 +78,17 @@ func (r *recorder) waitFor(t *testing.T, what string, match func(Event) bool) Ev
 	return Event{}
 }
 
+// fakeSession is one live session plus the pieces a test asks it about.
+type fakeSession struct {
+	sessions *Sessions
+	session  *Session
+	watcher  *recorder
+	log      string
+}
+
 // openFakeSession is the live path a socket takes: one session filed under a name, its startup
 // broadcast read before it is ready, and the watcher attached before anything is said.
-func openFakeSession(t *testing.T) (*Session, *recorder, string) {
+func openFakeSession(t *testing.T) fakeSession {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "fake-agent")
 	if err := os.WriteFile(path, []byte(fakeAgent), 0o755); err != nil {
@@ -100,11 +108,12 @@ func openFakeSession(t *testing.T) (*Session, *recorder, string) {
 	if !connected.Session.Watch(watcher.sink) {
 		t.Fatal("the session refused its first watcher")
 	}
-	return connected.Session, watcher, log
+	return fakeSession{sessions: sessions, session: connected.Session, watcher: watcher, log: log}
 }
 
 func TestSessionStreamsTheAnswerAndKeepsKeysHome(t *testing.T) {
-	session, watcher, log := openFakeSession(t)
+	fs := openFakeSession(t)
+	session, watcher, log := fs.session, fs.watcher, fs.log
 	if err := session.Send(Request{Prompt: "hi"}); err != nil {
 		t.Fatalf("send: %v", err)
 	}
@@ -146,7 +155,8 @@ func TestSessionStreamsTheAnswerAndKeepsKeysHome(t *testing.T) {
 // A setting change is the same stream as a question: one command, no prompt, and the agent's own
 // frames are the whole result.
 func TestSessionRelaysACommandAndTheAgentsStatement(t *testing.T) {
-	session, watcher, log := openFakeSession(t)
+	fs := openFakeSession(t)
+	session, watcher, log := fs.session, fs.watcher, fs.log
 	if err := session.Send(Request{Command: "model_set", Args: "2"}); err != nil {
 		t.Fatalf("send: %v", err)
 	}
@@ -173,7 +183,8 @@ func TestSessionRelaysACommandAndTheAgentsStatement(t *testing.T) {
 }
 
 func TestSessionRelaysARejection(t *testing.T) {
-	session, watcher, _ := openFakeSession(t)
+	fs := openFakeSession(t)
+	session, watcher := fs.session, fs.watcher
 	if err := session.Send(Request{Command: "model_set", Args: "99"}); err != nil {
 		t.Fatalf("send: %v", err)
 	}
