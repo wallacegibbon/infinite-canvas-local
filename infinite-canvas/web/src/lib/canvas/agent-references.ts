@@ -35,3 +35,25 @@ export function withoutReferences(prompt: string): string {
     if (blank < 0) return prompt;
     return prompt.slice(blank + 2);
 }
+
+/**
+ * The nodes a prompt cited, as the block recorded them: `- <id> (<kind>) <title>: <prompt>`.
+ *
+ * Reading the block back is what lets a mention in a message be a link to the node: the visible text says
+ * `@补全背景`, and only the block says which node that is.
+ */
+export function referenceEntries(prompt: string): { id: string; title: string }[] {
+    const marker = MARKERS.find((candidate) => prompt.startsWith(`${candidate}\n`));
+    if (!marker) return [];
+    const end = prompt.indexOf("\n\n");
+    if (end < 0) return [];
+    const entries: { id: string; title: string }[] = [];
+    for (const line of prompt.slice(marker.length + 1, end).split("\n")) {
+        const match = /^-\s+(\S+)\s+\(([^)]*)\)\s*(.*)$/.exec(line);
+        if (!match) continue;
+        const rest = match[3] || "";
+        const colon = rest.indexOf(": ");
+        entries.push({ id: match[1], title: (colon >= 0 ? rest.slice(0, colon) : rest).trim() });
+    }
+    return entries;
+}

@@ -3474,3 +3474,25 @@ disappeared when delivered — and both messages and both answers ended up in th
 gateway log shows the pair:
 `<< SM {"type":"steering","data":{"phase":"queued"…` then `…"phase":"delivered"}`. The header now lists only
 `关闭` and `发送`.
+
+## 106. A mention in a message is a link to its node
+
+**Decision** `@title` inside a message in the agent panel is drawn in the accent colour and clicked like a row
+in the side panel: the canvas moves to that node and selects it. Which node a mention means comes from the
+message itself — `referenceEntries` reads the ids back out of the citation block the canvas wrote — and, for a
+message that cited nothing (an answer that names a node), from the canvas's current titles.
+
+**Why** The visible text of a cited message says `@补全背景`; only the block says which node that is, and the
+block is stripped before display. Reading it first and keeping the pairs on the message is what makes the
+mention a reference rather than a word that looks like one. The action is `focusNode`, the same one the side
+panel's rows call, so "jump to that node" means one thing in the canvas.
+
+A title containing the block's own separator (`: `) loses its tail when read back — the id is never lost, so
+the link still points at the right node; only the token that gets coloured is shorter. That is the cost of
+keeping a format that reads well for the agent, and it was not worth a second markup.
+
+**Tested** `tests/agent-references.test.ts` round-trips the block: what `referenceBlock` writes,
+`referenceEntries` reads, including the colon case. In a browser: cited an audio node with the panel's `@`
+picker, sent the message, and the mention drew in the accent colour inside otherwise plain text; pressing
+"reset view" moved the canvas to `translate(858.5px, 367px)`, and clicking the mention put it back at
+`translate(-827.5px, -173px)` — the same transform a side-panel click produces — with the node selected.

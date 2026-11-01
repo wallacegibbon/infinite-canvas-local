@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowUp, Bot, LoaderCircle, Square, Wrench, X } from "lucide-react";
@@ -6,7 +6,7 @@ import { ArrowUp, Bot, LoaderCircle, Square, Wrench, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { CANVAS_DIALOG_CONTENT } from "@/lib/canvas-overlay";
-import { referenceBlock, referenceLine, withoutReferences } from "@/lib/canvas/agent-references";
+import { referenceBlock, referenceEntries, referenceLine, withoutReferences } from "@/lib/canvas/agent-references";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { AgentSettingsControls } from "./agent-settings-controls";
 import { cancelAgentSession, canvasAgent, closeAgentSession, onAgentEvent, openAgentSession, sendAgentMessage, type AgentEvent } from "@/services/api/agent";
@@ -29,6 +29,8 @@ type Message = {
     id: string;
     role: "user" | "assistant" | "error";
     text: string;
+    /** The nodes this message cited, read back from the reference block: `@title` in the text is one. */
+    mentions: { id: string; title: string }[];
     reasoning: string;
     tools: ToolStep[];
     /** An assistant message is still being written until the agent says the turn ended. */
@@ -96,7 +98,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
             setStatus("connected");
         } catch (error) {
             setStatus("closed");
-            setMessages((current) => [...current, { id: nextId(), role: "error", text: error instanceof Error ? error.message : t("canvas.agent.connectFailed"), reasoning: "", tools: [], streaming: false }]);
+            setMessages((current) => [...current, { id: nextId(), role: "error", text: error instanceof Error ? error.message : t("canvas.agent.connectFailed"), mentions: [], reasoning: "", tools: [], streaming: false }]);
         }
     }, [canvasId, config, t]);
 
@@ -126,7 +128,8 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         if (event.type === "user") {
             // The agent echoing what the canvas sent. This is the only place a user message comes from,
             // which is why a reloaded conversation and a live one look the same: both are the agent's.
-            setMessages((current) => [...current, { id: nextId(), role: "user", text: withoutReferences(event.text || ""), reasoning: "", tools: [], streaming: false }]);
+            const said = event.text || "";
+            setMessages((current) => [...current, { id: nextId(), role: "user", text: withoutReferences(said), mentions: referenceEntries(said), reasoning: "", tools: [], streaming: false }]);
             return;
         }
         if (event.type === "history") {
@@ -140,6 +143,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
                     role: entry.role,
                     // What was sent carried the citation block; what is shown is what was typed.
                     text: entry.role === "user" ? withoutReferences(entry.text) : entry.text,
+                    mentions: entry.role === "user" ? referenceEntries(entry.text) : [],
                     reasoning: "",
                     tools: [],
                     streaming: false,
@@ -155,7 +159,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
             return;
         }
         if (event.type === "error") {
-            setMessages((current) => [...current, { id: nextId(), role: "error", text: event.message || "", reasoning: "", tools: [], streaming: false }]);
+            setMessages((current) => [...current, { id: nextId(), role: "error", text: event.message || "", mentions: [], reasoning: "", tools: [], streaming: false }]);
             return;
         }
         if (event.type === "done") {
@@ -170,7 +174,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
                 // splitting into a second one.
                 const open = current.findLastIndex((message) => message.role === "assistant" && message.streaming);
                 const started = open >= 0 ? current[open] : null;
-                const from = started || { id: nextId(), role: "assistant" as const, text: "", reasoning: "", tools: [], streaming: true };
+                const from = started || { id: nextId(), role: "assistant" as const, text: "", mentions: [], reasoning: "", tools: [], streaming: true };
                 const updated = { ...from };
                 if (event.type === "delta") updated.text = from.text + (event.text || "");
                 else if (event.type === "reasoning") updated.reasoning = from.reasoning + (event.text || "");
@@ -215,6 +219,16 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         sendAgentMessage(session, { prompt: context + text });
     };
 
+    // --- size -------------------------------------------------------------------------------------------
+    // It opens at a share of the canvas rather than a fixed pair of numbers: the panel is for reading long
+    // answers and watching tools run, and 380×480 was too small for either on a normal window. Measured
+    // against the space the canvas actually has, so a small window still gets a panel that fits in it.
+    const host = cardRef.current?.parentElement?.getBoundingClientRect() ?? null;
+    const roomWidth = host?.width || window.innerWidth;
+    const roomHeight = host?.height || window.innerHeight;
+    const width = size?.width ?? Math.min(520, roomWidth - 24);
+    const height = size?.height ?? Math.min(760, Math.max(420, Math.round(roomHeight * 0.8)));
+
     // --- dragging ---------------------------------------------------------------------------------------
     // Pointer events are captured on the header, so a fast drag that leaves the card keeps moving it.
     const startDrag = (event: React.PointerEvent) => {
@@ -228,7 +242,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         const drag = dragRef.current;
         if (!drag) return;
         const host = cardRef.current?.parentElement?.getBoundingClientRect();
-        const width = cardRef.current?.offsetWidth || 380;
+        const width = cardRef.current?.offsetWidth || 520;
         const height = cardRef.current?.offsetHeight || 480;
         const maxX = (host?.width || window.innerWidth) - width - 8;
         const maxY = (host?.height || window.innerHeight) - height - 8;
@@ -239,9 +253,6 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         (event.target as HTMLElement).releasePointerCapture?.(event.pointerId);
     };
 
-    // --- size -------------------------------------------------------------------------------------------
-    const width = size?.width ?? 380;
-    const height = size?.height ?? 480;
     /**
      * Which corner is being pulled, and the room the panel had when the gesture started.
      *
@@ -412,7 +423,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
                                 ))}
                             </div>
                         ) : null}
-                        {message.text ? <p className="whitespace-pre-wrap leading-relaxed">{message.text}</p> : null}
+                        {message.text ? <p className="whitespace-pre-wrap leading-relaxed">{withMentions(message, nodes, onFocusNode, theme.node.activeStroke)}</p> : null}
                         {message.role === "assistant" && !message.text && message.streaming ? (
                             <p className="flex items-center gap-1.5 text-xs opacity-50">
                                 <LoaderCircle className="size-3 animate-spin" />
@@ -493,6 +504,42 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
 
 /** How one cited node is described to the agent. Ids are what a tool call could act on; the text is what
  * a model can read today. */
+/**
+ * A message's text with its `@title` mentions as links to the node, coloured like one.
+ *
+ * Which node a mention means comes from the message itself when it cited something — the block records the
+ * ids — and otherwise from the canvas's current titles, so an answer that names a node is clickable too.
+ * Clicking does what clicking a row in the side panel does: the canvas moves to that node and selects it.
+ */
+function withMentions(message: Message, nodes: CanvasNodeData[], onFocusNode: (nodeId: string) => void, color: string): ReactNode {
+    const targets = [...message.mentions, ...nodes.map((node) => ({ id: node.id, title: node.title || "" }))].filter((target) => target.title);
+    const seen = new Set<string>();
+    const titles = targets.filter((target) => (seen.has(target.title) ? false : (seen.add(target.title), true))).sort((a, b) => b.title.length - a.title.length);
+    if (!titles.length) return message.text;
+
+    const parts: ReactNode[] = [];
+    let plain = "";
+    let index = 0;
+    while (index < message.text.length) {
+        const hit = message.text[index] === "@" ? titles.find((target) => message.text.startsWith(target.title, index + 1)) : undefined;
+        if (!hit) {
+            plain += message.text[index];
+            index += 1;
+            continue;
+        }
+        if (plain) parts.push(plain);
+        plain = "";
+        parts.push(
+            <button key={`${index}-${hit.id}`} type="button" className="cursor-pointer rounded px-0.5 font-medium hover:underline" style={{ color }} onClick={() => onFocusNode(hit.id)}>
+                {`@${hit.title}`}
+            </button>,
+        );
+        index += 1 + hit.title.length;
+    }
+    if (plain) parts.push(plain);
+    return parts;
+}
+
 function describeNode(node?: CanvasNodeData): string {
     if (!node) return "";
     const kind = NODE_LABEL[node.type] || node.type;
