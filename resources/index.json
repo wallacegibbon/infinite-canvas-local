@@ -1001,9 +1001,9 @@
       "label": "SeedVR2 upscale node",
       "target": "custom_nodes/ComfyUI-SeedVR2_VideoUpscaler",
       "autoInstall": true,
-      "size": 2296099,
+      "size": 2284656,
       "license": "Apache-2.0",
-      "note": "A bundled node the launcher copies automatically; its runtime dependencies (diffusers / rotary_embedding_torch / omegaconf / opencv-python / einops) are detected and installed by the Runtime libraries entry. Restart ComfyUI afterwards.",
+      "note": "Bundled node pack: the installer copies it into ComfyUI's custom_nodes. Its Python dependencies (diffusers, rotary_embedding_torch, omegaconf, opencv-python, einops) are not installed by the gateway — the Runtime libraries entry reports the pip command for ComfyUI's own interpreter. Restart ComfyUI afterwards.",
       "provides": [
         "SeedVR2LoadDiTModel",
         "SeedVR2LoadVAEModel",

@@ -6,53 +6,36 @@ written out as commands.
 
 ---
 
-## 1. SeedVR2 node pack does not import (incomplete tree, after a fixed pip conflict)
+## 1. SeedVR2 node pack did not import *(fixed — the payload was incomplete)*
 
-**Symptom** `video-seedvr2-upscale` is unavailable; ComfyUI's log shows `IMPORT FAILED` for
-`ComfyUI-SeedVR2_VideoUpscaler` and the canvas reports `missing node SeedVR2LoadDiTModel`.
-`/api/resources/status` now names the classes it never got (`missingClasses`), which is the
-fastest way to see it.
+**Was** `video-seedvr2-upscale` was unavailable and ComfyUI's log showed `IMPORT FAILED` for
+`ComfyUI-SeedVR2_VideoUpscaler`, with the canvas reporting a missing node class. The first diagnosis
+blamed the *installed* copy and said to reinstall from the source — which could not have helped: the
+vendored pack in `resources/payload/custom_nodes/` was itself missing `src/data/`, and reinstalling
+copies that same directory. `src/core/generation_utils.py` imports
+`..data.image.transforms.{divisible_crop,na_resize}` on its first lines, so the pack raised
+`ModuleNotFoundError` before registering a single node.
 
-**State on the reference machine (2026-10-31)**
+**Fix (applied)** `src/data/image/transforms/` is restored from the upstream pack
+(`numz/ComfyUI-SeedVR2_VideoUpscaler`, the same 2.5.24 tree the rest of the vendored copy comes from):
+`area_resize.py`, `divisible_crop.py`, `na_resize.py`, `side_resize.py`. The index entry's size was
+recomputed (it had drifted from the tree it described) and its note no longer claims the gateway installs
+the Python dependencies — it reports the pip command instead.
 
-1. The Python packages the node needs were missing and are now installed:
+**The gate that was missing** `internal/resource/payload_imports_test.go` now resolves every relative
+import in every vendored pack against the files actually shipped, so a pack that cannot import fails
+`make check` instead of failing on a user's machine. Removing `src/data/` again makes it fail with the two
+imports above.
 
-   ```
-   diffusers 0.42.1  omegaconf 2.4.0  rotary_embedding_torch 0.9.1
-   opencv-python 5.0.0.93  einops 0.8.2
-   ```
-
-2. That install pulled `huggingface-hub 2.4.0`, which **breaks the whole environment**: both
-   `transformers 5.15.0` and `tokenizers 0.22.2` require `<2.0`. Fixed by pinning it back —
-   `diffusers` itself only needs `>=1.32,<3`, so the two ranges meet:
-
-   ```bash
-   "<ComfyUI's python>" -m pip install "huggingface-hub>=1.32,<2"   # -> 1.33.0
-   "<ComfyUI's python>" -m pip check                                 # No broken requirements found
-   ```
-
-3. The node still fails, for a different and unrelated reason: the **installed pack is
-   incomplete**. `src/` holds `common core interfaces models optimization utils` but no
-   `data/`, so its own import of `.data` cannot resolve:
-
-   ```
-   ModuleNotFoundError: No module named
-     '/home/wallace/comfy/ComfyUI/custom_nodes/ComfyUI-SeedVR2_VideoUpscaler.src.data'
-   ```
-
-**Fix** Reinstall the node pack so `src/data/` exists (re-download; do not hand-patch), then
-restart ComfyUI. Note the pack was extracted as `ComfyUI-Frame-Interpolation-main`-style
-folders elsewhere — ComfyUI loads those fine, and the resource panel no longer cares about the
-folder name (it asks ComfyUI which classes are loaded).
-
-**Not affected** H3 generation, RIFE interpolation (`video-rife`, verified end to end:
-24fps/24 frames → 47 frames at 48fps with audio), image and audio workflows. Only the upscale
-button is down.
+**Still true** The Python dependencies the pack needs (`diffusers` / `rotary_embedding_torch` / `omegaconf`
+/ `opencv-python` / `einops`) must be installed with ComfyUI's own pip; see
+[`runtime-deps.md`](runtime-deps.md). `huggingface-hub` has to stay `<2` for `transformers 5.15` — the
+pin that was worked out here is still the right one.
 
 **Follow-up worth deciding** Interpolating a clip with **no audio track** fails inside VHS
-(`VHS failed to extract audio`). Clips the canvas produces always carry audio; an imported
-silent clip does not. Detaching the audio input when the source has none would fix it at the
-cost of never carrying audio through.
+(`VHS failed to extract audio`). Clips the canvas produces always carry audio; an imported silent clip
+does not. Detaching the audio input when the source has none would fix it at the cost of never carrying
+audio through.
 
 ---
 

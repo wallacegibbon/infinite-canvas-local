@@ -3659,3 +3659,30 @@ routine one — and the observable contract ("one session per name") is unchange
 it"), but `Connect` read it for a *second* caller while that pump was writing. `-race` never saw it because
 no test connected twice; `TestConnectWhileATurnStreamsReadsTheState` does, and the guard is now a lock
 rather than a comment.
+
+---
+
+## 113. A vendored pack is checked against its own imports
+
+**Decision** `internal/resource/payload_imports_test.go` walks every pack under
+`resources/payload/custom_nodes`, resolves every relative import (`from ..pkg.mod import …`) against the
+files that are actually shipped, and fails `make check` when one names something absent. Host modules
+(`ComfyUI`, `folder_paths`, `comfy`, `nodes`, …) are excluded, and a bare `from . import name` is skipped —
+there is no module path in it to resolve.
+
+**Why** The SeedVR2 pack was vendored without `src/data/`, so `src/core/generation_utils.py` raised
+`ModuleNotFoundError` before registering a node, and `video-seedvr2-upscale` could never load. The
+symptom appears far from the cause — ComfyUI says `IMPORT FAILED` in its own log, the gateway reports a
+missing node class, the panel shows a workflow that cannot run — and the first written diagnosis blamed
+the *installed* copy, which reinstalling from this repository cannot fix. Nothing in the suite looked at
+the payload's internal consistency, so the tree could ship a pack that Python could not import.
+
+**Cost** A pack that imports a module another custom node provides at runtime would be reported. None does
+today (601 imports resolved when this was written), and the exclusion list is where such a case would go —
+one line, with the reason.
+
+**Tested** With `src/data/` present the check passes and reports 601 imports; moving the directory aside
+makes it fail with exactly the two imports `generation_utils.py` needs. The restored files are the upstream
+2.5.24 tree (`area_resize`, `divisible_crop`, `na_resize`, `side_resize`), byte-identical to it, and
+`python3 -m py_compile` accepts them — importing them for real needs torch, so the compile check is as far
+as this repository can go without ComfyUI's interpreter.
