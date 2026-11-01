@@ -3162,8 +3162,11 @@ inserted. Escaping a pick left `看看 @ 再看 @` untouched with the caret at 9
 ## 94. The agent panel is the user's window: it opens from the corner it sits in, and it resizes
 
 **Decision** The button that opens the agent panel is a round button in the canvas's bottom-right corner — where
-the panel itself opens — not one of the small icons in the top bar. The panel can be resized by dragging its
-bottom-right corner, clamped to 320×280 at the least and to the canvas (minus a 16px margin) at the most. The
+the panel itself opens — not one of the small icons in the top bar. The panel can be resized by dragging either
+of its corners: the bottom-right one, and the top-left one, which also moves the panel so that the opposite
+corner stays where it was (a panel in its default corner is pinned by its right and bottom edges, so pulling the
+top-left there needs no move at all). Both are clamped to 320×280 at the least and to the canvas (minus a 16px
+margin) at the most. The
 size is not persisted, for the same reason the position is not (#83's list of things that are not the canvas's):
 a window's shape belongs to the window. The open button is shown only while the panel is closed, because when it
 is open it covers that corner and carries its own close button.

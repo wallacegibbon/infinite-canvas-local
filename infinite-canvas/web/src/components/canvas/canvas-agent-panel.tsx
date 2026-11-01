@@ -197,11 +197,17 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
     // --- size -------------------------------------------------------------------------------------------
     const width = size?.width ?? 380;
     const height = size?.height ?? 480;
-    const resizeRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
-    const startResize = (event: React.PointerEvent) => {
+    /**
+     * Which corner is being pulled, and the room the panel had when the gesture started.
+     *
+     * `anchor` is the panel's explicit position, or null when it is sitting in its default corner (anchored by
+     * its right and bottom edges) — a corner can only move the far one if there is a near one to hold still.
+     */
+    const resizeRef = useRef<{ corner: "top-left" | "bottom-right"; x: number; y: number; width: number; height: number; anchor: { x: number; y: number } | null } | null>(null);
+    const startResize = (corner: "top-left" | "bottom-right") => (event: React.PointerEvent) => {
         event.preventDefault();
         event.stopPropagation();
-        resizeRef.current = { x: event.clientX, y: event.clientY, width, height };
+        resizeRef.current = { corner, x: event.clientX, y: event.clientY, width, height, anchor: position };
         (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
     };
     const moveResize = (event: React.PointerEvent) => {
@@ -210,10 +216,16 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         const host = cardRef.current?.parentElement?.getBoundingClientRect();
         // The panel is the window's: it may be made as big as the canvas it floats in, and no bigger.
         const limit = (value: number, min: number, max: number) => Math.min(Math.max(min, value), Math.max(min, max));
-        setSize({
-            width: limit(grip.width + event.clientX - grip.x, 320, (host?.width || window.innerWidth) - 16),
-            height: limit(grip.height + event.clientY - grip.y, 280, (host?.height || window.innerHeight) - 16),
-        });
+        const dx = event.clientX - grip.x;
+        const dy = event.clientY - grip.y;
+        // Pulling a corner towards the middle shrinks; from the top-left that means the opposite sign.
+        const sign = grip.corner === "top-left" ? -1 : 1;
+        const nextWidth = limit(grip.width + sign * dx, 320, (host?.width || window.innerWidth) - 16);
+        const nextHeight = limit(grip.height + sign * dy, 280, (host?.height || window.innerHeight) - 16);
+        setSize({ width: nextWidth, height: nextHeight });
+        // With an explicit position the panel is pinned by its top-left corner, so moving that corner is moving
+        // the panel: the opposite one stays where it is, which is what makes it look like the corner was pulled.
+        if (grip.anchor && grip.corner === "top-left") setPosition({ x: grip.anchor.x + (grip.width - nextWidth), y: grip.anchor.y + (grip.height - nextHeight) });
     };
     const endResize = (event: React.PointerEvent) => {
         resizeRef.current = null;
@@ -411,7 +423,18 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
             </div>
 
             {/* Drag the corner and the panel is the size you left it — for this session, like its position. */}
-            <div data-canvas-agent-grip="" className="absolute bottom-0 right-0 z-10 size-4 cursor-nwse-resize" onPointerDown={startResize} onPointerMove={moveResize} onPointerUp={endResize} onPointerCancel={endResize} aria-hidden>
+            <div data-canvas-agent-grip="top-left" className="absolute left-0 top-0 z-10 size-3 cursor-nwse-resize" onPointerDown={startResize("top-left")} onPointerMove={moveResize} onPointerUp={endResize} onPointerCancel={endResize} aria-hidden>
+                <div className="absolute left-1 top-1 size-1.5 rounded-tl-sm border-l-2 border-t-2 opacity-40" style={{ borderColor: theme.node.text }} />
+            </div>
+            <div
+                data-canvas-agent-grip="bottom-right"
+                className="absolute bottom-0 right-0 z-10 size-4 cursor-nwse-resize"
+                onPointerDown={startResize("bottom-right")}
+                onPointerMove={moveResize}
+                onPointerUp={endResize}
+                onPointerCancel={endResize}
+                aria-hidden
+            >
                 <div className="absolute bottom-1 right-1 size-2 rounded-br-sm border-b-2 border-r-2 opacity-40" style={{ borderColor: theme.node.text }} />
             </div>
         </div>
