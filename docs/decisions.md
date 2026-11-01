@@ -4454,3 +4454,25 @@ to do it. A half-extracted pack would also read as `待重启`; restarting is th
 **Where** `internal/resource/{resource.go,status.go}`,
 `infinite-canvas/web/src/{services/api/resources.ts,components/settings/resource-center-panel.tsx,
 i18n/locales/{en-US,zh-CN}.ts}`.
+
+## 133. The tick means "and also download this", so it says so
+
+**Decision** The optional section is called `可选版本` / "Optional versions", its checkbox carries a tooltip that
+states what ticking it does, a pack's own checkbox is disabled when the pack has nothing left to download, and
+"install selected" no longer re-sends packs that are only waiting for a ComfyUI restart.
+
+**Why** The section holds exactly the `alternates` of #130 — resources no workflow names — because everything a
+workflow does need is already listed inside that workflow's row. So a tick and a dot side by side in one pack
+looked like two strengths of the same statement, when they are two different sentences: the dot means "this
+workflow loads it, so installing the workflow gets it", the tick means "nothing needs it, tick it if you want
+it". The user asked what the difference was; a control whose meaning is not on screen is a control that will be
+misread.
+
+**Also fixed while there** A pack whose remaining gaps were all `needsRestart` still had an enabled checkbox,
+and ticking it built an install list that the server then rejected as empty. That checkbox is now disabled by
+the same rule that hides the pack's install button, and its tooltip explains that the files are already on disk.
+
+**Tested** `tsc --noEmit`, 132 canvas tests, and the pack rows against the live status payload: five packs
+disabled (nothing left to download), `h3` and `interp` disabled for the restart reason, everything else as before.
+
+**Where** `infinite-canvas/web/src/{components/settings/resource-center-panel.tsx,i18n/locales/{en-US,zh-CN}.ts}`.

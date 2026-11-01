@@ -128,7 +128,7 @@ function ResourceCard({
         <div className="rounded-lg border border-stone-200 bg-white/60 p-2 dark:border-stone-800 dark:bg-white/[.02]">
             <div className="flex items-start gap-2">
                 {optional ? (
-                    <WithHint hint={item.type === "bake" ? copy.manualOnlyHint : item.status === "present" ? copy.presentHint : undefined}>
+                    <WithHint hint={item.type === "bake" ? copy.manualOnlyHint : item.status === "present" ? copy.presentHint : copy.optionalToggleHint}>
                         <Checkbox checked={selected} disabled={item.status === "present" || item.type === "bake" || item.needsRestart} onChange={(event) => onToggle?.(event.target.checked)} />
                     </WithHint>
                 ) : (
@@ -457,7 +457,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
 
     const installIds = useMemo(() => {
         if (!status) return [];
-        const required = status.packs.filter((pack) => selectedPacks.has(pack.id) && !pack.planned).flatMap((pack) => pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake").map((item) => item.id));
+        const required = status.packs.filter((pack) => selectedPacks.has(pack.id) && !pack.planned).flatMap((pack) => pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake" && !item.needsRestart).map((item) => item.id));
         const optional = status.resources.filter((item) => selectedOptional.has(item.id) && item.status !== "present" && item.type !== "bake").map((item) => item.id);
         return [...new Set([...required, ...optional])];
     }, [selectedOptional, selectedPacks, status]);
@@ -810,8 +810,8 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                             <div className="flex items-start gap-2 p-3">
                                 {expandable ? (
                                     !pack.planned && pack.total > 0 ? (
-                                        <WithHint hint={pack.missing ? undefined : copy.packReadyHint}>
-                                            <Checkbox checked={selectedPacks.has(pack.id)} disabled={!pack.missing} onChange={(event) => togglePack(pack.id, event.target.checked)} />
+                                        <WithHint hint={pack.missing ? (pack.missing === pack.needsRestart ? copy.packRestartHint : undefined) : copy.packReadyHint}>
+                                            <Checkbox checked={selectedPacks.has(pack.id)} disabled={packInstallIds.length === 0} onChange={(event) => togglePack(pack.id, event.target.checked)} />
                                         </WithHint>
                                     ) : (
                                         <span className="mt-0.5 grid size-4 place-items-center text-stone-300 dark:text-stone-600">·</span>
