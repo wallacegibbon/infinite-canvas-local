@@ -382,11 +382,20 @@ func (m *Manager) itemStatus(resource *Resource, root string, byID map[string]*I
 			item.MatchedBy = "classes"
 			return item
 		}
-		// ComfyUI has been read, and the classes are not there: whatever is on disk, the pack is not
-		// loaded — a missing python dependency is the usual reason.
+		// ComfyUI has been read, and the classes are not there: the pack is not loaded. Two different
+		// situations produce that, and only the directory tells them apart — a pack that was never
+		// installed, and a pack installed while ComfyUI was running. ComfyUI imports custom nodes at
+		// startup, so the second one looks broken until it is restarted, and offering a download for it
+		// is an offer to do nothing.
 		item.Status = "missing"
 		item.Present = false
 		item.Exists = false
+		if match := m.resourceMatch(resource, root); match.present {
+			item.Exists = true
+			item.MatchedFile = match.rel
+			item.MatchedBy = "directory"
+			item.NeedsRestart = true
+		}
 		return item
 	}
 
@@ -714,6 +723,10 @@ func (m *Manager) packStatus(pack *Pack, providers *providerIndex, byID map[stri
 		status.Missing = len(requiredMissing)
 	}
 	for _, item := range requiredMissing {
+		if item.NeedsRestart {
+			status.NeedsRestart++
+			continue
+		}
 		status.MissingSize += item.Size
 	}
 	for _, item := range optionalMissing {
@@ -809,7 +822,12 @@ func (m *Manager) workflowDependencies(pack *Pack, providers *providerIndex, byI
 		var installIDs []string
 		for _, item := range missingItems {
 			// A bake resource is never installed: it is produced by a local merge. Its
-			// inputs still are, so they stay in the list below.
+			// inputs still are, so they stay in the list below. A pack that is already on disk
+			// but not loaded is not installed either: the download would find the directory and
+			// skip it, so listing it is an offer to do nothing.
+			if item.NeedsRestart {
+				continue
+			}
 			if item.Type != "bake" && !installSet[item.ID] {
 				installSet[item.ID] = true
 				installIDs = append(installIDs, item.ID)
@@ -837,7 +855,12 @@ func (m *Manager) workflowDependencies(pack *Pack, providers *providerIndex, byI
 		}
 
 		var missingSize int64
+		needsRestart := 0
 		for _, item := range missingItems {
+			if item.NeedsRestart {
+				needsRestart++
+				continue
+			}
 			missingSize += item.Size
 		}
 
@@ -853,6 +876,7 @@ func (m *Manager) workflowDependencies(pack *Pack, providers *providerIndex, byI
 			Resources:     nonNilItems(dependencyItems),
 			Missing:       len(missingItems),
 			MissingSize:   missingSize,
+			NeedsRestart:  needsRestart,
 			InstallIDs:    nonNilStrings(installIDs),
 			MainModel:     m.workflowMainModel(pack, packMainModel, workflowID),
 		})

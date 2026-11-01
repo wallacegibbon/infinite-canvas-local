@@ -45,6 +45,9 @@ function sourceSummary(item: ResourceItem, copy: Copy) {
 
 function statusTag(item: ResourceItem, copy: Copy) {
     if (item.overridden) return <Tag color="blue">{copy.mainModelSelected}</Tag>;
+    // Files are on disk, ComfyUI has not imported them: downloading again would skip the directory
+    // and change nothing, so this must not read as "missing".
+    if (item.needsRestart) return <Tag color="blue">{copy.needsRestart}</Tag>;
     if (item.status === "present") return <Tag color="green">{copy.present}</Tag>;
     if (item.status === "blocked") return <Tag color="gold">{copy.blocked}</Tag>;
     return <Tag color="orange">{copy.missing}</Tag>;
@@ -69,6 +72,9 @@ function WithHint({ hint, children }: { hint?: string; children: React.ReactNode
 function packState(pack: ResourcePack, copy: Copy) {
     if (pack.planned) return <Tag>{copy.planned}</Tag>;
     if (!pack.missing) return <Tag color="green">{copy.ready}</Tag>;
+    // Everything left is files already on disk that ComfyUI has not imported yet: the pack is
+    // installed, and "missing 5" would send the user to download what they already have.
+    if (pack.missing === pack.needsRestart) return <Tag color="blue">{copy.needsRestart} {pack.missing}</Tag>;
     return (
         <Tag color="orange">
             {copy.missing} {pack.missing}
@@ -123,7 +129,7 @@ function ResourceCard({
             <div className="flex items-start gap-2">
                 {optional ? (
                     <WithHint hint={item.type === "bake" ? copy.manualOnlyHint : item.status === "present" ? copy.presentHint : undefined}>
-                        <Checkbox checked={selected} disabled={item.status === "present" || item.type === "bake"} onChange={(event) => onToggle?.(event.target.checked)} />
+                        <Checkbox checked={selected} disabled={item.status === "present" || item.type === "bake" || item.needsRestart} onChange={(event) => onToggle?.(event.target.checked)} />
                     </WithHint>
                 ) : (
                     <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-stone-300 dark:bg-stone-600" />
@@ -150,6 +156,12 @@ function ResourceCard({
                         </div>
                     ) : null}
                     {item.sizeMismatch ? <div className="mt-0.5 text-[10px] leading-4 text-amber-600 dark:text-amber-400">{item.sizeMismatch}</div> : null}
+                    {item.needsRestart ? (
+                        <div className="mt-0.5 text-[10px] leading-4 text-blue-600 dark:text-blue-300">
+                            {copy.needsRestartHint}
+                            {item.missingClasses?.length ? ` (${item.missingClasses.join(", ")})` : ""}
+                        </div>
+                    ) : null}
                     {item.overridden && item.overriddenBy ? (
                         <div className="mt-0.5 text-[10px] leading-4 text-blue-600 dark:text-blue-300">
                             {copy.replacedBy}: {item.overriddenBy}
@@ -762,7 +774,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                     const extraOptionalMissing = extraOptionalItems.filter((item) => item.status !== "present");
                     const extraOptionalSize = extraOptionalMissing.reduce((sum, item) => sum + (item.size || 0), 0);
                     const selectedOptionalInPack = extraOptionalItems.filter((item) => selectedOptional.has(item.id) && item.status !== "present");
-                    const packInstallIds = [...pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake").map((item) => item.id), ...selectedOptionalInPack.map((item) => item.id)];
+                    const packInstallIds = [...pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake" && !item.needsRestart).map((item) => item.id), ...selectedOptionalInPack.map((item) => item.id)];
                     const expandable = pack.total > 0 || pack.optionalTotal > 0 || workflowDependencies.length > 0;
                     const headerBody = (
                         <>

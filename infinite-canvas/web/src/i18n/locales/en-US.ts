@@ -274,6 +274,8 @@ export default {
             blocked: "Waiting",
             planned: "Planned",
             ready: "Ready",
+            needsRestart: "Restart needed",
+            needsRestartHint: "The files are in place; ComfyUI imports custom nodes at startup only — restart ComfyUI and refresh. If the classes below are still missing after that, the pack's python dependencies are the problem.",
             size: "Download size",
             sources: "Sources",
             localBake: "Local bake",

@@ -30,6 +30,10 @@ export type ResourceItem = {
     actualSize: number;
     installed?: { version?: string; installedAt?: string } | null;
     missingRequires: string[];
+    /** Node classes this pack declares that ComfyUI has not loaded (a missing python dependency). */
+    missingClasses?: string[];
+    /** Node pack installed on disk while ComfyUI was running: it loads at startup, so restart it. */
+    needsRestart?: boolean;
     /** Set for type "bake": the command that produces the file locally. */
     manualCommand?: string;
     overridden?: boolean;
@@ -81,6 +85,7 @@ type WorkflowDependency = {
     resources: ResourceItem[];
     missing: number;
     missingSize: number;
+    needsRestart: number;
     installIds: string[];
 };
 
@@ -104,6 +109,7 @@ export type ResourcePack = {
     present: number;
     missing: number;
     missingSize: number;
+    needsRestart: number;
     optionalTotal: number;
     optionalPresent: number;
     optionalMissing: number;

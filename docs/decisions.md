@@ -4425,3 +4425,32 @@ still renders as a green row with an install checkbox.
 `infinite-canvas/web/src/{components/settings/resource-center-panel.tsx,
 i18n/locales/{en-US,zh-CN}.ts,lib/resource-copy-zh.ts}`, `infinite-canvas/web/tests/resource-copy-zh.test.ts`,
 `README.md`.
+
+## 132. A node pack that is on disk but not loaded is not "missing"
+
+**Decision** A node item now carries `needsRestart` when its directory exists but ComfyUI does not report the
+classes it declares. The panel shows it as `待重启` instead of `缺`, explains why in one line, and offers no
+download for it. `needsRestart` counts are also on the pack row and the per-workflow rows, and those items are
+excluded from `missingSize` and from every install list.
+
+**Why** ComfyUI imports `custom_nodes/` once, at startup. Install a pack while it is running and the directory is
+correct, the classes are absent, and the panel said `缺 6` — so the user downloaded again and read
+`directory already exists, skipping`. Both statements were true and together they were useless: the panel could
+not tell "not installed" apart from "installed, not loaded yet", which are one restart and zero downloads apart.
+
+**What it looks like** The directory check runs after the class check fails, so a healthy pack still reports
+`matchedBy: classes`; only the broken-looking case consults the filesystem. The hint names the missing classes,
+because the same symptom has a second cause — a python dependency that failed to import — and after a restart
+that list is the difference between "restart again" and "install the dependency".
+
+**Limits** The gateway cannot restart ComfyUI: this build of `--enable-manager` has no reboot route (`POST
+/manager/reboot` → 405, `GET` → 404), so the panel tells the user to restart and refresh rather than pretending
+to do it. A half-extracted pack would also read as `待重启`; restarting is the honest first answer to that too.
+
+**Tested** Against the live ComfyUI on this machine, with seven packs installed while it was running: `interp`
+→ `missing 2, needsRestart 2, missingSize 0`, `h3` → `missing 6, needsRestart 6`, and every other pack `missing 0`.
+`gofmt`, `go vet`, `go test ./internal/...`, `tsc --noEmit`, 132 canvas tests.
+
+**Where** `internal/resource/{resource.go,status.go}`,
+`infinite-canvas/web/src/{services/api/resources.ts,components/settings/resource-center-panel.tsx,
+i18n/locales/{en-US,zh-CN}.ts}`.

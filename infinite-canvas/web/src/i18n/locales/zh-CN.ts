@@ -249,6 +249,8 @@ export default {
             indexVersion: "资源索引",
             present: "已具备",
             missing: "缺少",
+            needsRestart: "待重启",
+            needsRestartHint: "文件已就位，而 ComfyUI 只在启动时导入自定义节点：重启 ComfyUI 后点“重新扫描”即可。若重启后仍缺，看括号里的节点类，检查该包的 python 依赖。",
             recommended: "推荐",
             optional: "可选",
             showAll: "显示其他版本",

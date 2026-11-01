@@ -109,6 +109,11 @@ type Item struct {
 	// MissingClasses names the node classes a pack declares but ComfyUI has not loaded. It is what
 	// "the folder is there but nothing works" looks like: a missing python dependency, for instance.
 	MissingClasses []string `json:"missingClasses,omitempty"`
+	// NeedsRestart marks a node pack whose files are on disk but whose classes ComfyUI has not loaded.
+	// ComfyUI imports custom nodes once, at startup, so a fresh install always looks like this until it
+	// is restarted — a different situation from "not installed", and the only one where downloading
+	// again cannot help.
+	NeedsRestart bool `json:"needsRestart,omitempty"`
 	// ManualCommand is set for resources the gateway never installs itself (type
 	// "bake"): the exact command that produces the file.
 	ManualCommand string `json:"manualCommand,omitempty"`
@@ -153,6 +158,7 @@ type WorkflowDependency struct {
 	Resources     []*Item            `json:"resources"`
 	Missing       int                `json:"missing"`
 	MissingSize   int64              `json:"missingSize"`
+	NeedsRestart  int                `json:"needsRestart"`
 	InstallIDs    []string           `json:"installIds"`
 }
 
@@ -192,6 +198,7 @@ type PackStatus struct {
 	Present         int                   `json:"present"`
 	Missing         int                   `json:"missing"`
 	MissingSize     int64                 `json:"missingSize"`
+	NeedsRestart    int                   `json:"needsRestart"`
 	OptionalTotal   int                   `json:"optionalTotal"`
 	OptionalPresent int                   `json:"optionalPresent"`
 	OptionalMissing int                   `json:"optionalMissing"`
