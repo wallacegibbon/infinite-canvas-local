@@ -4604,3 +4604,48 @@ identity inside the subtree, not this repository's name for it.
 
 **Where** `canvas/` (moved, 290 tracked files), `Makefile`, `start.sh`, `.gitignore`, `README.md`,
 `docs/{decisions,gateway,known-issues}.md`.
+
+## 138. The project is Comfy Loft
+
+**Decision** The project is called **Comfy Loft**. The gateway code keeps its module name `comfyui-gateway`
+(that is the binary, not the product), and the repository slug is being renamed by the owner separately.
+
+**Why "Comfy" stays and the second word changed** "Comfy" is the searchable half: this is an abstraction layer
+over ComfyUI, and users look for that word. What it may not do is claim to be a ComfyUI *component* — `bench` and
+`dock` were the two candidates that failed that test, and both failures were measured rather than guessed:
+
+- `ComfyBench` is already two projects, one of them literally a benchmark paper ("ComfyBench: Benchmarking
+  LLM-based Agents…"). In a technical name, `bench` reads as *benchmark* and nothing else, which is a claim this
+  project is not making.
+- `ComfyDock` is an existing product (`comfygit-ai`) that manages ComfyUI environments — adjacent enough that the
+  collision would be a real one, not a coinsidence of string.
+- `comfyloft` returned **zero** repositories on GitHub.
+
+A loft is the working space the thing is: one open room where images, video and audio are made — the
+"multimedia workbench" idea without a generic word in the name.
+
+**What the name says in the README** `# Comfy Loft`, then one line: images, video and audio made on your own
+machine, no cloud API, no vendor account, no per-image bill. The upstream credit is untouched and still names
+both repositories and keeps the MIT text at `canvas/LICENSE`; renaming is not a claim of authorship (#137).
+
+**Stale documentation fixed in the same pass** — the three statements this project was carrying that were no
+longer true:
+
+- `main.go` described the gateway as "OpenAI-compatible". There is no `/v1` route left; the README has said so
+  for a while ("the gateway serves no `/v1/...` at all — that belongs to the model provider AlayaCore talks to"),
+  and the package comment disagreed with it.
+- `docs/gateway.md` listed the runtime assets as `workflows/`, `resources/`, `prompts/`. `resources/` became
+  `resources.json` at the root in #128–#129.
+- The README said "generate images and videos"; the music pack has been shipping audio since #124.
+
+**Left alone, on purpose** `canvas/` still carries upstream's strings: the plugin ids and directory
+(`plugins/infinite-canvas/`, `@infinite-canvas/plugin-sdk`), the plugin skills documentation, and the
+default *board* title (`无限画布 {{count}}` / "Infinite Canvas {{count}}") and export file name. Those are
+upstream contract and document names, not this project's name; the browser tab already says `无界工作台`
+(`canvas/web/index.html`), which is the one place the product introduces itself. Changing any of them is a
+separate decision with its own consequences, not a rename.
+
+**Tested** `gofmt`, `go vet`, `go test ./internal/...`, `tsc --noEmit`, 134 canvas tests. A grep for
+`Infinite Canvas`/`ComfyUI Local` now finds nothing outside `canvas/` (upstream strings) and this log.
+
+**Where** `README.md`, `docs/gateway.md`, `main.go`.

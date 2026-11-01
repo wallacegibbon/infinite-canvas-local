@@ -1,7 +1,7 @@
-# ComfyUI Local Infinite Canvas
+# Comfy Loft
 
-A local infinite-canvas workbench for ComfyUI: generate images and videos
-from ComfyUI workflows without touching a cloud API.
+A local workbench for ComfyUI: images, video and audio made on your own machine. No cloud API, no
+vendor account, no per-image bill — the models, the graphs and the hardware are yours.
 
 ## Credits
 
@@ -11,10 +11,11 @@ itself a modified copy of [basketikun/infinite-canvas](https://github.com/basket
 Both are MIT; the original license text is kept at [`canvas/LICENSE`](canvas/LICENSE).
 
 The canvas frontend in `canvas/` started as a copy of that project's UI, and the Go gateway
-(`main.go`, `internal/`) is a port of the Node gateway that shipped with it. The frontend is no longer a
-copy: it has been reworked far enough that carrying the upstream project's name would have been a
-claim about the code that is not true, so the directory is called what it is. The upstream licence is
-kept verbatim at `canvas/LICENSE`, and the fork this project descends from is named above.
+(`main.go`, `internal/`) is a port of the Node gateway that shipped with it. Neither is a copy any more:
+both have been reworked far enough that carrying the upstream project's name would have been a claim
+about the code that is not true, so this project and that directory have names of their own (see
+`docs/decisions.md` #137–#138). The upstream licence is kept verbatim at `canvas/LICENSE`, and the fork
+this project descends from is named above.
 
 Maintained here: the workflow graphs and `registry.json`, the resource index and installer,
 `docs/`, `tools/` and `start.sh`.

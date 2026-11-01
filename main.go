@@ -1,5 +1,6 @@
-// Command comfyui-gateway is a local, OpenAI-compatible gateway that exposes
-// ComfyUI workflows as models for the Infinite Canvas.
+// Command comfyui-gateway is the local service behind Comfy Loft: it runs ComfyUI
+// workflows and offers them to the canvas as models. It speaks its own protocol
+// (`/api/...`), not OpenAI's.
 //
 // It is a single statically linked binary: no interpreter, no virtualenv, no
 // node_modules. Configuration comes from the environment (see README), and all

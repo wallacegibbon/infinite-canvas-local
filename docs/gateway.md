@@ -1,8 +1,8 @@
 # comfyui-gateway (Go)
 
-A local gateway that runs ComfyUI workflows for the Infinite Canvas. It is the repository root: `main.go`, `internal/`, and the runtime
-assets (`workflows/`, `resources/`, `prompts/`) live at the top level, while the canvas
-frontend sits beside them in `canvas/`.
+The gateway behind Comfy Loft: a local service that runs ComfyUI workflows. It is the repository root
+— `main.go`, `internal/`, and the runtime assets (`workflows/`, `resources.json`, `prompts/`) live at the
+top level, while the canvas frontend sits beside them in `canvas/`.
 
 It is a **single statically linked binary**: no Node runtime, no `node_modules`, no
 Python virtualenv. Configuration comes from the environment; all mutable state lives
