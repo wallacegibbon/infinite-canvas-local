@@ -22,4 +22,4 @@ npm run typecheck
 - `src/index.tsx` 里 `Content({ ctx })` 的节点 UI 与逻辑;
 - `definePlugin({...})` 里的 `id` / `nodes[].type` / `defaultSize` 等元信息。
 
-类型、JSX、宿主 React、构建都由 `@infinite-canvas/plugin-sdk` 提供,写 TSX 全程有补全。`ctx` 的完整能力见 `plugins/canvas/README.md` 与 SDK 的类型定义。
+类型、JSX、宿主 React、构建都由 `@comfy-loft/plugin-sdk` 提供,写 TSX 全程有补全。`ctx` 的完整能力见 `plugins/canvas/README.md` 与 SDK 的类型定义。

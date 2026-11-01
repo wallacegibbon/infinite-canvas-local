@@ -4,8 +4,8 @@
 // 防闪烁:解析结果按源码模块级缓存,且只在 HTML 真正变化时写入 DOM——
 //   画布任何重渲染都不会重新解析或重载 Markdown 里的图片。
 // styles.css 由 esbuild 以 text 方式打进 bundle,通过 plugin.css 自动注入。
-import { definePlugin, useEffect, useRef, useState } from "@infinite-canvas/plugin-sdk";
-import type { CanvasNodeContentProps } from "@infinite-canvas/plugin-sdk";
+import { definePlugin, useEffect, useRef, useState } from "@comfy-loft/plugin-sdk";
+import type { CanvasNodeContentProps } from "@comfy-loft/plugin-sdk";
 
 import css from "./styles.css";
 

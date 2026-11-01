@@ -1,7 +1,7 @@
 // 便利贴节点:纯展示便利贴——整块可拖动、双击编辑、右上角自选颜色。
 // 不再声明 resource(避免宿主在右上角显示「文本N」资源角标),也不再衍生节点。
-import { definePlugin, useEffect, useRef, useState } from "@infinite-canvas/plugin-sdk";
-import type { CanvasNodeContentProps } from "@infinite-canvas/plugin-sdk";
+import { definePlugin, useEffect, useRef, useState } from "@comfy-loft/plugin-sdk";
+import type { CanvasNodeContentProps } from "@comfy-loft/plugin-sdk";
 
 // 预设便签色(点选切换),并额外提供自定义取色
 const PRESET_COLORS = ["#fde68a", "#fca5a5", "#fdba74", "#a7f3d0", "#bfdbfe", "#ddd6fe", "#f9a8d4", "#e7e5e4"];

@@ -1,6 +1,6 @@
 // SVG 节点:编辑与渲染 SVG,透明背景直接融入画布;无自身内容时可取上游文本节点里的 SVG 源码。
-import { definePlugin, useEffect, useRef, useState } from "@infinite-canvas/plugin-sdk";
-import type { CanvasNodeContentProps } from "@infinite-canvas/plugin-sdk";
+import { definePlugin, useEffect, useRef, useState } from "@comfy-loft/plugin-sdk";
+import type { CanvasNodeContentProps } from "@comfy-loft/plugin-sdk";
 
 function SvgContent({ ctx }: CanvasNodeContentProps) {
     const [editing, setEditing] = useState(false);

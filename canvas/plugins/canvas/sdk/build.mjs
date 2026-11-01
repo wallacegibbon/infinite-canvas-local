@@ -55,7 +55,7 @@ export async function buildPlugin(metaUrl, overrides = {}) {
         target: "es2020",
         // automatic JSX → 转发到本 SDK 的 jsx-runtime(内部用宿主 React),插件无需自带 React
         jsx: "automatic",
-        jsxImportSource: "@infinite-canvas/plugin-sdk",
+        jsxImportSource: "@comfy-loft/plugin-sdk",
         loader: { ".js": "jsx", ".jsx": "jsx", ".ts": "ts", ".tsx": "tsx", ".css": "text" },
         // 宿主提供单例 React,插件不打包 react;https:// 依赖 esbuild 自动 external
         external: ["react", "react-dom"],

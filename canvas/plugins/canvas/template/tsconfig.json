@@ -5,7 +5,7 @@
         "moduleResolution": "bundler",
         "lib": ["dom", "dom.iterable", "esnext"],
         "jsx": "react-jsx",
-        "jsxImportSource": "@infinite-canvas/plugin-sdk",
+        "jsxImportSource": "@comfy-loft/plugin-sdk",
         "strict": true,
         "skipLibCheck": true,
         "noEmit": true,

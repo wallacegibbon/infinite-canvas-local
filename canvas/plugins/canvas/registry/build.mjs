@@ -1,6 +1,6 @@
 // 官方插件集中构建:一次进程构建所有官方插件 + 生成清单,产物进 dist/(已 gitignore)。
 // 官方插件目录本身不各自安装依赖:统一从本目录 node_modules 解析 SDK(nodePaths)。
-// 本仓库不走 CI/CDN:产物手动复制到 infinite-canvas/web/public/plugins/ 随画布构建。
+// 本仓库不走 CI/CDN:产物手动复制到 canvas/web/public/plugins/ 随画布构建。
 // 本地自测:`npm install && npm run build`,再把 VITE_PLUGIN_REGISTRY_URL 指向本地 dist。
 import { build } from "esbuild";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -42,7 +42,7 @@ for (const plugin of OFFICIAL) {
         target: "es2020",
         // automatic JSX → SDK 的 jsx-runtime(内部用宿主 React),react external
         jsx: "automatic",
-        jsxImportSource: "@infinite-canvas/plugin-sdk",
+        jsxImportSource: "@comfy-loft/plugin-sdk",
         loader: { ".ts": "ts", ".tsx": "tsx", ".css": "text" },
         external: ["react", "react-dom"],
         minify: true,

@@ -1,8 +1,8 @@
 // 3D 全景节点:等距柱状(equirectangular)360° 全景查看器。
 // 三种取图方式:① 从上游图片节点自动取图 ② 本地上传 ③ AI 生成(复用宿主内置生成面板)。
 // three.js 从 CDN 按需加载,不打进 bundle。AI 生成通过 useBuiltinPanel 声明,结果写回本节点。
-import { definePlugin, useCallback, useEffect, useRef, useState } from "@infinite-canvas/plugin-sdk";
-import type { CanvasNodeContentProps, CanvasNodeContext } from "@infinite-canvas/plugin-sdk";
+import { definePlugin, useCallback, useEffect, useRef, useState } from "@comfy-loft/plugin-sdk";
+import type { CanvasNodeContentProps, CanvasNodeContext } from "@comfy-loft/plugin-sdk";
 
 // three 从 CDN 动态加载(env.d.ts 里声明为 any),不打进 bundle
 let threePromise: Promise<any> | undefined;

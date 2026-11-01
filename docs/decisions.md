@@ -4683,3 +4683,39 @@ tests, `go test ./internal/...`, and a rebuilt bundle whose `<title>` is `Comfy 
 names now returns nothing outside `canvas/plugins/**`.
 
 **Where** `canvas/web/{index.html,src/i18n/locales/{zh-CN,en-US}.ts}`.
+
+## 140. The plugin SDK and its packages stop being named after upstream
+
+**Decision** The web app's package is `comfy-loft`, the plugin SDK is `@comfy-loft/plugin-sdk`, and the plugin
+packages, READMEs, `tsconfig` `jsxImportSource`, `build.mjs` entry points and SDK comments follow it: 48 files
+across `canvas/plugins/canvas/**`, plus `canvas/web/{package.json,package-lock.json}`. The CHANGELOG and SECURITY
+files the upstream project shipped are deleted — they describe a release history that stops before this work and a
+security policy whose reporting address is someone else's.
+
+**What was renamed and why it is safe** The SDK name is a *build-time* identity: `build.mjs` bundles the SDK into
+each plugin, so the host never resolves the package name at runtime. Nothing in `canvas/web/src` imports it, and
+the two prebuilt host plugins in `canvas/web/public/plugins/` contain no reference to it. The registry's build
+comment also still pointed at `infinite-canvas/web/public/plugins/`, a path that has not existed since #137.
+
+**Three identities were left alone, and they are the interesting part**
+
+- **Persisted data.** `infinite-canvas:canvas_store`, `:asset_store`, `:ai_config_store`, `:plugin_store`,
+  `:theme_store`, `:locale`, and the localforage databases `infinite-canvas` and `infinite-canvas-plugins` are keys
+  in the user's browser, not labels. Renaming them silently orphans every canvas, asset, setting and theme on every
+  machine that has used this app. Doing it properly means reading the old key, writing the new one, and keeping the
+  old one readable for a while — a migration, not a rename.
+- **Export files.** `app: "infinite-canvas"` in `canvas-export.ts`, `types/canvas-export.ts`,
+  `asset-transfer.ts` and `project.tsx` is the marker that says "this JSON is a canvas export". Change it and every
+  file exported so far stops importing. Its own migration, if it is ever worth it.
+- **The agent plugin.** `canvas/plugins/infinite-canvas/**` is a third party's work: the manifest names
+  `basketikun` as author, links `canvas.best` and its `.mcp.json` spawns `@basketikun/canvas-agent`. Renaming the
+  wrapper while it still calls their package would present their tool as ours, which is the opposite of what #137
+  was about.
+
+**Tested** `tsc --noEmit`, `npm run check:i18n`, 134 canvas tests, `go test ./internal/...`, `make web` (bundle
+title `Comfy Loft`), and JSON validity of every touched lockfile. The `Symbol.for("infinite-canvas.jsx.fragment")`
+in `sdk/src/jsx-runtime.ts` stays as well: it is an interop symbol inside prebuilt bundles, and renaming it would
+risk plugins built before this commit for no visible gain.
+
+**Where** `canvas/plugins/canvas/**` (48 files), `canvas/web/{package.json,package-lock.json}`,
+`canvas/{CHANGELOG.md,SECURITY.md}` (deleted).

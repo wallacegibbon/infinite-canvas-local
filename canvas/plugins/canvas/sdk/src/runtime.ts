@@ -12,7 +12,7 @@ type RuntimeGlobal = { InfiniteCanvasRuntime?: PluginRuntime };
 export function getRuntime(): PluginRuntime {
     const runtime = (globalThis as unknown as RuntimeGlobal).InfiniteCanvasRuntime;
     if (!runtime) {
-        throw new Error("[plugin-sdk] Infinite Canvas 运行时未就绪:请在画布宿主中加载本插件");
+        throw new Error("[plugin-sdk] Comfy Loft 运行时未就绪:请在画布宿主中加载本插件");
     }
     return runtime;
 }
@@ -23,7 +23,7 @@ export function getReact(): typeof React {
 }
 
 // --- 类型完整的 hooks 转发:签名取自 @types/react,运行时转发到宿主 React ---
-// 这样插件作者可以直接 `import { useState } from "@infinite-canvas/plugin-sdk"`,
+// 这样插件作者可以直接 `import { useState } from "@comfy-loft/plugin-sdk"`,
 // 无需再从 runtime 里解构 React。
 
 export const useState: typeof React.useState = ((...args: unknown[]) => (getReact().useState as (...a: unknown[]) => unknown)(...args)) as typeof React.useState;

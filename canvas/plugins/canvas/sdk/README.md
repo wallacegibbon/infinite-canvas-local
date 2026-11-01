@@ -1,6 +1,6 @@
-# @infinite-canvas/plugin-sdk
+# @comfy-loft/plugin-sdk
 
-Infinite Canvas 画布节点插件的 **TypeScript SDK**。插件作者只写节点 UI 与逻辑,类型、JSX、运行时桥接、构建全部由 SDK 提供;产物仍是宿主加载器现有契约的 ESM(React external,宿主单例)。
+Comfy Loft 画布节点插件的 **TypeScript SDK**。插件作者只写节点 UI 与逻辑,类型、JSX、运行时桥接、构建全部由 SDK 提供;产物仍是宿主加载器现有契约的 ESM(React external,宿主单例)。
 
 ## 提供什么
 
@@ -16,8 +16,8 @@ Infinite Canvas 画布节点插件的 **TypeScript SDK**。插件作者只写节
 
 ```tsx
 // src/index.tsx
-import { definePlugin, useState } from "@infinite-canvas/plugin-sdk";
-import type { CanvasNodeContentProps } from "@infinite-canvas/plugin-sdk";
+import { definePlugin, useState } from "@comfy-loft/plugin-sdk";
+import type { CanvasNodeContentProps } from "@comfy-loft/plugin-sdk";
 
 function Content({ ctx }: CanvasNodeContentProps) {
     const [n, setN] = useState(0);
@@ -46,7 +46,7 @@ export default definePlugin({
 
 ```js
 // build.mjs
-import { buildPlugin } from "@infinite-canvas/plugin-sdk/build";
+import { buildPlugin } from "@comfy-loft/plugin-sdk/build";
 await buildPlugin(import.meta.url);
 ```
 
@@ -61,14 +61,14 @@ await buildPlugin(import.meta.url);
     "type": "module",
     "scripts": { "build": "node build.mjs", "dev": "node build.mjs --watch", "typecheck": "tsc --noEmit" },
     "devDependencies": {
-        "@infinite-canvas/plugin-sdk": "file:../sdk",
+        "@comfy-loft/plugin-sdk": "file:../sdk",
         "@types/react": "19.1.12",
         "typescript": "^5"
     }
 }
 ```
 
-插件 `tsconfig.json` 关键项:`"jsx": "react-jsx"`、`"jsxImportSource": "@infinite-canvas/plugin-sdk"`、`"moduleResolution": "bundler"`。
+插件 `tsconfig.json` 关键项:`"jsx": "react-jsx"`、`"jsxImportSource": "@comfy-loft/plugin-sdk"`、`"moduleResolution": "bundler"`。
 
 ## 设计约束
 

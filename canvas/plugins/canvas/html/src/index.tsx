@@ -2,8 +2,8 @@
 // 交互:预览态 iframe 默认 pointer-events:none —— 鼠标事件穿透到宿主节点体,
 // 因此点节点任意位置都能拖动,无需在节点上加任何标题栏/按钮。
 // 「编辑/预览」与「交互」开关都放在节点外的悬浮工具条(toolbar 扩展点),状态存 metadata。
-import { definePlugin, useMemo, useRef, useState } from "@infinite-canvas/plugin-sdk";
-import type { CanvasNodeContentProps } from "@infinite-canvas/plugin-sdk";
+import { definePlugin, useMemo, useRef, useState } from "@comfy-loft/plugin-sdk";
+import type { CanvasNodeContentProps } from "@comfy-loft/plugin-sdk";
 
 // 源码编辑器行高/字号,行号槽与文本域必须完全一致才能对齐
 const EDITOR_FONT = 12;

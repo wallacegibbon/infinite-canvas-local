@@ -1,7 +1,7 @@
 // 插件模板:复制本目录 → 改 id/name/type → 写你的节点。
 // 这是一个演示节点:编辑文本、跟随主题、读取上游节点、用画布指令衍生新节点。
-import { definePlugin, useState } from "@infinite-canvas/plugin-sdk";
-import type { CanvasNodeContentProps } from "@infinite-canvas/plugin-sdk";
+import { definePlugin, useState } from "@comfy-loft/plugin-sdk";
+import type { CanvasNodeContentProps } from "@comfy-loft/plugin-sdk";
 
 function TemplateContent({ ctx }: CanvasNodeContentProps) {
     const [editing, setEditing] = useState(false);
