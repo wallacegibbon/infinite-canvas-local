@@ -177,6 +177,7 @@ back what AlayaCore says. The gateway owns no wording, no model choice and no st
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/agent/socket/{session}` | One agent process, named by the client, both directions. |
+| `POST` | `/mcp/{workspace}` | The agent's tools, spoken to AlayaCore. One workspace per session. |
 
 A session is one `alayacore --rawio` process with one socket, filed under a name the **client** chooses:
 the canvas agent panel calls its own `canvas`, a node's panel calls its own `node:<id>`. The gateway does
@@ -201,6 +202,37 @@ eyes, and two readers would take half the frames each.
 
 A built-in tool (`read_file`, enabled for the skills the agent loads) runs inside AlayaCore, so the call
 and its result arrive as frames and the gateway relays both without answering either.
+
+### The agent's hands are MCP
+
+Anything the agent does that AlayaCore cannot do by itself — build a node, wire an edge, start a
+generation — is a tool this gateway serves, because the gateway is already the process holding the
+socket to the browser. AlayaCore learns about it the same way it learns anything about its
+configuration: from a file.
+
+Each session is spawned with its own `--config-path`, a directory under `<DATA_DIR>/agent/`
+(`<sanitised-session>-<hash8>`), holding a copy of the operator's `model.conf` and `runtime.conf` plus
+an `mcp.conf` written for that session:
+
+```
+server: canvas
+url: http://127.0.0.1:<GATEWAY_PORT>/mcp/<workspace>
+proto-version: 2025-11-25
+```
+
+The URL is the only thing that says which agent is asking: an MCP call carries no identity of its own,
+and guessing from "the session with a turn in flight" is wrong as soon as two panels ask at once. The
+workspace name is derived from the session name (`agentWorkspaceKey`), so a call routes back to the
+session it came from without a registry that could disagree with the sessions that exist.
+
+A session's directory is removed when the process is released, and every leftover is removed at startup:
+a session does not survive a restart, so neither should what it wrote. Copying `runtime.conf` rather than
+sharing it is what keeps one session's model choice out of the next one's default.
+
+The endpoint speaks `initialize`, `tools/list` and `tools/call`; notifications are answered `202`. Tool
+names are **not** prefixed with `canvas_`: AlayaCore adds the server's name itself, so a tool called
+`ping` here is `canvas_ping` to the model and arrives back as `ping`. See
+[`decisions.md`](decisions.md) #84.
 
 A music graph needs two texts, and both are ordinary `registry.json` bindings (`prompt`, `lyrics`), so
 a run carries them as inputs like any other parameter. `response_format`-style container selection is
@@ -245,7 +277,7 @@ carries reaches a node.
 
 ### Prompt models are the agent's
 
-The gateway has no prompt model of its own: `/api/agent/chat` and `/api/agent/once` spawn AlayaCore,
+The gateway has no prompt model of its own: `/api/agent/socket/{session}` spawns AlayaCore,
 and every question about models — which exist, which is active, how hard it should think — is answered
 by the agent's own `model.conf` and its `reasoning_0/1/2` blocks. Nothing here configures a provider,
 negotiates a thinking parameter or retries a rejected field: AlayaCore does, and the gateway relays

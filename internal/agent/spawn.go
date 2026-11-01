@@ -29,6 +29,8 @@ type Process struct {
 	Stderr    *stderrTail
 	Log       *logx.Logger
 	startedAt time.Time
+	// workDir is removed on release; empty for an agent that shares the operator's directory.
+	workDir string
 
 	stdinFile *os.File
 
@@ -47,6 +49,10 @@ type SpawnOptions struct {
 	// Tools is the `--builtin-tools` list. Read-only file access is what a skill needs in order to be
 	// activated at all (the agent loads a skill by reading its SKILL.md); no other tool is enabled.
 	Tools string
+	// WorkDir is a directory this agent owns and removes when it is released: its copy of the operator's
+	// configuration, and the `mcp.conf` that points its tool calls at this gateway. Empty means the
+	// agent shares one directory with everyone else, which is only right for a one-shot.
+	WorkDir string
 	// Log records what happened in terms someone who knows AlayaCore can follow: the command line,
 	// every frame in both directions, and how the process ended.
 	Log *logx.Logger
@@ -132,6 +138,7 @@ func Spawn(o SpawnOptions) (*Process, error) {
 		stdinFile: stdin.(*os.File),
 		Log:       o.Log,
 		startedAt: time.Now(),
+		workDir:   o.WorkDir,
 	}, nil
 }
 
@@ -200,6 +207,9 @@ func (p *Process) Wait() error {
 // the OS still reaps it — Wait blocks until it does, which is why the caller does this in the
 // background rather than on the response path.
 func (p *Process) Release() {
+	if p.workDir != "" {
+		_ = os.RemoveAll(p.workDir)
+	}
 	if p.stdinFile != nil {
 		_ = p.stdinFile.Close()
 	}

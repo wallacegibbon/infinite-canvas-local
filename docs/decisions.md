@@ -2912,3 +2912,40 @@ send) while the second still read 未连接 / 连接; pressing send on the first
 `released session=node:config-… reason=close` with the button back to 连接 and no `alayacore` process
 left running. The client tests hold the
 other half: a session's model does not leak into another's, and asking for words opens no second socket.
+
+## 84. A session's tools are its own, and the workspace is how a call says so
+
+**Decision** A session's agent is spawned with `--config-path` pointing at a directory of its own,
+`<DATA_DIR>/agent/<sanitised-session>-<hash8>`, holding a copy of the operator's `model.conf` and
+`runtime.conf` plus an `mcp.conf` that points its tool calls at `http://127.0.0.1:<GATEWAY_PORT>/mcp/<workspace>`.
+The workspace name is derived from the session name, so `POST /mcp/{workspace}` finds the session that is
+asking by scanning the sessions that exist rather than through a registry beside them. The directory is
+removed with the process, and every leftover is removed at startup. The endpoint speaks `initialize`,
+`tools/list` and `tools/call` (notifications are `202`) and, for now, offers one tool, `ping`, which
+answers with the session's own name. Tool names are unprefixed: AlayaCore namespaces them under the
+server, so `ping` is the model's `canvas_ping` and arrives back here as `ping`.
+
+**Why MCP at all** Anything the agent does that AlayaCore cannot do itself — make a node, wire an edge,
+start a generation — has to reach the gateway, which is the process that holds the socket to the canvas.
+AlayaCore's only way to learn a tool exists is `mcp.conf` in its config directory, so the gateway serves
+that tool itself instead of inventing a second channel.
+
+**Why the identity is a directory** An MCP call carries nothing but its arguments. The alternative ways
+to know who is asking are both wrong: guessing the session with a turn in flight breaks the moment two
+panels ask at once, and adding a session field to every tool's arguments makes the model carry something
+that is not its business. A path segment written by the gateway, into a file the gateway chose, cannot be
+got wrong by the client — and it is a name that says what it is.
+
+**Why a config directory per session, rather than one shared** `model_set` is persisted by AlayaCore into
+`runtime.conf`, so a shared directory would turn "the model this session runs on" into the default for
+every later session — the same kind of second owner that #83 removed from the client. The copy also means
+the agent writes nowhere near the operator's configuration.
+
+**Tested** Against a real AlayaCore on `:8191`: on connect it read its own `mcp.conf`, logged
+`MCP servers initialized: 1 servers, 1 tools loaded`, called the tool, and the gateway logged
+`<< UF {"call_id":…,"output":[{"type":"text","text":"pong from probe-mcp"}]}`; closing the conversation
+removed `data/agent/probe-mcp-7ed10748` with it. The name the model sees was measured, not assumed — the
+first version offered `canvas_ping` and the model was shown `canvas_canvas_ping`. `mcp_test.go` holds the
+rest: the handshake and tool list, a call answered with the name of the session behind the workspace, a
+call for a workspace nobody owns answered as an error, a notification accepted with no body, and a
+session's directory built for it and removed with it.

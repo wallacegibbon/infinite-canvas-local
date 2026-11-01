@@ -99,6 +99,18 @@ func (s *Sessions) Connect(ctx context.Context, id string, opts SpawnOptions) (C
 	return Connected{Session: session, Startup: state.event(), Spawned: true}, nil
 }
 
+// List is every connected session. The MCP route uses it to find the session that owns a workspace,
+// which is a name derived from the session rather than a registry kept beside it.
+func (s *Sessions) List() []*Session {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all := make([]*Session, 0, len(s.list))
+	for _, session := range s.list {
+		all = append(all, session)
+	}
+	return all
+}
+
 // Close releases a session and the process with it. Called when the client says so, when the process
 // dies under it, and when the gateway is shutting down.
 func (s *Sessions) Close(id, reason string) {

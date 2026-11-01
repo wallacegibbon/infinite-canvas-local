@@ -76,7 +76,15 @@ func (s *Server) handleAgentSocket(ctx *httpx.Ctx) error {
 		return conn.WriteText(payload)
 	}
 
-	connected, err := s.agentSessions.Connect(ctx.R.Context(), id, s.agentOptions())
+	options, err := s.agentOptionsFor(id)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Warn("agent: socket %q has no workspace: %v", id, err)
+		}
+		_ = send(agent.Event{Type: "error", Message: err.Error()})
+		return nil
+	}
+	connected, err := s.agentSessions.Connect(ctx.R.Context(), id, options)
 	if err != nil {
 		if s.logger != nil {
 			s.logger.Warn("agent: socket %q could not connect: %v", id, err)

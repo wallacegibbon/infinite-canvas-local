@@ -29,3 +29,6 @@ infinite-canvas/web/dist/
 
 # local test artifacts
 tmp-*
+
+# working notes for whoever picks this up next (not part of the project)
+TODO.md

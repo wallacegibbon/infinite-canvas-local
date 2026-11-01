@@ -61,6 +61,9 @@ type Server struct {
 // New constructs the whole gateway. Everything is loaded before the first request,
 // so a half-initialized server can never answer.
 func New(cfg *config.Config, logger *logx.Logger) (*Server, error) {
+	// Sessions do not survive a restart, so neither do the directories their agents worked in.
+	clearAgentWorkspaces(cfg.DataDir)
+
 	comfyClient, err := comfy.New(comfy.Options{
 		BaseURL:       cfg.ComfyURL,
 		TimeoutMs:     cfg.RequestTimeoutMs,
