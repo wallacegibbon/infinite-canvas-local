@@ -3101,3 +3101,25 @@ messages grew it to 1360px with `scrollTop` still 0 and `gap 1070` — the reade
 scrolling back to the end, the next message put it at 1145 of 1435 with `gap 0` again. `@` in the composer
 showed "点击一个节点来引用 · ESC 取消", clicking the teapot node put `@a brass compass on a marble table` in the
 draft, and the prompt the gateway logged carried `【画布引用】- image-1793524968642-jq17f (image) …`.
+
+## 91. Changing a prompt and running it again are the manual path, so the agent gets both
+
+**Decision** `set_prompt(nodeId, prompt)` writes the prompt where the node's own prompt panel writes it: a node
+that already holds a result keeps the words in `composerContent` (typing must not throw the result away), a
+node that holds none keeps them in `prompt`. The question "does this node hold a result" is one function,
+`holdsResult`, asked by both the panel and the tool. Generating afterwards is `generate` on that same node,
+which replaces the result in place (#77) — nothing is created beside it. A variant remains what it is manually:
+a new node fed through the reference bar, i.e. `create_node` plus a connection.
+
+**Why** Before this the agent's only way to answer "draw this differently" was `create_node` + `generate`, so
+every request produced a sibling — the shape #77 deliberately removed from the manual button because it made
+one press mean two things. An agent that offers only the removed route is a second, worse product: the user's
+hand and the agent's hand would do different things to the same canvas. Both intents are legitimate and both
+have explicit routes; which one is meant is the user's sentence, not the tool's choice.
+
+**Tested** In a browser against a real AlayaCore: "把 image-1793524968642-jq17f 这个节点的提示词改成「a rusty
+copper kettle on a dark stone shelf, candle light」，然后在同一个节点上重新生成，不要新建节点" →
+`canvas_set_prompt` → `canvas_generate` → `POST /api/runs 202` → the run succeeded in that node (3 images, the
+count the canvas is set to), the node's prompt box showed the new words, its picture became the copper kettle
+by candlelight, and the canvas still had **40 nodes** — the same 40 as before. The agent then called
+`read_node` and reported "已直接在原节点上触发生成（没有新建节点）".

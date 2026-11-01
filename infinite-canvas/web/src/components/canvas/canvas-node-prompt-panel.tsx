@@ -10,6 +10,7 @@ import { Tooltip } from "@/components/kit/tooltip";
 import { BaseModelPicker, ModelPicker, WorkflowModelPicker } from "@/components/model-picker";
 import { channelModelOf, defaultConfig, modelImageInputs, modelOptionName, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 
+import { holdsResult } from "@/lib/canvas/node-prompt-field";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { isPlainEnterKey } from "@/lib/keyboard-event";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -75,9 +76,11 @@ export function CanvasNodePromptPanel({
     const theme = useCanvasTheme();
     const mode = modeOverride ?? defaultMode(node.type);
     const config = buildNodeConfig(globalConfig, node, mode);
+    // A node that already holds a result keeps its words in `composerContent`; one that holds none keeps them
+    // in `prompt`. Shared with the agent's set_prompt, so both write to the same field.
+    const isEditingExistingContent = holdsResult(node);
     const hasTextContent = node.type === CanvasNodeType.Text && Boolean(node.metadata?.content?.trim());
     const hasImageContent = node.type === CanvasNodeType.Image && Boolean(node.metadata?.content);
-    const isEditingExistingContent = hasTextContent || hasImageContent;
     const [prompt, setPrompt] = useState(node.metadata?.composerContent ?? node.metadata?.prompt ?? "");
     const [draft, setDraft] = useState(prompt);
     const draftRef = useRef(draft);

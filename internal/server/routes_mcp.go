@@ -134,6 +134,18 @@ func (s *Server) mcpTools() []mcpTool {
 			"additionalProperties": false
 		}`),
 	}, {
+		Name:        "set_prompt",
+		Description: "Change one node's prompt, in the same field the node's own panel writes it to. Running it again afterwards replaces that node's result (docs/decisions.md #77); a variant is a new node.",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"nodeId": {"type": "string", "description": "The id list_nodes reported."},
+				"prompt": {"type": "string", "description": "The words the node should hold."}
+			},
+			"required": ["nodeId", "prompt"],
+			"additionalProperties": false
+		}`),
+	}, {
 		Name:        "generate",
 		Description: "Press one node's generate button — the same thing the node's own panel does. It starts the work and answers at once; the node shows its own progress and holds the result.",
 		InputSchema: json.RawMessage(`{

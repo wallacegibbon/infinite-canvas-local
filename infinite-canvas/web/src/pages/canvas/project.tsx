@@ -63,6 +63,7 @@ import { CanvasSidePanel } from "@/components/canvas/canvas-side-panel";
 import { CanvasZoomControls } from "@/components/canvas/canvas-zoom-controls";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { usePluginHost } from "@/pages/canvas/hooks/use-plugin-host";
+import { holdsResult } from "@/lib/canvas/node-prompt-field";
 import { useCanvasAgentTools } from "@/pages/canvas/hooks/use-canvas-agent-tools";
 import { buildNodeMentionReferences, getGroupResourceNodes, isCanvasReferenceNode, type CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
@@ -2193,8 +2194,23 @@ function InfiniteCanvasPage() {
         generateNodeRef.current = handleGenerateNode;
     }, [handleGenerateNode]);
 
+    /**
+     * Write a node's prompt the way its own panel writes it: a node that already holds a result keeps the
+     * words in `composerContent` (typing must not throw the result away), a node that holds none keeps them
+     * in `prompt`, ready to be run.
+     */
+    const setNodePrompt = useCallback(
+        (nodeId: string, prompt: string) => {
+            const node = nodesRef.current.find((candidate) => candidate.id === nodeId);
+            if (!node) return;
+            if (holdsResult(node)) handleConfigNodeChange(nodeId, { composerContent: prompt });
+            else handleNodePromptChange(nodeId, prompt);
+        },
+        [handleConfigNodeChange, handleNodePromptChange],
+    );
+
     // The agent's hands are the same functions the buttons press.
-    useCanvasAgentTools({ nodesRef, connectionsRef, createNode, generateNode: handleGenerateNode });
+    useCanvasAgentTools({ nodesRef, connectionsRef, createNode, generateNode: handleGenerateNode, setNodePrompt });
 
     const deleteBatchImage = useCallback((nodeId: string, imageId: string) => {
         const node = nodesRef.current.find((item) => item.id === nodeId);

@@ -22,11 +22,13 @@ export function useCanvasAgentTools({
     connectionsRef,
     createNode,
     generateNode,
+    setNodePrompt,
 }: {
     nodesRef: RefObject<CanvasNodeData[]>;
     connectionsRef: RefObject<CanvasConnection[]>;
     createNode: CanvasHands["createNode"];
     generateNode: CanvasHands["generateNode"];
+    setNodePrompt: CanvasHands["setNodePrompt"];
 }) {
     // The refs and callbacks outlive a render, and a tool call can arrive between two of them.
     const hands = useRef<CanvasHands>({
@@ -34,12 +36,14 @@ export function useCanvasAgentTools({
         connections: () => [],
         createNode,
         generateNode,
+        setNodePrompt,
     });
     hands.current = {
         nodes: () => nodesRef.current || [],
         connections: () => connectionsRef.current || [],
         createNode,
         generateNode,
+        setNodePrompt,
     };
 
     useEffect(
@@ -63,6 +67,7 @@ type CanvasHands = {
     connections: () => CanvasConnection[];
     createNode: (type: CanvasNodeTypeId, position?: Position, patch?: CanvasNodeMetadata) => CanvasNodeData;
     generateNode: (nodeId: string, mode: CanvasGenerationMode, prompt: string) => Promise<void>;
+    setNodePrompt: (nodeId: string, prompt: string) => void;
 };
 
 /** One tool's result: the content blocks the agent reads, and whether it failed rather than did something. */
@@ -83,6 +88,8 @@ async function runTool(name: string, args: unknown, hands: CanvasHands): Promise
             return createNode(hands, args);
         case "read_node":
             return readNode(hands, args);
+        case "set_prompt":
+            return setPrompt(hands, args);
         case "generate":
             return pressGenerate(hands, args);
         default:
@@ -110,6 +117,24 @@ function createNode(hands: CanvasHands, args: unknown): ToolAnswer {
 
     const node = hands.createNode(type, centre, patch);
     return { content: [textBlock(`created ${node.id} (${node.type}) at (${Math.round(node.position.x)}, ${Math.round(node.position.y)})`)] };
+}
+
+/**
+ * Write one node's prompt, in the same field the node's own panel writes it to.
+ *
+ * Changing what a node says and running it again is one gesture in the canvas: the result is replaced in that
+ * node (docs/decisions.md #77), not made beside it. A variant is a new node fed through the reference bar,
+ * which is what `create_node` plus a connection is — so both intents keep their own tool.
+ */
+function setPrompt(hands: CanvasHands, args: unknown): ToolAnswer {
+    const input = (typeof args === "object" && args ? args : {}) as { nodeId?: unknown; prompt?: unknown };
+    const nodeId = typeof input.nodeId === "string" ? input.nodeId.trim() : "";
+    if (typeof input.prompt !== "string") return { content: [textBlock("set_prompt needs a prompt")], isError: true };
+    const node = hands.nodes().find((candidate) => candidate.id === nodeId);
+    if (!node) return { content: [textBlock(`no node with id "${nodeId}" on this canvas`)], isError: true };
+
+    hands.setNodePrompt(node.id, input.prompt);
+    return { content: [textBlock(`the prompt of ${node.id} is now: ${input.prompt.slice(0, 200)}`)], isError: false };
 }
 
 /**
