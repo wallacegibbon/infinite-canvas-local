@@ -4154,3 +4154,46 @@ re-vendoring a dormant pack and hoping.
 **Where** `workflows/registry.json`, `resources/index.json`, `resources/payload/custom_nodes/`,
 `internal/resource/status.go`, `internal/workflow/loaders.go`, `internal/setup/paths.go`,
 `infinite-canvas/web/src/{lib/canvas,components/canvas,pages/canvas,services/api,i18n}`.
+## 124. The no-VDN path leaves, and takes the last unlicensed pack with it
+
+**Decision** The three `-novdn` workflows, their graph, the LightX2V 8-step LoRA, the SolAttn pack, the
+two unreferenced 4-step LoRAs, and the UI switch that chose between the two backends are gone. The
+catalogue is 14 workflows and 53 resources; `resources/payload` holds 8 packs, all of them reachable
+upstream and none of them patched.
+
+**Why** Four reasons that arrived in this order:
+
+1. **The capability was duplicated.** `-novdn` and the VDN trio are the same model with the same three
+   input modes; only the acceleration recipe differs (a 1.8 GB distillation LoRA plus sparse attention,
+   versus a 5.1 GB distilled stage model plus chunked attention). Both run 8 steps + one refinement.
+2. **Nobody had ever used it.** The gateway's 16 recorded runs are `image-qwen21` ×8,
+   `video-h3-frames` ×6 and `video-h3-ref2va` ×2 — the last two are the VDN graphs. No `-novdn` run
+   exists, and no run carries a LoRA at all.
+3. **It was SolAttn's only reason to exist**, and SolAttn was the last pack with no real license story —
+   the repo does publish one (Apache-2.0), which our copy never carried, so the index said "No LICENSE
+   declared". More importantly, ComfyUI core already ships the same thing:
+   `comfy_extras/nodes_sparse_attention.py` implements *Sol-Attn adaptive threshold*, SLA-style top-k and
+   FastVideo's VSA behind one `BlockSparseAttention` node, with patches specifically for MiniMax-H3. A
+   third-party pack that reimplements core, on a path nobody runs, is not worth its dependency.
+4. **Two of the four LoRAs were dead weight.** `minimax_h3_fl2v_turbo_4step_v1.0_768p` and
+   `minimax_h3_ref2v_turbo_4step_v0.1` are referenced by no graph — they only appeared in a LoRA dropdown
+   whose filter matches any `minimax_h3*` file. 3.6 GB for an entry nobody can use correctly without the
+   chain they were trained for.
+
+**What was kept, and why** `h3_character_swap_lora` stays: 0.14 GB, referenced by the character-swap
+graph, and the only "replace the person in this clip" capability we have. The VDN trio and character swap
+are exactly the workflows that have actually run.
+
+**Cost** There is no fallback if the VDN stage weights disappear. They come from a single source
+(`OpenVDN/vdn-minimax-h3`), and #118 is what makes that survivable: the sha256 of every stage file is in
+the catalogue and the copies are on disk. The UI also loses its "no VDN" toggle —
+`video-model-mode.ts` went from five exports to three and no longer rewrites a workflow id.
+
+**Tested** `make check` (imports, bytecode, the media-role tests now naming only the VDN ids), `tsc
+--noEmit`, 132 canvas tests, and an integrity pass: 14 registry entries all point at graphs that exist,
+every pack reference resolves, and the 8 payload directories are exactly the 8 vendored node resources.
+
+**Where** `workflows/registry.json`, `workflows/video-h3-ref2va-drama.json` (deleted),
+`resources/index.json`, `resources/payload/custom_nodes/ComfyUI-SolAttn_triton` (deleted),
+`infinite-canvas/web/src/lib/canvas/video-model-mode.ts`, the two node panels, `video-settings-panel.tsx`,
+`i18n/locales/*`, `lib/resource-copy-zh.ts`, `internal/workflow/media_test.go`.

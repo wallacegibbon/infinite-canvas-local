@@ -153,8 +153,8 @@
     },
     {
       "id": "h3",
-      "label": "H3 video (VDN / no-VDN / character swap)",
-      "description": "H3 video generation: 7 workflows (three VDN, three no-VDN, one character swap). The nodes ship with the pack; the weights download per workflow.",
+      "label": "H3 video (VDN / character swap)",
+      "description": "H3 video generation: 4 workflows (three VDN, one character swap). The nodes ship with the pack; the weights download per workflow.",
       "planned": false,
       "resources": [
         "h3_unet_singularity_ref2va_v13_int8",
@@ -170,7 +170,6 @@
         "h3_vdn_stage_linear_config",
         "h3_vdn_stage_turbo_config",
         "h3_vdn_stage_default_config",
-        "h3_lightx2v_8step_lora",
         "h3_character_swap_lora",
         "h3_tiny_vae"
       ],
@@ -178,9 +177,6 @@
         "video-h3-ref2va",
         "video-h3-t2v",
         "video-h3-frames",
-        "video-h3-ref2va-novdn",
-        "video-h3-t2v-novdn",
-        "video-h3-frames-novdn",
         "video-h3-character-swap"
       ],
       "optional": true,
@@ -198,7 +194,6 @@
         "h3_vdn_stage_linear_config",
         "h3_vdn_stage_turbo_config",
         "h3_vdn_stage_default_config",
-        "h3_lightx2v_8step_lora",
         "h3_character_swap_lora",
         "h3_tiny_vae"
       ],
@@ -249,33 +244,6 @@
           "h3_vdn_stage_linear_config",
           "h3_vdn_stage_turbo_config",
           "h3_vdn_stage_default_config",
-          "h3_tiny_vae"
-        ],
-        "video-h3-ref2va-novdn": [
-          "h3_unet_singularity_ref2va_v13_int8",
-          "h3_te_qwen3vl_32b_int8_convrot",
-          "h3_audio_vae_fp32",
-          "h3_video_vae_fp16",
-          "h3_latent_upscaler_3d_fp16",
-          "h3_lightx2v_8step_lora",
-          "h3_tiny_vae"
-        ],
-        "video-h3-t2v-novdn": [
-          "h3_unet_singularity_ref2va_v13_int8",
-          "h3_te_qwen3vl_32b_int8_convrot",
-          "h3_audio_vae_fp32",
-          "h3_video_vae_fp16",
-          "h3_latent_upscaler_3d_fp16",
-          "h3_lightx2v_8step_lora",
-          "h3_tiny_vae"
-        ],
-        "video-h3-frames-novdn": [
-          "h3_unet_singularity_ref2va_v13_int8",
-          "h3_te_qwen3vl_32b_int8_convrot",
-          "h3_audio_vae_fp32",
-          "h3_video_vae_fp16",
-          "h3_latent_upscaler_3d_fp16",
-          "h3_lightx2v_8step_lora",
           "h3_tiny_vae"
         ],
         "video-h3-character-swap": [
@@ -758,20 +726,6 @@
       ]
     },
     {
-      "id": "h3_lightx2v_8step_lora",
-      "type": "model",
-      "label": "H3 LightX2V 8-step Turbo LoRA",
-      "target": "loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
-      "size": 1956193000,
-      "sha256": "2339acdf19bfe123f46b971ea35d367a84adb85de43627e1eceafa5a5b2b111e",
-      "license": "MiniMax H3 Community License",
-      "note": "Used by the no-VDN workflows.",
-      "sources": [
-        "https://www.modelscope.cn/models/Comfy-Org/MiniMax-H3/resolve/master/loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
-        "https://hf-mirror.com/Comfy-Org/MiniMax-H3/resolve/main/loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors"
-      ]
-    },
-    {
       "id": "h3_character_swap_lora",
       "type": "model",
       "label": "H3 Character Swap v1.5 LoRA",
@@ -957,24 +911,6 @@
       "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
       "sources": [
         "https://github.com/facok/comfyui-SelfLift/archive/835c3cf7919410f71f414688f049c6ca497789d0.zip"
-      ]
-    },
-    {
-      "id": "h3_solattn_node",
-      "type": "node",
-      "label": "SolAttn H3（Triton）",
-      "target": "custom_nodes/ComfyUI-SolAttn_triton",
-      "upstream": "https://github.com/kijai/ComfyUI-SolAttn_triton",
-      "pinnedCommit": "dfc2e31a41afd72bd53dd2137fc8b2931d5ec192",
-      "size": 104848,
-      "license": "No LICENSE declared",
-      "autoInstall": true,
-      "provides": [
-        "SolAttnPatch"
-      ],
-      "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
-      "sources": [
-        "https://github.com/kijai/ComfyUI-SolAttn_triton/archive/dfc2e31a41afd72bd53dd2137fc8b2931d5ec192.zip"
       ]
     },
     {

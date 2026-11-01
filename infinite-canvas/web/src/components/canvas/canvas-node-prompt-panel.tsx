@@ -23,7 +23,7 @@ import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-refer
 import { resolveCanvasReferenceImages } from "@/lib/canvas/canvas-resource-references";
 import { askOnceAgentSession, agentSession, endAgentSession, nodeAgent, openAgentSession, subscribeAgentSessions } from "@/services/api/agent";
 import type { PromptOptimizeMode } from "@/services/api/prompts";
-import { videoModelForWorkflow, videoModelModePatch, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
+import { videoModelForWorkflow, videoModelModePatch } from "@/lib/canvas/video-model-mode";
 import { CanvasNodeReferenceBar } from "./canvas-node-reference-bar";
 import { abortCaptionJob, hasCaptionJob, registerCaptionJob, releaseCaptionJob } from "@/lib/canvas/caption-jobs";
 import { abortPromptOptimizeJob, hasPromptOptimizeJob, registerPromptOptimizeJob, releasePromptOptimizeJob } from "@/lib/canvas/prompt-optimize-jobs";
@@ -95,8 +95,7 @@ export function CanvasNodePromptPanel({
         .map((reference) => reference.text!.trim())
         .join("\n\n");
     const rawWorkflowId = channelModelOf(config, config.model)?.model.workflowId || modelOptionName(config.model);
-    const workflowId = baseVideoWorkflowId(rawWorkflowId);
-    const isNoVdnModel = rawWorkflowId !== workflowId;
+    const workflowId = rawWorkflowId;
     const isH3T2V = mode === "video" && workflowId === "video-h3-t2v";
     const isH3Reference = workflowId === "video-h3-ref2va" || workflowId === "video-h3-character-swap";
     const isCharacterSwap = workflowId === "video-h3-character-swap";
@@ -140,7 +139,7 @@ export function CanvasNodePromptPanel({
             return;
         }
         const baseId = value === "reference" ? "video-h3-ref2va" : value === "frames" ? "video-h3-frames" : "video-h3-t2v";
-        const nextModel = videoModelForWorkflow(config, baseId, { noVdn: isNoVdnModel });
+        const nextModel = videoModelForWorkflow(config, baseId);
         onConfigChange(node.id, { ...(nextModel ? { model: nextModel } : {}), videoMode: value, ...(value === "frames" ? { frameMode } : {}) });
     };
 

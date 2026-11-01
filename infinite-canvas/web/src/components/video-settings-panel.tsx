@@ -7,7 +7,7 @@ import { Slider } from "@/components/kit/input";
 import i18n from "@/i18n";
 import { SeedSetting } from "@/components/image-settings-panel";
 import { type CanvasTheme } from "@/lib/canvas-theme";
-import { videoWorkflowId, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
+import { videoWorkflowId } from "@/lib/canvas/video-model-mode";
 import { clampVideoSeconds, computeVideoSize, inferVideoRatio, parseVideoResolution, readVideoDimensions, VIDEO_SECONDS_MAX, VIDEO_SECONDS_MIN, videoRatioOptions } from "@/lib/media-size";
 import { type AiConfig } from "@/stores/use-config-store";
 
@@ -57,7 +57,7 @@ export function VideoSettingsPanel({
     const { t } = useTranslation();
     const seconds = Number(clampVideoSeconds(config.videoSeconds || "6"));
     const videoMode = normalizeVideoModeValue(config.videoMode);
-    const workflowId = baseVideoWorkflowId(videoWorkflowId(config, config.model));
+    const workflowId = videoWorkflowId(config, config.model);
     const isH3Reference = workflowId === "video-h3-ref2va" || workflowId === "video-h3-character-swap";
     const isH3Frames = workflowId === "video-h3-frames";
     const isH3Text = workflowId === "video-h3-t2v";

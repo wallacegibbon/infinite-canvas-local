@@ -181,14 +181,14 @@ func TestShippedWorkflowsDeclareTheirMediaContract(t *testing.T) {
 		}
 	}
 
-	for _, id := range []string{"video-h3-t2v", "video-h3-t2v-novdn"} {
+	for _, id := range []string{"video-h3-t2v"} {
 		if got := plan(id, MediaCounts{}, "", nil).Mode; got != "text" {
 			t.Errorf("%s mode = %q", id, got)
 		}
 		refused(id, MediaCounts{Images: 1}, "unsupported_media")
 	}
 
-	for _, id := range []string{"video-h3-frames", "video-h3-frames-novdn"} {
+	for _, id := range []string{"video-h3-frames"} {
 		if got := plan(id, MediaCounts{Images: 2}, "", nil); got.FrameMode != "both" {
 			t.Errorf("%s frameMode = %q", id, got.FrameMode)
 		}
@@ -199,7 +199,7 @@ func TestShippedWorkflowsDeclareTheirMediaContract(t *testing.T) {
 		refused(id, MediaCounts{Images: 1, Audios: 1}, "unsupported_media")
 	}
 
-	for _, id := range []string{"video-h3-ref2va", "video-h3-ref2va-novdn"} {
+	for _, id := range []string{"video-h3-ref2va"} {
 		if got := plan(id, MediaCounts{Images: 6, Videos: 1, Audios: 2}, "", nil).Mode; got != "reference" {
 			t.Errorf("%s mode = %q", id, got)
 		}
