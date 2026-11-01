@@ -3006,3 +3006,22 @@ refusal names what it can make.
 `<< UF "created text-1793522100580-liw89 (text) at (1541, 438)"`. The node appeared in the middle of the
 viewport with the text already in it, selected, with the selection toolbar over it — visible in a
 screenshot taken right after — and the panel showed one step, `调用 canvas_create_node`, and the id.
+
+## 87. The tool URL is the address the gateway actually listens on
+
+**Decision** `mcp.conf` names the workspace at the gateway's **bind** address — `GATEWAY_HOST:GATEWAY_PORT`,
+not `127.0.0.1:<port>` — with a wildcard bind (`0.0.0.0`, `::`) replaced by loopback, since a wildcard has
+no address of its own to dial and loopback is what it reaches.
+
+**Why** The agent runs on the same machine as the gateway, but "same machine" is not "loopback": a gateway
+bound to `192.168.3.232:8190` does not answer on `127.0.0.1:8190` at all. Handed that URL, AlayaCore's MCP
+client simply cannot connect — it reports `0 servers` in its own output, the agent has no tools, and the
+only place the failure is visible is the agent's own log. This was found the way it should have been found
+earlier: on a real setup whose gateway binds a LAN address, while every test of ours ran on `127.0.0.1`,
+where the wrong URL happens to be right.
+
+**Tested** `TestMCPURLIsAnAddressTheAgentCanDial` pins the four shapes (loopback, LAN, wildcard, IPv6) and
+the generated file. A gateway bound to `192.168.3.232:8192` wrote
+`url: http://192.168.3.232:8192/mcp/probe-lan-8a8315a4` and its agent logged
+`MCP servers initialized: 1 servers, 3 tools loaded`; with the old `127.0.0.1` URL the same setup cannot
+connect at all (`curl http://127.0.0.1:8192/` → connection refused).

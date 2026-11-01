@@ -114,7 +114,7 @@ func (s *Server) mcpTools() []mcpTool {
 		Description: "Every node on the canvas — id, type, title, prompt, position — and every connection between them. The ids are what the other tools act on.",
 		InputSchema: noArguments,
 	}, {
-		Name: "create_node",
+		Name:        "create_node",
 		Description: "Make one node on the canvas, the way the user's own button makes one: it appears where the view is looking, selected, with its panel open when that is what pressing the button does. Answers with the new node's id and position.",
 		InputSchema: json.RawMessage(`{
 			"type": "object",

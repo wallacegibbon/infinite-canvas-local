@@ -60,12 +60,30 @@ func (s *Server) prepareAgentWorkspace(session string) (string, error) {
 	}
 	// Where this session's tool calls go. The URL names the workspace, which names the session.
 	mcp := "server: canvas\n" +
-		fmt.Sprintf("url: http://127.0.0.1:%d/mcp/%s\n", s.cfg.GatewayPort, agentWorkspaceKey(session)) +
+		"url: " + s.mcpURL(agentWorkspaceKey(session)) + "\n" +
 		"proto-version: " + mcpProtocolVersion + "\n"
 	if err := os.WriteFile(filepath.Join(dir, "mcp.conf"), []byte(mcp), 0o644); err != nil {
 		return "", err
 	}
 	return dir, nil
+}
+
+// mcpURL is the address an agent on this machine dials to reach its workspace.
+//
+// It is built from the address the gateway actually listens on, because that is the only one that is
+// certainly up: a gateway bound to a LAN address does not answer on 127.0.0.1, and an agent handed
+// `127.0.0.1:<port>` in that setup cannot connect at all — it loads no tools and says so only in its own
+// output. A wildcard bind cannot be dialled, so it becomes loopback, which is where a wildcard reaches.
+func (s *Server) mcpURL(workspace string) string {
+	host := s.cfg.GatewayHost
+	switch host {
+	case "", "0.0.0.0", "::", "[::]":
+		host = "127.0.0.1"
+	}
+	if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
+		host = "[" + host + "]" // an IPv6 literal
+	}
+	return fmt.Sprintf("http://%s:%d/mcp/%s", host, s.cfg.GatewayPort, workspace)
 }
 
 // clearAgentWorkspaces removes whatever a previous run left behind: sessions do not survive a restart,

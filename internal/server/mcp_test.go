@@ -16,6 +16,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"comfyui-gateway/internal/config"
 )
 
 // startMCPGateway is a gateway whose agent is the fake binary and whose operator configuration has one
@@ -353,5 +355,24 @@ func TestMCPWorkspaceIsNotReused(t *testing.T) {
 	}
 	if strings.Contains(string(written), "chosen in the last session") {
 		t.Fatalf("the new session inherited %q", written)
+	}
+}
+
+// TestMCPURLIsAnAddressTheAgentCanDial: the agent runs on this machine, so the only address that is
+// certainly up is the one the gateway listens on. Handing it `127.0.0.1` while the gateway is bound to a
+// LAN address is a server the agent can never reach — it loads no tools, and nothing here would notice.
+func TestMCPURLIsAnAddressTheAgentCanDial(t *testing.T) {
+	cases := []struct{ host, want string }{
+		{"127.0.0.1", "http://127.0.0.1:8190/mcp/w"},
+		{"192.168.3.232", "http://192.168.3.232:8190/mcp/w"},
+		{"0.0.0.0", "http://127.0.0.1:8190/mcp/w"}, // a wildcard has no address of its own
+		{"", "http://127.0.0.1:8190/mcp/w"},
+		{"::1", "http://[::1]:8190/mcp/w"},
+	}
+	for _, one := range cases {
+		server := &Server{cfg: &config.Config{GatewayHost: one.host, GatewayPort: 8190}}
+		if got := server.mcpURL("w"); got != one.want {
+			t.Fatalf("mcpURL with host %q = %q, want %q", one.host, got, one.want)
+		}
 	}
 }
