@@ -3,22 +3,44 @@
 A local workbench for ComfyUI: images, video and audio made on your own machine. No cloud API, no
 vendor account, no per-image bill — the models, the graphs and the hardware are yours.
 
-## Credits
+## Credits, and what this is not
 
 This project started as a fork of
 [1314521gjy/ComfyUI-Local-Infinite-Canvas](https://github.com/1314521gjy/ComfyUI-Local-Infinite-Canvas),
 itself a modified copy of [basketikun/infinite-canvas](https://github.com/basketikun/infinite-canvas).
-Both are MIT; the original license text is kept at [`canvas/LICENSE`](canvas/LICENSE).
+Both are MIT; the original licence text is kept verbatim at [`canvas/LICENSE`](canvas/LICENSE).
 
-The canvas frontend in `canvas/` started as a copy of that project's UI, and the Go gateway
-(`main.go`, `internal/`) is a port of the Node gateway that shipped with it. Neither is a copy any more:
-both have been reworked far enough that carrying the upstream project's name would have been a claim
-about the code that is not true, so this project and that directory have names of their own (see
-`docs/decisions.md` #137–#138). The upstream licence is kept verbatim at `canvas/LICENSE`, and the fork
-this project descends from is named above.
+**It is no longer compatible with either of them.** That is not a disclaimer at the bottom of a page, it is
+how the code is meant to be read: upstream changes cannot be merged into this tree, and nothing here can be
+dropped back into theirs. The measurements, taken against the initial import of this repository:
 
-Maintained here: the workflow graphs and `registry.json`, the resource index and installer,
-`docs/`, `tools/` and `start.sh`.
+| | at the import | now | byte-identical | rewritten |
+|---|---|---|---|---|
+| `canvas/web/src` (the canvas) | 167 files | 182 files | 22 (12%) | +13,138 / −15,007 lines |
+| `internal/` (the gateway) | 64 files | 102 files | 12 (12%) | +11,077 / −5,984 lines, 76 commits |
+
+Neither half resembles what it started as:
+
+- **The gateway is ours.** Upstream shipped a Node gateway; this repository replaced it with a Go service
+  before the first commit here and has rebuilt most of it since. It speaks its own `/api/...` protocol —
+  there is no `/v1`, nothing OpenAI-compatible — and it owns the parts upstream had no concept of: the
+  workflow registry (`workflows/registry.json`), the resource catalogue and installer (`resources.json`),
+  the run queue, the agent socket.
+- **The canvas was reworked, not patched.** The UI kit is Radix instead of antd, the request layer talks to
+  this gateway, and the editors that define the product — mask, outpaint, layout, multi-angle, the mode
+  switcher behind Qwen's four variants — were written here. Its plugin SDK is `@comfy-loft/plugin-sdk`.
+- **The feature set diverged both ways.** Added: the MOSS-Image, Qwen 2.1, Z-Image, H3 video and MiniMax
+  Music workflows, with the resource panel that installs what they need. Removed: the SeedVR2 upscaler, the
+  Krea2 family, the third-party Moss portrait LoRA, and the three paths that bypassed VDN.
+
+**Three things were kept on purpose**, and they are the only places the old names survive: the browser
+storage keys and localforage databases (`infinite-canvas:*`), the export file marker (`app:
+"infinite-canvas"`), and the third-party agent plugin under `canvas/plugins/infinite-canvas/`, which is
+someone else's work and stays as it shipped. The first two exist so that data saved and files exported
+before the rename still open (`docs/decisions.md` #140); the third is attribution.
+
+Treat `canvas/` as this project's own code from now on. `docs/decisions.md` is the record of why it looks
+the way it does — 140 entries, nearly all of them about this tree, not the upstream one.
 
 ## What it does
 

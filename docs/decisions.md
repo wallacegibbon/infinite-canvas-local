@@ -4719,3 +4719,36 @@ risk plugins built before this commit for no visible gain.
 
 **Where** `canvas/plugins/canvas/**` (48 files), `canvas/web/{package.json,package-lock.json}`,
 `canvas/{CHANGELOG.md,SECURITY.md}` (deleted).
+
+## 141. The README states the incompatibility instead of hinting at it
+
+**Decision** The Credits section is now "Credits, and what this is not". It names both upstream repositories and
+keeps the MIT text at `canvas/LICENSE`, then says plainly that upstream changes cannot be merged into this tree and
+nothing here can be dropped back into theirs — with the measurements that make the claim checkable.
+
+**Why a number rather than an adjective** "Heavily modified" is what every fork says, including the ones that are
+three patches ahead of upstream. Measured against the initial import of this repository:
+
+| | at the import | now | byte-identical | rewritten |
+|---|---|---|---|---|
+| `canvas/web/src` | 167 files | 182 files | 22 (12%) | +13,138 / −15,007 |
+| `internal/` | 64 files | 102 files | 12 (12%) | +11,077 / −5,984, 76 commits |
+
+Twelve per cent of each half survives untouched. That is a rewrite wearing the same directory names.
+
+**What the section lists** The gateway's own protocol (no `/v1`, nothing OpenAI-compatible) and the parts upstream
+never had — the workflow registry, the resource catalogue and installer, the run queue, the agent socket. The
+canvas's rework (Radix instead of antd, the editors that define the product, the plugin SDK now
+`@comfy-loft/plugin-sdk`). And the feature set diverging both ways: MOSS/Qwen/Z-Image/H3/music added, SeedVR2,
+Krea2, the Moss portrait LoRA and the three no-VDN paths removed.
+
+**The three surviving old names are named there too** — browser storage keys, the export marker, and the
+third-party agent plugin — because a reader who finds `infinite-canvas:*` in the code deserves to know it is
+deliberate (#140) rather than assume the rename was half done.
+
+**Tested** Prose only, but the numbers were re-derived for it: file counts and blob comparison against the root
+commit (`git ls-tree` on both trees), and `git diff --numstat` on the same paths. The README still passes the
+project's own language rule — a Chinese check over the file returns one hit, the pre-existing example in the
+Language section.
+
+**Where** `README.md`.
