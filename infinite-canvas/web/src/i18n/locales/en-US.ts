@@ -430,6 +430,8 @@ export default {
         expandPanel: "Expand panel",
         projects: "My Canvases",
         deleteCurrent: "Delete current canvas",
+        deleteCurrentTitle: "Delete this canvas?",
+        deleteCurrentDescription: "Delete “{{name}}”? Its nodes and connections go with it.",
         exportCurrent: "Export current canvas",
         undo: "Undo",
         redo: "Redo",

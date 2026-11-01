@@ -118,7 +118,6 @@ export function CanvasTopBar({
                                         { type: "divider" as const },
                                         { key: "rename", icon: <Pencil className="size-4" />, label: t("canvas.project.rename"), onClick: onStartTitleEditing },
                                         { key: "new", icon: <Plus className="size-4" />, label: t("canvas.create"), onClick: onCreateProject },
-                                        { key: "all", icon: <Images className="size-4" />, label: t("canvas.projects"), onClick: () => openManager(true) },
                                         { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: t("canvas.deleteCurrent"), onClick: onDeleteProject },
                                     ],
                                 }}

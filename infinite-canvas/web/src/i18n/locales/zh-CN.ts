@@ -448,6 +448,8 @@ export default {
         expandPanel: "展开面板",
         projects: "我的画布",
         deleteCurrent: "删除当前画布",
+        deleteCurrentTitle: "删除这个画布？",
+        deleteCurrentDescription: "删除「{{name}}」吗？里面的节点和连线也会一起移除。",
         exportCurrent: "导出当前画布",
         undo: "撤销",
         redo: "重做",

@@ -1367,11 +1367,23 @@ function InfiniteCanvasPage() {
         navigate(`/canvas/${id}`);
     }, [createProject, navigate, t]);
 
+    // Deleting the canvas you are standing on throws away the view as well as the record, and nothing
+    // brings it back. A red menu entry one click deep is not enough of a warning for that.
     const deleteCurrentProject = useCallback(() => {
-        deleteProjects([projectId]);
-        cleanupAssetImages();
-        navigate("/canvas");
-    }, [cleanupAssetImages, deleteProjects, navigate, projectId]);
+        const title = useCanvasStore.getState().projects.find((item) => item.id === projectId)?.title || t("canvas.runtime.untitledCanvas");
+        confirm({
+            title: t("canvas.deleteCurrentTitle"),
+            content: t("canvas.deleteCurrentDescription", { name: title }),
+            okText: t("canvas.project.delete"),
+            cancelText: t("common.cancel"),
+            danger: true,
+            onOk: () => {
+                deleteProjects([projectId]);
+                cleanupAssetImages();
+                navigate("/canvas");
+            },
+        });
+    }, [cleanupAssetImages, deleteProjects, navigate, projectId, t]);
 
     const exportCurrentProject = useCallback(async () => {
         const project = useCanvasStore.getState().projects.find((item) => item.id === projectId);
