@@ -3441,10 +3441,10 @@ as it streamed — while nothing was added by the submit handler.
 ## 105. Sending is never blocked, and the queue is visible
 
 **Decision** The panel no longer refuses to send while a turn is in flight, and it shows the agent's steering
-queue above the input: `N 条消息已排队,会在当前步骤之后插入`. The gateway relays AlayaCore's
-`SM steering` frames as `{type:"steering", phase:"queued"|"delivered"}`; the panel counts what is queued
-minus what has been delivered. The "End conversation" button in the header is gone, and with it
-`canvas.agent.end`.
+queue above the input: `消息已排队,会在当前步骤之后插入`. The gateway relays AlayaCore's `SM steering` frames
+as `{type:"steering", phase:"queued"|"delivered"}`, and the panel repeats the last phase it heard — a state,
+not a count, because the frame carries a phase and nothing else. The "End conversation" button in the header
+is gone, and with it `canvas.agent.end`.
 
 **Why** AlayaCore has its own queue. A message sent into a running task is inserted between the agent's steps
 — that is in the gateway's own reading loop, which explicitly may not assume one prompt equals one answer —
@@ -3455,6 +3455,11 @@ But queueing invisibly is its own problem: the message is accepted and then noth
 looks exactly like a message that was lost. AlayaCore already announces both ends of the queue
 (`phase: queued` when it takes the message, `phase: delivered` when it works it in), so the panel says so,
 where the message was sent from.
+
+It says it as a state rather than a number. The first version counted queued minus delivered, which is the
+panel keeping a tally of a queue it does not own — and every field AlayaCore actually sends was checked for a
+length first: `SM steering` carries `phase` and a fixed sentence, and no other frame carries a queue size. A
+count that can drift is worse than a state that cannot.
 
 The End conversation button promised something that stopped being true when conversations moved into session
 files: it closed the socket and released the process, and the next open replayed the conversation anyway. A

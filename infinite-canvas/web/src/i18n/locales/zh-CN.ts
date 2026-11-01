@@ -842,7 +842,7 @@ export default {
             stop: "停止",
             close: "关闭",
             thinking: "思考中…",
-            steeringQueued: "{{count}} 条消息已排队,会在当前步骤之后插入",
+            steeringQueued: "消息已排队,会在当前步骤之后插入",
             tool: "调用 {{name}}",
             contextMarker: "【画布引用】",
             pickingNode: "点击一个节点来引用 · ESC 取消",

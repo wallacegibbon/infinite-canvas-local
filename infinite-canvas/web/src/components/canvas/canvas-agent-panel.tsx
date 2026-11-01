@@ -72,8 +72,13 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
     const [draft, setDraft] = useState("");
     const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "closed">("idle");
     const [busy, setBusy] = useState(false);
-    /** How many of this panel's messages are waiting in the agent's queue for a running task. */
-    const [steering, setSteering] = useState(0);
+    /**
+     * What the agent last said about its queue: `queued` has been announced and not yet delivered.
+     *
+     * A state, not a count. The frames carry a phase and nothing else — no length — so a number here would
+     * be the panel's own arithmetic, which can only drift from a queue it does not own.
+     */
+    const [steering, setSteering] = useState(false);
     /** The nodes this draft mentions, by id. They travel with the message as context. */
     const [cited, setCited] = useState<string[]>([]);
 
@@ -112,9 +117,9 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
 
     const applyEvent = (event: AgentEvent) => {
         if (event.type === "steering") {
-            // The agent's own count of what it has taken and not yet used. Sending into a running task is
-            // queueing, and a queue nobody can see is a message that looks lost.
-            setSteering((current) => (event.phase === "queued" ? current + 1 : Math.max(0, current - 1)));
+            // Sending into a running task is queueing, and a queue nobody can see is a message that looks
+            // lost. The agent says when it took one and when it used it; the panel repeats that, nothing more.
+            setSteering(event.phase === "queued");
             return;
         }
         if (event.type === "user") {
@@ -127,7 +132,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
             // The agent has just said what its conversation is. That is the whole truth about this
             // panel's past — a reload left nothing on screen, and a reopened panel may have been
             // showing a copy that the file has since moved past — so it replaces, and it does not append.
-            setSteering(0);
+            setSteering(false);
             setMessages(
                 (event.history || []).map((entry) => ({
                     id: nextId(),
@@ -144,7 +149,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         if (event.type === "closed") {
             setStatus("closed");
             setBusy(false);
-            setSteering(0);
+            setSteering(false);
             setMessages((current) => current.map((message) => (message.streaming ? { ...message, streaming: false } : message)));
             return;
         }
@@ -421,12 +426,12 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
             </div>
 
             <div className="relative border-t px-2 py-2" style={{ borderColor: theme.toolbar.border }}>
-                {steering > 0 ? (
-                    // Sending into a running task queues the message; a queue nobody can see looks like a
-                    // message that was lost, so it is counted right where it was sent from.
+                {steering ? (
+                    // A queue nobody can see looks like a message that was lost, so the agent's own word on
+                    // it is shown right where the message was sent from.
                     <p className="flex items-center gap-1.5 px-1 pb-1 text-[11px] opacity-60">
                         <LoaderCircle className="size-3 animate-spin" />
-                        {t("canvas.agent.steeringQueued", { count: steering })}
+                        {t("canvas.agent.steeringQueued")}
                     </p>
                 ) : null}
                 <textarea
