@@ -46,6 +46,15 @@ export function CanvasTopBar({
     const colorTheme = useThemeStore((state) => state.theme);
     const { t } = useTranslation();
     const theme = canvasThemes[colorTheme];
+    // The same recipe as the dock at the bottom: these are bars that sit on the canvas, so they have to
+    // read as bars — a surface, a border, and a shadow — not as glyphs printed onto someone's artwork.
+    const barStyle = {
+        background: theme.toolbar.panel,
+        borderColor: theme.toolbar.border,
+        color: theme.toolbar.item,
+        boxShadow: colorTheme === "dark" ? "0 12px 30px rgba(0,0,0,.32)" : "0 10px 28px rgba(28,25,23,.12)",
+    };
+    const barClass = "pointer-events-auto flex h-12 min-w-0 items-center gap-1.5 rounded-xl border px-2 shadow-lg backdrop-blur";
     const titleRef = useRef<HTMLDivElement>(null);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const sidePanelOpen = useCanvasSidePanelStore((state) => state.panelOpen);
@@ -73,8 +82,8 @@ export function CanvasTopBar({
 
     return (
         <>
-            <div className="pointer-events-none absolute left-0 right-0 top-0 z-50 flex h-16 items-center justify-between pl-1 pr-4">
-                <div className="pointer-events-auto flex min-w-0 items-center gap-2">
+            <div className="pointer-events-none absolute left-0 right-0 top-0 z-50 flex h-16 items-center justify-between gap-3 pl-3 pr-3">
+                <div className={barClass} style={barStyle}>
                     <TopBarButton label={sidePanelOpen ? t("canvas.collapsePanel") : t("canvas.expandPanel")} onClick={toggleSidePanel}>
                         {sidePanelOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
                     </TopBarButton>
@@ -84,6 +93,7 @@ export function CanvasTopBar({
                     <TopBarButton label={t("canvas.projects")} onClick={() => openManager(true)}>
                         <LayoutGrid className="size-4" />
                     </TopBarButton>
+                    <span className="mx-0.5 h-6 w-px shrink-0" style={{ background: theme.toolbar.border }} />
 
                     <div ref={titleRef} className="flex min-w-0 items-center gap-2">
                         {isTitleEditing ? (
@@ -136,8 +146,9 @@ export function CanvasTopBar({
                     </div>
                 </div>
 
-                <div className="pointer-events-auto flex items-center gap-1.5">
+                <div className={barClass} style={barStyle}>
                     <CanvasSystemStatus />
+                    <span className="mx-0.5 h-6 w-px shrink-0" style={{ background: theme.toolbar.border }} />
                     <UserStatusActions variant="canvas" onOpenShortcuts={() => setShortcutsOpen(true)} onOpenPlugins={onOpenPlugins} />
                 </div>
             </div>
