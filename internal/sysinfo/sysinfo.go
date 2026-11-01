@@ -1,165 +1,112 @@
-// Package sysinfo reports host memory and GPU statistics for the system panel.
+// Package sysinfo is the shape of the system panel's numbers: what the machine that runs ComfyUI
+// has left to give.
+//
+// It deliberately does not sample the gateway's own host. The gateway and ComfyUI are two machines
+// as often as one, and a figure about the wrong machine is worse than no figure at all: it reads
+// "1.7 GB of VRAM free" next to a generation that just ran out of memory. ComfyUI already answers
+// the question about itself at /system_stats — this package turns that answer into the panel's
+// units, and nothing else.
 package sysinfo
 
 import (
-	"context"
-	"os/exec"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
+	"encoding/json"
 
 	"comfyui-gateway/internal/util"
 )
 
-// GPU is one NVIDIA device.
+// GPU is one device as ComfyUI sees it. There is no load or temperature here because ComfyUI does
+// not report them; the panel shows what it is told and leaves the rest out.
 type GPU struct {
 	Index         int    `json:"index"`
 	Name          string `json:"name"`
 	MemoryUsedMb  int    `json:"memoryUsedMb"`
 	MemoryTotalMb int    `json:"memoryTotalMb"`
-	Utilization   int    `json:"utilization"`
-	Temperature   int    `json:"temperature"`
 }
 
-// Ram is host memory usage in bytes.
+// Ram is memory on ComfyUI's host, in bytes.
 type Ram struct {
 	TotalBytes int64 `json:"totalBytes"`
 	FreeBytes  int64 `json:"freeBytes"`
 	UsedBytes  int64 `json:"usedBytes"`
 }
 
-// Stats is one sample of host resources.
+// Stats is one reading of ComfyUI's host.
 type Stats struct {
 	At  string `json:"at"`
 	GPU []GPU  `json:"gpu"`
-	// GPUError is a pointer so a healthy host serialises null, not an empty string;
-	// the canvas distinguishes "no GPU" from "GPU query failed".
-	GPUError *string `json:"gpuError"`
-	Ram      Ram     `json:"ram"`
+	Ram Ram    `json:"ram"`
 }
 
-// gpuFields asks nvidia-smi for exactly what the UI renders.
-const gpuFields = "index,name,memory.used,memory.total,utilization.gpu,temperature.gpu"
-
-// Reader samples host resources with a short-lived cache, because the system panel
-// polls while a user is also generating, and shelling out to nvidia-smi per request
-// would itself become load.
-type Reader struct {
-	mu       sync.Mutex
-	cached   *Stats
-	cachedAt time.Time
-}
-
-// NewReader builds a Reader.
-func NewReader() *Reader { return &Reader{} }
-
-// Read returns a sample, reusing a value younger than cacheMs.
-func (r *Reader) Read(cacheMs int) *Stats {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.cached != nil && cacheMs > 0 && time.Since(r.cachedAt) < time.Duration(cacheMs)*time.Millisecond {
-		return r.cached
-	}
-
-	sample := &Stats{At: util.NowIso(), GPU: []GPU{}}
-	gpu, err := readGPU()
-	if err != nil {
-		message := err.Error()
-		sample.GPUError = &message
-	} else {
-		sample.GPU = gpu
-	}
-	sample.Ram = readRam()
-
-	r.cached = sample
-	r.cachedAt = time.Now()
-	return sample
-}
-
-// readGPU shells out to nvidia-smi. A missing binary is not an error condition:
-// the host may simply have no NVIDIA GPU.
-func readGPU() ([]GPU, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	out, err := exec.CommandContext(ctx, "nvidia-smi",
-		"--query-gpu="+gpuFields, "--format=csv,noheader,nounits").Output()
-	if err != nil {
-		return nil, err
-	}
-
-	var devices []GPU
-	for index, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		parts := strings.Split(line, ",")
-		for i := range parts {
-			parts[i] = strings.TrimSpace(parts[i])
-		}
-		if len(parts) < 6 {
-			continue
-		}
-		device := GPU{Name: parts[1]}
-		device.Index = atoiOr(parts[0], index)
-		device.MemoryUsedMb = atoiOr(parts[2], 0)
-		device.MemoryTotalMb = atoiOr(parts[3], 0)
-		device.Utilization = atoiOr(parts[4], 0)
-		device.Temperature = atoiOr(parts[5], 0)
-		devices = append(devices, device)
-	}
-	if devices == nil {
-		devices = []GPU{}
-	}
-	return devices, nil
-}
-
-func atoiOr(value string, fallback int) int {
-	parsed, err := strconv.Atoi(strings.TrimSpace(value))
-	if err != nil {
-		return fallback
-	}
-	return parsed
-}
-
-// readRam parses /proc/meminfo.
+// FromComfy turns a /system_stats payload into a reading.
 //
-// MemAvailable is used rather than MemFree: MemFree excludes reclaimable page cache,
-// which makes "used" read as nearly the whole machine and makes the freed-bytes
-// figure from /api/system/free-memory pure noise.
-func readRam() Ram {
-	data, err := readFile("/proc/meminfo")
-	if err != nil {
-		return Ram{}
-	}
-	var totalKB, availableKB int64
-	for _, line := range strings.Split(data, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
+// It returns nil when ComfyUI did not say what its devices have: a build that reports no GPU is one
+// the panel has nothing honest to show for, and "0 GB used of 0 GB" would be a worse answer than
+// silence.
+func FromComfy(payload map[string]any) *Stats {
+	devices, _ := payload["devices"].([]any)
+	stats := &Stats{At: util.NowIso(), GPU: []GPU{}}
+
+	for position, raw := range devices {
+		device, ok := raw.(map[string]any)
+		if !ok {
 			continue
 		}
-		value, parseErr := strconv.ParseInt(fields[1], 10, 64)
-		if parseErr != nil {
+		total := int64(number(device["vram_total"]))
+		if total <= 0 {
 			continue
 		}
-		switch fields[0] {
-		case "MemTotal:":
-			totalKB = value
-		case "MemAvailable:":
-			availableKB = value
+		free := int64(number(device["vram_free"]))
+		used := total - free
+		if used < 0 {
+			used = 0
+		}
+		// ComfyUI names the device and numbers it; a build that leaves the index out gets the
+		// position it was listed at, so the panel never shows two "GPU 0"s.
+		index := int(number(device["index"]))
+		if index == 0 && position > 0 {
+			index = position
+		}
+		stats.GPU = append(stats.GPU, GPU{
+			Index:         index,
+			Name:          text(device["name"]),
+			MemoryUsedMb:  int(used / (1024 * 1024)),
+			MemoryTotalMb: int(total / (1024 * 1024)),
+		})
+	}
+	if len(stats.GPU) == 0 {
+		return nil
+	}
+
+	system, _ := payload["system"].(map[string]any)
+	total := int64(number(system["ram_total"]))
+	if total > 0 {
+		free := int64(number(system["ram_free"]))
+		used := total - free
+		if used < 0 {
+			used = 0
+		}
+		stats.Ram = Ram{TotalBytes: total, FreeBytes: free, UsedBytes: used}
+	}
+	return stats
+}
+
+// number reads a JSON number, whatever the decoder produced for it.
+func number(value any) float64 {
+	switch typed := value.(type) {
+	case float64:
+		return typed
+	case json.Number:
+		parsed, err := typed.Float64()
+		if err == nil {
+			return parsed
 		}
 	}
-	if totalKB == 0 {
-		return Ram{}
+	return 0
+}
+
+func text(value any) string {
+	if typed, ok := value.(string); ok {
+		return typed
 	}
-	total := totalKB * 1024
-	available := availableKB * 1024
-	used := total - available
-	if used < 0 {
-		used = 0
-	}
-	return Ram{TotalBytes: total, FreeBytes: available, UsedBytes: used}
+	return ""
 }

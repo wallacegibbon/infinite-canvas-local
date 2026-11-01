@@ -306,7 +306,7 @@ Metadata and management:
 | `GET` | `/api/tasks` | Every run the gateway has queued or finished, newest first. |
 | `GET` | `/api/tasks/{id}` | One run by id. |
 | `GET` | `/api/setup/status` | Last scan result. |
-| `GET` | `/api/system/stats` | GPU and RAM, plus the last OOM. |
+| `GET` | `/api/system/stats` | VRAM and RAM **of the machine running ComfyUI** (read from ComfyUI's own `/system_stats`), plus the last OOM. `available: false` when ComfyUI does not report its devices — the panel then shows nothing, because the gateway host's own memory is somebody else's machine. |
 
 `/api/previews/{promptId}` and `/api/progress/{requestId}` serve in-flight preview
 frames and step counts; both are best-effort and never fail a generation. A run also carries its own

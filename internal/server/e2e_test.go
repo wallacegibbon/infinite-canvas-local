@@ -27,10 +27,11 @@ type fakeComfy struct {
 
 	// Optional overrides. Nil/empty keeps the image defaults above, so existing tests
 	// describe only what they care about.
-	objectInfo map[string]any
-	outputs    map[string]any
-	viewMime   string
-	viewBody   string
+	objectInfo  map[string]any
+	outputs     map[string]any
+	systemStats map[string]any
+	viewMime    string
+	viewBody    string
 
 	// historyGate, when set, holds /history until it is closed. It lets a test observe a
 	// run that outlives the HTTP request that started it.
@@ -53,6 +54,10 @@ func newFakeComfy(t *testing.T) *fakeComfy {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/system_stats", func(w http.ResponseWriter, _ *http.Request) {
+		if fake.systemStats != nil {
+			writeJSON(w, fake.systemStats)
+			return
+		}
 		writeJSON(w, map[string]any{"system": map[string]any{"os": "test"}})
 	})
 	mux.HandleFunc("/internal/folder_paths", func(w http.ResponseWriter, _ *http.Request) {

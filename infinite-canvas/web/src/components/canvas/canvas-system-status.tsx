@@ -15,14 +15,13 @@ type GpuStats = {
     name: string;
     memoryUsedMb: number;
     memoryTotalMb: number;
-    utilization: number;
-    temperature: number;
 };
 
 type SystemStats = {
     at: string;
+    /** False when ComfyUI did not report its own machine — nothing is shown then, not even zeros. */
+    available: boolean;
     gpu: GpuStats[];
-    gpuError?: string | null;
     ram: { totalBytes: number; usedBytes: number; freeBytes: number };
     comfy: { url: string; reachable: boolean };
     lastOOM: { at: string; message: string } | null;
@@ -79,8 +78,6 @@ export function CanvasSystemStatus() {
     }, [refresh]);
 
     const gpu = stats?.gpu?.[0];
-    const vramPercent = gpu ? percent(gpu.memoryUsedMb, gpu.memoryTotalMb) : 0;
-    const ramPercent = stats ? percent(stats.ram.usedBytes, stats.ram.totalBytes) : 0;
     const oom = stats?.lastOOM;
 
     const freeMemory = async () => {
@@ -102,6 +99,13 @@ export function CanvasSystemStatus() {
 
     const barStyle = (value: number) => ({ width: `${value}%`, background: value >= 90 ? "#dc2626" : theme.node.text });
 
+    // The numbers are ComfyUI's, so there is nothing to show until it has told us what it has. The
+    // readout used to fall back on the gateway's own host, which was a different machine here and
+    // read as free VRAM while a generation was out of memory.
+    if (!stats?.available || !gpu) return null;
+    const vramPercent = percent(gpu.memoryUsedMb, gpu.memoryTotalMb);
+    const ramPercent = percent(stats.ram.usedBytes, stats.ram.totalBytes);
+
     return (
         <>
             <button
@@ -112,14 +116,9 @@ export function CanvasSystemStatus() {
                 onClick={() => setOpen(true)}
             >
                 <Gauge className="size-3.5" />
-                <span>{gpu ? t("canvas.systemStatus.vramShort", { used: vramGb(gpu.memoryUsedMb), total: vramGb(gpu.memoryTotalMb) }) : t("canvas.systemStatus.vramShortEmpty")}</span>
+                <span>{t("canvas.systemStatus.vramShort", { used: vramGb(gpu.memoryUsedMb), total: vramGb(gpu.memoryTotalMb) })}</span>
                 <span className="hidden opacity-40 lg:inline">·</span>
-                <span className="hidden lg:inline">
-                    {t("canvas.systemStatus.ramShort", {
-                        used: stats ? gb(stats.ram.usedBytes) : "--",
-                        total: stats ? gb(stats.ram.totalBytes) : "--",
-                    })}
-                </span>
+                <span className="hidden lg:inline">{t("canvas.systemStatus.ramShort", { used: gb(stats.ram.usedBytes), total: gb(stats.ram.totalBytes) })}</span>
                 {oom ? <span className="size-1.5 rounded-full" style={{ background: "#dc2626" }} title={t("canvas.systemStatus.oomBadge")} /> : null}
             </button>
             <Dialog title={t("canvas.systemStatus.title")} open={open} onClose={() => setOpen(false)} size="form">
@@ -127,26 +126,19 @@ export function CanvasSystemStatus() {
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-xs" style={{ color: theme.node.muted }}>
                             <span>{t("canvas.systemStatus.vramLabel")}</span>
-                            <span>{gpu ? `${vramGb(gpu.memoryUsedMb)} / ${vramGb(gpu.memoryTotalMb)} GB` : "--"}</span>
+                            <span>{`${vramGb(gpu.memoryUsedMb)} / ${vramGb(gpu.memoryTotalMb)} GB`}</span>
                         </div>
                         <div className="h-1.5 overflow-hidden rounded-full" style={{ background: theme.node.fill }}>
                             <div className="h-full rounded-full transition-[width]" style={barStyle(vramPercent)} />
                         </div>
-                        {gpu ? (
-                            <div className="flex items-center justify-between text-[11px]" style={{ color: theme.node.faint }}>
-                                <span className="truncate">{gpu.name}</span>
-                                <span>{t("canvas.systemStatus.utilizationLine", { utilization: gpu.utilization, temperature: gpu.temperature })}</span>
-                            </div>
-                        ) : (
-                            <div className="text-[11px]" style={{ color: theme.node.faint }}>
-                                {stats?.gpuError ? t("canvas.systemStatus.gpuError", { error: stats.gpuError }) : t("canvas.systemStatus.gpuLoading")}
-                            </div>
-                        )}
+                        <div className="truncate text-[11px]" style={{ color: theme.node.faint }}>
+                            {gpu.name}
+                        </div>
                     </div>
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-xs" style={{ color: theme.node.muted }}>
                             <span>{t("canvas.systemStatus.ramLabel")}</span>
-                            <span>{stats ? `${gb(stats.ram.usedBytes)} / ${gb(stats.ram.totalBytes)} GB` : "--"}</span>
+                            <span>{`${gb(stats.ram.usedBytes)} / ${gb(stats.ram.totalBytes)} GB`}</span>
                         </div>
                         <div className="h-1.5 overflow-hidden rounded-full" style={{ background: theme.node.fill }}>
                             <div className="h-full rounded-full transition-[width]" style={barStyle(ramPercent)} />
@@ -154,7 +146,7 @@ export function CanvasSystemStatus() {
                     </div>
                     <div className="flex items-center justify-between text-xs" style={{ color: theme.node.muted }}>
                         <span>ComfyUI</span>
-                        <span style={{ color: stats?.comfy.reachable ? theme.node.text : "#dc2626" }}>{stats?.comfy.reachable ? t("canvas.systemStatus.online") : t("canvas.systemStatus.offline")}</span>
+                        <span style={{ color: stats.comfy.reachable ? theme.node.text : "#dc2626" }}>{stats.comfy.reachable ? t("canvas.systemStatus.online") : t("canvas.systemStatus.offline")}</span>
                     </div>
                     {oom ? (
                         <div className="rounded-lg border px-3 py-2 text-[11px]" style={{ borderColor: "#fca5a5", color: "#b91c1c" }}>
@@ -168,7 +160,7 @@ export function CanvasSystemStatus() {
                                     {t("canvas.systemStatus.freeHint")}
                                 </span>
                                 <div className="flex shrink-0 items-center gap-2">
-                                    <Button size="small" loading={freeing} disabled={!stats?.comfy.reachable || freeing} onClick={() => void freeMemory()} style={{ background: "#16a34a", borderColor: "#16a34a", color: "#fff" }}>
+                                    <Button size="small" loading={freeing} disabled={!stats.comfy.reachable || freeing} onClick={() => void freeMemory()} style={{ background: "#16a34a", borderColor: "#16a34a", color: "#fff" }}>
                                         {t("canvas.systemStatus.freeAction")}
                                     </Button>
                                 </div>

@@ -3264,3 +3264,34 @@ after a reload — the canvas did not move once. Closing it put the aside at `le
 canvas. `elementFromPoint(120, 300)` returned a button inside the aside, and `(900, 600)` returned the canvas,
 so the board takes the pointer it covers. A clean storage (all three keys removed, reload) opened with the board
 shut and width 280 and wrote nothing until it was toggled; after opening it, a reload kept it open.
+
+## 99. The memory readout is ComfyUI's, or it is nothing
+
+**Decision** `/api/system/stats` no longer samples the gateway's own host. It asks ComfyUI's
+`/system_stats` what its machine has — `ram_total`/`ram_free` and, per device, `vram_total`/`vram_free` —
+and reports that as `gpu` and `ram`, with `available: true`. When ComfyUI cannot be asked, or answers
+without a device, `available` is false and the panel renders nothing at all. `internal/sysinfo` lost its
+`nvidia-smi` shell-out and its `/proc/meminfo` reader and is now only the shape plus the translation.
+`/api/system/free-memory` measures the freed memory from ComfyUI's own figures for the same reason.
+
+**Why** The gateway and ComfyUI are usually *not* the same machine — here the gateway runs on a 14 GB box
+with no NVIDIA GPU at all, while ComfyUI is a 5080 with 16 GB of VRAM and 94 GB of RAM on another host.
+The panel was printing the gateway host's numbers under the heading "VRAM" and "memory", so it read
+`显存 --` and `内存 6/14G` while the machine doing the work had 15.6 GB of VRAM. A number about the wrong
+machine is worse than a blank: it invites you to wait for memory that is not the memory that ran out.
+ComfyUI already knows the answer about itself, so the fix needs no new protocol and no IP comparison
+between gateway and ComfyUI — the question is simply asked in the right place.
+
+The `utilization` and `temperature` fields are gone: ComfyUI does not report them, and they were the only
+numbers the local sampler had that ComfyUI lacks. The panel shows a device's name and its memory, which
+is what it can be told.
+
+**Tested** Against the real pair (`gateway :8191` → `comfy 192.168.3.233:8188`), the endpoint returned
+`available: true`, `gpu[0] = cuda:0 NVIDIA GeForce RTX 5080, 821 / 15933 MB`, `ram = 22.1 / 93.6 GB` —
+figures that cannot have come from the gateway host (14 GB, no GPU). In a browser, the bar read
+`显存 0.5/15.6G · 内存 20.0/93.6G`, and its dialog listed the 5080 by name with no load or temperature
+line. Pointed at a gateway whose ComfyUI is unreachable (`:8192` → `:8198`), the same bar showed only the
+account buttons: no readout, no zeros. `POST /api/system/free-memory` there returned
+`503 comfy_unreachable`. Go: `TestSystemStatsReportComfysMachine`,
+`TestSystemStatsAreAbsentWhenComfyReportsNoDevices`, `TestSystemStatsAreAbsentWhenComfyIsGone`, and the
+`sysinfo.FromComfy` unit tests (units, `nil` for no device, index fallback).

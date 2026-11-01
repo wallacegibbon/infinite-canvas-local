@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"comfyui-gateway/internal/store"
 	"comfyui-gateway/internal/sysinfo"
 	"comfyui-gateway/internal/task"
+	"comfyui-gateway/internal/util"
 	"comfyui-gateway/internal/workflow"
 )
 
@@ -385,8 +388,15 @@ func (s *Server) handleSkinUnlocksPost(ctx *httpx.Ctx) error {
 }
 
 // handleSystemStats implements GET /api/system/stats.
+//
+// Every number here comes from ComfyUI's own /system_stats: the panel is asked about the machine
+// that does the generating, and the gateway's host is only interesting when it is that machine —
+// which is not a question this handler can answer, so it does not try. When ComfyUI does not say,
+// `available` is false and the panel shows nothing rather than its own host's figures.
 func (s *Server) handleSystemStats(ctx *httpx.Ctx) error {
-	sample := s.stats.Read(1500)
+	requestCtx, cancel := contextWithTimeout(2000)
+	defer cancel()
+	sample, _ := s.comfyHostStats(requestCtx)
 
 	s.lastOOM.Lock()
 	lastOOM := map[string]any(nil)
@@ -410,13 +420,18 @@ func (s *Server) handleSystemStats(ctx *httpx.Ctx) error {
 	}
 
 	payload := map[string]any{
-		"ok":       true,
-		"at":       sample.At,
-		"gpu":      sample.GPU,
-		"gpuError": sample.GPUError,
-		"ram":      sample.Ram,
-		"comfy":    map[string]any{"url": s.cfg.ComfyURL, "reachable": s.setup.Status().ComfyReachable},
-		"lastOOM":  lastOOM,
+		"ok":        true,
+		"at":        util.NowIso(),
+		"available": sample != nil,
+		"gpu":       []sysinfo.GPU{},
+		"ram":       sysinfo.Ram{},
+		"comfy":     map[string]any{"url": s.cfg.ComfyURL, "reachable": s.setup.Status().ComfyReachable},
+		"lastOOM":   lastOOM,
+	}
+	if sample != nil {
+		payload["at"] = sample.At
+		payload["gpu"] = sample.GPU
+		payload["ram"] = sample.Ram
 	}
 	httpx.OK(ctx.W, payload)
 	return nil
@@ -428,7 +443,12 @@ func (s *Server) handleFreeMemory(ctx *httpx.Ctx) error {
 		return httpx.NewError(http.StatusServiceUnavailable, "comfy_unreachable", "ComfyUI is unreachable; cannot free VRAM")
 	}
 
-	before := s.stats.Read(0)
+	sampleCtx, cancelSample := contextWithTimeout(2000)
+	before, err := s.comfyHostStats(sampleCtx)
+	cancelSample()
+	if err != nil {
+		return httpx.NewError(http.StatusServiceUnavailable, "comfy_stats_unavailable", "ComfyUI did not report its memory")
+	}
 	started := time.Now()
 
 	requestCtx, cancel := contextWithTimeout(15000)
@@ -444,7 +464,13 @@ func (s *Server) handleFreeMemory(ctx *httpx.Ctx) error {
 	deadline := time.Now().Add(8 * time.Second)
 	for time.Now().Before(deadline) {
 		time.Sleep(300 * time.Millisecond)
-		after = s.stats.Read(0)
+		pollCtx, cancelPoll := contextWithTimeout(2000)
+		after, err = s.comfyHostStats(pollCtx)
+		cancelPoll()
+		if err != nil || after == nil {
+			after = before
+			break
+		}
 		used := gpuUsedMB(after)
 		if beforeVRAM == 0 || used <= maxIntInt(beforeVRAM-256, 0) {
 			break
@@ -556,6 +582,19 @@ func sessionPayload(status store.SessionStatus) map[string]any {
 		payload["lastSeenAt"] = *status.LastSeenAt
 	}
 	return payload
+}
+
+// comfyHostStats asks ComfyUI about its own machine. Nil means it did not answer usefully.
+func (s *Server) comfyHostStats(ctx context.Context) (*sysinfo.Stats, error) {
+	payload, err := s.comfy.SystemStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	stats := sysinfo.FromComfy(payload)
+	if stats == nil {
+		return nil, errors.New("ComfyUI reported no device memory")
+	}
+	return stats, nil
 }
 
 func gpuUsedMB(sample *sysinfo.Stats) int {

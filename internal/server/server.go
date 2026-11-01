@@ -23,7 +23,6 @@ import (
 	"comfyui-gateway/internal/resource"
 	"comfyui-gateway/internal/setup"
 	"comfyui-gateway/internal/store"
-	"comfyui-gateway/internal/sysinfo"
 	"comfyui-gateway/internal/task"
 	"comfyui-gateway/internal/upload"
 	"comfyui-gateway/internal/util"
@@ -37,7 +36,6 @@ type Server struct {
 	comfy      *comfy.Client
 	hub        *generate.Hub
 	runner     *generate.Runner
-	stats      *sysinfo.Reader
 	sessions   *store.Sessions
 	skins      *store.Skins
 	visibility *store.Visibility
@@ -142,7 +140,6 @@ func New(cfg *config.Config, logger *logx.Logger) (*Server, error) {
 		comfy:         comfyClient,
 		hub:           hub,
 		runner:        generate.NewRunner(comfyClient, hub, logger, cfg.RequestTimeoutMs, cfg.PollIntervalMs),
-		stats:         sysinfo.NewReader(),
 		sessions:      store.NewSessions(time.Duration(cfg.SessionStaleSec) * time.Second),
 		skins:         skins,
 		visibility:    visibility,
