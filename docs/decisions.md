@@ -3740,8 +3740,15 @@ the payload's internal consistency, so the tree could ship a pack that Python co
 today (601 imports resolved when this was written), and the exclusion list is where such a case would go —
 one line, with the reason.
 
+**The mistake this made, and the second check** Restoring the files needed a syntax check, and the only
+one available without torch is `python3 -m py_compile` — which left four `__pycache__/*.pyc` files behind,
+and those were committed with the sources they came from. `TestVendoredPacksContainNoBytecode` now fails on
+any `__pycache__` or `.pyc` under `resources/payload`, and `.gitignore` covers both. A vendored pack is
+source; bytecode is machine-specific and stale the moment the source moves.
+
 **Tested** With `src/data/` present the check passes and reports 601 imports; moving the directory aside
-makes it fail with exactly the two imports `generation_utils.py` needs. The restored files are the upstream
+makes it fail with exactly the two imports `generation_utils.py` needs. Planting a `__pycache__` directory
+makes the bytecode check fail by name. The restored files are the upstream
 2.5.24 tree (`area_resize`, `divisible_crop`, `na_resize`, `side_resize`), byte-identical to it, and
 `python3 -m py_compile` accepts them — importing them for real needs torch, so the compile check is as far
 as this repository can go without ComfyUI's interpreter.

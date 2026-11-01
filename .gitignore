@@ -19,6 +19,10 @@ infinite-canvas/out/
 infinite-canvas/plugins/canvas/*/dist/
 infinite-canvas/web/dist/
 
+# python bytecode (a py_compile check, or ComfyUI itself, drops these into the vendored packs)
+__pycache__/
+*.pyc
+
 # editor / OS
 .DS_Store
 .idea/

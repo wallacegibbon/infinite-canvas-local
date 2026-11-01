@@ -133,3 +133,48 @@ func TestVendoredPacksImportOnlyWhatTheyShip(t *testing.T) {
 	}
 	t.Logf("checked %d relative imports across the vendored packs", checked)
 }
+
+// A vendored pack is source, not a working directory: bytecode is machine-specific (and stale the moment
+// the source moves), so it has no business in the tree. This check exists because one `python3 -m
+// py_compile` run — the only way this repository can check a pack's syntax without torch — left four
+// `.pyc` files behind that were then committed with the files they came from.
+func TestVendoredPacksContainNoBytecode(t *testing.T) {
+	root := filepath.Join("..", "..", "resources", "payload", "custom_nodes")
+	if !dirExists(root) {
+		t.Skipf("vendored packs not available at %s", root)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("read %s: %v", root, err)
+	}
+	found := 0
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		packRoot := filepath.Join(root, entry.Name())
+		err := filepath.WalkDir(packRoot, func(path string, item os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if item.IsDir() && item.Name() == "__pycache__" {
+				rel, _ := filepath.Rel(root, path)
+				t.Errorf("%s is bytecode, not source", rel)
+				found++
+				return filepath.SkipDir
+			}
+			if !item.IsDir() && strings.HasSuffix(item.Name(), ".pyc") {
+				rel, _ := filepath.Rel(root, path)
+				t.Errorf("%s is bytecode, not source", rel)
+				found++
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", packRoot, err)
+		}
+	}
+	if found == 0 {
+		t.Log("no bytecode in the vendored packs")
+	}
+}
