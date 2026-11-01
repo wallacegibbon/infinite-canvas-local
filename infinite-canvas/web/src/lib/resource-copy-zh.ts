@@ -25,7 +25,7 @@ const PACK_ZH: Record<string, ResourceCopy> = {
     h3: { label: "H3 视频生成（VDN / 无VDN / 角色替换）", description: "H3 视频生成：7 条工作流（VDN 三档 / 无VDN 三档 / 角色替换）。节点随包，权重按工作流下载。" },
     music: { label: "MiniMax Music 3 音乐生成", description: "MiniMax Music 3 文生音乐：风格描述 + 可选歌词，默认 fp16 底模、int8 文本编码器和 dav 音频 VAE；int8/fp32 底模与更大的文本编码器是选下内容。" },
     interp: { label: "RIFE 插帧", description: "把已有片段补帧到 2×/3×。节点从 GitHub 安装，权重由节点自己下载；只影响「插帧」按钮。" },
-    upscale: { label: "超分", description: "快速放大（ESRGAN）与 SeedVR2 视频超分。节点随包自动安装，运行库与权重按工作流下载；SeedVR2 3B DiT 是选下内容。" },
+    upscale: { label: "超分", description: "快速放大图片（ESRGAN）。节点随包自动安装，权重按工作流下载。" },
 };
 
 const RESOURCE_ZH: Record<string, ResourceCopy> = {
@@ -61,10 +61,7 @@ const RESOURCE_ZH: Record<string, ResourceCopy> = {
     h3_solattn_node: { note: "预解压目录随包复制，不跑 pip；节点依赖按 README 处理。", license: "未声明 LICENSE" },
     h3_vhs_node: { note: "预解压目录随包复制，不跑 pip；节点依赖按 README 处理。" },
     h3_tiny_vae: { label: "H3 预览用 TAESD (taeh3)", note: "Kijai 的 H3 2D 微型解码器（MiniMax-H3-TAE，Apache-2.0），张量与上游一致。" },
-    seedvr2_node: { label: "SeedVR2 超分节点", note: "随包节点，启动器自动复制；运行依赖（diffusers / rotary_embedding_torch / omegaconf / opencv-python / einops）由「运行库」安装项检测并补装，装完重启 ComfyUI。" },
     frame_interpolation_node: { note: "RIFE 插帧节点，从 GitHub 安装（不随包复制）；权重 rife49.pth 由该节点包在首次运行时自行下载到自己的 ckpts 目录，不走 models/，所以没有单独的模型条目。装完重启 ComfyUI。" },
-    seedvr2_3b_dit: { label: "SeedVR2 3B DiT（视频）", note: "SeedVR2 视频超分 DiT；约 3.4GB。" },
-    seedvr2_vae: { note: "SeedVR2 图片/视频超分共用 VAE；节点只从 models/SEEDVR2 读取（不是 models/vae）。" },
     esrgan_x2plus: { label: "RealESRGAN x2plus（快速放大）", note: "ESRGAN 快速放大默认模型。" },
     esrgan_anime6b: { label: "RealESRGAN anime 6B（动漫放大）", note: "面向动漫/插画的 4x 放大模型；不是快速放大工作流的默认模型，可在 ComfyUI 中替换。" },
     esrgan_x4plus: { note: "4x 快速放大；输出尺寸较大。" },

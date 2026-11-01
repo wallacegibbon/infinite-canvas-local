@@ -25,7 +25,7 @@ vi.mock("@/services/file-storage", () => ({
     uploadMediaFile: async () => ({ url: "", storageKey: "", bytes: 0, mimeType: "video/mp4" }),
 }));
 
-const { createVideoGenerationTask, createVideoInterpolateTask, createVideoUpscaleTask, waitForVideoGenerationTask } = await import("@/services/api/video");
+const { createVideoGenerationTask, createVideoInterpolateTask, waitForVideoGenerationTask } = await import("@/services/api/video");
 
 type Config = Parameters<typeof createVideoGenerationTask>[0];
 const gateway = (overrides: Record<string, unknown> = {}) =>
@@ -150,25 +150,6 @@ describe("createVideoGenerationTask", () => {
     });
 });
 
-describe("createVideoUpscaleTask", () => {
-    it("is one run with the clip uploaded by role", async () => {
-        const { calls, fetchMock } = stubGateway({});
-        // The source clip is read as a blob, so the upload route answers with a video id.
-        fetchMock.mockImplementationOnce(async (url: string, init: RequestInit = {}) => {
-            calls.push({ url, method: String(init.method || "GET"), body: init.body });
-            return json({ upload: { id: "upl_video", kind: "video", mime: "video/mp4", bytes: 3, filename: "source.mp4" } });
-        });
-
-        const task = await createVideoUpscaleTask(gateway(), { name: "clip.mp4", type: "video/mp4", storageKey: "k1" }, { scale: 2, resolution: 1104, fps: 24, seed: 7, batchSize: 5 });
-
-        expect(task).toMatchObject({ model: "video-seedvr2-upscale" });
-        const body = runBody(calls);
-        expect(body.workflow).toBe("video-seedvr2-upscale");
-        expect(body.media).toEqual({ video: "upl_video" });
-        // `scale` and `fps` are dialog values the graph derives itself; sending them would be a 400.
-        expect(body.inputs).toEqual({ resolution: 1104, seed: 7, batch_size: 5 });
-    });
-});
 
 describe("createVideoInterpolateTask", () => {
     it("is one run of the RIFE workflow with the clip and the multiplier", async () => {

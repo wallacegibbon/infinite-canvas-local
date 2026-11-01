@@ -967,7 +967,6 @@ func (m *Manager) modelRootsView(root string) map[string][]string {
 func runtimeDeps() []RuntimeDep {
 	return []RuntimeDep{
 		{ID: "h3", Packages: []string{"sageattention"}},
-		{ID: "seedvr2", Packages: []string{"diffusers", "omegaconf", "rotary_embedding_torch", "opencv-python", "einops"}},
 	}
 }
 

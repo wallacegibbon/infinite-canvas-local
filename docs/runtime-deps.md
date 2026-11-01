@@ -38,23 +38,6 @@ Verify:
 "<ComfyUI's python>" -c "import sageattention; print(sageattention.__version__)"
 ```
 
-## SeedVR2 upscaling
-
-```bash
-"<ComfyUI's python>" -m pip install diffusers omegaconf rotary_embedding_torch opencv-python einops
-```
-
-The SeedVR2 nodes need these packages to load. Without them ComfyUI's startup log shows
-`IMPORT FAILED`, and the canvas reports "missing node SeedVR2LoadDiTModel".
-
-Verify:
-
-```bash
-"<ComfyUI's python>" -c "import diffusers, omegaconf, rotary_embedding_torch, cv2, einops; print('ok')"
-```
-
----
-
 ## Why automatic installation is gone
 
 The old implementation ran `pip install` itself (complete with wheel-matrix selection,

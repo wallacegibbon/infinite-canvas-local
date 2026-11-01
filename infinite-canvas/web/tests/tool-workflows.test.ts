@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { IMAGE_ANGLE_WORKFLOW, IMAGE_UPSCALE_WORKFLOW, isToolWorkflow, VIDEO_INTERPOLATE_WORKFLOW, VIDEO_UPSCALE_WORKFLOW } from "@/lib/canvas/tool-workflows";
+import { IMAGE_ANGLE_WORKFLOW, IMAGE_UPSCALE_WORKFLOW, isToolWorkflow, VIDEO_INTERPOLATE_WORKFLOW } from "@/lib/canvas/tool-workflows";
 
 /**
  * Which workflows are actions rather than models.
@@ -11,7 +11,7 @@ import { IMAGE_ANGLE_WORKFLOW, IMAGE_UPSCALE_WORKFLOW, isToolWorkflow, VIDEO_INT
  */
 describe("tool workflows", () => {
     it("are the ones the canvas drives from an action", () => {
-        for (const id of [VIDEO_UPSCALE_WORKFLOW, VIDEO_INTERPOLATE_WORKFLOW, IMAGE_UPSCALE_WORKFLOW, IMAGE_ANGLE_WORKFLOW]) {
+        for (const id of [VIDEO_INTERPOLATE_WORKFLOW, IMAGE_UPSCALE_WORKFLOW, IMAGE_ANGLE_WORKFLOW]) {
             expect(isToolWorkflow(id)).toBe(true);
         }
     });

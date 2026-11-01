@@ -4110,3 +4110,47 @@ input-name check above is the closest thing available without it.
 
 **Where** `resources/payload/custom_nodes/minimax-h3-audio-t8`, `.../ComfyUI-SolAttn_triton/__init__.py`,
 `resources/index.json`.
+
+## 123. SeedVR2 leaves: the video upscaler nobody maintains, for a job we do not have
+
+**Decision** `video-seedvr2-upscale` is gone — the registry entry, the graph, its three resources, the
+vendored pack, the runtime-dependency entry, the two loader specs, the `SEEDVR2` model-dir alias, and the
+canvas action that drove it (toolbar button, dialog, API call, hook, i18n, Chinese copy, tests). The
+catalogue is 55 resources and 17 workflows; `resources/payload` is node packs only.
+
+**Why it went** Three facts, in the order they mattered:
+
+1. **The job is not one we have.** `video-seedvr2-upscale` took any clip and returned a bigger one. Nobody
+   asked for that; the H3 workflows already produce their own video at the resolution they need.
+2. **Upstream is dormant.** `numz/ComfyUI-SeedVR2_VideoUpscaler` is the official port — its README says so
+   — but the last push was 2025-12-24, with 140 open issues and 24 open pull requests. Recent reports are
+   unanswered, including one from 2026-09-18 that matters for a ComfyUI we keep updating: the pack's
+   compatibility shims register phantom `flash_attn` / `bitsandbytes` modules. It is not archived, so
+   nothing warns a user; it simply rots.
+3. **Nothing better exists for that job.** A code search inside `comfyanonymous/ComfyUI` for `seedvr2`
+   returns zero hits across code, issues, PRs and commits — core never absorbed it — and no fork picked it
+   up (the search returns wrappers and integrations, not successors).
+
+**What was checked before deleting, because "find a better one" was the tempting answer**
+Two actively maintained packs do H3 video upscaling: `LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler`
+(805★, MIT, last push 2026-09) and `bbaudio-2025/Comfyui-MMH3-UltimateUpscale` (248★, MIT, 2026-10). Both
+are **latent-in, latent-out**: their main nodes declare `model`, `conditioning`, `negative?`, `latent` and
+return `latent`. They enhance a clip *inside* the generation graph; they cannot take an exported mp4. So
+they are not replacements for a file→file workflow — they are a better second pass, and #121's numbers
+already show we benefit from LBH's work: `SelfLiftH3Sampler` loads
+`minimax_h3_latent_upscaler_3d_fp16.safetensors`, which is LBH's model.
+
+That distinction is the whole decision: **"replace the upscaler" and "keep the upscale button" are
+different questions.** The first has a good answer we already use. The second has none, and does not need
+one.
+
+**Cost** A user holding an arbitrary clip and wanting it bigger has no path any more. If that becomes a
+requirement, the honest way back is a fork of the Apache-2.0 upstream with the torch shim fixed — not
+re-vendoring a dormant pack and hoping.
+
+**Tested** `make check` (imports and bytecode gates included), `tsc --noEmit`, and the canvas suite:
+132 tests, one fewer than before because the deleted `createVideoUpscaleTask` case went with the function.
+
+**Where** `workflows/registry.json`, `resources/index.json`, `resources/payload/custom_nodes/`,
+`internal/resource/status.go`, `internal/workflow/loaders.go`, `internal/setup/paths.go`,
+`infinite-canvas/web/src/{lib/canvas,components/canvas,pages/canvas,services/api,i18n}`.

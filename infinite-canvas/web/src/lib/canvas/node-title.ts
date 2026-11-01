@@ -30,7 +30,6 @@ const DEFAULT_TITLE_KEYS = [
     "canvas.runtime.cropNodeTitle",
     "canvas.outpaint.resultTitle",
     "canvas.mossLayout.resultTitle",
-    "canvas.videoUpscale.resultTitle",
     "canvas.nodeToolbar.interpolateTitle",
     "canvas.superResolve.title",
     "canvas.superResolve.fastTitle",

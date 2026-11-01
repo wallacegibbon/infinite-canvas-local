@@ -154,15 +154,9 @@ the way it does.
 
 ## Fixed, and where the reason is
 
-- **SeedVR2 pack did not import** — the vendored payload was missing `src/data/`; restored, and
-  `internal/resource/payload_imports_test.go` now fails on any pack that imports what it does not ship,
-  plus `TestVendoredPacksContainNoBytecode` for the `.pyc` files that same round left behind. #113.
-  **Not the same as "the workflow runs."** ComfyUI on the reference machine (2026-11-02) reports five
-  `SeedVR2*` classes — `Conditioning`, `Preprocess`, `PostProcessing`, `TemporalChunk`, `TemporalMerge` —
-  and none of the three `video-seedvr2-upscale` declares (`SeedVR2LoadDiTModel`, `SeedVR2LoadVAEModel`,
-  `SeedVR2VideoUpscaler`), so what is installed there is another SeedVR2 pack. The workflow stays
-  unavailable until this payload is installed from the panel and ComfyUI restarted; the dependencies in
-  [`runtime-deps.md`](runtime-deps.md) (`huggingface-hub<2` included) still apply.
+Evidence for the SeedVR2 import failure (#113) still describes the general rule — a vendored pack must
+import only what it ships — but the pack and the workflow it served are gone as of #123.
+
 - **Old 10-bit HEVC clips played audio only** — the two files this entry named are no longer in
   `data/outputs`, and the three H3 workflows have written `h264` / `yuv420p` since then; the guard is
   `internal/workflow/browser_playback_test.go`.

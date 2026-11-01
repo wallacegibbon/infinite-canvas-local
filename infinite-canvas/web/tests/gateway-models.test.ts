@@ -60,7 +60,7 @@ describe("modelsOf", () => {
 
     it("leaves out the workflows the canvas drives from a button", () => {
         // An upscaler takes a clip, not a prompt: it is not a model the picker should offer.
-        expect(modelsOf(workflow({ id: "video-seedvr2-upscale", type: "video", models: [{ id: "video-seedvr2-upscale" }] }))).toEqual([]);
+        expect(modelsOf(workflow({ id: "video-rife", type: "video", models: [{ id: "video-rife" }] }))).toEqual([]);
         expect(modelsOf(workflow({ id: "image-esrgan-upscale", models: [{ id: "image-esrgan-upscale" }] }))).toEqual([]);
     });
 

@@ -15,10 +15,6 @@ var ModelLoaderSpecs = []struct {
 	{ClassType: "CheckpointLoaderSimple", Input: "ckpt_name", Key: "checkpoints", Dirs: []string{"checkpoints"}},
 	{ClassType: "UNETLoader", Input: "unet_name", Key: "unets", Dirs: []string{"diffusion_models"}},
 	{ClassType: "UpscaleModelLoader", Input: "model_name", Key: "upscaleModels", Dirs: []string{"upscale_models"}},
-	// The SeedVR2 nodes only look in models/SEEDVR2: folder_paths type "seedvr2",
-	// see ComfyUI-SeedVR2_VideoUpscaler/src/utils/constants.py: SEEDVR2_FOLDER_NAME.
-	{ClassType: "SeedVR2LoadDiTModel", Input: "model", Key: "seedvr2Dit", Dirs: []string{"SEEDVR2"}},
-	{ClassType: "SeedVR2LoadVAEModel", Input: "model", Key: "seedvr2Vae", Dirs: []string{"SEEDVR2"}},
 	{ClassType: "CLIPLoader", Input: "clip_name", Key: "clips", Dirs: []string{"text_encoders"}},
 	{ClassType: "VAELoader", Input: "vae_name", Key: "vaes", Dirs: []string{"vae"}},
 	{ClassType: "LoraLoader", Input: "lora_name", Key: "loras", Dirs: []string{"loras"}},

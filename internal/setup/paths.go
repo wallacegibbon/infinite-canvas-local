@@ -25,7 +25,6 @@ var ModelDirKeys = map[string][]string{
 	"vdn":                   {"vdn"},
 	"clip_vision":           {"clip_vision"},
 	"LLM":                   {"LLM", "llm"},
-	"SEEDVR2":               {"SEEDVR2", "seedvr2"},
 }
 
 var yamlKeyPattern = regexp.MustCompile(`^([\w.-]+):\s*(.*)$`)

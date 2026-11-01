@@ -272,7 +272,7 @@ id exists to remove.
 | `/v1/models` (gone) | `GET /api/workflows`, then the client decides what to offer |
 | `/v1/videos`, `/v1/videos/{id}`, `/{id}/content`, `/{id}/cancel` (gone) | the same `run` endpoints |
 | `/v1/audio/speech` (gone) | the same `run` endpoints |
-| `/v1/videos/upscale`, `/v1/videos/interpolate` (gone) | runs of the `video-seedvr2-upscale` / `video-rife` workflows |
+| `/v1/videos/interpolate` (gone) | a run of the `video-rife` workflow |
 | `mode`, `vquality`, `resolution_name`, `params` (JSON string) | declared `inputs` in the schema |
 | field names that must contain `image`/`frame` | explicit media roles |
 | `entry.ID == "video-h3-…"`, `image-qwen21`, `image-moss-*` branches in handlers | `accepts` / `inputs` / `outputs` in `registry.json` |

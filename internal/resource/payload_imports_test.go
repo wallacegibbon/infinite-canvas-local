@@ -4,8 +4,8 @@ package resource
 // into ComfyUI, so a pack that is missing a file is a pack that fails to import — and ComfyUI then reports
 // the node classes as missing, which the panel shows as "this workflow cannot run" with no reason.
 //
-// That happened: `ComfyUI-SeedVR2_VideoUpscaler` shipped without `src/data/`, which its own
-// `src/core/generation_utils.py` imports, so `video-seedvr2-upscale` could never load (known-issues #1
+// That happened: a vendored pack shipped without a directory its own module imports, so the
+// workflow it served could never load (known-issues #1
 // spent a while blaming the installed copy instead). These tests read the payload the way Python would.
 
 import (

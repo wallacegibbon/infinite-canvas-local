@@ -26,13 +26,6 @@ function optionLabel(option: string | { value: string; label: string }) {
 }
 
 function prettyModel(value: string) {
-    const lower = value.toLowerCase();
-    if (/seedvr2/.test(lower)) {
-        const size = /(\d+b)/.exec(lower)?.[1]?.toUpperCase() || "";
-        const sharp = /sharp/.test(lower) ? "Sharp" : "";
-        const quant = /q4/.test(lower) ? "Q4" : /q8/.test(lower) ? "Q8" : /fp8/.test(lower) ? "fp8" : /fp16/.test(lower) ? "fp16" : "";
-        return ["SeedVR2", size, sharp, quant].filter(Boolean).join(" ");
-    }
     return value.replace(/\.(safetensors|pth|gguf)$/i, "").replace(/_/g, " ");
 }
 

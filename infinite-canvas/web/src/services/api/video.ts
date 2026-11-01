@@ -2,7 +2,7 @@ import i18n from "@/i18n";
 import { apiErrorMessage, isCancelled } from "@/services/api/http";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { clampVideoSeconds, computeVideoSize, inferVideoRatio } from "@/lib/media-size";
-import { VIDEO_INTERPOLATE_WORKFLOW, VIDEO_UPSCALE_WORKFLOW } from "@/lib/canvas/tool-workflows";
+import { VIDEO_INTERPOLATE_WORKFLOW } from "@/lib/canvas/tool-workflows";
 import { getMediaBlob, resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
 import { cancelRun, createRun, downloadRunOutput, uploadMedia, waitForRun, RunFailedError, type Run } from "@/services/api/runs";
@@ -18,7 +18,6 @@ type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
 /** A video task is a run: the id is the run id, and the file is read off the run. */
 type VideoGenerationTask = { id: string; model: string };
 type VideoUpscaleSource = { name: string; type?: string; url?: string; storageKey?: string };
-type VideoUpscaleParams = { scale: number; resolution: number; fps?: number; seed?: number; batchSize?: number; colorCorrection?: string };
 type VideoInterpolateSource = VideoUpscaleSource;
 type VideoInterpolateParams = { multiplier: 2 | 3 };
 export type VideoPreview = { url: string; mime?: string; step?: number; total?: number };
@@ -52,28 +51,6 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
     assertVideoConfig(requestConfig, requestConfig.model);
     return createGatewayVideoTask(requestConfig, prompt, references, options);
-}
-
-/**
- * Upscale a clip: one uploaded video, one run, one artifact.
- *
- * `scale` and `fps` are dialog values the graph derives itself (the target short edge and the source
- * frame rate), so only the inputs the workflow declares are sent — the gateway rejects the rest.
- */
-export async function createVideoUpscaleTask(config: AiConfig, source: VideoUpscaleSource, params: VideoUpscaleParams, options?: RequestOptions): Promise<VideoGenerationTask> {
-    const requestConfig = resolveModelRequestConfig(config, VIDEO_UPSCALE_WORKFLOW);
-    const file = await referenceMediaToFile(source, "source.mp4", "invalidReferenceVideo", options);
-    const inputs: Record<string, unknown> = { resolution: params.resolution };
-    if (params.seed !== undefined) inputs.seed = params.seed;
-    if (params.batchSize !== undefined) inputs.batch_size = params.batchSize;
-    if (params.colorCorrection) inputs.color_correction = params.colorCorrection;
-    try {
-        const uploaded = await uploadMedia(requestConfig, file, file.name, { signal: options?.signal });
-        const run = await createRun(requestConfig, { workflow: VIDEO_UPSCALE_WORKFLOW, inputs, media: { video: uploaded.id } });
-        return { id: run.id, model: VIDEO_UPSCALE_WORKFLOW };
-    } catch (error) {
-        throw new Error(apiErrorMessage(error, apiText("videoTaskCreateFailed")));
-    }
 }
 
 /**

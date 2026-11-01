@@ -49,7 +49,6 @@ import { CanvasNodeOutpaintDialog } from "@/components/canvas/canvas-node-outpai
 import { CanvasNodeMossLayoutDialog } from "@/components/canvas/canvas-node-moss-layout-dialog";
 import { CanvasNodeSplitDialog } from "@/components/canvas/canvas-node-split-dialog";
 import { CanvasNodeSuperResolveDialog } from "@/components/canvas/canvas-node-super-resolve-dialog";
-import { CanvasNodeVideoUpscaleDialog } from "@/components/canvas/canvas-node-video-upscale-dialog";
 import { buildNodeGenerationContext, buildNodeGenerationInputs, hydrateNodeGenerationContext, type NodeGenerationInput } from "@/components/canvas/canvas-node-generation";
 import { CanvasNodeHoverToolbar, CanvasNodeInfoModal } from "@/components/canvas/canvas-node-hover-toolbar";
 import { CanvasSelectionToolbar } from "@/components/canvas/canvas-selection-toolbar";
@@ -149,7 +148,7 @@ type CanvasGenerationRequest = {
 // editor is open" had no single answer, so each reset path cleared a different subset: delete and
 // clear closed five of the ten, Escape closed three. One nullable record instead makes "at most one
 // editor is open" an invariant the compiler can see, and leaves the resets a single thing to clear.
-type CanvasNodeTool = "info" | "crop" | "maskEdit" | "outpaint" | "mossLayout" | "split" | "upscale" | "superResolve" | "videoUpscale" | "angle";
+type CanvasNodeTool = "info" | "crop" | "maskEdit" | "outpaint" | "mossLayout" | "split" | "upscale" | "superResolve" | "angle";
 type CanvasNodeToolState = { kind: CanvasNodeTool; nodeId: string } | null;
 
 // Stable empty reference array prevents `... || []` from invalidating CanvasNode's React.memo on every render.
@@ -831,7 +830,6 @@ function InfiniteCanvasPage() {
     const splitNode = activeNodeTool?.kind === "split" ? activeNodeToolNode : null;
     const upscaleNode = activeNodeTool?.kind === "upscale" ? activeNodeToolNode : null;
     const superResolveNode = activeNodeTool?.kind === "superResolve" ? activeNodeToolNode : null;
-    const videoUpscaleNode = activeNodeTool?.kind === "videoUpscale" ? activeNodeToolNode : null;
     const angleNode = activeNodeTool?.kind === "angle" ? activeNodeToolNode : null;
     const contextMenuNode = contextMenu?.type === "node" ? nodeById.get(contextMenu.nodeId) || null : null;
     const previewNode = previewNodeId ? nodeById.get(previewNodeId) || null : null;
@@ -1980,7 +1978,7 @@ function InfiniteCanvasPage() {
         [closeNodeTool, finishGenerationRequest, setConnections, setDialogNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds, setRunningNodeId, startGenerationRequest],
     );
     const { cropImageNode, splitImageNode, maskEditImageNode, outpaintImageNode, mossLayoutImageNode, runSuperResolve, runFastUpscale, generateAngleNode } = useImageEditors(nodeEditorDeps);
-    const { upscaleVideoNode, interpolateVideoNode } = useVideoEditors(nodeEditorDeps);
+    const { interpolateVideoNode } = useVideoEditors(nodeEditorDeps);
 
     const handleFontSizeChange = useCallback((nodeId: string, fontSize: number) => {
         setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, fontSize } } : node)));
@@ -2729,7 +2727,6 @@ function InfiniteCanvasPage() {
                     onToggleDialog={(node) => setDialogNodeId((current) => (current === node.id ? null : node.id))}
                     onGenerateImage={generateImageFromTextNode}
                     onUpload={(node) => handleUploadRequest(node.id)}
-                    onVideoUpscale={(node) => openNodeTool("videoUpscale", node.id)}
                     onInterpolateVideo={(node) => void interpolateVideoNode(node)}
                     onDownload={downloadNodeImage}
                     onSaveAsset={(node) => void saveNodeAsset(node)}
@@ -2879,17 +2876,6 @@ function InfiniteCanvasPage() {
                     onConfirm={(params) => {
                         closeNodeTool();
                         if (superResolveNode) void runSuperResolve(superResolveNode, params);
-                    }}
-                />
-
-                <CanvasNodeVideoUpscaleDialog
-                    open={Boolean(videoUpscaleNode)}
-                    node={videoUpscaleNode}
-                    onClose={() => closeNodeTool()}
-                    onConfirm={(params) => {
-                        const target = videoUpscaleNode;
-                        closeNodeTool();
-                        if (target) void upscaleVideoNode(target, params);
                     }}
                 />
 

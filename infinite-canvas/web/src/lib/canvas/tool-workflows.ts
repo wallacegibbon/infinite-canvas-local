@@ -9,12 +9,11 @@
  * Keeping the ids in one place means a tool cannot drift: the same constant names the button, builds
  * the request, and filters the model list.
  */
-export const VIDEO_UPSCALE_WORKFLOW = "video-seedvr2-upscale";
 export const VIDEO_INTERPOLATE_WORKFLOW = "video-rife";
 export const IMAGE_UPSCALE_WORKFLOW = "image-esrgan-upscale";
 export const IMAGE_ANGLE_WORKFLOW = "image-qwen21-angle";
 
-const TOOL_WORKFLOWS: readonly string[] = [VIDEO_UPSCALE_WORKFLOW, VIDEO_INTERPOLATE_WORKFLOW, IMAGE_UPSCALE_WORKFLOW, IMAGE_ANGLE_WORKFLOW];
+const TOOL_WORKFLOWS: readonly string[] = [VIDEO_INTERPOLATE_WORKFLOW, IMAGE_UPSCALE_WORKFLOW, IMAGE_ANGLE_WORKFLOW];
 
 /** Whether a workflow is one the canvas drives from an action rather than from the model list. */
 export function isToolWorkflow(id: string) {

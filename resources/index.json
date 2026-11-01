@@ -349,33 +349,24 @@
     {
       "id": "upscale",
       "label": "Upscaling",
-      "description": "Fast upscale (ESRGAN) and SeedVR2 video upscaling. The nodes are installed with the pack, the runtime libraries and weights download per workflow; the SeedVR2 3B DiT is optional.",
+      "description": "Fast image upscale (ESRGAN). The nodes are installed with the pack, the weights download per workflow.", 
       "resources": [
         "esrgan_x2plus",
         "esrgan_x4plus",
-        "esrgan_anime6b",
-        "seedvr2_3b_dit",
-        "seedvr2_vae"
+        "esrgan_anime6b"
       ],
       "optionalResources": [
         "esrgan_x2plus",
         "esrgan_x4plus",
-        "esrgan_anime6b",
-        "seedvr2_3b_dit",
-        "seedvr2_vae"
+        "esrgan_anime6b"
       ],
       "workflows": [
-        "image-esrgan-upscale",
-        "video-seedvr2-upscale"
+        "image-esrgan-upscale"
       ],
       "optional": true,
       "workflowDependencies": {
         "image-esrgan-upscale": [
           "esrgan_x2plus"
-        ],
-        "video-seedvr2-upscale": [
-          "seedvr2_3b_dit",
-          "seedvr2_vae"
         ]
       }
     }
@@ -1016,25 +1007,6 @@
       ]
     },
     {
-      "id": "seedvr2_node",
-      "type": "node",
-      "label": "SeedVR2 upscale node",
-      "target": "custom_nodes/ComfyUI-SeedVR2_VideoUpscaler",
-      "upstream": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler",
-      "pinnedCommit": "4490bd1f482e026674543386bb2a4d176da245b9",
-      "localPatches": ["src/common/distributed/basic.py"],
-      "autoInstall": true,
-      "size": 2270483,
-      "license": "Apache-2.0",
-      "note": "Bundled node pack: the installer copies it into ComfyUI's custom_nodes. Its Python dependencies (diffusers, rotary_embedding_torch, omegaconf, opencv-python, einops) are not installed by the gateway — the Runtime libraries entry reports the pip command for ComfyUI's own interpreter. Restart ComfyUI afterwards.",
-      "provides": [
-        "SeedVR2LoadDiTModel",
-        "SeedVR2LoadVAEModel",
-        "SeedVR2VideoUpscaler"
-      ],
-      "sources": []
-    },
-    {
       "id": "frame_interpolation_node",
       "type": "node",
       "label": "Frame Interpolation (RIFE)",
@@ -1046,34 +1018,6 @@
       "note": "The RIFE interpolation node, installed from GitHub (not copied with the pack); on first run the pack downloads rife49.pth into its own ckpts folder, not models/, which is why there is no separate model entry. Restart ComfyUI afterwards.",
       "sources": [
         "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation/archive/refs/heads/main.zip"
-      ]
-    },
-    {
-      "id": "seedvr2_3b_dit",
-      "type": "model",
-      "label": "SeedVR2 3B DiT (video)",
-      "target": "SEEDVR2/seedvr2_ema_3b_fp8_e4m3fn.safetensors",
-      "size": 3391544696,
-      "sha256": "3bf1e43ebedd570e7e7a0b1b60d6a02e105978f505c8128a241cde99a8240cff",
-      "license": "Apache-2.0",
-      "note": "The DiT for SeedVR2 video upscaling; about 3.4GB.",
-      "sources": [
-        "https://hf-mirror.com/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors",
-        "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/seedvr2_ema_3b_fp8_e4m3fn.safetensors"
-      ]
-    },
-    {
-      "id": "seedvr2_vae",
-      "type": "model",
-      "label": "SeedVR2 VAE",
-      "target": "SEEDVR2/ema_vae_fp16.safetensors",
-      "size": 501324814,
-      "sha256": "20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1",
-      "license": "Apache-2.0",
-      "note": "The VAE shared by SeedVR2 image and video upscaling; the node only reads models/SEEDVR2, not models/vae.",
-      "sources": [
-        "https://hf-mirror.com/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors",
-        "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main/ema_vae_fp16.safetensors"
       ]
     },
     {

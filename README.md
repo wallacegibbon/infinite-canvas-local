@@ -22,7 +22,7 @@ Maintained here: the workflow graphs and `registry.json`, the resource index and
 - **Workflows are the unit**: the gateway runs ComfyUI workflows (`GET /api/workflows`, `POST /api/runs`) and reports what each accepts; the canvas decides which of them the picker offers.
 - **Images**: Z-Image Turbo, Krea2 Aesthetics, MOSS SFT (8-step, regional layout), Qwen Image 2.1 (multi-image edit, masked inpaint, outpaint).
 - **Video**: MiniMax-H3 text-to-video, first/last-frame and multi-reference, with sampling preview and LoRA cards.
-- **Upscaling**: ESRGAN, SeedVR2 for images and video.
+- **Upscaling**: ESRGAN for images.
 - **Local plugins**: LoRA strength card, ComfyUI parameter card.
 - **Prompts come from AlayaCore**: one `alayacore --rawio` process per request, its frames relayed to the canvas; the model, the skills and the wording are the agent's.
 - **System panel**: VRAM / RAM / GPU / ComfyUI status, one-click VRAM release.
@@ -183,7 +183,7 @@ own frame protocol on stdin/stdout. Its model list, model choice and skills are 
 - [`docs/gateway.md`](docs/gateway.md): gateway endpoints, environment variables, architecture and language policy.
 - [`docs/decisions.md`](docs/decisions.md): why the code looks the way it does — one entry per decision, with its cost.
 - [`docs/known-issues.md`](docs/known-issues.md): verified open problems and the command that fixes each.
-- [`docs/runtime-deps.md`](docs/runtime-deps.md): SageAttention / SeedVR2 and other runtimes must be installed with `pip` by hand (the workbench no longer does it).
+- [`docs/runtime-deps.md`](docs/runtime-deps.md): SageAttention and other runtimes must be installed with `pip` by hand (the workbench no longer does it).
 - [`tools/bake-moss-preset.py`](tools/bake-moss-preset.py): bakes MOSS Base+SFT into `moss_balanced_s100.safetensors` — the `builder` behind the `type: "bake"` entry in the resource index; run it with ComfyUI's Python (it imports torch).
 
 ## License

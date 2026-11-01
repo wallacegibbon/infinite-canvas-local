@@ -223,8 +223,6 @@ export default {
             runtimeHelpNote: "Restart ComfyUI afterwards. SageAttention may need to be built for your CUDA version; see docs/runtime-deps.md.",
             runtimeDep_h3: "H3 video (required)",
             runtimeDepNote_h3: "SageAttention. Without it H3 / VDN workflows fail at runtime.",
-            runtimeDep_seedvr2: "SeedVR2 upscale",
-            runtimeDepNote_seedvr2: "Dependencies of the SeedVR2 node; without them the node cannot load.",
             subtitle: "Only missing files are downloaded. Existing models with the same name are reused.",
             refresh: "Rescan",
             installSelected: "Install selected",
@@ -333,19 +331,6 @@ export default {
         configFirst: "Complete the configuration first",
     },
     canvas: {
-        videoUpscale: {
-            label: "Upscale",
-            resultTitle: "SeedVR2 upscale",
-            title: "SeedVR2 video upscaling",
-            emptySource: "The source video has no content yet",
-            sourceInfo: "Source {{width}} × {{height}} · 24fps · original audio kept",
-            scale: "Scale factor",
-            targetShortEdge: "Target short edge",
-            expectedOutput: "Expected output",
-            engineInfo: "SeedVR2 3B · H.264 · original audio passes through",
-            timeHint: "Time grows with resolution and duration; keep the canvas open while it runs. 1.5× suits 720p→1080p, 2× is slower.",
-            start: "Start upscaling",
-        },
         outpaint: {
             resultTitle: "Outpaint result",
             failed: "Outpaint failed",
