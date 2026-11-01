@@ -2536,17 +2536,17 @@ function InfiniteCanvasPage() {
 
     return (
         <main className="flex h-full min-h-0 overflow-hidden" style={{ background: theme.canvas.background, color: theme.node.text }}>
-            <CanvasSidePanel
-                nodes={nodes}
-                selectedNodeIds={selectedNodeIds}
-                onFocusNode={focusNode}
-                onPreviewNode={setPreviewNodeId}
-                onPreviewImage={handleSidebarPreviewImage}
-                onHoverNode={handleSidebarHoverNode}
-                onHoverImage={handleSidebarHoverImage}
-                onInsertAsset={handleAssetInsert}
-            />
             <section className="relative min-w-0 flex-1 overflow-hidden">
+                <CanvasSidePanel
+                    nodes={nodes}
+                    selectedNodeIds={selectedNodeIds}
+                    onFocusNode={focusNode}
+                    onPreviewNode={setPreviewNodeId}
+                    onPreviewImage={handleSidebarPreviewImage}
+                    onHoverNode={handleSidebarHoverNode}
+                    onHoverImage={handleSidebarHoverImage}
+                    onInsertAsset={handleAssetInsert}
+                />
                 {agentOpen ? null : (
                     <button
                         type="button"

@@ -3234,3 +3234,33 @@ owns no subject) rather than adding one.
 row; the dock lists … 上传资产 / 导出当前画布 …, and `导出当前画布` was present in the accessibility tree next to
 `上传资产`. The title menu reads 无限画布 1 (42 个节点) / 重命名 / 新建画布 / 我的画布 / **删除当前画布** (red).
 A grep for `打开画布菜单` in the accessibility tree returns nothing: no hamburger is left.
+
+## 98. The side panel is a board over the canvas, not a column beside it
+
+**Decision** `CanvasSidePanel` is no longer a flex sibling that the canvas is laid out next to. It lives
+inside the canvas `<section>` as `absolute left-0 top-16 bottom-0`, slides out with `translateX(-width)` and
+`opacity: 0`, and turns `pointer-events` off while it is away. It is shut by default (`canvas-side-panel-open`
+must say `1`), and the same top-left button opens and closes it. With the reflow gone, the store lost
+`panelMounted`/`panelClosing` and the component lost the two-frame "render at 0, then flip" hack that existed
+only because a CSS transition cannot run on first paint. Chrome that used to be pushed aside by the column now
+steps over the board: `useSidePanelInset(gap)` — 20 for the zoom dock, 24 for the minimap, 300 for the bottom
+dock.
+
+**Why** The panel was reflowing the canvas: opening it moved every node on screen, so a person looking for a
+node in the list lost the view they were looking at. A list of what is on the canvas is a way of *looking*, and
+looking should not move the thing you are looking at. The floating board keeps the function and drops the
+consequence.
+
+The bottom dock's `left: 300` was **not** room for the side panel, which is what this change first assumed: it
+is the width the zoom dock and minimap occupy in the bottom-left corner. Changing it to 16 made the dock
+overlap the zoom dock as soon as the board was wide, which the browser showed immediately. It is
+`useSidePanelInset(300)` now: still 300 from the canvas's left edge when the board is shut, 300 further right
+when it is open — the same pixels as before, without the canvas ever moving.
+
+**Tested** In a browser (1717×734, 42 nodes). The board sits at (0, 64), 280×670, bottom flush with the canvas.
+Its first node's screen rect read `left=-53` with the board open, after closing it, after a resize to 360, and
+after a reload — the canvas did not move once. Closing it put the aside at `left=-361` with
+`pointer-events: none`; the zoom dock moved 380 → 20, and the bottom dock 660 → 300, both without touching the
+canvas. `elementFromPoint(120, 300)` returned a button inside the aside, and `(900, 600)` returned the canvas,
+so the board takes the pointer it covers. A clean storage (all three keys removed, reload) opened with the board
+shut and width 280 and wrote nothing until it was toggled; after opening it, a reload kept it open.

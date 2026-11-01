@@ -69,30 +69,9 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, onFocusNode, onPreview
     const [tab, setTab] = useState<PanelTab>("canvas");
     const width = useCanvasSidePanelStore((state) => state.width);
     const panelOpen = useCanvasSidePanelStore((state) => state.panelOpen);
-    const panelMounted = useCanvasSidePanelStore((state) => state.panelMounted);
-    const panelClosing = useCanvasSidePanelStore((state) => state.panelClosing);
     const setWidth = useCanvasSidePanelStore((state) => state.setWidth);
     const commitWidth = useCanvasSidePanelStore((state) => state.commitWidth);
     const [resizing, setResizing] = useState(false);
-    // CSS transitions do not run on an element's first paint, so a freshly mounted panel would
-    // appear at full width. It renders at 0 for one frame, then flips — that two-pass is what
-    // `motion`'s `initial={{ width: 0 }}` was doing for us.
-    const [entered, setEntered] = useState(false);
-    useEffect(() => {
-        if (!panelMounted || !panelOpen) {
-            setEntered(false);
-            return;
-        }
-        // Two frames: one for the 0-width style to be committed, one to change away from it.
-        let second = 0;
-        const first = requestAnimationFrame(() => {
-            second = requestAnimationFrame(() => setEntered(true));
-        });
-        return () => {
-            cancelAnimationFrame(first);
-            if (second) cancelAnimationFrame(second);
-        };
-    }, [panelMounted, panelOpen]);
 
     const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
         event.preventDefault();
@@ -114,49 +93,39 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, onFocusNode, onPreview
         window.addEventListener("pointerup", onUp);
     };
 
-    if (!panelMounted) return null;
-
+    // A board over the canvas, not a column beside it: the canvas keeps its full width whether this is
+    // open or shut, and nothing reflows when it moves. Closing slides it out to the left and turns it
+    // off for hit-testing, so the gutter it leaves behind belongs to the canvas again.
     return (
-        <div
-            className="relative z-[60] flex h-full shrink-0"
+        <aside
+            className="absolute bottom-0 left-0 top-16 z-[60] flex flex-col overflow-hidden border-r"
             style={{
-                width: panelOpen && entered ? width + 1 : 0,
-                opacity: panelOpen && entered ? 1 : 0,
-                overflow: "clip",
-                pointerEvents: panelClosing ? "none" : undefined,
-                transitionProperty: "width, opacity",
+                width,
+                background: theme.toolbar.panel,
+                borderColor: theme.toolbar.border,
+                color: theme.node.text,
+                transform: panelOpen ? "translateX(0)" : `translateX(-${width + 1}px)`,
+                opacity: panelOpen ? 1 : 0,
+                pointerEvents: panelOpen ? undefined : "none",
+                transitionProperty: "transform, opacity",
                 transitionDuration: resizing ? "0ms" : `${PANEL_TRANSITION_MS}ms`,
                 transitionTimingFunction: PANEL_EASE,
             }}
+            data-canvas-no-zoom
         >
-            <aside
-                className="relative flex h-full shrink-0 flex-col overflow-hidden border-r"
-                style={{
-                    width,
-                    background: theme.toolbar.panel,
-                    borderColor: theme.toolbar.border,
-                    color: theme.node.text,
-                    transform: `translateX(${!entered ? -48 : panelClosing ? -28 : 0}px)`,
-                    transitionProperty: "transform",
-                    transitionDuration: resizing ? "0ms" : `${PANEL_TRANSITION_MS}ms`,
-                    transitionTimingFunction: PANEL_EASE,
-                }}
-                data-canvas-no-zoom
-            >
-                <div className="flex items-center gap-5 px-4 pt-3.5">
-                    <TabButton label={t("canvas.sidePanel.canvas")} active={tab === "canvas"} theme={theme} onClick={() => setTab("canvas")} />
-                    <TabButton label={t("canvas.sidePanel.assets")} active={tab === "assets"} theme={theme} onClick={() => setTab("assets")} />
-                </div>
-                <div className="mt-2 min-h-0 flex-1 overflow-hidden">
-                    {tab === "canvas" ? (
-                        <CanvasNodesTab nodes={nodes} selectedNodeIds={selectedNodeIds} onFocusNode={onFocusNode} onPreviewNode={onPreviewNode} onPreviewImage={onPreviewImage} onHoverNode={onHoverNode} onHoverImage={onHoverImage} theme={theme} />
-                    ) : tab === "assets" ? (
-                        <CanvasAssetsTab onInsert={onInsertAsset} theme={theme} />
-                    ) : null}
-                </div>
-                <button type="button" className="absolute inset-y-0 right-0 z-40 w-4 translate-x-1/2 cursor-col-resize" onPointerDown={startResize} aria-label={t("canvas.sidePanel.resize")} />
-            </aside>
-        </div>
+            <div className="flex items-center gap-5 px-4 pt-3.5">
+                <TabButton label={t("canvas.sidePanel.canvas")} active={tab === "canvas"} theme={theme} onClick={() => setTab("canvas")} />
+                <TabButton label={t("canvas.sidePanel.assets")} active={tab === "assets"} theme={theme} onClick={() => setTab("assets")} />
+            </div>
+            <div className="mt-2 min-h-0 flex-1 overflow-hidden">
+                {tab === "canvas" ? (
+                    <CanvasNodesTab nodes={nodes} selectedNodeIds={selectedNodeIds} onFocusNode={onFocusNode} onPreviewNode={onPreviewNode} onPreviewImage={onPreviewImage} onHoverNode={onHoverNode} onHoverImage={onHoverImage} theme={theme} />
+                ) : tab === "assets" ? (
+                    <CanvasAssetsTab onInsert={onInsertAsset} theme={theme} />
+                ) : null}
+            </div>
+            <button type="button" className="absolute inset-y-0 right-0 z-40 w-4 translate-x-1/2 cursor-col-resize" onPointerDown={startResize} aria-label={t("canvas.sidePanel.resize")} />
+        </aside>
     );
 }
 

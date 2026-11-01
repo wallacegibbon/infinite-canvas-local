@@ -18,9 +18,10 @@ function initialWidth() {
     return Math.min(CANVAS_SIDE_PANEL_MAX_WIDTH, Math.max(CANVAS_SIDE_PANEL_MIN_WIDTH, stored));
 }
 
+/** Shut until asked for: the board floats over the canvas, so nothing is missing while it is away. */
 function initialOpen() {
-    if (typeof window === "undefined") return true;
-    return localStorage.getItem(OPEN_KEY) !== "0";
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(OPEN_KEY) === "1";
 }
 
 function initialNodeView(): CanvasNodeViewMode {
@@ -31,23 +32,17 @@ function initialNodeView(): CanvasNodeViewMode {
 type CanvasSidePanelStore = {
     width: number;
     panelOpen: boolean;
-    panelMounted: boolean;
-    panelClosing: boolean;
     nodeViewMode: CanvasNodeViewMode;
     setWidth: (width: number) => void;
     /** Write the current width to storage. Called when a drag ends, not on every pixel. */
     commitWidth: () => void;
     setNodeViewMode: (mode: CanvasNodeViewMode) => void;
-    openPanel: () => void;
-    closePanel: () => void;
     togglePanel: () => void;
 };
 
 export const useCanvasSidePanelStore = create<CanvasSidePanelStore>((set, get) => ({
     width: initialWidth(),
     panelOpen: initialOpen(),
-    panelMounted: initialOpen(),
-    panelClosing: false,
     nodeViewMode: initialNodeView(),
     setWidth: (width) => set({ width }),
     commitWidth: () => {
@@ -57,17 +52,19 @@ export const useCanvasSidePanelStore = create<CanvasSidePanelStore>((set, get) =
         if (typeof window !== "undefined") localStorage.setItem(NODE_VIEW_KEY, mode);
         set({ nodeViewMode: mode });
     },
-    openPanel: () => {
-        if (typeof window !== "undefined") localStorage.setItem(OPEN_KEY, "1");
-        set({ panelOpen: true, panelMounted: true, panelClosing: false });
+    togglePanel: () => {
+        const open = !get().panelOpen;
+        if (typeof window !== "undefined") localStorage.setItem(OPEN_KEY, open ? "1" : "0");
+        set({ panelOpen: open });
     },
-    closePanel: () => {
-        if (!get().panelMounted || get().panelClosing) return;
-        if (typeof window !== "undefined") localStorage.setItem(OPEN_KEY, "0");
-        set({ panelOpen: false, panelClosing: true });
-        setTimeout(() => {
-            if (get().panelClosing) set({ panelMounted: false, panelClosing: false });
-        }, CANVAS_SIDE_PANEL_MOTION_MS);
-    },
-    togglePanel: () => (get().panelOpen ? get().closePanel() : get().openPanel()),
 }));
+
+/**
+ * Where the canvas's own chrome should sit, measured from the left edge. The board floats there, so a
+ * zoom dock or a minimap that used to be pushed aside by a column now has to step over it instead.
+ */
+export function useSidePanelInset(gap: number) {
+    const open = useCanvasSidePanelStore((state) => state.panelOpen);
+    const width = useCanvasSidePanelStore((state) => state.width);
+    return open ? width + gap : gap;
+}

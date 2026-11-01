@@ -10,6 +10,7 @@ import { canvasThemes, type CanvasBackgroundMode, type CanvasColorTheme, type Ca
 import { getNodePluginId, listNodeDefinitions, useNodeRegistryVersion } from "@/lib/canvas/node-registry";
 import { getNodeSpec } from "@/constant/canvas";
 import { useThemeStore } from "@/stores/use-theme-store";
+import { useSidePanelInset } from "@/stores/canvas/use-canvas-side-panel-store";
 import { AnimatedThemeToggler } from "@/components/kit/animated-theme-toggler";
 import { useTranslation } from "react-i18next";
 
@@ -61,6 +62,9 @@ export function CanvasToolbar({
     const wrapRef = useRef<HTMLDivElement>(null);
     const { t } = useTranslation();
     const rootRef = useRef<HTMLDivElement>(null);
+    // 300 was never room for the side panel — it is the width the zoom dock and the minimap occupy in the
+    // bottom-left corner. The board floats, so the dock now has to step over it *and* keep that corner clear.
+    const left = useSidePanelInset(300);
     const colorTheme = useThemeStore((state) => state.theme);
     const setTheme = useThemeStore((state) => state.setTheme);
     const theme = canvasThemes[colorTheme];
@@ -92,7 +96,7 @@ export function CanvasToolbar({
     }, [extensionsOpen, appearanceOpen]);
 
     return (
-        <div ref={rootRef} className="pointer-events-none absolute bottom-5 z-50 flex justify-center" style={{ left: 300, right: 16 }} data-canvas-bottom-toolbar>
+        <div ref={rootRef} className="pointer-events-none absolute bottom-5 z-50 flex justify-center" style={{ left, right: 16 }} data-canvas-bottom-toolbar>
             {tip ? <DockTip label={tip} x={tipX} theme={theme} /> : null}
             <div ref={wrapRef} className="thin-scrollbar pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto rounded-xl border px-2 shadow-lg backdrop-blur [&>*]:shrink-0" style={dockStyle}>
                 <ToolbarButton
