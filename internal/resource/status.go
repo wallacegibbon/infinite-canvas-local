@@ -872,6 +872,7 @@ func (m *Manager) workflowDependencies(pack *Pack, providers *providerIndex, byI
 			ModelVisible:  modelVisible,
 			VariantLabels: variantLabels,
 			Problems:      nonNilProblems(availability.Problems),
+			ModeProblems:  availability.ModeProblems,
 			Recommended:   false,
 			Resources:     nonNilItems(dependencyItems),
 			Missing:       len(missingItems),

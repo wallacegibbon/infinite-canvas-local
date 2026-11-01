@@ -36,6 +36,10 @@ type Problem struct {
 type Availability struct {
 	Available bool      `json:"available"`
 	Problems  []Problem `json:"problems"`
+	// ModeProblems are what only a variant needs: a graph the workflow offers, not the graph it opens
+	// with. They do not make the workflow unavailable — declining to hide a model because one of its
+	// four modes wants a node pack is what made Qwen Image disappear while its edit mode was fine.
+	ModeProblems map[string][]Problem `json:"modeProblems,omitempty"`
 }
 
 // WorkflowState is one row of the scan summary.

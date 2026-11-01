@@ -570,6 +570,7 @@ export default {
         },
         imagePopover: {
             mode: "功能",
+            modeBlocked: "缺节点",
             canvasRatio: "画布比例",
             followFirst: "跟随首图",
             followSource: "跟随原图",

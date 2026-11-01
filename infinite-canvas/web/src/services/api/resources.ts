@@ -82,6 +82,8 @@ type WorkflowDependency = {
     variantLabels?: Record<string, string>;
     recommended?: boolean;
     problems: Array<{ type?: string; message?: string; classType?: string; input?: string; value?: string; candidates?: string[] }>;
+    /** Gaps of a mode this workflow offers but does not open with; they do not block the workflow. */
+    modeProblems?: Record<string, Array<{ type?: string; message?: string; classType?: string; input?: string; value?: string; candidates?: string[] }>>;
     resources: ResourceItem[];
     missing: number;
     missingSize: number;

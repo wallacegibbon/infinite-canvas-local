@@ -146,20 +146,23 @@ type MainModel struct {
 
 // WorkflowDependency is the per-workflow resource rollup inside a pack.
 type WorkflowDependency struct {
-	ID            string             `json:"id"`
-	Label         string             `json:"label"`
-	Available     bool               `json:"available"`
-	Enabled       bool               `json:"enabled"`
-	ModelVisible  bool               `json:"modelVisible"`
-	VariantLabels map[string]string  `json:"variantLabels"`
-	Problems      []setup.Problem    `json:"problems"`
-	Recommended   bool               `json:"recommended"`
-	MainModel     *WorkflowMainModel `json:"mainModel"`
-	Resources     []*Item            `json:"resources"`
-	Missing       int                `json:"missing"`
-	MissingSize   int64              `json:"missingSize"`
-	NeedsRestart  int                `json:"needsRestart"`
-	InstallIDs    []string           `json:"installIds"`
+	ID            string            `json:"id"`
+	Label         string            `json:"label"`
+	Available     bool              `json:"available"`
+	Enabled       bool              `json:"enabled"`
+	ModelVisible  bool              `json:"modelVisible"`
+	VariantLabels map[string]string `json:"variantLabels"`
+	Problems      []setup.Problem   `json:"problems"`
+	// ModeProblems are the gaps of a mode the workflow offers but does not open with (Qwen's inpaint
+	// wants a node pack its edit mode does not). They are shown, and they do not exclude the row.
+	ModeProblems map[string][]setup.Problem `json:"modeProblems,omitempty"`
+	Recommended  bool                       `json:"recommended"`
+	MainModel    *WorkflowMainModel         `json:"mainModel"`
+	Resources    []*Item                    `json:"resources"`
+	Missing      int                        `json:"missing"`
+	MissingSize  int64                      `json:"missingSize"`
+	NeedsRestart int                        `json:"needsRestart"`
+	InstallIDs   []string                   `json:"installIds"`
 }
 
 // WorkflowMainModel is a single workflow's main-model override state.

@@ -198,3 +198,56 @@ func TestScanReportsUnregisteredWorkflowFiles(t *testing.T) {
 		t.Errorf("log does not explain why:\n%s", log)
 	}
 }
+
+// A mode the workflow offers but does not open with must not take the workflow off the model list.
+//
+// Qwen Image's inpaint mode wants Inpaint-CropAndStitch, and because that node pack was not installed
+// the whole model vanished from the picker while edit and text-to-image were perfectly runnable. The
+// gap belongs to the mode; the workflow is still the user's to choose.
+func TestScanKeepsAWorkflowWhoseVariantModeIsBlocked(t *testing.T) {
+	root := t.TempDir()
+	workflowsDir := filepath.Join(root, "workflows")
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeGraph(t, workflowsDir, "image-qwen.json", imageGraph())
+
+	// A variant graph that loads a node no fake ComfyUI reports. The file name breaks the
+	// `<type>-<slug>.json` rule on purpose: a variant is registered by the entry that names it, not
+	// by sitting in the folder.
+	inpaintGraph := imageGraph()
+	inpaintGraph["4"] = map[string]any{"class_type": "InpaintCropImproved", "inputs": map[string]any{}}
+	writeGraph(t, workflowsDir, "variant-inpaint.json", inpaintGraph)
+
+	registryJSON := `{"version": 1, "workflows": [{
+		"id": "image-qwen", "name": "image-qwen", "type": "image", "file": "image-qwen.json",
+		"variants": {"inpaint": {"file": "variant-inpaint.json", "label": "Inpaint"}}
+	}]}`
+	if err := os.WriteFile(filepath.Join(workflowsDir, "registry.json"), []byte(registryJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	manager, _ := newScanManager(t, workflowsDir, logx.NewWithWriter("test", &bytes.Buffer{}), fakeComfy(t).URL)
+	status, err := manager.Scan()
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+
+	availability := manager.WorkflowStatus("image-qwen")
+	if !availability.Available {
+		t.Fatalf("availability = %+v, want available: the blocked graph is a mode, not the workflow", availability)
+	}
+	if len(availability.ModeProblems["inpaint"]) == 0 {
+		t.Errorf("modeProblems = %v, want the inpaint gap reported", availability.ModeProblems)
+	}
+	// Counted, not swallowed: the node is still missing, and the panel's node list has to say so.
+	found := false
+	for _, node := range status.Missing.Nodes {
+		if strings.Contains(node, "InpaintCropImproved") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("missing nodes = %v, want InpaintCropImproved among them", status.Missing.Nodes)
+	}
+}

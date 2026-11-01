@@ -17,6 +17,8 @@ export type ChannelModel = {
     baseModel?: string;
     baseModelLabel?: string;
     variantModes?: string[];
+    /** Modes the gateway reports as blocked: they would fail inside ComfyUI, so they are not offered. */
+    blockedModes?: string[];
     variantLabels?: Record<string, string>;
     imageInputs?: number;
 };
@@ -388,9 +390,10 @@ export function normalizeChannelModels(models: Array<string | ChannelModel> | un
         const baseModel = typeof item === "string" ? undefined : item.baseModel?.trim() || undefined;
         const baseModelLabel = typeof item === "string" ? undefined : item.baseModelLabel?.trim() || undefined;
         const variantModes = typeof item === "string" ? undefined : Array.isArray(item.variantModes) ? item.variantModes.map((mode) => String(mode).trim()).filter(Boolean) : undefined;
+        const blockedModes = typeof item === "string" ? undefined : Array.isArray(item.blockedModes) ? item.blockedModes.map((mode) => String(mode).trim()).filter(Boolean) : undefined;
         const variantLabels = typeof item === "string" ? undefined : item.variantLabels && typeof item.variantLabels === "object" ? item.variantLabels : undefined;
         const imageInputs = typeof item === "string" ? undefined : typeof item.imageInputs === "number" ? item.imageInputs : undefined;
-        result.push({ name, capability, label, workflowId, baseModel, baseModelLabel, variantModes, variantLabels, imageInputs });
+        result.push({ name, capability, label, workflowId, baseModel, baseModelLabel, variantModes, variantLabels, blockedModes, imageInputs });
     }
     return result;
 }

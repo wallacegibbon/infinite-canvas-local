@@ -75,7 +75,9 @@ function qwenModelInfo(config: AiConfig) {
     const model = channelModelOf(config, config.model)?.model;
     if (model?.workflowId !== "image-qwen21") return null;
     const modes = model.variantModes?.length ? model.variantModes : ["t2i", "edit", "inpaint", "outpaint"];
-    return { modes, labels: model.variantLabels };
+    // Modes whose own nodes are missing are shown but refused: choosing inpaint without the inpaint
+    // node pack used to fail inside ComfyUI, after the mask editor had already opened.
+    return { modes, labels: model.variantLabels, blocked: model.blockedModes || [] };
 }
 
 export function CanvasImageSettingsPopover({
@@ -102,7 +104,7 @@ export function CanvasImageSettingsPopover({
     const editCanvasRatio = canvasRatioOf(String((config.params as Record<string, unknown> | undefined)?.editCanvasSize || ""), String((config.params as Record<string, unknown> | undefined)?.resolution ?? 1024));
     // A stored imageMode can outlive the model it was chosen for (switching to Qwen while the
     // config still says "layout"), so an unknown mode reads as plain text-to-image.
-    const imageMode = qwen && qwen.modes.includes(String(config.imageMode)) ? String(config.imageMode) : "t2i";
+    const imageMode = qwen && qwen.modes.includes(String(config.imageMode)) && !qwen.blocked.includes(String(config.imageMode)) ? String(config.imageMode) : "t2i";
     // The trigger reads `mode · scope`: the mode name, then what the canvas will follow.
     const qwenTriggerLabel = !qwen
         ? ""
@@ -244,6 +246,7 @@ function ImageSettingsPortal({
                                         key={mode}
                                         selected={qwenMode === mode}
                                         theme={theme}
+                                        disabled={qwen.blocked.includes(mode)}
                                         onClick={() => {
                                             onConfigChange("imageMode", mode);
                                             if (mode === "inpaint" || mode === "outpaint") onClose();
@@ -252,6 +255,7 @@ function ImageSettingsPortal({
                                         }}
                                     >
                                         {qwenVariantLabel(mode, qwen.labels)}
+                                        {qwen.blocked.includes(mode) ? `（${t("canvas.imagePopover.modeBlocked")}）` : ""}
                                     </OptionPill>
                                 ))}
                         </div>

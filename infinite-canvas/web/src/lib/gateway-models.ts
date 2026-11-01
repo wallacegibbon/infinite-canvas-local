@@ -29,6 +29,9 @@ export function modelsOf(workflow: GatewayWorkflow): ChannelModel[] {
         baseModelLabel: model.baseModelLabel || undefined,
         variantModes: workflow.variantModes,
         variantLabels: workflow.variantLabels,
+        // A mode whose own nodes or models are missing: offered, marked, and refused by the popover
+        // instead of failing inside ComfyUI after the user has committed to it.
+        blockedModes: Object.keys(workflow.availability?.modeProblems || {}),
         imageInputs: model.imageInputs,
     }));
 }
@@ -44,7 +47,7 @@ export function gatewayModels(workflows: GatewayWorkflow[]) {
  * the picker.
  */
 export function modelSignature(models: ChannelModel[]) {
-    return JSON.stringify(models.map((model) => [model.name, model.capability, model.label || "", model.workflowId || "", model.baseModel || "", model.baseModelLabel || "", model.imageInputs ?? -1, model.variantModes || [], model.variantLabels || {}]));
+    return JSON.stringify(models.map((model) => [model.name, model.capability, model.label || "", model.workflowId || "", model.baseModel || "", model.baseModelLabel || "", model.imageInputs ?? -1, model.variantModes || [], model.variantLabels || {}, model.blockedModes || []]));
 }
 
 /**

@@ -864,6 +864,17 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                         .map((problem) => problem.message)
                                                         .filter(Boolean)
                                                         .join("；");
+                                                    // A mode's own gaps (Qwen's inpaint wants a node pack its
+                                                    // edit mode does not) are worth saying out loud, without
+                                                    // pretending the workflow cannot run.
+                                                    const modeProblemText = Object.entries(workflow.modeProblems || {})
+                                                        .flatMap(([mode, problems]) =>
+                                                            problems
+                                                                .map((problem) => problem.message)
+                                                                .filter((message): message is string => Boolean(message))
+                                                                .map((message) => `${mode}: ${message}`),
+                                                        )
+                                                        .join("；");
                                                     return (
                                                         <div
                                                             key={workflow.id}
@@ -941,6 +952,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                                         ))}
                                                                     </div>
                                                                     {!workflow.available && problemText ? <div className="mt-1 text-[10px] leading-4 text-amber-600 dark:text-amber-400">{problemText}</div> : null}
+                                                                    {modeProblemText ? <div className="mt-1 text-[10px] leading-4 text-stone-500 dark:text-stone-400">{modeProblemText}</div> : null}
                                                                     {workflow.installIds.length ? (
                                                                         <div className="mt-2 flex justify-end">
                                                                             <WithHint hint={job?.status === "running" ? copy.jobRunningHint : installDisabled ? copy.installDisabled : undefined}>

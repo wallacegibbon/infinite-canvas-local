@@ -19,6 +19,24 @@ type loaderInfo struct {
 	options map[string]bool
 }
 
+// dedupeProblems drops repeats, keeping the first of each kind and message.
+func dedupeProblems(problems []Problem) []Problem {
+	if len(problems) == 0 {
+		return []Problem{}
+	}
+	seen := map[string]bool{}
+	out := make([]Problem, 0, len(problems))
+	for _, problem := range problems {
+		key := problem.Type + ":" + problem.Message
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, problem)
+	}
+	return out
+}
+
 // Scan refreshes the whole availability view from ComfyUI.
 //
 // Only one scan runs at a time: the canvas can trigger a manual scan while the
@@ -107,35 +125,34 @@ func (m *Manager) Scan() (Status, error) {
 	missingNodes := map[string]bool{}
 
 	for _, entry := range entries {
-		graphs := []workflow.Graph{entry.Workflow}
-		for _, mode := range entry.Variants.Keys {
-			if variant := entry.Variants.Values[mode]; variant != nil && variant.Workflow != nil {
-				graphs = append(graphs, variant.Workflow)
-			}
-		}
-
-		var problems []Problem
+		// The graph the workflow opens with decides whether it can be offered at all. A variant is a
+		// mode the user may never pick, so its own gaps are reported next to that mode instead of
+		// taking the whole workflow off the model list.
+		problems := dedupeProblems(m.validateWorkflow(entry.Workflow, classes, loaders, entry))
+		modeProblems := map[string][]Problem{}
 		seen := map[string]bool{}
-		for _, graph := range graphs {
-			for _, problem := range m.validateWorkflow(graph, classes, loaders, entry) {
-				key := problem.Type + ":" + problem.Message
-				if seen[key] {
+		for _, problem := range problems {
+			seen[problem.Type+":"+problem.Message] = true
+		}
+		for _, mode := range entry.Variants.Keys {
+			variant := entry.Variants.Values[mode]
+			if variant == nil || variant.Workflow == nil {
+				continue
+			}
+			var only []Problem
+			for _, problem := range dedupeProblems(m.validateWorkflow(variant.Workflow, classes, loaders, entry)) {
+				if seen[problem.Type+":"+problem.Message] {
 					continue
 				}
-				seen[key] = true
-				problems = append(problems, problem)
+				only = append(only, problem)
 			}
-		}
-		if problems == nil {
-			problems = []Problem{}
+			if len(only) > 0 {
+				modeProblems[mode] = only
+			}
 		}
 
 		available := len(problems) == 0
-		availability[entry.ID] = &Availability{Available: available, Problems: problems}
-
-		// Every registered workflow is reported, tool or model alike: a missing node behind a
-		// toolbar button is still missing, and hiding it from the totals is how an install page
-		// ends up all green while half the buttons fail.
+		availability[entry.ID] = &Availability{Available: available, Problems: problems, ModeProblems: modeProblems}
 		for _, problem := range problems {
 			switch problem.Type {
 			case "model":
@@ -144,6 +161,21 @@ func (m *Manager) Scan() (Status, error) {
 				missingNodes[problem.Message] = true
 			}
 		}
+		for _, mode := range entry.Variants.Keys {
+			for _, problem := range modeProblems[mode] {
+				switch problem.Type {
+				case "model":
+					missingModels[problem.Message] = true
+				case "node":
+					missingNodes[problem.Message] = true
+				}
+			}
+		}
+
+		// Every registered workflow is reported, tool or model alike: a missing node behind a
+		// toolbar button is still missing, and hiding it from the totals is how an install page
+		// ends up all green while half the buttons fail. That includes a mode's own gaps, which is
+		// why they are counted above even though they no longer decide availability.
 		workflows = append(workflows, WorkflowState{
 			ID:        entry.ID,
 			Name:      entry.Name,

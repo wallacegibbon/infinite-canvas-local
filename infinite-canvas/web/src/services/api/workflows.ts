@@ -26,6 +26,8 @@ export type WorkflowParameter = {
 type WorkflowAvailability = {
     available?: boolean;
     problems?: Array<{ message?: string }>;
+    /** Gaps of a mode the workflow offers but does not open with — reported, not blocking. */
+    modeProblems?: Record<string, Array<{ message?: string }>>;
 };
 
 /**

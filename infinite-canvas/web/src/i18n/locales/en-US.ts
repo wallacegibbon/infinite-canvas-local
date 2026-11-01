@@ -565,6 +565,7 @@ export default {
         },
         imagePopover: {
             mode: "Mode",
+            modeBlocked: "nodes missing",
             canvasRatio: "Canvas ratio",
             followFirst: "First image",
             followSource: "Follow the source",

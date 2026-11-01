@@ -4476,3 +4476,34 @@ the same rule that hides the pack's install button, and its tooltip explains tha
 disabled (nothing left to download), `h3` and `interp` disabled for the restart reason, everything else as before.
 
 **Where** `infinite-canvas/web/src/{components/settings/resource-center-panel.tsx,i18n/locales/{en-US,zh-CN}.ts}`.
+
+## 134. A blocked mode does not hide the workflow
+
+**Decision** Availability is decided by the graph a workflow *opens with*. A variant's own gaps are collected
+into `availability.modeProblems` instead of `problems`, shown against that mode, and never take the workflow off
+the model list. The canvas marks such a mode as `（缺节点）` and refuses to switch to it.
+
+**Why** `image-qwen21` has four modes sharing one entry: edit, t2i, inpaint, outpaint. Inpaint wants
+Inpaint-CropAndStitch; the pack was not installed, so the scan — which unioned every variant's problems and
+called the entry unavailable — dropped Qwen Image from the image-model picker entirely, while edit and
+text-to-image were runnable. The same shape hid nothing else, which is why it survived: only one workflow in the
+registry has variants.
+
+The panel showed the same pack as green at the same time, because its required/optional split (see #130) counts
+inpaint's node pack as optional. Two screens disagreeing about one pack is the bug; the fix is to make the
+workflow's own graph the unit of availability, and to let a mode carry its own verdict.
+
+**What is unchanged** A single-graph workflow with a missing node is still unavailable (`image-qwen21-angle` needs
+`QwenMultiangleCameraNode` and stays out of the picker), and the missing node is still counted in the scan's
+`missing.nodes` — the totals do not quietly lose it.
+
+**Tested** `TestScanKeepsAWorkflowWhoseVariantModeIsBlocked` builds a registry entry whose `inpaint` variant loads
+an unknown node and asserts the entry stays available, that `modeProblems["inpaint"]` is reported, and that the
+node still appears in `missing.nodes`. Against the live gateway: `image-qwen21` → `available: true,
+modeProblems: {inpaint: 2}`, every other workflow unchanged. `gofmt`, `go vet`, `go test ./internal/...`,
+`tsc --noEmit`, 132 canvas tests.
+
+**Where** `internal/setup/{scan.go,setup.go,scan_test.go}`, `internal/resource/{resource.go,status.go}`,
+`infinite-canvas/web/src/{services/api/{resources,workflows}.ts,lib/gateway-models.ts,stores/use-config-store.ts,
+components/image-settings-panel.tsx,components/canvas/canvas-image-settings-popover.tsx,
+components/settings/resource-center-panel.tsx,i18n/locales/{en-US,zh-CN}.ts}`.
