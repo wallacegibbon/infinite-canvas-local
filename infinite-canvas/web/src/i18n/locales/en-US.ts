@@ -277,7 +277,6 @@ export default {
             size: "Download size",
             sources: "Sources",
             localBake: "Local bake",
-            noResources: "This pack has no downloadable resources.",
             downloadProgress: "Install progress",
             copying: "Installing",
             verifying: "Verifying",

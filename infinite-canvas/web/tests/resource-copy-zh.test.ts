@@ -27,7 +27,6 @@ beforeEach(() => {
 
 describe("resource-copy-zh", () => {
     it("gives the Chinese UI Chinese for a pack and a resource", () => {
-        expect(packZh("core", "label")).toBe("画布与基础工作流");
         expect(packZh("h3", "description")).toContain("H3 视频生成");
         expect(resourceZh("esrgan_anime6b", "label")).toBe("RealESRGAN anime 6B（动漫放大）");
         expect(resourceZh("esrgan_x4plus", "note")).toBe("4x 快速放大；输出尺寸较大。");
@@ -37,7 +36,7 @@ describe("resource-copy-zh", () => {
     it("gives the English UI nothing, so the index text stands", () => {
         language.current = "en-US";
         for (const [id, field] of [
-            ["core", "label"],
+            ["moss", "label"],
             ["esrgan_x4plus", "note"],
             ["h3_selflift_node", "license"],
         ] as const) {

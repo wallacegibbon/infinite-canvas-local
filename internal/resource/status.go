@@ -748,8 +748,9 @@ func (m *Manager) packStatus(pack *Pack, providers *providerIndex, byID map[stri
 // packResourceSplit answers what a pack must have and what part of it is a choice.
 //
 // Required is the intersection over the pack's workflows; everything else it can install — files only
-// some workflows load, plus the alternates no graph names — is optional. A pack with no workflows has
-// nothing to install, which is how the "core" row stays informational.
+// some workflows load, plus the alternates no graph names — is optional. A pack with no workflows would
+// require nothing, which is why no such pack exists: a bundle with nothing to download is a row that
+// can only tell the user the panel has nothing to say.
 func (m *Manager) packResourceSplit(pack *Pack, providers *providerIndex) (required, optional []string) {
 	sets := make([]map[string]bool, 0, len(pack.Workflows))
 	union := map[string]bool{}

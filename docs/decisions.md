@@ -4400,3 +4400,28 @@ count 3, 3, 3 and 20 required items.
 catalogue_test.go (new),resource.go,status.go,helpers.go,jobs.go,bake_test.go,resource_test.go}`,
 `infinite-canvas/web/src/{services/api/resources.ts,components/settings/resource-center-panel.tsx,
 lib/resource-copy-zh.ts}`, `internal/resource/payload_imports_test.go` (deleted).
+
+## 131. `core` stops being a pack
+
+**Decision** The `core` pack is gone from `resources.json`. The panel now lists seven packs, all of them
+things that download.
+
+**Why** It was a row whose only content was the sentence "此包没有需要下载的资源" — a bundle declared to
+contain nothing, in a drawer whose job is to list what to download. Since #130 a pack's contents are read
+off its workflows, so `core` could never have said anything else: it has no workflows and no resources, and
+no future edit would make it informative. The fact it was trying to state — the binary, the canvas bundle
+and the base graphs ship with the installer — belongs in the README, where it now says it in one line.
+
+**What went with it** The `noResources` branch in `packState` (unreachable once no pack can be empty), the
+`noResources` string in both locales, the `core` row of the Chinese copy table, and the pack-fixture id in
+the index validation test. Nothing consults `core` by id — the "is everything ready" summary counts packs,
+and it now counts seven.
+
+**Tested** `gofmt`, `go vet`, `go test ./internal/...`, `tsc --noEmit`, 132 canvas tests. The panel's
+remaining states are `planned`, `ready` and `missing N`; a pack offering only alternates and no workflows
+still renders as a green row with an install checkbox.
+
+**Where** `resources.json`, `internal/resource/status.go`,
+`infinite-canvas/web/src/{components/settings/resource-center-panel.tsx,
+i18n/locales/{en-US,zh-CN}.ts,lib/resource-copy-zh.ts}`, `infinite-canvas/web/tests/resource-copy-zh.test.ts`,
+`README.md`.

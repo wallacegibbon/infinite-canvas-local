@@ -65,8 +65,8 @@ Two directories carry the runtime assets, and the split is deliberate:
   second precision of a base model, the other upscale checkpoints — because no graph names them.
 
 What does ship with the installer is the application itself: the gateway binary, the canvas bundle,
-the graphs under `workflows/` and this index. That is the `core` pack, and it is the reason it lists
-no resources.
+the graphs under `workflows/` and this index. That is why the panel lists no pack for them — a pack is
+a bundle of downloads, and the installer's own files are not one.
 
 ## Language
 

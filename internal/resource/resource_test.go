@@ -43,7 +43,7 @@ func TestValidateIndexAcceptsRealisticDocument(t *testing.T) {
 			{"id": "b", "type": "model", "target": "loras/sub/b.safetensors"}
 		],
 		"packs": [
-			{"id": "core", "workflows": ["image-a"], "alternates": ["b"]}
+			{"id": "image", "workflows": ["image-a"], "alternates": ["b"]}
 		]
 	}`)
 

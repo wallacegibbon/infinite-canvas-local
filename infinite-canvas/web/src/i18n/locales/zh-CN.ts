@@ -292,7 +292,6 @@ export default {
             size: "下载体积",
             sources: "下载源",
             localBake: "本地烘焙",
-            noResources: "此包没有需要下载的资源。",
             downloadProgress: "安装进度",
             copying: "安装中",
             verifying: "校验中",

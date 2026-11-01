@@ -17,7 +17,6 @@ type ResourceCopyField = "label" | "description" | "note" | "license";
 type ResourceCopy = Partial<Record<ResourceCopyField, string>>;
 
 const PACK_ZH: Record<string, ResourceCopy> = {
-    core: { label: "画布与基础工作流", description: "画布、网关、启动器和基础工作流已随安装器内置，无需下载。" },
     moss: { description: "BF16 与 INT8 两套精度按显卡选择：大显存推荐 BF16（SFT 8/50、Balanced 8/50），小显存推荐 INT8（SFT 8/50）。TE 统一 INT8；按工作流安装，已具备的资源不会重复下载。" },
     qwen21: { label: "千问 2.1 全能工作流", description: "按工作流安装：生图/编辑（文生图、多图编辑、局部重绘、扩图）共用三件套；扩图另含 Outpaint LoRA，局部重绘/扩图节点按包下载；多角度从画布「多角度」进入。" },
     zimage: { description: "Z-Image Turbo 默认 BF16 底模、Qwen3-4B 文本编码器和 ae VAE；4–8 步蒸馏。底模可在画布底模下拉自选，小显存可另装 INT8 底模切换。" },

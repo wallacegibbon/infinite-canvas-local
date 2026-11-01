@@ -1,15 +1,9 @@
 {
   "schema": 2,
-  "version": "2026.11.02-34",
+  "version": "2026.11.02-35",
   "channel": "stable",
   "updatedAt": "2026-11-02",
   "packs": [
-    {
-      "id": "core",
-      "label": "Canvas and base workflows",
-      "description": "The canvas, the gateway, the launcher and the base workflows ship with the installer; nothing to download.",
-      "workflows": []
-    },
     {
       "id": "moss",
       "label": "MOSS-Image",
