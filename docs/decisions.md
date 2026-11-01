@@ -4006,3 +4006,64 @@ only.
 
 **Where** `resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`,
 `resources/payload/vae_approx/`.
+
+## 121. Every vendored pack says which commit it is, and which files we changed
+
+**Decision** Each of the eleven node entries carries `upstream` (the repository) and — for the ten that are
+vendored — `pinnedCommit`. Three of them also carry `localPatches`, a list of files that are not what
+upstream published. `Resource` gained the three fields so the facts survive the index→cache rewrite and
+reach `/api/resources/status` instead of sitting in the JSON unread.
+
+**Why it was missing** The catalogue described where to download a pack from, but the packs are not
+downloaded: they are copied from `resources/payload`. So the index described the wrong thing about half of
+its own node entries, and "which version are we frozen on" had no answer anywhere — the repositories publish
+no tags (`lquesada` and `kijai` return empty tag lists), and nothing recorded a commit.
+
+**How the pins were found, without downloading the packs again** A blobless clone per repository
+(`--filter=blob:none --no-checkout`) keeps trees and commits and skips file contents. `git ls-tree -r
+<commit>` then yields the complete blob manifest of a commit, which is comparable to `git hash-object` over
+the vendored directory — no blob fetched, no API quota spent. Candidate commits were limited to those
+before 2026-10-30, the date the packs were committed here, because a copy cannot come from the future.
+
+| pack | pinned | upstream commit date |
+|---|---|---|
+| `comfyui-kjnodes` | `d7641533d663` | 2026-10-10 |
+| `ComfyUI-VideoHelperSuite` | `4d907bee61e9` | 2026-09-01 |
+| `ComfyUI-Inpaint-CropAndStitch` | `e2727a26c0a0` | 2026-10-18 |
+| `ComfyUI-qwenmultiangle` | `bf8d032a36f1` | 2026-09-12 |
+| `ComfyUI-VDN-H3` | `7271c648d7c2` | 2026-09-07 |
+| `ComfyUI-YCNodes-MiniMax-H3` | `efbe83f69ffa` | 2026-09-15 |
+| `comfyui-SelfLift` | `835c3cf79194` | 2026-09-19 |
+| `ComfyUI-SolAttn_triton` | `dfc2e31a41af` | 2026-08-22 |
+| `minimax-h3-audio-t8` | `5bb623978d0e` | 2026-08-26 |
+| `ComfyUI-SeedVR2_VideoUpscaler` | `4490bd1f482e` | 2025-12-24 |
+
+**What the comparison turned up** Two things that were not known before this pass:
+
+1. **Three files differ only by line endings.** `ComfyUI-Inpaint-CropAndStitch/__init__.py` and two files in
+   `ComfyUI-YCNodes-MiniMax-H3` are CRLF upstream and LF here, because `.gitattributes` says `* text=auto`
+   and normalises on commit. The content is upstream's; only the blob differs.
+2. **Four files are ours, not upstream's, and no commit ever published them.** `ComfyUI-SolAttn_triton`
+   changes two node defaults (`sink_conditioning` → `exact_kv`, `dense_blocks` → `0-5`) and resolves
+   `_forward` on the class at call time "so sampling-scoped patches such as TE-Speed's MiniMaxH3 runtime
+   forward remain in the chain"; `ComfyUI-SeedVR2_VideoUpscaler` swaps `allow_tf32` for the newer
+   `fp32_precision` API; `minimax-h3-audio-t8` passes three extra arguments to `final_layer`
+   (`sigma_v`, `sample_sigmas`, the two shifts). #113 recorded that the SeedVR2 files *restored* were
+   byte-identical to upstream, which is still true — but the tree as a whole was never pristine, and
+   nothing said so.
+
+**Why it changes the download question** "Replace the vendored packs with downloads" was being argued from
+principle, because nobody could measure the difference. It is now measurable: switching to upstream would
+drop those four fixes. That does not make vendoring right — it makes the trade-off explicit, which is what
+`localPatches` is for.
+
+**Cost** A pin is only useful while upstream keeps the commit. If a repository is deleted or force-pushed
+past it, the SHA stops resolving — the copy in `resources/payload` remains the artifact, which is the point
+of vendoring in the first place. `frame_interpolation_node` has `upstream` and no pin: it is downloaded at
+install time, so what lands on a machine is whatever `main` was that day, and pretending otherwise would be
+worse than the admission.
+
+**Tested** `make check`, `tsc --noEmit` and the canvas suite (133 tests) pass; `gofmt` clean after the struct
+change.
+
+**Where** `resources/index.json`, `internal/resource/resource.go`.

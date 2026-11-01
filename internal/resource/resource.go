@@ -46,6 +46,13 @@ type Resource struct {
 	Requires []string       `json:"requires"`
 	Builder  map[string]any `json:"builder"`
 	Files    []string       `json:"files"`
+	// A node pack is vendored source, so the catalogue records which upstream commit the
+	// copy came from and which files were changed on top of it. Both are facts about the
+	// tree in resources/payload, not download instructions: the install still copies the
+	// bundled directory.
+	Upstream     string   `json:"upstream"`
+	PinnedCommit string   `json:"pinnedCommit"`
+	LocalPatches []string `json:"localPatches"`
 }
 
 // Pack is one feature bundle: a set of resources plus the workflows they enable.
