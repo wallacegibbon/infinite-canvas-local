@@ -2921,9 +2921,11 @@ other half: a session's model does not leak into another's, and asking for words
 The workspace name is derived from the session name, so `POST /mcp/{workspace}` finds the session that is
 asking by scanning the sessions that exist rather than through a registry beside them. The directory is
 removed with the process, and every leftover is removed at startup. The endpoint speaks `initialize`,
-`tools/list` and `tools/call` (notifications are `202`) and, for now, offers one tool, `ping`, which
-answers with the session's own name. Tool names are unprefixed: AlayaCore namespaces them under the
-server, so `ping` is the model's `canvas_ping` and arrives back here as `ping`.
+`tools/list` and `tools/call` (notifications are `202`) and, for now, offers one tool, `ping`. A call is
+then **not answered by the gateway**: it is published down the session's socket as a `tool` event, and the
+canvas — the only thing that knows what a node is — replies with `{"toolResult":…}` on the same socket,
+which becomes the tool's answer to the agent. Tool names are unprefixed: AlayaCore namespaces them under
+the server, so `ping` is the model's `canvas_ping` and arrives back here as `ping`.
 
 **Why MCP at all** Anything the agent does that AlayaCore cannot do itself — make a node, wire an edge,
 start a generation — has to reach the gateway, which is the process that holds the socket to the canvas.
@@ -2941,11 +2943,14 @@ got wrong by the client — and it is a name that says what it is.
 every later session — the same kind of second owner that #83 removed from the client. The copy also means
 the agent writes nowhere near the operator's configuration.
 
-**Tested** Against a real AlayaCore on `:8191`: on connect it read its own `mcp.conf`, logged
-`MCP servers initialized: 1 servers, 1 tools loaded`, called the tool, and the gateway logged
-`<< UF {"call_id":…,"output":[{"type":"text","text":"pong from probe-mcp"}]}`; closing the conversation
+**Tested** Against a real AlayaCore on `:8191`, with a WebSocket client standing in for the page: on
+connect it read its own `mcp.conf` and logged `MCP servers initialized: 1 servers, 1 tools loaded`; the
+agent called `canvas_ping`, the gateway published
+`{"type":"tool","callId":"tool-1","name":"ping","arguments":{}}` on the session's socket, the client
+answered `{"toolResult":{"callId":"tool-1","text":"pong from the page"}}`, the POST that had been holding
+the agent's turn returned it, and the agent's answer was "pong from the page". Closing the conversation
 removed `data/agent/probe-mcp-7ed10748` with it. The name the model sees was measured, not assumed — the
 first version offered `canvas_ping` and the model was shown `canvas_canvas_ping`. `mcp_test.go` holds the
-rest: the handshake and tool list, a call answered with the name of the session behind the workspace, a
-call for a workspace nobody owns answered as an error, a notification accepted with no body, and a
-session's directory built for it and removed with it.
+rest: the handshake and tool list, a call run by the canvas and answered with what it said, a tool the
+canvas called a failure, a session nobody is watching, a name the gateway never advertised, a notification
+accepted with no body, and a session's directory built for it and removed with it.

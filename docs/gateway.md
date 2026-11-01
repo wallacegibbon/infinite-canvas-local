@@ -190,9 +190,10 @@ so a node nobody is working on holds no process. Nothing expires on the gateway'
 [`decisions.md`](decisions.md) #80 for the cost of that.
 
 Down the socket: `models`, `delta`, `reasoning`, `model`, `reasoning_level`, `command`, `tool_call`,
-`tool_result`, `done`, `error`, `closed`. The first message is the agent's startup broadcast, which is
-where the model list comes from. Up: `{"prompt":…}` (with optional `images` as data URLs),
-`{"command":…,"args":…}` for one of AlayaCore's own settings, `{"cancel":true}`, and `{"close":true}`.
+`tool_result`, `tool`, `done`, `error`, `closed`. The first message is the agent's startup broadcast,
+which is where the model list comes from. Up: `{"prompt":…}` (with optional `images` as data URLs),
+`{"command":…,"args":…}` for one of AlayaCore's own settings, `{"cancel":true}`, `{"toolResult":…}` for a
+tool the agent asked for, and `{"close":true}`.
 
 `done` marks the end of a turn and carries the elapsed time only: the answer is what the deltas built,
 and a second copy of it would be a second truth.
@@ -229,8 +230,25 @@ A session's directory is removed when the process is released, and every leftove
 a session does not survive a restart, so neither should what it wrote. Copying `runtime.conf` rather than
 sharing it is what keeps one session's model choice out of the next one's default.
 
-The endpoint speaks `initialize`, `tools/list` and `tools/call`; notifications are answered `202`. Tool
-names are **not** prefixed with `canvas_`: AlayaCore adds the server's name itself, so a tool called
+The endpoint speaks `initialize`, `tools/list` and `tools/call`; notifications are answered `202`. A call
+is not answered by the gateway — it goes down the session's socket and the **canvas** runs it, because
+the page is the only thing that knows what a node is. Down:
+
+```json
+{"type":"tool","callId":"tool-1","name":"ping","arguments":{}}
+```
+
+and up, on the same socket, the answer that the waiting call returns to AlayaCore:
+
+```json
+{"toolResult":{"callId":"tool-1","text":"pong from the page","isError":false}}
+```
+
+A call waits 30s, and every way of not getting an answer — nobody watching, a canvas that went away, a
+page that never replied — comes back as a tool result with `isError`, not a broken response: the agent can
+report those, while an aborted turn leaves it with nothing to say.
+
+Tool names are **not** prefixed with `canvas_`: AlayaCore adds the server's name itself, so a tool called
 `ping` here is `canvas_ping` to the model and arrives back as `ping`. See
 [`decisions.md`](decisions.md) #84.
 

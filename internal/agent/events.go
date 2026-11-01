@@ -33,6 +33,10 @@ type Event struct {
 	Input  string `json:"input,omitempty"`
 	Output string `json:"output,omitempty"`
 
+	// tool: one of the gateway's own tools, on its way down to the canvas, which is the only thing that
+	// can run it. The canvas answers with `{"toolResult":…}` on the same socket — see Session.CallTool.
+	Arguments json.RawMessage `json:"arguments,omitempty"`
+
 	// error: the agent's own words
 	Message string `json:"message,omitempty"`
 }

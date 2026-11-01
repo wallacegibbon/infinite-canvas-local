@@ -38,17 +38,28 @@ func (s *Server) agentOptions() agent.SpawnOptions {
 }
 
 // socketMessage is what a client may say on the socket. One of them per message: a prompt, a setting,
-// a cancel, or the end of the conversation.
+// a cancel, a tool's answer, or the end of the conversation.
 type socketMessage struct {
 	Prompt  string   `json:"prompt"`
 	Images  []string `json:"images"`
 	Command string   `json:"command"`
 	Args    string   `json:"args"`
 	Cancel  bool     `json:"cancel"`
+	// ToolResult is the canvas answering a `tool` event: what running the tool did. It is not the same
+	// pipe as the agent's own `tool_call` / `tool_result` events, which run inside AlayaCore and which
+	// the gateway only relays.
+	ToolResult *toolAnswer `json:"toolResult"`
 	// Close ends the conversation: the agent is released, history and all. Closing the tab is not this
 	// — a socket that goes away leaves the process running, which is what makes coming back a
 	// continuation rather than a fresh start.
 	Close bool `json:"close"`
+}
+
+// toolAnswer is one tool's result, on its way from the canvas to the agent.
+type toolAnswer struct {
+	CallID  string `json:"callId"`
+	Text    string `json:"text"`
+	IsError bool   `json:"isError"`
 }
 
 // handleAgentSocket implements GET /api/agent/socket/{session}: the conversation.
@@ -139,6 +150,11 @@ func (s *Server) readSocket(conn *ws.Conn, session *agent.Session, send func(age
 			continue
 		}
 		switch {
+		case message.ToolResult != nil:
+			if s.logger != nil {
+				s.logger.Info("agent: tool answered session=%s callId=%s isError=%t", session.ID, message.ToolResult.CallID, message.ToolResult.IsError)
+			}
+			session.AnswerTool(message.ToolResult.CallID, message.ToolResult.Text, message.ToolResult.IsError)
 		case message.Close:
 			s.agentSessions.Close(session.ID, "closed by the client")
 			_ = conn.Close()

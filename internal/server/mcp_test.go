@@ -41,25 +41,53 @@ func startMCPGateway(t *testing.T) (*httptest.Server, *Server, string) {
 	return gateway, server, configDir
 }
 
-// mcpCall posts one JSON-RPC call to a workspace and returns the status and the decoded answer.
-func mcpCall(t *testing.T, gateway *httptest.Server, workspace string, call map[string]any) (int, map[string]any) {
-	t.Helper()
+// postMCP sends one JSON-RPC call and returns the status and the decoded answer. It is the raw half, so
+// a test can post from a goroutine while the main one reads the canvas's socket.
+func postMCP(gateway *httptest.Server, workspace string, call map[string]any) (int, map[string]any, error) {
 	body, err := json.Marshal(call)
 	if err != nil {
-		t.Fatalf("encode: %v", err)
+		return 0, nil, err
 	}
 	response, err := http.Post(gateway.URL+"/mcp/"+workspace, "application/json", strings.NewReader(string(body)))
 	if err != nil {
-		t.Fatalf("post: %v", err)
+		return 0, nil, err
 	}
 	defer response.Body.Close()
 	var answer map[string]any
 	if response.StatusCode == http.StatusOK {
 		if err := json.NewDecoder(response.Body).Decode(&answer); err != nil {
-			t.Fatalf("answer is not JSON: %v", err)
+			return response.StatusCode, nil, err
 		}
 	}
-	return response.StatusCode, answer
+	return response.StatusCode, answer, nil
+}
+
+// mcpCall is postMCP for a call that is supposed to happen on this goroutine.
+func mcpCall(t *testing.T, gateway *httptest.Server, workspace string, call map[string]any) (int, map[string]any) {
+	t.Helper()
+	status, answer, err := postMCP(gateway, workspace, call)
+	if err != nil {
+		t.Fatalf("mcp call: %v", err)
+	}
+	return status, answer
+}
+
+// toolCall is one `tools/call`, which is what an agent does once it has decided to use a tool.
+func toolCall(id int, name string, arguments map[string]any) map[string]any {
+	return map[string]any{
+		"jsonrpc": "2.0", "id": id, "method": "tools/call",
+		"params": map[string]any{"name": name, "arguments": arguments},
+	}
+}
+
+// textOfResult is the one text block a tool result carries.
+func textOfResult(t *testing.T, result map[string]any) string {
+	t.Helper()
+	content, ok := result["content"].([]any)
+	if !ok || len(content) != 1 {
+		t.Fatalf("result content = %v, want one block", result["content"])
+	}
+	return content[0].(map[string]any)["text"].(string)
 }
 
 // resultOf is the `result` of a call that has to succeed.
@@ -104,23 +132,108 @@ func TestMCPHandshakeIsEnoughToDiscoverTheTools(t *testing.T) {
 	}
 }
 
-// TestMCPToolAnswersWithTheSessionThatAsked is the whole point of the per-session workspace: a call
-// carries no identity, and the URL has to be enough.
-func TestMCPToolAnswersWithTheSessionThatAsked(t *testing.T) {
+// TestMCPToolIsRunByTheCanvas is the whole point of the pipe: a call carries no identity, the URL has to
+// be enough to find the session, and only the page can actually run the tool.
+func TestMCPToolIsRunByTheCanvas(t *testing.T) {
+	gateway, _, _ := startMCPGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+
+	answered := make(chan map[string]any, 1)
+	go func() {
+		_, answer, err := postMCP(gateway, agentWorkspaceKey("canvas-1"), toolCall(3, "ping", map[string]any{"where": "here"}))
+		if err != nil {
+			answered <- map[string]any{"post": err.Error()}
+			return
+		}
+		answered <- answer
+	}()
+
+	// The page is asked, with an id to answer with and the arguments as they were sent.
+	asked := nextEvent(t, conn)
+	if asked["type"] != "tool" || asked["name"] != "ping" {
+		t.Fatalf("canvas was asked %v, want a ping tool call", asked)
+	}
+	callID, ok := asked["callId"].(string)
+	if !ok || callID == "" {
+		t.Fatalf("tool call has no id: %v", asked)
+	}
+	if arguments, ok := asked["arguments"].(map[string]any); !ok || arguments["where"] != "here" {
+		t.Fatalf("arguments = %v, want the call's own", asked["arguments"])
+	}
+
+	send(t, conn, map[string]any{"toolResult": map[string]any{"callId": callID, "text": "pong from the page"}})
+
+	answer := <-answered
+	if failure, ok := answer["post"]; ok {
+		t.Fatalf("post: %v", failure)
+	}
+	result := resultOf(t, answer)
+	if text := textOfResult(t, result); text != "pong from the page" {
+		t.Fatalf("tool result = %q, want what the canvas said", text)
+	}
+	if result["isError"] != nil {
+		t.Fatalf("the call is an error: %v", result)
+	}
+}
+
+// TestMCPToolReportsWhatTheCanvasCalledAFailure: a tool that failed is a result the agent can read, not a
+// broken response.
+func TestMCPToolReportsWhatTheCanvasCalledAFailure(t *testing.T) {
+	gateway, _, _ := startMCPGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+
+	answered := make(chan map[string]any, 1)
+	go func() {
+		_, answer, err := postMCP(gateway, agentWorkspaceKey("canvas-1"), toolCall(4, "ping", map[string]any{}))
+		if err != nil {
+			answered <- map[string]any{"post": err.Error()}
+			return
+		}
+		answered <- answer
+	}()
+
+	asked := nextEvent(t, conn)
+	send(t, conn, map[string]any{"toolResult": map[string]any{
+		"callId": asked["callId"], "text": "there is no such node", "isError": true,
+	}})
+
+	result := resultOf(t, <-answered)
+	if result["isError"] != true {
+		t.Fatalf("a tool the canvas failed is not reported as one: %v", result)
+	}
+	if text := textOfResult(t, result); text != "there is no such node" {
+		t.Fatalf("tool result = %q, want the canvas's reason", text)
+	}
+}
+
+// TestMCPToolSaysWhenNoCanvasIsWatching: the session outlives its socket (that is what makes coming back
+// a continuation), so a call can arrive with nobody to run it — and has to be answered anyway.
+func TestMCPToolSaysWhenNoCanvasIsWatching(t *testing.T) {
+	gateway, _, _ := startMCPGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+	_ = conn.Close()
+	time.Sleep(300 * time.Millisecond) // long enough for the gateway to notice the socket is gone
+
+	_, answer := mcpCall(t, gateway, agentWorkspaceKey("canvas-1"), toolCall(5, "ping", map[string]any{}))
+	result := resultOf(t, answer)
+	if result["isError"] != true {
+		t.Fatalf("a call with no canvas behind it is not an error: %v", result)
+	}
+	if text := textOfResult(t, result); !strings.Contains(text, "no canvas") {
+		t.Fatalf("answer = %q, want it to say no canvas is connected", text)
+	}
+}
+
+// TestMCPUnknownToolIsRefused: the vocabulary is the gateway's, so a name it never advertised does not
+// reach the canvas at all.
+func TestMCPUnknownToolIsRefused(t *testing.T) {
 	gateway, _, _ := startMCPGateway(t)
 	openSocket(t, gateway, "canvas-1")
 
-	_, answer := mcpCall(t, gateway, agentWorkspaceKey("canvas-1"), map[string]any{
-		"jsonrpc": "2.0", "id": 3, "method": "tools/call",
-		"params": map[string]any{"name": "ping", "arguments": map[string]any{}},
-	})
+	_, answer := mcpCall(t, gateway, agentWorkspaceKey("canvas-1"), toolCall(6, "empty_the_canvas", map[string]any{}))
 	result := resultOf(t, answer)
-	content := result["content"].([]any)
-	if text := content[0].(map[string]any)["text"]; text != "pong from canvas-1" {
-		t.Fatalf("ping answered %q, want the session's name", text)
-	}
-	if result["isError"] != nil {
-		t.Fatalf("ping is an error: %v", result)
+	if text := textOfResult(t, result); !strings.Contains(text, "no such tool") {
+		t.Fatalf("answer = %q, want it to refuse the name", text)
 	}
 }
 
@@ -129,15 +242,12 @@ func TestMCPToolAnswersWithTheSessionThatAsked(t *testing.T) {
 func TestMCPToolSaysWhenNoAgentOwnsTheWorkspace(t *testing.T) {
 	gateway, _, _ := startMCPGateway(t)
 
-	_, answer := mcpCall(t, gateway, agentWorkspaceKey("canvas-1"), map[string]any{
-		"jsonrpc": "2.0", "id": 4, "method": "tools/call",
-		"params": map[string]any{"name": "ping", "arguments": map[string]any{}},
-	})
+	_, answer := mcpCall(t, gateway, agentWorkspaceKey("canvas-1"), toolCall(7, "ping", map[string]any{}))
 	result := resultOf(t, answer)
 	if result["isError"] != true {
 		t.Fatalf("a call with no agent behind it is not an error: %v", result)
 	}
-	if text := result["content"].([]any)[0].(map[string]any)["text"].(string); !strings.Contains(text, "no agent") {
+	if text := textOfResult(t, result); !strings.Contains(text, "no agent") {
 		t.Fatalf("answer = %q, want it to say no agent is attached", text)
 	}
 }

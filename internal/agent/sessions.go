@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"strconv"
 	"sync"
+	"time"
 
 	"comfyui-gateway/internal/logx"
 )
@@ -37,6 +40,12 @@ type Session struct {
 	// inside a blocking read nobody can interrupt.
 	mu   sync.Mutex
 	sink func(Event) error
+
+	// pending is the tool calls waiting for the canvas to answer them, by the id the gateway gave them,
+	// and calls counts the ones asked so far. A tool call is a question only the page can answer, so it
+	// leaves through the same sink and comes back as a message on the same socket.
+	pending map[string]chan toolAnswer
+	calls   int
 
 	// gone releases the session's own entry when the process dies. Set by Connect.
 	gone func(reason string)
@@ -88,7 +97,7 @@ func (s *Sessions) Connect(ctx context.Context, id string, opts SpawnOptions) (C
 		proc.Release()
 		return Connected{}, err
 	}
-	session := &Session{ID: id, proc: proc, state: state}
+	session := &Session{ID: id, proc: proc, state: state, pending: map[string]chan toolAnswer{}}
 	session.gone = func(reason string) { s.Close(id, reason) }
 	s.list[id] = session
 	go session.pump()
@@ -144,10 +153,84 @@ func (s *Session) Watch(sink func(Event) error) bool {
 // Unwatch detaches the connection. The pump keeps reading: the process is not going anywhere, and a
 // reader that stopped with its socket could not be restarted without losing whatever the agent said in
 // between.
+//
+// Any tool call still waiting is answered here rather than left to time out: the page that would have
+// run it is gone, and that is the answer.
 func (s *Session) Unwatch() {
 	s.mu.Lock()
 	s.sink = nil
+	pending := s.pending
+	s.pending = map[string]chan toolAnswer{}
 	s.mu.Unlock()
+	for _, waiting := range pending {
+		deliver(waiting, toolAnswer{text: "the canvas went away", isError: true})
+	}
+}
+
+// toolAnswer is what the canvas says about a tool call: the text to hand the agent, and whether the tool
+// failed rather than did something.
+type toolAnswer struct {
+	text    string
+	isError bool
+}
+
+// toolTimeout is how long a tool call waits for the canvas. Short of forever is the point: a call that
+// never returns holds the agent's whole turn open, and a page that is not answering is not going to.
+const toolTimeout = 30 * time.Second
+
+// CallTool runs one of the gateway's tools by asking the canvas. The gateway knows the vocabulary, the
+// page knows the nodes, so the call goes down the session's socket and this waits for the answer.
+//
+// Every way of not getting an answer — nobody watching, a canvas that left, a page that never replied —
+// is a tool result with `isError` rather than an error: an agent told "the canvas did not answer" can
+// say so to the user, while an aborted turn just disappears.
+func (s *Session) CallTool(name string, arguments json.RawMessage) (string, bool) {
+	s.mu.Lock()
+	if s.sink == nil {
+		s.mu.Unlock()
+		return "no canvas is connected to this session", true
+	}
+	s.calls++
+	callID := "tool-" + strconv.Itoa(s.calls)
+	waiting := make(chan toolAnswer, 1)
+	s.pending[callID] = waiting
+	s.mu.Unlock()
+
+	defer func() {
+		s.mu.Lock()
+		delete(s.pending, callID)
+		s.mu.Unlock()
+	}()
+
+	s.publish(Event{Type: "tool", CallID: callID, Name: name, Arguments: arguments})
+	select {
+	case answer := <-waiting:
+		return answer.text, answer.isError
+	case <-time.After(toolTimeout):
+		return "the canvas did not answer", true
+	}
+}
+
+// AnswerTool completes a call the canvas ran, and reports whether anyone was still waiting for it: an
+// answer that arrives after the timeout has nobody left to tell.
+func (s *Session) AnswerTool(callID, text string, isError bool) bool {
+	s.mu.Lock()
+	waiting, ok := s.pending[callID]
+	delete(s.pending, callID)
+	s.mu.Unlock()
+	if ok {
+		deliver(waiting, toolAnswer{text: text, isError: isError})
+	}
+	return ok
+}
+
+// deliver hands over an answer without ever blocking: the channel holds one, and an answer that arrives
+// twice (a canvas and a timeout both finishing) is not worth waiting on.
+func deliver(waiting chan toolAnswer, answer toolAnswer) {
+	select {
+	case waiting <- answer:
+	default:
+	}
 }
 
 // publish hands one event to the watcher, if there is one. A failed write means the connection is gone,

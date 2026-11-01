@@ -107,26 +107,38 @@ func (s *Server) handleMCP(ctx *httpx.Ctx) error {
 func (s *Server) mcpTools() []mcpTool {
 	return []mcpTool{{
 		Name:        "ping",
-		Description: "Check that the canvas is listening. Returns the canvas this agent is attached to.",
+		Description: "Check that the canvas is listening. Answers with the session's own name.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{},"additionalProperties":false}`),
 	}}
 }
 
-// callMCPTool runs one tool. The stub answers itself; the real ones will have to ask the browser.
+// callMCPTool hands one call to the session's canvas, which is the only thing that can run it: the
+// gateway knows the vocabulary, the page knows the nodes.
 //
-// `ping` answers with the session that asked, which is what proves the two things this step is
-// about: the agent read *its own* `mcp.conf`, and the workspace in the URL is enough to find it.
+// Everything that goes wrong is a tool result with `isError`, not a JSON-RPC error. The agent is holding
+// a turn open waiting for this write; telling it "the canvas did not answer" lets it say so, while a
+// broken response leaves it with nothing to report.
 func (s *Server) callMCPTool(workspace, name string, args json.RawMessage) (mcpResult, error) {
 	session, ok := s.sessionForWorkspace(workspace)
 	if !ok {
 		return mcpResult{Content: []mcpContent{{Type: "text", Text: "no agent is attached to this workspace"}}, IsError: true}, nil
 	}
-	switch name {
-	case "ping":
-		return mcpResult{Content: []mcpContent{{Type: "text", Text: "pong from " + session.ID}}}, nil
-	default:
+	if !s.hasMCPTool(name) {
 		return mcpResult{Content: []mcpContent{{Type: "text", Text: "no such tool: " + name}}, IsError: true}, nil
 	}
+	text, failed := session.CallTool(name, args)
+	return mcpResult{Content: []mcpContent{{Type: "text", Text: text}}, IsError: failed}, nil
+}
+
+// hasMCPTool reports whether the advertised table contains this name: the gateway owns the vocabulary
+// even though the canvas is what runs a tool, so an unknown name is refused before it leaves.
+func (s *Server) hasMCPTool(name string) bool {
+	for _, tool := range s.mcpTools() {
+		if tool.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func mcpReply(ctx *httpx.Ctx, id json.RawMessage, result any) error {
