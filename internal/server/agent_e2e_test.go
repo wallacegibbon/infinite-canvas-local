@@ -6,6 +6,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -379,6 +380,55 @@ func TestSocketGoingAwayReplaysTheConversation(t *testing.T) {
 	}
 	if got := spawns(t, spawnLog); got != 2 {
 		t.Fatalf("spawned %d agents, want a fresh one on the new connection", got)
+	}
+}
+
+// TestDeletingASessionForgetsTheConversation: a canvas that is gone has nobody left to talk to, so its
+// session file — the whole conversation — goes with it, and the next connection starts clean.
+func TestDeletingASessionForgetsTheConversation(t *testing.T) {
+	gateway, server, _ := startMCPGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+	send(t, conn, map[string]any{"prompt": "remember the violet"})
+	until(t, conn, "done")
+
+	file, err := server.sessionFile("canvas-1")
+	if err != nil {
+		t.Fatalf("session file: %v", err)
+	}
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("the fake agent wrote no session file: %v", err)
+	}
+
+	request, err := http.NewRequest(http.MethodDelete, gateway.URL+"/api/agent/session/canvas-1", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	response, err := gateway.Client().Do(request)
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", response.StatusCode)
+	}
+	if _, err := os.Stat(file); !os.IsNotExist(err) {
+		t.Fatalf("the session file survived the canvas: %v", err)
+	}
+
+	// The next connection is a new conversation: nothing to replay.
+	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/canvas-1"
+	next, err := comfy.DialWS(context.Background(), url)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer next.Close()
+	t.Cleanup(func() { _ = next.Close() })
+	if first := nextEvent(t, next); first["type"] != "models" {
+		t.Fatalf("first message = %v, want the startup broadcast", first)
+	}
+	history := nextEvent(t, next)
+	if replayed, _ := history["history"].([]any); len(replayed) != 0 {
+		t.Fatalf("history = %v, want none after the canvas was deleted", history["history"])
 	}
 }
 

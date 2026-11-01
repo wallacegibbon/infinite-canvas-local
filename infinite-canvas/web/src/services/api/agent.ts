@@ -365,3 +365,25 @@ export function endAgentSession(name: string): void {
     // session cannot be mistaken for a live one.
     setTimeout(() => closeAgentSession(name), 1000);
 }
+
+/**
+ * Forget a canvas's conversation, on the gateway as well as here.
+ *
+ * The agent keeps a conversation in a file named after its session, and the session is named after the
+ * canvas. When the canvas is deleted there is nobody left to talk to, so the file would sit in the data
+ * directory forever — this is the canvas saying "this conversation is over", which is the one thing only
+ * the canvas knows. Closing the panel is not this: it leaves the conversation for the next visit.
+ *
+ * A failure is not worth failing a delete over — the canvas is going away either way — but it is worth a
+ * line in the console, because a file that outlives its canvas is a small mess nobody would find again.
+ */
+export async function forgetCanvasConversation(config: AiConfig, canvasId: string): Promise<void> {
+    const name = canvasAgent(canvasId);
+    closeAgentSession(name);
+    try {
+        const response = await fetch(`${gatewayProtocolRoot(config.baseUrl)}/api/agent/session/${encodeURIComponent(name)}`, { method: "DELETE" });
+        if (!response.ok) console.warn(`agent: the gateway did not forget ${name} (${response.status})`);
+    } catch (error) {
+        console.warn(`agent: could not reach the gateway to forget ${name}`, error);
+    }
+}

@@ -3386,3 +3386,25 @@ the first. Old canvases are repaired on load rather than left to fail, which is 
 **Tested** `tests/persist-migration.test.ts`: a version-2 blob whose node params hold
 `{editCanvasRatio, editCanvasSize, resolution, seed}` reads back as
 `{editCanvasSize, resolution, seed}`, and a node with nothing stored is untouched.
+
+## 103. Deleting a canvas forgets its conversation
+
+**Decision** `DELETE /api/agent/session/{session}` releases the process if one is running, removes the
+session file and the session's workspace, and answers `{ok, removed}`. The canvas calls it for each canvas
+it deletes — from the canvas menu and from the multi-select dialog — with the name it already owns
+(`canvas:<canvasId>`), fire and forget.
+
+**Why** A conversation now outlives the page, which is the point, but a canvas does not outlive the canvas.
+Without this, every deleted canvas left a file in `DATA_DIR/agent/sessions/` that nothing would ever read
+again — the user's words, kept forever, for a canvas that no longer exists. Only the canvas knows when a
+conversation is over: the gateway sees names, not canvases.
+
+Closing the panel is deliberately _not_ this. A closed panel is a conversation waiting to be reopened; a
+deleted canvas is a conversation with nobody left to have it.
+
+**Tested** `TestDeletingASessionForgetsTheConversation`: prompt, wait for the turn, confirm the file exists,
+`DELETE`, confirm it is gone and that the next connection replays nothing. In a browser: a scratch canvas
+was opened with its panel (workspace created), given a session file, then deleted through the canvas menu
+and its confirmation — the gateway logged
+`DELETE /api/agent/session/canvas%3APrivX2hRZQHWmyUJmmsP6 200`, and both the file and the workspace were
+gone while the other canvas's conversation was untouched.

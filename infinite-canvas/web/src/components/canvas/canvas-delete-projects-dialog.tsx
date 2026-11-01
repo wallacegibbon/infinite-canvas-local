@@ -2,9 +2,11 @@ import { Button } from "@/components/kit/button";
 import { useTranslation } from "react-i18next";
 
 import { Dialog } from "@/components/kit/dialog";
+import { forgetCanvasConversation } from "@/services/api/agent";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useCanvasListStore } from "@/stores/canvas/use-canvas-list-store";
+import { useEffectiveConfig } from "@/stores/use-config-store";
 
 export function CanvasDeleteProjectsDialog() {
     const { t } = useTranslation();
@@ -13,9 +15,12 @@ export function CanvasDeleteProjectsDialog() {
     const removeSelectedIds = useCanvasListStore((state) => state.removeSelectedProjectIds);
     const deleteProjects = useCanvasStore((state) => state.deleteProjects);
     const cleanupImages = useAssetStore((state) => state.cleanupImages);
+    const config = useEffectiveConfig();
     const confirm = () => {
         deleteProjects(ids);
         cleanupImages();
+        // Each canvas also owns an agent conversation, which lives in a file on the gateway.
+        for (const id of ids) void forgetCanvasConversation(config, id);
         removeSelectedIds(ids);
         setDeleteIds([]);
     };

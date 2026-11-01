@@ -39,10 +39,10 @@ CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64 go build -o comfyui-gateway-mac .
 Linux is the target that is actually run and tested. Three probes lean on Linux facilities
 and degrade on their own elsewhere rather than failing the process:
 
-| Probe | On Linux | Elsewhere |
-|---|---|---|
-| RAM usage | `/proc/meminfo` | panel shows nothing (returns an empty record) |
-| "Pick a model file" dialog | `zenity` | the request fails with a message telling you to type the relative path |
+| Probe                      | On Linux        | Elsewhere                                                              |
+| -------------------------- | --------------- | ---------------------------------------------------------------------- |
+| RAM usage                  | `/proc/meminfo` | panel shows nothing (returns an empty record)                          |
+| "Pick a model file" dialog | `zenity`        | the request fails with a message telling you to type the relative path |
 
 `start.sh` is a bash script, so Windows needs WSL or Git Bash; running `bin/comfyui-gateway`
 by hand works anywhere.
@@ -64,25 +64,25 @@ Verify: `curl -s localhost:8190/health`.
 
 Every variable is optional; the defaults match the previous implementation.
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `GATEWAY_HOST` | `127.0.0.1` | Gateway listen address, bound as given. `0.0.0.0` accepts every interface. |
-| `GATEWAY_PORT` | `8190` | Gateway listen port. |
-| `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI base URL. |
-| `INSTALL_INTO_COMFY` | *(empty)* | `1` = this gateway can write into ComfyUI's folders (`models/`, `custom_nodes/`) because it runs there or sees them through a mount. Installs stay off without it. |
-| `WORKFLOW_DIR` | `<root>/workflows` | Registry directory. |
-| `DATA_DIR` | `<root>/data` | Tasks, locks, preferences. |
-| `OUTPUT_DIR` | `<data>/outputs` | Generated files served under `/files/`. |
-| `PUBLIC_BASE_URL` | `http://GATEWAY_HOST:GATEWAY_PORT` | Absolute prefix for returned URLs. |
-| `CORS_ORIGINS` | canvas + ComfyUI origins | Extra allow list for canvases on another host. A canvas on the gateway's own host is allowed by rule. `*` is refused. |
+| Variable             | Default                            | Meaning                                                                                                                                                            |
+| -------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GATEWAY_HOST`       | `127.0.0.1`                        | Gateway listen address, bound as given. `0.0.0.0` accepts every interface.                                                                                         |
+| `GATEWAY_PORT`       | `8190`                             | Gateway listen port.                                                                                                                                               |
+| `COMFY_URL`          | `http://127.0.0.1:8188`            | ComfyUI base URL.                                                                                                                                                  |
+| `INSTALL_INTO_COMFY` | _(empty)_                          | `1` = this gateway can write into ComfyUI's folders (`models/`, `custom_nodes/`) because it runs there or sees them through a mount. Installs stay off without it. |
+| `WORKFLOW_DIR`       | `<root>/workflows`                 | Registry directory.                                                                                                                                                |
+| `DATA_DIR`           | `<root>/data`                      | Tasks, locks, preferences.                                                                                                                                         |
+| `OUTPUT_DIR`         | `<data>/outputs`                   | Generated files served under `/files/`.                                                                                                                            |
+| `PUBLIC_BASE_URL`    | `http://GATEWAY_HOST:GATEWAY_PORT` | Absolute prefix for returned URLs.                                                                                                                                 |
+| `CORS_ORIGINS`       | canvas + ComfyUI origins           | Extra allow list for canvases on another host. A canvas on the gateway's own host is allowed by rule. `*` is refused.                                              |
 
 `GATEWAY_HOST` is not a policy switch: `GATEWAY_HOST=192.168.3.232` binds the LAN address exactly
 like `127.0.0.1` binds loopback, and the gateway says so in a startup warning when that address is
 reachable from the network and no `GATEWAY_TOKEN` is set. Browser access is allowed when the
 canvas is served from the same host name as the gateway — the usual `:3000` canvas and `:8190`
-gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a *different* host does.
+gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a _different_ host does.
 
-| `GATEWAY_TOKEN` | *(empty)* | When set, `/api/*` requires the `X-Gateway-Token` header. |
+| `GATEWAY_TOKEN` | _(empty)_ | When set, `/api/*` requires the `X-Gateway-Token` header. |
 | `REQUEST_TIMEOUT_MS` | `600000` | Image generation timeout. |
 | `VIDEO_TIMEOUT_MS` | `0` | Video timeout; `0` means no limit. |
 | `AUDIO_TIMEOUT_MS` | `0` | Audio/music timeout; `0` means no limit. A song is the same order of work as a short video, so it gets the same default. |
@@ -92,7 +92,7 @@ gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a *diffe
 | `MAX_STORED_TASKS` | `0` | Cap on stored tasks; `0` is unlimited. |
 | `MAX_UPLOAD_BYTES` | `52428800` | Per-file upload limit. |
 | `RESOURCE_CONCURRENCY` | `2` | Parallel downloads during a resource install. |
-| `ALAYACORE_BIN` | *(found)* | The agent binary. Empty looks on `PATH`, then beside the gateway. |
+| `ALAYACORE_BIN` | _(found)_ | The agent binary. Empty looks on `PATH`, then beside the gateway. |
 | `AGENT_CONFIG_PATH` | `UserConfigDir()/comfyui-gateway/alayacore` | The agent's own config directory (`model.conf`, …). The gateway names it and never reads or writes it; AlayaCore creates it on first spawn. |
 
 ### The gateway runs beside ComfyUI
@@ -103,9 +103,9 @@ discovered from inside the process — a mount at another path looks exactly lik
 and two machines that both install to `/opt/ComfyUI` look exactly like one — so it is configured,
 not detected:
 
-| `INSTALL_INTO_COMFY` | Behaviour |
-| --- | --- |
-| `1` | the gateway may write into ComfyUI's folders: installs allowed, nothing is inspected |
+| `INSTALL_INTO_COMFY`  | Behaviour                                                                                                                                                                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `1`                   | the gateway may write into ComfyUI's folders: installs allowed, nothing is inspected                                                                                                                                                                          |
 | unset / anything else | installs off: `GET /api/resources/status` reports `modelInstall { allowed: false, comfyHost }`, the canvas shows a banner and disables the download buttons, and `POST /api/resources/install` answers `400 model_install_disabled` naming `COMFY_URL`'s host |
 
 Fail-closed on purpose. The failure this prevents is not one the user can react to: writing into a
@@ -115,24 +115,24 @@ filled in by `.env.example`, which is the single-machine template — is cheaper
 
 ### What works, and what does not, when the gateway is not on the ComfyUI machine
 
-Everything the gateway *reads over HTTP* works from anywhere; everything that touches ComfyUI's
+Everything the gateway _reads over HTTP_ works from anywhere; everything that touches ComfyUI's
 filesystem does not, and no environment variable can change that — a folder path is a folder path
 on the gateway's own host by definition.
 
-| Feature | Path |
-| --- | --- |
-| Generation, uploads, fetching images/videos, queue, system stats | HTTP (`/prompt`, `/upload/image`, `/view`, `/queue`, `/system_stats`) |
-| Which models are installed (panel "present/missing") | HTTP (`/object_info`) |
-| Installing models and custom nodes | **local write** — needs `INSTALL_INTO_COMFY=1` and the folders on this host |
-| `extra_model_paths.yaml` (mapped drives, NFS model dirs) | **local read** under ComfyUI's own directory |
-| Knowing where to write at all | ComfyUI's reported folder layout (`custom_nodes`) |
-| "Runtime deps" interpreter hint | **local read** of `/proc` |
-| Replacing a model via the file picker | **local** GUI dialog |
+| Feature                                                          | Path                                                                        |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Generation, uploads, fetching images/videos, queue, system stats | HTTP (`/prompt`, `/upload/image`, `/view`, `/queue`, `/system_stats`)       |
+| Which models are installed (panel "present/missing")             | HTTP (`/object_info`)                                                       |
+| Installing models and custom nodes                               | **local write** — needs `INSTALL_INTO_COMFY=1` and the folders on this host |
+| `extra_model_paths.yaml` (mapped drives, NFS model dirs)         | **local read** under ComfyUI's own directory                                |
+| Knowing where to write at all                                    | ComfyUI's reported folder layout (`custom_nodes`)                           |
+| "Runtime deps" interpreter hint                                  | **local read** of `/proc`                                                   |
+| Replacing a model via the file picker                            | **local** GUI dialog                                                        |
 
 So a gateway on another machine still generates images; it just cannot install models, and it says
 so instead of filling the wrong disk. Run it beside ComfyUI when you want the whole panel.
 
-An install also needs to know *where* ComfyUI is, and the only thing that knows is ComfyUI: the
+An install also needs to know _where_ ComfyUI is, and the only thing that knows is ComfyUI: the
 `custom_nodes` entry of `GET /internal/folder_paths`. There is no configuration override and no
 fallback inference — model folders can live outside the tree (`extra_model_paths`), so deriving a
 root from them writes custom nodes into the wrong place, silently. A build that does not report
@@ -143,11 +143,11 @@ capability is checked rather than a number.
 Workflows are the gateway's own: `workflows/registry.json` plus its graphs. There is no polling and
 no automatic import of ComfyUI's workflow folder. To add a graph made in ComfyUI, export it in
 **API format** (the UI format ComfyUI saves is rejected) and drop the file into `workflows/`, then
-scan with `POST /api/resources/refresh` — the refresh button in the canvas's *Add workflows* tab.
+scan with `POST /api/resources/refresh` — the refresh button in the canvas's _Add workflows_ tab.
 One scan both registers the graph and clears its availability, which is why it is the only scan
 route: no "scan only the workflow folder" endpoint, no reload endpoint and no background poller.
 
-The file name *is* the workflow's identity, and it has to say what it is:
+The file name _is_ the workflow's identity, and it has to say what it is:
 
 ```
 workflows/image-my-flow.json      id = name = image-my-flow, file = image-my-flow.json
@@ -174,10 +174,11 @@ Prompts are the agent's, not the gateway's: these routes carry what the canvas w
 back what AlayaCore says. The gateway owns no wording, no model choice and no state — see
 [`decisions.md`](decisions.md) #75 for why, and AlayaCore's own `adapter-guide` for the frames.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/agent/socket/{session}` | One agent process, named by the client, both directions. Its conversation is kept in a session file. |
-| `POST` | `/mcp/{workspace}` | The agent's tools, spoken to AlayaCore. One workspace per session. |
+| Method   | Path                           | Purpose                                                                                              |
+| -------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/agent/socket/{session}`  | One agent process, named by the client, both directions. Its conversation is kept in a session file. |
+| `DELETE` | `/api/agent/session/{session}` | Forget a conversation: releases the process, removes its session file and its workspace. Idempotent. |
+| `POST`   | `/mcp/{workspace}`             | The agent's tools, spoken to AlayaCore. One workspace per session.                                   |
 
 A session is one `alayacore --rawio` process with one socket, filed under a name the **client** chooses:
 the canvas agent panel calls its own `canvas:<canvasId>`, a node's panel calls its own `node:<id>`. The
@@ -246,13 +247,18 @@ is not answered by the gateway — it goes down the session's socket and the **c
 the page is the only thing that knows what a node is. Down:
 
 ```json
-{"type":"tool","callId":"tool-1","name":"ping","arguments":{}}
+{ "type": "tool", "callId": "tool-1", "name": "ping", "arguments": {} }
 ```
 
 and up, on the same socket, the answer that the waiting call returns to AlayaCore:
 
 ```json
-{"toolResult":{"callId":"tool-1","content":[{"type":"text","text":"pong from the page"}]}}
+{
+  "toolResult": {
+    "callId": "tool-1",
+    "content": [{ "type": "text", "text": "pong from the page" }]
+  }
+}
 ```
 
 `content` is the protocol's content array, carried through untouched: `text`, `image` (`data` + `mimeType`),
@@ -289,30 +295,30 @@ refused with `unsupported_audio_format` at submission instead of being silently 
 Runs (the protocol in [`protocol.md`](protocol.md); every canvas node and tool uses them — frame
 interpolation included, as a run of the `video-rife` workflow):
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/uploads` | Upload one media file. Returns an id a run can reference by role. |
-| `GET` | `/api/uploads` | Uploads that have not expired, newest first. |
-| `POST` | `/api/runs` | Submit a run. Always `202` with the run, never blocks. |
-| `GET` | `/api/runs` | Runs, newest first; `?status=` and `?workflow=` filter. |
-| `GET` | `/api/runs/{id}` | Status, progress, preview frame, outputs, error. |
-| `GET` | `/api/runs/{id}/outputs/{index}` | One artifact. |
-| `GET` | `/api/runs/{id}/preview` | In-flight preview frame, when one exists. |
-| `DELETE` | `/api/runs/{id}` | Cancel (idempotent; also interrupts ComfyUI). |
+| Method   | Path                             | Purpose                                                           |
+| -------- | -------------------------------- | ----------------------------------------------------------------- |
+| `POST`   | `/api/uploads`                   | Upload one media file. Returns an id a run can reference by role. |
+| `GET`    | `/api/uploads`                   | Uploads that have not expired, newest first.                      |
+| `POST`   | `/api/runs`                      | Submit a run. Always `202` with the run, never blocks.            |
+| `GET`    | `/api/runs`                      | Runs, newest first; `?status=` and `?workflow=` filter.           |
+| `GET`    | `/api/runs/{id}`                 | Status, progress, preview frame, outputs, error.                  |
+| `GET`    | `/api/runs/{id}/outputs/{index}` | One artifact.                                                     |
+| `GET`    | `/api/runs/{id}/preview`         | In-flight preview frame, when one exists.                         |
+| `DELETE` | `/api/runs/{id}`                 | Cancel (idempotent; also interrupts ComfyUI).                     |
 
 Metadata and management:
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Liveness, ComfyUI reachability, counts. |
-| `GET` | `/api/workflows` | Full workflow list: availability, typed parameters, and the model ids each workflow answers to (`models`). Every registered workflow, tool or model. |
-| `GET` | `/api/resources/status` | Model and node install status. |
-| `POST` | `/api/resources/install` | Start an install job. |
-| `POST` | `/api/resources/refresh` | The only rescan: reloads the resource index, re-scans ComfyUI (nodes, models, availability, new workflow graphs) and returns the resource status. This is the panel's refresh button. |
-| `GET` | `/api/tasks` | Every run the gateway has queued or finished, newest first. |
-| `GET` | `/api/tasks/{id}` | One run by id. |
-| `GET` | `/api/setup/status` | Last scan result. |
-| `GET` | `/api/system/stats` | VRAM and RAM **of the machine running ComfyUI** (read from ComfyUI's own `/system_stats`), plus the last OOM. `available: false` when ComfyUI does not report its devices — the panel then shows nothing, because the gateway host's own memory is somebody else's machine. |
+| Method | Path                     | Purpose                                                                                                                                                                                                                                                                     |
+| ------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/health`                | Liveness, ComfyUI reachability, counts.                                                                                                                                                                                                                                     |
+| `GET`  | `/api/workflows`         | Full workflow list: availability, typed parameters, and the model ids each workflow answers to (`models`). Every registered workflow, tool or model.                                                                                                                        |
+| `GET`  | `/api/resources/status`  | Model and node install status.                                                                                                                                                                                                                                              |
+| `POST` | `/api/resources/install` | Start an install job.                                                                                                                                                                                                                                                       |
+| `POST` | `/api/resources/refresh` | The only rescan: reloads the resource index, re-scans ComfyUI (nodes, models, availability, new workflow graphs) and returns the resource status. This is the panel's refresh button.                                                                                       |
+| `GET`  | `/api/tasks`             | Every run the gateway has queued or finished, newest first.                                                                                                                                                                                                                 |
+| `GET`  | `/api/tasks/{id}`        | One run by id.                                                                                                                                                                                                                                                              |
+| `GET`  | `/api/setup/status`      | Last scan result.                                                                                                                                                                                                                                                           |
+| `GET`  | `/api/system/stats`      | VRAM and RAM **of the machine running ComfyUI** (read from ComfyUI's own `/system_stats`), plus the last OOM. `available: false` when ComfyUI does not report its devices — the panel then shows nothing, because the gateway host's own memory is somebody else's machine. |
 
 `/api/previews/{promptId}` and `/api/progress/{requestId}` serve in-flight preview
 frames and step counts; both are best-effort and never fail a generation. A run also carries its own
@@ -369,17 +375,17 @@ until done, fetch the artifact. `internal/comfy/client.go` speaks exactly that s
 `GET /queue`, `GET /object_info`, and a WebSocket for progress. What is ours is the abstraction above
 it: a caller names a **workflow** and its inputs and never sees a node graph.
 
-| ComfyUI | Gateway |
-| --- | --- |
-| `POST /prompt` with a full API-format graph | `POST /api/runs` with `{workflow, inputs, media}` |
-| `prompt_id` | `run.id` |
-| `POST /upload/image` → file name | `POST /api/uploads` → upload id, referenced by role |
-| `GET /queue` (running/pending) | `GET /api/runs?status=`, `GET /api/tasks` |
-| `GET /history/{prompt_id}` | `GET /api/runs/{id}` |
-| `GET /view?filename=&subfolder=&type=` | `GET /api/runs/{id}/outputs/{index}` |
-| `POST /interrupt` + queue deletion | `DELETE /api/runs/{id}` (idempotent, reports `cancelled` at once) |
-| WebSocket `executing` / `progress` / binary preview | `GET /api/runs/{id}` progress + `GET /api/runs/{id}/preview` (polled; the socket stays internal) |
-| `GET /object_info` (node classes and their file options) | `GET /api/workflows[/{id}/schema]` (runnable capabilities, availability, typed inputs) |
+| ComfyUI                                                  | Gateway                                                                                          |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `POST /prompt` with a full API-format graph              | `POST /api/runs` with `{workflow, inputs, media}`                                                |
+| `prompt_id`                                              | `run.id`                                                                                         |
+| `POST /upload/image` → file name                         | `POST /api/uploads` → upload id, referenced by role                                              |
+| `GET /queue` (running/pending)                           | `GET /api/runs?status=`, `GET /api/tasks`                                                        |
+| `GET /history/{prompt_id}`                               | `GET /api/runs/{id}`                                                                             |
+| `GET /view?filename=&subfolder=&type=`                   | `GET /api/runs/{id}/outputs/{index}`                                                             |
+| `POST /interrupt` + queue deletion                       | `DELETE /api/runs/{id}` (idempotent, reports `cancelled` at once)                                |
+| WebSocket `executing` / `progress` / binary preview      | `GET /api/runs/{id}` progress + `GET /api/runs/{id}/preview` (polled; the socket stays internal) |
+| `GET /object_info` (node classes and their file options) | `GET /api/workflows[/{id}/schema]` (runnable capabilities, availability, typed inputs)           |
 
 Where the two differ, and why:
 
@@ -407,7 +413,7 @@ Where the two differ, and why:
 - **Cancellation.** ComfyUI has a global interrupt plus queue deletion. A run has its own idempotent
   `DELETE`, which maps to both and is reflected immediately.
 - **Discovery.** `/object_info` describes node classes and their file options. `/api/workflows`
-  describes *runnable capabilities*: whether the models and nodes are installed, the modes/variants,
+  describes _runnable capabilities_: whether the models and nodes are installed, the modes/variants,
   and the typed inputs — it is computed from `object_info`, but it answers a different question.
 - **Trust boundary.** ComfyUI is single-user and unauthenticated. The gateway has an origin allow
   list and an optional token, and it is the only surface meant to be reachable from a browser.
@@ -445,7 +451,7 @@ Error `code` values are stable (`model_not_found`, `missing_reference_image`,
 `LIMIT_FILE_SIZE`, …), so the frontend can map them to localized text instead of
 displaying `error.message` verbatim.
 
-Two things stay Chinese on purpose, because they are *data* rather than messaging:
+Two things stay Chinese on purpose, because they are _data_ rather than messaging:
 
 - **Model-facing prompts** in `internal/prompt` — the H3 writing instructions, the image
   and caption system prompts, and the user-turn labels are input to a model, not text

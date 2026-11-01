@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/kit/button";
 import { Dialog } from "@/components/kit/dialog";
 import { toast } from "@/components/kit/toast";
+import { forgetCanvasConversation } from "@/services/api/agent";
 import { requestEdit, requestGeneration } from "@/services/api/image";
 import { bindStepProgress, unbindStepProgress } from "@/services/api/step-progress";
 import { createVideoGenerationTask, isVideoTaskFailed, storeGeneratedVideo, waitForVideoGenerationTask, type VideoPreview } from "@/services/api/video";
@@ -1380,10 +1381,12 @@ function InfiniteCanvasPage() {
             onOk: () => {
                 deleteProjects([projectId]);
                 cleanupAssetImages();
+                // The canvas's agent conversation is a file on the gateway; deleting the canvas ends it.
+                void forgetCanvasConversation(effectiveConfig, projectId);
                 navigate("/canvas");
             },
         });
-    }, [cleanupAssetImages, deleteProjects, navigate, projectId, t]);
+    }, [cleanupAssetImages, deleteProjects, effectiveConfig, navigate, projectId, t]);
 
     const exportCurrentProject = useCallback(async () => {
         const project = useCanvasStore.getState().projects.find((item) => item.id === projectId);

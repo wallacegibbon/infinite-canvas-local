@@ -2,8 +2,12 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"comfyui-gateway/internal/agent"
@@ -11,14 +15,40 @@ import (
 	"comfyui-gateway/internal/ws"
 )
 
-// routesAgent registers the one agent route.
+// routesAgent registers the agent routes.
 //
 // A session is one agent process with one name, and the name is the client's — the canvas panel calls
-// its own `canvas`, a node's panel calls its own `node:<id>`. The lifetimes differ (the canvas's agent
-// lives until it is closed, a node's while its panel is open) and the client owns both, because the
-// client is what knows when a surface went away. The gateway only files processes under names.
+// its own `canvas:<canvasId>`, a node's panel calls its own `node:<id>`. The lifetimes differ (the
+// canvas's agent lives as long as its socket, a node's while its panel is open) and the client owns both,
+// because the client is what knows when a surface went away. The gateway only files processes under
+// names, and keeps their conversations in files named after them.
 func (s *Server) routesAgent(mux *http.ServeMux) {
 	s.route(mux, "GET /api/agent/socket/{session}", s.handleAgentSocket)
+	s.route(mux, "DELETE /api/agent/session/{session}", s.handleAgentSessionDelete)
+}
+
+// handleAgentSessionDelete implements DELETE /api/agent/session/{session}: forget this conversation.
+//
+// The canvas owns the name and is the only thing that knows a conversation is over — a canvas that has
+// been deleted has nobody left to talk to, and its session file would sit in the data directory forever.
+// The process, if one is running, is released first so nothing writes the file back after it is removed.
+func (s *Server) handleAgentSessionDelete(ctx *httpx.Ctx) error {
+	id := ctx.R.PathValue("session")
+	s.agentSessions.Close(id, "forgotten")
+
+	removed := false
+	if file, err := s.sessionFile(id); err == nil {
+		switch err := os.Remove(file); {
+		case err == nil:
+			removed = true
+		case !errors.Is(err, fs.ErrNotExist):
+			return err
+		}
+	}
+	_ = os.RemoveAll(filepath.Join(workspacesRoot(s.cfg.DataDir), agentWorkspaceKey(id)))
+
+	httpx.OK(ctx.W, map[string]any{"ok": true, "removed": removed})
+	return nil
 }
 
 // agentOptions is what every spawn needs. The wording (skills) and the tools are passed through from
