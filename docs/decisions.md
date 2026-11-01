@@ -3197,3 +3197,18 @@ canvas, and above it.
 `z-50` against a card at `z-95`; after, `z-1500` and the option is the topmost element at its own centre. Clicking
 它 changed the panel to `Test / qwen3.8-27b` and the gateway logged `command="model_set"`; the level select
 showed 不思考/普通思考/深度思考, and picking 不思考 logged `command="reasoning_level_set"`.
+
+## 96. `@` needs no space in front of it
+
+**Decision** Any `@` that lands at the caret in the composer asks for a node pick. The earlier rule — only after
+whitespace, so that `foo@bar` would not trigger — is gone.
+
+**Why** The rule was Latin typography imposed on a Chinese box: Chinese does not put a space between words, so
+the natural way to cite a node is `看看@那个茶壶`, which did nothing at all, and the "fix" the rule asked of the
+user was to type a space that then travelled into the prompt. The case it was protecting against — an address
+being typed in an agent's message — is rare here and costs one escape: a cancelled pick leaves the `@` exactly as
+typed. A gesture that refuses to start on the input it was made for is worse than one that starts too eagerly.
+
+**Tested** In a browser: the draft `看看@` (no space before the `@`) showed "点击一个节点来引用 · ESC 取消";
+clicking the kettle node replaced it with `看看@a rusty copper kettle on a dark  `, focus back in the textarea at
+the end of what was inserted.

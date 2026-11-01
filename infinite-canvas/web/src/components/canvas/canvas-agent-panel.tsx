@@ -265,7 +265,10 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
      */
     const onChange = (value: string) => {
         const caret = inputRef.current?.selectionStart ?? value.length;
-        const typed = value.length > draft.length && caret > 0 && value[caret - 1] === "@" && (caret === 1 || !/\S/.test(value[caret - 2]));
+        // Any `@` that just landed at the caret asks for a pick. It does not need a space in front of it: Chinese
+        // text has no spaces to put there, and an `@` that was not meant as a citation is one escape away from
+        // staying exactly as typed.
+        const typed = value.length > draft.length && caret > 0 && value[caret - 1] === "@";
         setDraft(value);
         if (!typed) return;
         const at = caret - 1;
