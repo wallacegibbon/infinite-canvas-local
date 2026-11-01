@@ -253,6 +253,21 @@ func withAgent(ctx context.Context, opts SpawnOptions, body func(*Process, *star
 	return body(proc, &startup{}, emit)
 }
 
+// userContent is a `UX` frame's words: what the canvas sent, as the agent echoes it back.
+//
+// The tag travels in both directions, and the echo is the only place a user message comes from — live or
+// replayed, the panel draws what the agent said was said, and keeps no copy of its own to keep in step.
+func userContent(value string) (string, bool) {
+	var item struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if json.Unmarshal([]byte(value), &item) != nil || item.Type != "text" || strings.TrimSpace(item.Text) == "" {
+		return "", false
+	}
+	return item.Text, true
+}
+
 // replayed reads a frame that arrived before the agent was ready as part of the conversation it loaded
 // from its session file. Live turns send the same tags — `UX` echo and a textless `AX` marker — so this
 // is only ever asked about frames from the startup window: a `AX` that carries text is a replayed
@@ -261,7 +276,10 @@ func replayed(frame *Frame) (HistoryEntry, bool) {
 	role := ""
 	switch frame.Tag {
 	case TagUserX:
-		role = "user"
+		if text, ok := userContent(frame.Value); ok {
+			return HistoryEntry{Role: "user", Text: text}, true
+		}
+		return HistoryEntry{}, false
 	case TagAssistantX:
 		role = "assistant"
 	default:

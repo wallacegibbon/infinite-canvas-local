@@ -84,7 +84,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
     const connect = useCallback(async () => {
         setStatus((current) => (current === "connected" ? current : "connecting"));
         try {
-            await openAgentSession(config, session);
+            await openAgentSession(config, session, { history: true });
             setStatus("connected");
         } catch (error) {
             setStatus("closed");
@@ -109,6 +109,12 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
     useEffect(() => onAgentEvent(session, applyEvent), [session]);
 
     const applyEvent = (event: AgentEvent) => {
+        if (event.type === "user") {
+            // The agent echoing what the canvas sent. This is the only place a user message comes from,
+            // which is why a reloaded conversation and a live one look the same: both are the agent's.
+            setMessages((current) => [...current, { id: nextId(), role: "user", text: withoutReferences(event.text || ""), reasoning: "", tools: [], streaming: false }]);
+            return;
+        }
         if (event.type === "history") {
             // The agent has just said what its conversation is. That is the whole truth about this
             // panel's past — a reload left nothing on screen, and a reopened panel may have been
@@ -144,10 +150,14 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         if (event.type === "delta" || event.type === "reasoning" || event.type === "tool_call" || event.type === "tool_result") {
             setMessages((current) => {
                 const last = current[current.length - 1];
-                if (!last || last.role !== "assistant") return current;
-                const updated = { ...last };
-                if (event.type === "delta") updated.text = last.text + (event.text || "");
-                else if (event.type === "reasoning") updated.reasoning = last.reasoning + (event.text || "");
+                // The answer's message starts where the answer starts: nothing about this panel is written
+                // before the agent has said it.
+                const started = last && last.role === "assistant" && last.streaming;
+                const from = started ? last : { id: nextId(), role: "assistant" as const, text: "", reasoning: "", tools: [], streaming: true };
+                const previous = started ? current.slice(0, -1) : current;
+                const updated = { ...from };
+                if (event.type === "delta") updated.text = from.text + (event.text || "");
+                else if (event.type === "reasoning") updated.reasoning = from.reasoning + (event.text || "");
                 else if (event.type === "tool_call") {
                     // A call arrives in frames, not in one message: the name first, so the step can be
                     // shown while the tool runs, then the input as it fills in. One step per call,
@@ -159,9 +169,9 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
                         ...(event.name ? { name: event.name } : {}),
                         ...(event.input ? { input: event.input } : {}),
                     });
-                    updated.tools = last.tools.some((step) => step.callId === callId) ? last.tools.map((step) => (step.callId === callId ? merge(step) : step)) : [...last.tools, merge({ callId, name: "tool" })];
-                } else updated.tools = last.tools.map((step) => (step.callId === event.callId ? { ...step, output: event.output } : step));
-                return [...current.slice(0, -1), updated];
+                    updated.tools = from.tools.some((step) => step.callId === callId) ? from.tools.map((step) => (step.callId === callId ? merge(step) : step)) : [...from.tools, merge({ callId, name: "tool" })];
+                } else updated.tools = from.tools.map((step) => (step.callId === event.callId ? { ...step, output: event.output } : step));
+                return [...previous, updated];
             });
         }
     };
@@ -177,7 +187,8 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
             return;
         }
         const context = referenceBlock(t("canvas.agent.contextMarker"), cited.map((id) => describeNode(nodes.find((node) => node.id === id))).filter(Boolean));
-        setMessages((current) => [...current, { id: nextId(), role: "user", text, reasoning: "", tools: [], streaming: false }, { id: nextId(), role: "assistant", text: "", reasoning: "", tools: [], streaming: true }]);
+        // Nothing is drawn here. What the panel shows is the conversation the agent reports — its echo of
+        // this message, then what it answers — so there is one copy of it and no second one to keep in step.
         setDraft("");
         setCited([]);
         setBusy(true);

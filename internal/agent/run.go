@@ -141,6 +141,12 @@ func readTurn(ctx context.Context, proc *Process, state *startup, hasPrompt bool
 // agent means, shared by the one-shot loop and the socket's: a frame is a frame whatever is listening.
 func turnStep(state *startup, frame *Frame, hasPrompt bool, emit func(Event)) (ended bool) {
 	switch frame.Tag {
+	case TagUserX:
+		// The agent echoing what the canvas sent. A user message comes from here and nowhere else, so
+		// the panel has nothing of its own to draw — and nothing to keep in step with the transcript.
+		if text, ok := userContent(frame.Value); ok {
+			emit(Event{Type: "user", Text: text})
+		}
 	case TagAssistantXDelta:
 		kind, text, ok := contentDelta(frame.Value)
 		if !ok {

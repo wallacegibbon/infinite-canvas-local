@@ -3408,3 +3408,32 @@ was opened with its panel (workspace created), given a session file, then delete
 and its confirmation — the gateway logged
 `DELETE /api/agent/session/canvas%3APrivX2hRZQHWmyUJmmsP6 200`, and both the file and the workspace were
 gone while the other canvas's conversation was untouched.
+
+## 104. The transcript is the agent's, and only a conversation keeps a file
+
+**Decision** Two things that were the same mistake:
+
+1. The panel no longer writes a message when the user presses send. A user message is drawn from the agent's
+   own echo (`UX`, which it sends live as well as on replay), and the assistant's message starts at the
+   first delta instead of being created empty beforehand. The panel holds no message the agent did not
+   report.
+2. A session file is created only when the client asks for one: `GET /api/agent/socket/{name}?history=1`.
+   The canvas panel asks; a node's panel does not, so a one-shot question leaves nothing on disk.
+
+**Why** (1) The submit handler drew the typed text itself, and the replay drew the agent's copy — two copies
+of the same message, which is why they could disagree (the typed `@补全背景 …` versus the stored
+`[Canvas references] …` block). Stripping the block on replay patched the symptom and left both copies in
+place. One owner removes the class: what is on screen is what the agent says was said, live and replayed,
+and the citation block is stripped in one place because there is only one place.
+
+(2) A node's agent is asked one question at a time — reverse-prompt, text generation — and writes the
+answer into the node. Giving it a session file left one file per node in the data directory with nothing to
+ever read or delete it, and it would carry an earlier question into the next answer. Whether a name is a
+conversation is a property of the surface, and the surface is the client, so the client says so in the
+socket URL. The gateway keeps filing processes under opaque names.
+
+**Tested** Gateway: `TestSocketRelaysTheUsersWordsOnce` (a prompt produces exactly one `user` event, with the
+words as sent) and `TestOneShotSessionKeepsNoFile` (a socket without the flag prompts and answers, and
+`sessionFile("node:n1")` does not exist). In a browser against a real AlayaCore: after a reload the replayed
+conversation still drew, and a new turn showed the typed sentence once — with the answer appearing under it
+as it streamed — while nothing was added by the submit handler.

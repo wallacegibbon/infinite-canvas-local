@@ -50,6 +50,7 @@ while IFS= read -r line; do
     UX*'die'*)
       exit 0 ;;
     UX*text*)
+      printf '%s\n' "$line"
       if [ -n "$SESSION" ]; then printf '%s\n' "$line" >> "$SESSION"; fi ;;
     UE)
       printf 'SM{"type":"task","data":{"in_progress":true,"current_step":1,"context_tokens":5}}\n'
@@ -93,11 +94,11 @@ func spawns(t *testing.T, path string) int {
 	return len(strings.Split(strings.TrimSpace(string(raw)), "\n"))
 }
 
-// openSocket dials the conversation and drains the startup broadcast, which is what a client does
-// before it says anything.
+// openSocket dials a conversation — the canvas panel's socket, which asks for a history — and drains the
+// startup broadcast and the replayed conversation, which is what a client does before it says anything.
 func openSocket(t *testing.T, gateway *httptest.Server, session string) *comfy.WSConn {
 	t.Helper()
-	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/" + session
+	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/" + session + "?history=1"
 	conn, err := comfy.DialWS(context.Background(), url)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
@@ -251,6 +252,56 @@ func TestSocketIsOnePerCanvas(t *testing.T) {
 	}
 }
 
+// TestSocketRelaysTheUsersWordsOnce: the agent echoes what the canvas sent, and that echo — not a copy the
+// panel made — is what a user message is drawn from. Live and replayed arrive the same way.
+func TestSocketRelaysTheUsersWordsOnce(t *testing.T) {
+	gateway, _ := startAgentGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+
+	send(t, conn, map[string]any{"prompt": "remember the violet"})
+	seen := until(t, conn, "done")
+	var said []string
+	for _, event := range seen {
+		if event["type"] == "user" {
+			said = append(said, event["text"].(string))
+		}
+	}
+	if len(said) != 1 || said[0] != "remember the violet" {
+		t.Fatalf("user messages = %v, want the words once", said)
+	}
+}
+
+// TestOneShotSessionKeepsNoFile: a node's agent asks one question and writes the answer into the node. It is
+// not a conversation, so it gets no session file — one per node would pile up in the data directory, and an
+// earlier question would be carried into the next answer.
+func TestOneShotSessionKeepsNoFile(t *testing.T) {
+	gateway, server, _ := startMCPGateway(t)
+	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/node:n1"
+	conn, err := comfy.DialWS(context.Background(), url)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+	t.Cleanup(func() { _ = conn.Close() })
+	if first := nextEvent(t, conn); first["type"] != "models" {
+		t.Fatalf("first message = %v, want the startup broadcast", first)
+	}
+	if next := nextEvent(t, conn); next["type"] != "history" {
+		t.Fatalf("second message = %v, want an empty history", next)
+	}
+
+	send(t, conn, map[string]any{"prompt": "describe the sea"})
+	until(t, conn, "done")
+
+	file, err := server.sessionFile("node:n1")
+	if err != nil {
+		t.Fatalf("session file path: %v", err)
+	}
+	if _, err := os.Stat(file); !os.IsNotExist(err) {
+		t.Fatalf("a one-shot session wrote a conversation file: %v", err)
+	}
+}
+
 func TestSocketRelaysASettingChange(t *testing.T) {
 	gateway, _ := startAgentGateway(t)
 	conn := openSocket(t, gateway, "canvas-1")
@@ -352,7 +403,7 @@ func TestSocketGoingAwayReplaysTheConversation(t *testing.T) {
 	}
 
 	// A new connection: a new process, and the words from the file — not an empty conversation.
-	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/canvas-1"
+	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/canvas-1?history=1"
 	next, err := comfy.DialWS(context.Background(), url)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
@@ -416,7 +467,7 @@ func TestDeletingASessionForgetsTheConversation(t *testing.T) {
 	}
 
 	// The next connection is a new conversation: nothing to replay.
-	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/canvas-1"
+	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/canvas-1?history=1"
 	next, err := comfy.DialWS(context.Background(), url)
 	if err != nil {
 		t.Fatalf("dial: %v", err)

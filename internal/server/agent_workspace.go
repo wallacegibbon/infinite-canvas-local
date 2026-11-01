@@ -112,20 +112,26 @@ func (s *Server) sessionFile(session string) (string, error) {
 	return filepath.Join(root, agentWorkspaceKey(session)+".session"), nil
 }
 
-// agentOptionsFor is what one session's spawn needs, which is the shared options plus a workspace and a
-// conversation file of its own.
-func (s *Server) agentOptionsFor(session string) (agent.SpawnOptions, error) {
+// agentOptionsFor is what one session's spawn needs: the shared options, a workspace of its own and — when
+// the client says this name is a conversation rather than a question — a session file to keep it in.
+//
+// A node's agent is asked one thing at a time and writes the answer into the node; keeping that in a file
+// would leave one per node on disk, and would carry an earlier question into the next answer.
+func (s *Server) agentOptionsFor(session string, history bool) (agent.SpawnOptions, error) {
 	opts := s.agentOptions()
 	dir, err := s.prepareAgentWorkspace(session)
 	if err != nil {
 		return opts, err
 	}
+	opts.ConfigPath = dir
+	opts.WorkDir = dir
+	if !history {
+		return opts, nil
+	}
 	file, err := s.sessionFile(session)
 	if err != nil {
 		return opts, err
 	}
-	opts.ConfigPath = dir
-	opts.WorkDir = dir
 	opts.Session = file
 	return opts, nil
 }

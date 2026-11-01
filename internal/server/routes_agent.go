@@ -118,7 +118,11 @@ func (s *Server) handleAgentSocket(ctx *httpx.Ctx) error {
 		return conn.WriteText(payload)
 	}
 
-	options, err := s.agentOptionsFor(id)
+	// Whether this name keeps a conversation is the client's answer, not the gateway's: a canvas panel is a
+	// dialogue with a history and asks for one, a node's reverse-prompt is one question and does not.
+	// File processes under names — do not teach it which names mean what.
+	history := ctx.R.URL.Query().Get("history") == "1"
+	options, err := s.agentOptionsFor(id, history)
 	if err != nil {
 		if s.logger != nil {
 			s.logger.Warn("agent: socket %q has no workspace: %v", id, err)
