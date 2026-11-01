@@ -3437,3 +3437,34 @@ words as sent) and `TestOneShotSessionKeepsNoFile` (a socket without the flag pr
 `sessionFile("node:n1")` does not exist). In a browser against a real AlayaCore: after a reload the replayed
 conversation still drew, and a new turn showed the typed sentence once — with the answer appearing under it
 as it streamed — while nothing was added by the submit handler.
+
+## 105. Sending is never blocked, and the queue is visible
+
+**Decision** The panel no longer refuses to send while a turn is in flight, and it shows the agent's steering
+queue above the input: `N 条消息已排队,会在当前步骤之后插入`. The gateway relays AlayaCore's
+`SM steering` frames as `{type:"steering", phase:"queued"|"delivered"}`; the panel counts what is queued
+minus what has been delivered. The "End conversation" button in the header is gone, and with it
+`canvas.agent.end`.
+
+**Why** AlayaCore has its own queue. A message sent into a running task is inserted between the agent's steps
+— that is in the gateway's own reading loop, which explicitly may not assume one prompt equals one answer —
+so a send button that goes dead for the length of a three-hundred-word answer is the panel inventing a
+limitation the agent does not have.
+
+But queueing invisibly is its own problem: the message is accepted and then nothing happens for a while, which
+looks exactly like a message that was lost. AlayaCore already announces both ends of the queue
+(`phase: queued` when it takes the message, `phase: delivered` when it works it in), so the panel says so,
+where the message was sent from.
+
+The End conversation button promised something that stopped being true when conversations moved into session
+files: it closed the socket and released the process, and the next open replayed the conversation anyway. A
+button that claims to end a conversation and does not is worse than no button — closing the panel is the only
+"leave" the panel has, and deleting the canvas is the only end.
+
+**Tested** Gateway: `TestSocketRelaysTheSteeringQueue` (the two phases arrive in order). In a browser against a
+real AlayaCore: a 300-word request was sent, the send button stayed enabled while it streamed, a second
+message was accepted mid-answer — the line above the input read `1 条消息已排队,会在当前步骤之后插入` and then
+disappeared when delivered — and both messages and both answers ended up in the transcript in order. The
+gateway log shows the pair:
+`<< SM {"type":"steering","data":{"phase":"queued"…` then `…"phase":"delivered"}`. The header now lists only
+`关闭` and `发送`.

@@ -9,7 +9,7 @@ import { CANVAS_DIALOG_CONTENT } from "@/lib/canvas-overlay";
 import { referenceBlock, referenceLine, withoutReferences } from "@/lib/canvas/agent-references";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { AgentSettingsControls } from "./agent-settings-controls";
-import { cancelAgentSession, canvasAgent, closeAgentSession, endAgentSession, onAgentEvent, openAgentSession, sendAgentMessage, type AgentEvent } from "@/services/api/agent";
+import { cancelAgentSession, canvasAgent, closeAgentSession, onAgentEvent, openAgentSession, sendAgentMessage, type AgentEvent } from "@/services/api/agent";
 import { useCanvasAgentStore } from "@/stores/canvas/use-canvas-agent-store";
 import { useEffectiveConfig } from "@/stores/use-config-store";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
@@ -72,6 +72,8 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
     const [draft, setDraft] = useState("");
     const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "closed">("idle");
     const [busy, setBusy] = useState(false);
+    /** How many of this panel's messages are waiting in the agent's queue for a running task. */
+    const [steering, setSteering] = useState(0);
     /** The nodes this draft mentions, by id. They travel with the message as context. */
     const [cited, setCited] = useState<string[]>([]);
 
@@ -109,6 +111,12 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
     useEffect(() => onAgentEvent(session, applyEvent), [session]);
 
     const applyEvent = (event: AgentEvent) => {
+        if (event.type === "steering") {
+            // The agent's own count of what it has taken and not yet used. Sending into a running task is
+            // queueing, and a queue nobody can see is a message that looks lost.
+            setSteering((current) => (event.phase === "queued" ? current + 1 : Math.max(0, current - 1)));
+            return;
+        }
         if (event.type === "user") {
             // The agent echoing what the canvas sent. This is the only place a user message comes from,
             // which is why a reloaded conversation and a live one look the same: both are the agent's.
@@ -119,6 +127,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
             // The agent has just said what its conversation is. That is the whole truth about this
             // panel's past — a reload left nothing on screen, and a reopened panel may have been
             // showing a copy that the file has since moved past — so it replaces, and it does not append.
+            setSteering(0);
             setMessages(
                 (event.history || []).map((entry) => ({
                     id: nextId(),
@@ -135,6 +144,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         if (event.type === "closed") {
             setStatus("closed");
             setBusy(false);
+            setSteering(0);
             setMessages((current) => current.map((message) => (message.streaming ? { ...message, streaming: false } : message)));
             return;
         }
@@ -149,12 +159,12 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         }
         if (event.type === "delta" || event.type === "reasoning" || event.type === "tool_call" || event.type === "tool_result") {
             setMessages((current) => {
-                const last = current[current.length - 1];
-                // The answer's message starts where the answer starts: nothing about this panel is written
-                // before the agent has said it.
-                const started = last && last.role === "assistant" && last.streaming;
-                const from = started ? last : { id: nextId(), role: "assistant" as const, text: "", reasoning: "", tools: [], streaming: true };
-                const previous = started ? current.slice(0, -1) : current;
+                // The answer that is still being written, wherever it sits: a message sent while one is in
+                // flight is echoed above it, and the answer continues in its own bubble rather than
+                // splitting into a second one.
+                const open = current.findLastIndex((message) => message.role === "assistant" && message.streaming);
+                const started = open >= 0 ? current[open] : null;
+                const from = started || { id: nextId(), role: "assistant" as const, text: "", reasoning: "", tools: [], streaming: true };
                 const updated = { ...from };
                 if (event.type === "delta") updated.text = from.text + (event.text || "");
                 else if (event.type === "reasoning") updated.reasoning = from.reasoning + (event.text || "");
@@ -171,14 +181,18 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
                     });
                     updated.tools = from.tools.some((step) => step.callId === callId) ? from.tools.map((step) => (step.callId === callId ? merge(step) : step)) : [...from.tools, merge({ callId, name: "tool" })];
                 } else updated.tools = from.tools.map((step) => (step.callId === event.callId ? { ...step, output: event.output } : step));
-                return [...previous, updated];
+                // In place, not at the end: the answer belongs to the question above it, and a message that
+                // arrives while it is being written does not take it over.
+                return started ? [...current.slice(0, open), updated, ...current.slice(open + 1)] : [...current, updated];
             });
         }
     };
 
     const submit = async () => {
         const text = draft.trim();
-        if (!text || busy) return;
+        // Not `busy`: AlayaCore queues, and a message sent mid-loop is inserted between the agent's steps.
+        // Refusing to send would only make the user wait for a turn that may be long.
+        if (!text) return;
         // Sending into a socket that is not open would drop the message and leave the panel stuck on a
         // turn that never ends, so the conversation is opened (or reopened) first. It is idempotent.
         try {
@@ -193,13 +207,6 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         setCited([]);
         setBusy(true);
         sendAgentMessage(session, { prompt: context + text });
-    };
-
-    const closeSession = () => {
-        endAgentSession(session);
-        setStatus("closed");
-        setBusy(false);
-        setMessages([]);
     };
 
     // --- dragging ---------------------------------------------------------------------------------------
@@ -360,12 +367,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
                 <Bot className="size-4 shrink-0" style={{ color: theme.node.activeStroke }} />
                 <span className="text-sm font-medium">{t("canvas.agent.title")}</span>
                 <span className="truncate text-xs opacity-60">{status === "connected" ? t("canvas.agent.connected") : status === "connecting" ? t("canvas.agent.connecting") : t("canvas.agent.disconnected")}</span>
-                {status === "connected" ? (
-                    <button type="button" className="ml-auto rounded p-1 text-xs opacity-60 hover:opacity-100" onClick={closeSession} title={t("canvas.agent.end")} aria-label={t("canvas.agent.end")}>
-                        <Square className="size-3" />
-                    </button>
-                ) : null}
-                <button type="button" className={cn("rounded p-1 opacity-60 hover:opacity-100", status === "connected" ? "" : "ml-auto")} onClick={() => setOpen(false)} title={t("canvas.agent.close")} aria-label={t("canvas.agent.close")}>
+                <button type="button" className="ml-auto rounded p-1 opacity-60 hover:opacity-100" onClick={() => setOpen(false)} title={t("canvas.agent.close")} aria-label={t("canvas.agent.close")}>
                     <X className="size-3.5" />
                 </button>
             </div>
@@ -419,6 +421,14 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
             </div>
 
             <div className="relative border-t px-2 py-2" style={{ borderColor: theme.toolbar.border }}>
+                {steering > 0 ? (
+                    // Sending into a running task queues the message; a queue nobody can see looks like a
+                    // message that was lost, so it is counted right where it was sent from.
+                    <p className="flex items-center gap-1.5 px-1 pb-1 text-[11px] opacity-60">
+                        <LoaderCircle className="size-3 animate-spin" />
+                        {t("canvas.agent.steeringQueued", { count: steering })}
+                    </p>
+                ) : null}
                 <textarea
                     ref={inputRef}
                     value={draft}
@@ -444,7 +454,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
                         type="button"
                         className="rounded-full p-2 hover:opacity-80 disabled:opacity-30"
                         style={{ background: theme.node.fill, border: `1px solid ${theme.node.stroke}` }}
-                        disabled={!draft.trim() || busy}
+                        disabled={!draft.trim()}
                         onClick={() => void submit()}
                         title={t("canvas.agent.send")}
                         aria-label={t("canvas.agent.send")}

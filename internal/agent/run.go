@@ -193,6 +193,14 @@ func turnStep(state *startup, frame *Frame, hasPrompt bool, emit func(Event)) (e
 			if sessionState(data) == "closed" {
 				return true
 			}
+		case "steering":
+			// A message sent while the agent was working: it says when it queued it and when it used it.
+			var payload struct {
+				Phase string `json:"phase"`
+			}
+			if json.Unmarshal(data, &payload) == nil && payload.Phase != "" {
+				emit(Event{Type: "steering", Phase: payload.Phase})
+			}
 		case "error":
 			emit(systemError(data))
 		default:

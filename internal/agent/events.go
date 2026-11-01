@@ -27,6 +27,10 @@ type Event struct {
 	// command: the agent's answer to a CI frame
 	OK bool `json:"ok,omitempty"`
 
+	// steering: `queued` when a message sent into a running task was taken into the queue, `delivered`
+	// when the agent has worked it into the conversation.
+	Phase string `json:"phase,omitempty"`
+
 	// tool_call, tool_result: what the agent did between two sentences. A built-in tool runs inside
 	// AlayaCore, so both frames come back from it — the gateway relays them and answers neither.
 	CallID string `json:"callId,omitempty"`

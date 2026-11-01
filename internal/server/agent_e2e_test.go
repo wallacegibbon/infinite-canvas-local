@@ -53,12 +53,14 @@ while IFS= read -r line; do
       printf '%s\n' "$line"
       if [ -n "$SESSION" ]; then printf '%s\n' "$line" >> "$SESSION"; fi ;;
     UE)
+      printf 'SM{"type":"steering","data":{"phase":"queued","text":"steering queued"}}\n'
       printf 'SM{"type":"task","data":{"in_progress":true,"current_step":1,"context_tokens":5}}\n'
       printf 'AF{"call_id":"call-1","name":"read_file","id":"3"}\n'
       printf 'AF{"call_id":"call-1","input":{"path":"/skills/SKILL.md"},"id":"3"}\n'
       printf 'UF{"call_id":"call-1","output":[{"type":"text","text":"a file"}],"id":"4"}\n'
       printf 'Ax{"id":"2","type":"text","text":"hello "}\n'
       printf 'Ax{"id":"2","type":"text","text":"world"}\n'
+      printf 'SM{"type":"steering","data":{"phase":"delivered"}}\n'
       printf 'SM{"type":"task","data":{"in_progress":false,"context_tokens":9}}\n'
       if [ -n "$SESSION" ]; then printf 'AX{"type":"text","text":"hello world"}\n' >> "$SESSION"; fi ;;
   esac
@@ -299,6 +301,25 @@ func TestOneShotSessionKeepsNoFile(t *testing.T) {
 	}
 	if _, err := os.Stat(file); !os.IsNotExist(err) {
 		t.Fatalf("a one-shot session wrote a conversation file: %v", err)
+	}
+}
+
+// TestSocketRelaysTheSteeringQueue: a message sent into a running task is queued by the agent, which says so
+// and later says when it used it. The panel shows the difference; the gateway only carries it.
+func TestSocketRelaysTheSteeringQueue(t *testing.T) {
+	gateway, _ := startAgentGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+
+	send(t, conn, map[string]any{"prompt": "write a long one"})
+	seen := until(t, conn, "done")
+	var phases []string
+	for _, event := range seen {
+		if event["type"] == "steering" {
+			phases = append(phases, event["phase"].(string))
+		}
+	}
+	if len(phases) != 2 || phases[0] != "queued" || phases[1] != "delivered" {
+		t.Fatalf("steering phases = %v, want queued then delivered", phases)
 	}
 }
 
