@@ -111,9 +111,9 @@ not exhaustive.
 
 ## 7. Chinese prose remains in the vendored canvas and plugin subtree
 
-**Where** `infinite-canvas/plugins/` — 63 tracked files, 454 Chinese lines: plugin `README.md`s, plugin
+**Where** `canvas/plugins/` — 63 tracked files, 454 Chinese lines: plugin `README.md`s, plugin
 components, the SDK, the build scripts, the `SKILL.md` agent instructions and `packages.json` metadata.
-Plus `infinite-canvas/CHANGELOG.md` (265 Chinese lines of release history).
+Plus `canvas/CHANGELOG.md` (265 Chinese lines of release history).
 
 **Why it is listed** [`decisions.md`](decisions.md) #17 requires English for documentation and comments.
 These files came in with the upstream canvas subtree and predate the rule. The READMEs and the ~163
@@ -143,7 +143,7 @@ over ~3,200 objects, and most of it is history of files that are no longer here 
 ```bash
 pip install --user git-filter-repo
 git filter-repo --invert-paths \
-  --path infinite-canvas/web/dist \
+  --path canvas/web/dist \
   --path-glob '*/T5_tokenizer/*'
 ```
 

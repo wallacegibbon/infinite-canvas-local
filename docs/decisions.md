@@ -43,12 +43,12 @@ close). Reconnect logic lives in the caller.
 
 **Decision** `main.go`, `internal/`, `go.mod`, `Makefile` and the runtime assets (`workflows/`,
 `resources/`, `prompts/`) sit at the top level; the canvas frontend is a sibling subtree in
-`infinite-canvas/`.
+`canvas/`.
 
 **Why** The repository _is_ a Go service with one vendored frontend. An extra `gateway/`
 directory only made sense while a second, Node implementation lived next to it.
 
-**Cost** `go build ./...` would walk `infinite-canvas/web/node_modules`, so the Makefile uses an
+**Cost** `go build ./...` would walk `canvas/web/node_modules`, so the Makefile uses an
 explicit package list (`. ./internal/...`). Measured difference: `go vet` 0.64 s vs 0.89 s, plus
 protection from a stray `.go` file inside an npm package.
 
@@ -117,7 +117,7 @@ reshuffle the canvas image-mode selector on every refresh.
 ## 8. Backend messages are English; localization lives only in the frontend
 
 **Decision** Log lines, error messages and warnings are English. Translation happens in
-`infinite-canvas/web/src/i18n`. Error `code` values are stable identifiers
+`canvas/web/src/i18n`. Error `code` values are stable identifiers
 (`model_not_found`, `missing_reference_image`, …).
 
 **Why** One backend, two UI languages. Translating backend text would mean shipping a locale to
@@ -266,7 +266,7 @@ A gateway that restarts it would race with whatever the user is doing.
 
 **Decision** Documentation, code comments, log lines, error messages and commit messages are
 English. User-visible copy is not written in the source at all: it lives in the i18n
-dictionaries (`infinite-canvas/web/src/i18n`) and is translated there. The two exceptions are
+dictionaries (`canvas/web/src/i18n`) and is translated there. The two exceptions are
 the ones already argued for: model-facing Chinese and protocol values (#9), and UI copy as
 data (#8).
 
@@ -301,8 +301,8 @@ there was nothing to keep. Removing it lets installs go back to strict peer reso
 **Cost** Anyone who later wants ProTable/ProForm has to add the package back, and antd 6
 support becomes a prerequisite for that work.
 
-**Where** `infinite-canvas/web/package.json`,
-`infinite-canvas/web/src/components/layout/app-providers.tsx`. The rendered output is
+**Where** `canvas/web/package.json`,
+`canvas/web/src/components/layout/app-providers.tsx`. The rendered output is
 unchanged — the built page still emits `class="css-1tzwyuk ant-app"` and
 `--ant-color-bg-base:#000`, i.e. the same antd hashed theme as before the removal.
 
@@ -361,7 +361,7 @@ helper asks `getFixedT("zh-CN")` and only when `resolvedLanguage` is `zh-CN`.
 dictionary (Chinese, this UI). A workflow added by hand shows English in both languages until
 someone adds the zh entries — visible, not silent.
 
-**Where** `workflows/registry.json`, `infinite-canvas/web/src/lib/gateway-labels.ts`,
+**Where** `workflows/registry.json`, `canvas/web/src/lib/gateway-labels.ts`,
 `web/src/i18n/locales/zh-CN.ts` (`gateway.models`, `gateway.variants`), `use-config-store.ts`
 (`modelOptionLabel`, `baseModelOptions`), `resource-center-panel.tsx` (variant list).
 
@@ -477,7 +477,7 @@ library that is no longer installed. `design-tokens.ts` and the `:root` / `.dark
 `globals.css` cannot import each other, so changing a semantic colour is two edits — both
 file headers say so.
 
-**Where** `infinite-canvas/web/src/lib/canvas-overlay.ts`, `design-tokens.ts`, `app-theme.ts`,
+**Where** `canvas/web/src/lib/canvas-overlay.ts`, `design-tokens.ts`, `app-theme.ts`,
 `canvas-theme.ts`, `styles/globals.css`, `components/canvas/infinite-canvas.tsx`,
 `canvas-context-menu.tsx`, `canvas-size-picker.tsx`, `canvas-resource-mention-textarea.tsx`.
 
@@ -513,7 +513,7 @@ as a size optimisation.
 one-for-one, no bare `message` identifier is left in application code, and the three files
 that keep `modal` still destructure it correctly.
 
-**Where** `infinite-canvas/web/src/components/kit/toast.ts`,
+**Where** `canvas/web/src/components/kit/toast.ts`,
 `components/layout/app-providers.tsx`, `package.json` (sonner), and the 20 migrated files.
 
 ---
@@ -541,7 +541,7 @@ That behaviour had to be reimplemented by hand, so if someone later "cleans up" 
 async cases will start closing early. The styling is also ours now — it is meant to look like the
 antd dialogs around it, and will need a touch-up if the surrounding design moves.
 
-**Where** `infinite-canvas/web/src/components/kit/confirm.tsx`,
+**Where** `canvas/web/src/components/kit/confirm.tsx`,
 `components/layout/app-providers.tsx`, the three call sites above.
 
 ---
@@ -568,7 +568,7 @@ assertions and the gate are gone too. The suite is 11 passing, no skips.
 selection. There are no component or canvas interaction tests, so the overlay guards and the
 kit primitives (toast, confirm) are still verified by hand.
 
-**Where** `infinite-canvas/web/package.json`, `vitest.config.ts`, `tests/*.test.ts`.
+**Where** `canvas/web/package.json`, `vitest.config.ts`, `tests/*.test.ts`.
 
 ---
 
@@ -979,7 +979,7 @@ renders is not an API.
 change made where its intent is obvious. The cost of the alternative is permanent: a reader cannot
 distinguish a narrower module from one that happens to have no callers today.
 
-**Where** `infinite-canvas/web/src/**`, and the commit that removed the sixteen dead symbols.
+**Where** `canvas/web/src/**`, and the commit that removed the sixteen dead symbols.
 
 ---
 
@@ -1115,7 +1115,7 @@ switching used to mean leaving the canvas for the list page), `components/canvas
 
 ## 41. `npm run check` is the third gate, because the compiler cannot see these two bugs
 
-**Decision** Two scripts in `infinite-canvas/web/scripts/` run as `npm run check:i18n` and
+**Decision** Two scripts in `canvas/web/scripts/` run as `npm run check:i18n` and
 `npm run check:exports`, together with `tsc --noEmit` under `npm run check`.
 
 **Why they exist** Both catch a class of bug that type-checks, builds, and passes tests while
@@ -1150,7 +1150,7 @@ never page furniture: they are stop-generation, export, clipboard and failure me
 _by_ the canvas. `canvas.project.*` keeps the list-management keys, which is what "project"
 actually means here.
 
-**Where** `infinite-canvas/web/scripts/check-i18n.cjs`, `scripts/check-exports.cjs`,
+**Where** `canvas/web/scripts/check-i18n.cjs`, `scripts/check-exports.cjs`,
 `package.json`.
 
 ## 42. Ten "which node has which dialog open" states become one
@@ -1192,7 +1192,7 @@ panel open while a crop dialog floats above it). Only the modal ten were collaps
 **Cost** 52 `useState` in the component became 43. The diff is 59 insertions and 64 deletions,
 almost all of them mechanical renames the compiler checked.
 
-**Where** `infinite-canvas/web/src/pages/canvas/project.tsx`.
+**Where** `canvas/web/src/pages/canvas/project.tsx`.
 
 ## 43. The node editors are a module with a nine-key contract, not a closure
 
@@ -1229,7 +1229,7 @@ because each hook carries its own imports and the contract type is written down 
 implicit. The win is that "what a node editor may touch" is now a 23-line type you can read in one
 screen, and that proving an editor correct no longer means standing up a 3,459-line component.
 
-**Where** `infinite-canvas/web/src/pages/canvas/hooks/`, `infinite-canvas/web/src/lib/canvas/`.
+**Where** `canvas/web/src/pages/canvas/hooks/`, `canvas/web/src/lib/canvas/`.
 
 ## 44. `handleGenerateNode` was 440 lines and four of them did not talk to each other
 
@@ -1262,7 +1262,7 @@ difference. It stays where it is, at ~340 lines, and is the next thing worth its
 stamping in `catch` — because they are about the canvas, not about one request. The five setters and
 the two registry calls go in as `GenerationRunDeps`, the same shape as `NodeEditorDeps` (#43).
 
-**Where** `infinite-canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`.
+**Where** `canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`.
 
 ## 45. Retry joins the generation module, and `project.tsx` drops under 3,000
 
@@ -1297,7 +1297,7 @@ context menu work, and the console is empty. The body is a byte-identical move a
 type-checked, but the runtime path itself remains unexercised — worth one click from a human on a
 node that has actually failed.
 
-**Where** `infinite-canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`.
+**Where** `canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`.
 
 ## 46. Three pieces of housekeeping, and what two of them turned out to be
 
@@ -1398,7 +1398,7 @@ is now exactly zero, which is a stronger statement than "tsc passes".
 `File` built from a canvas and a `DataTransfer`: a node titled `ingress-test.png` appeared with its
 image, selected, composer open, and was deleted afterwards. Console empty.
 
-**Where** `infinite-canvas/web/src/pages/canvas/hooks/use-content-ingress.ts`.
+**Where** `canvas/web/src/pages/canvas/hooks/use-content-ingress.ts`.
 
 ## 48. Three small correctness fixes found by a full read of the frontend
 
@@ -1902,7 +1902,7 @@ abort-cancels-only-when-asked, relative output URLs) and `tests/canvas-resumable
 (which nodes survive a reload). End to end against a real ComfyUI with the exact payload the canvas
 sends: a run reached `succeeded` 30/30 and the downloaded mp3 played; `opus` came back as Ogg/Opus.
 
-**Where** `infinite-canvas/web/src/services/api/runs.ts`, `services/api/audio.ts`,
+**Where** `canvas/web/src/services/api/runs.ts`, `services/api/audio.ts`,
 `pages/canvas/hooks/use-generation-runs.ts`, `pages/canvas/project.tsx`,
 `lib/canvas/canvas-generation-helpers.ts`.
 
@@ -1954,7 +1954,7 @@ user stop.
 
 **Where** `internal/server/postprocess.go`, `internal/server/routes_runs.go`,
 `internal/server/routes_video.go`, `internal/workflow/inputs.go`,
-`infinite-canvas/web/src/services/api/video.ts`, `services/api/runs.ts`, `pages/canvas/project.tsx`,
+`canvas/web/src/services/api/video.ts`, `services/api/runs.ts`, `pages/canvas/project.tsx`,
 `docs/protocol.md`.
 
 ## 60. An interrupted image batch reattaches to its run
@@ -1979,7 +1979,7 @@ anyway. Retrying is a deliberate, short action; the batch is the one that can qu
 the restore pass (and one with content, or of another type, does not). The fill-and-resume path was
 exercised against the real gateway during the image migration.
 
-**Where** `infinite-canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`,
+**Where** `canvas/web/src/pages/canvas/hooks/use-generation-runs.ts`,
 `lib/canvas/canvas-generation-helpers.ts`, `pages/canvas/project.tsx`, `types/canvas.ts`.
 
 ## 61. The last generation adapters, and why one of them is not a run
@@ -2015,7 +2015,7 @@ the request was accepted, the graph was built with the clip wired into `LoadVide
 `missing_node_type` error came back on the run — the same failure the adapter produced on that
 machine, since the SeedVR2 custom node is not installed there.
 
-**Where** `infinite-canvas/web/src/services/api/video.ts`, `services/api/image.ts`,
+**Where** `canvas/web/src/services/api/video.ts`, `services/api/image.ts`,
 `pages/canvas/hooks/use-video-editors.ts`, `docs/protocol.md`, `docs/gateway.md`.
 
 ## 62. Frame interpolation is a workflow, not a run input
@@ -2070,7 +2070,7 @@ reports.
 
 **Where** `workflows/video-rife.json`, `workflows/registry.json`, `internal/workflow/bindings.go`,
 `internal/workflow/loaders.go`, `internal/server/routes_video.go`, `internal/server/routes_runs.go`,
-`infinite-canvas/web/src/services/api/video.ts`.
+`canvas/web/src/services/api/video.ts`.
 
 ## 63. An input is a key that reaches something
 
@@ -2133,7 +2133,7 @@ the setup status totals and in `missing.nodes` (models and tools alike), and a w
 
 **Where** `internal/workflow/entry.go`, `internal/workflow/render.go`, `internal/setup/scan.go`,
 `internal/server/routes_admin.go`, `internal/resource/status.go`, `workflows/registry.json`,
-`resources/index.json`, `infinite-canvas/web/src/lib/canvas/tool-workflows.ts`.
+`resources/index.json`, `canvas/web/src/lib/canvas/tool-workflows.ts`.
 
 ## 65. The image upscaler is a run, and a tool workflow takes exactly one item
 
@@ -2173,9 +2173,9 @@ message). In the browser: the 放大 dialog listed the three ESRGAN models from 
 submitted a run, and produced a 4096×4096 PNG node.
 
 **Where** `internal/server/routes_generation.go`, `internal/server/routes_admin.go`,
-`workflows/registry.json`, `infinite-canvas/web/src/services/api/workflows.ts`,
-`infinite-canvas/web/src/services/api/image.ts`,
-`infinite-canvas/web/src/components/canvas/canvas-node-super-resolve-dialog.tsx`.
+`workflows/registry.json`, `canvas/web/src/services/api/workflows.ts`,
+`canvas/web/src/services/api/image.ts`,
+`canvas/web/src/components/canvas/canvas-node-super-resolve-dialog.tsx`.
 
 ## 66. Everything under `workflows/` is English _(the one path it kept was not the author's, see #117)_
 
@@ -2205,13 +2205,13 @@ pass has to be applied again. The registry is the part that matters, and it is m
 in the resource panel, with no key indirection. That is #67; it could not be fixed by editing JSON
 alone.
 
-**Where** `workflows/*.json`, `workflows/registry.json`, `infinite-canvas/web/src/i18n/locales/zh-CN.ts`.
+**Where** `workflows/*.json`, `workflows/registry.json`, `canvas/web/src/i18n/locales/zh-CN.ts`.
 
 ## 67. The resource catalogue is English; its Chinese lives beside the app _(one of the two paths was not upstream's, see #117)_
 
 **Decision** `resources/index.json` carries no Chinese copy — pack `label`/`description`, resource
 `label`/`note`/`license` are English. The Chinese sits in
-`infinite-canvas/web/src/lib/resource-copy-zh.ts`, keyed by pack/resource id, and
+`canvas/web/src/lib/resource-copy-zh.ts`, keyed by pack/resource id, and
 `ResourceCenterPanel` looks it up before falling back to the index text. Vendored third-party content
 under `resources/payload/**` is untouched: it is the upstream author's text, not ours.
 
@@ -2238,8 +2238,8 @@ index itself containing Chinese only in `target`. In the browser: the Add-workfl
 English with the language set to English and in Chinese with it set to 中文, over the same rows,
 including the LoRA whose path stays Chinese.
 
-**Where** `resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`,
-`infinite-canvas/web/src/components/settings/resource-center-panel.tsx`.
+**Where** `resources/index.json`, `canvas/web/src/lib/resource-copy-zh.ts`,
+`canvas/web/src/components/settings/resource-center-panel.tsx`.
 
 ## 68. There is no `/v1/models`; a workflow reports the ids it answers to
 
@@ -2279,9 +2279,9 @@ base-model sub-dropdown still lists `默认底模 / z_image_bf16 / int8`, and a 
 returned three images.
 
 **Where** `internal/server/routes_admin.go`, `internal/server/e2e_test.go`,
-`infinite-canvas/web/src/services/api/workflows.ts`,
-`infinite-canvas/web/src/hooks/use-local-gateway-sync.ts`,
-`infinite-canvas/web/src/lib/gateway-models.ts`, `infinite-canvas/web/src/services/api/image.ts`
+`canvas/web/src/services/api/workflows.ts`,
+`canvas/web/src/hooks/use-local-gateway-sync.ts`,
+`canvas/web/src/lib/gateway-models.ts`, `canvas/web/src/services/api/image.ts`
 (`fetchChannelModels`).
 
 ## 69. `/v1` is gone
@@ -2325,7 +2325,7 @@ page load syncs its models, generates an image, and lists the workflows with no 
 
 **Where** `internal/server/routes_generation.go`, `internal/server/routes_video.go` (deleted),
 `internal/server/runs.go`, `internal/server/server.go`, `internal/server/helpers.go`,
-`infinite-canvas/web/src/services/api/{image,video,audio}.ts`, `docs/protocol.md`, `docs/gateway.md`,
+`canvas/web/src/services/api/{image,video,audio}.ts`, `docs/protocol.md`, `docs/gateway.md`,
 `README.md`.
 
 ## 70. Saved names are keys, not translations
@@ -2362,13 +2362,13 @@ stored "音频" becomes `canvas.nodeTypes.audio`, a typed title and an explicit 
 browser: the existing canvas, created in Chinese, shows "Audio" and "Local ComfyUI" in English, and
 "音频" / "本地 ComfyUI" again after switching back — with nothing edited in between.
 
-**Where** `infinite-canvas/web/src/lib/canvas/node-title.ts`,
-`infinite-canvas/web/src/constant/canvas.ts`,
-`infinite-canvas/web/src/stores/canvas/canvas-persist.ts`,
-`infinite-canvas/web/src/stores/use-config-store.ts`,
-`infinite-canvas/web/src/components/canvas/canvas-node.tsx`,
-`infinite-canvas/web/src/pages/canvas/hooks/use-image-editors.ts`,
-`infinite-canvas/web/src/pages/canvas/project.tsx`.
+**Where** `canvas/web/src/lib/canvas/node-title.ts`,
+`canvas/web/src/constant/canvas.ts`,
+`canvas/web/src/stores/canvas/canvas-persist.ts`,
+`canvas/web/src/stores/use-config-store.ts`,
+`canvas/web/src/components/canvas/canvas-node.tsx`,
+`canvas/web/src/pages/canvas/hooks/use-image-editors.ts`,
+`canvas/web/src/pages/canvas/project.tsx`.
 
 ## 71. There is one channel, and it is the gateway the page came from
 
@@ -2389,10 +2389,10 @@ user wants it to be.
 on read: the first channel that points at this gateway wins, the rest are dropped, and a backup of the
 original blob is left in `localStorage` under `…:pre-local-only-backup`.
 
-**Where** `infinite-canvas/web/src/constant/app-mode.ts`,
-`infinite-canvas/web/src/stores/use-config-store.ts` (`merge`),
-`infinite-canvas/web/src/components/settings/channel-editor-drawer.tsx`,
-`infinite-canvas/web/src/components/layout/client-root-init.tsx`.
+**Where** `canvas/web/src/constant/app-mode.ts`,
+`canvas/web/src/stores/use-config-store.ts` (`merge`),
+`canvas/web/src/components/settings/channel-editor-drawer.tsx`,
+`canvas/web/src/components/layout/client-root-init.tsx`.
 
 **Tested** `npm run check`, `npx vitest run` (the config-store merge cases), and in the browser: a cleared
 config syncs the gateway's workflow list, the editor shows one channel, and its address field does not
@@ -2428,11 +2428,11 @@ separately.
 17 models sync from `http://127.0.0.1:8190`, the stored channel address has no `/v1`, and a recorded
 network capture shows every gateway request on `/api/...` with no `/v1` path anywhere.
 
-**Where** `infinite-canvas/web/src/constant/app-mode.ts`, `start.sh`,
-`infinite-canvas/web/src/services/api/{runs,resources}.ts`,
-`infinite-canvas/web/src/components/canvas/canvas-system-status.tsx`,
-`infinite-canvas/web/src/pages/canvas/hooks/use-plugin-host.tsx`,
-`infinite-canvas/web/src/stores/use-config-store.ts`. (The `lib/local-session.ts` this list used to
+**Where** `canvas/web/src/constant/app-mode.ts`, `start.sh`,
+`canvas/web/src/services/api/{runs,resources}.ts`,
+`canvas/web/src/components/canvas/canvas-system-status.tsx`,
+`canvas/web/src/pages/canvas/hooks/use-plugin-host.tsx`,
+`canvas/web/src/stores/use-config-store.ts`. (The `lib/local-session.ts` this list used to
 name went in #109, and `POST /api/prompts/chat` — the endpoint #73 gave the prompt path — went in #76
 when prompts became the agent's socket.)
 
@@ -2480,12 +2480,12 @@ and the browser's own capture shows no `/v1` path on the gateway.
 
 **Where** `internal/prompt/optimizer.go` (`ChatRequest`, `Complete`, `chatMessages`),
 `internal/server/routes_generation.go` (`handlePromptChat`, `promptCloud`, `promptImageURLs`),
-`infinite-canvas/web/src/services/api/prompts.ts` (the four prompt routes, moved out of `image.ts`),
-`infinite-canvas/web/src/services/api/image.ts`,
-`infinite-canvas/web/src/pages/canvas/hooks/{use-generation-runs,use-plugin-host}.tsx`,
-`infinite-canvas/web/src/pages/canvas/project.tsx`,
-`infinite-canvas/web/src/stores/use-config-store.ts`,
-`infinite-canvas/web/src/components/canvas/{canvas-config-node-panel,canvas-node-prompt-panel}.tsx`.
+`canvas/web/src/services/api/prompts.ts` (the four prompt routes, moved out of `image.ts`),
+`canvas/web/src/services/api/image.ts`,
+`canvas/web/src/pages/canvas/hooks/{use-generation-runs,use-plugin-host}.tsx`,
+`canvas/web/src/pages/canvas/project.tsx`,
+`canvas/web/src/stores/use-config-store.ts`,
+`canvas/web/src/components/canvas/{canvas-config-node-panel,canvas-node-prompt-panel}.tsx`.
 
 ## 74. The prompt endpoint is called what it is, and text has no model
 
@@ -2532,14 +2532,14 @@ endpoint as "使用中", a text generation answered `孤灯向海，夜浪无声
 caption route returned a prompt with no `engine` field.
 
 **Where** `internal/prompt/optimizer.go`, `internal/server/routes_generation.go`,
-`infinite-canvas/web/src/lib/config-migration.ts`,
-`infinite-canvas/web/src/stores/use-config-store.ts`,
-`infinite-canvas/web/src/services/api/prompts.ts`,
-`infinite-canvas/web/src/components/canvas/canvas-prompt-endpoint-chip.tsx`,
-`infinite-canvas/web/src/components/canvas/canvas-node-prompt-panel.tsx`,
-`infinite-canvas/web/src/components/canvas/canvas-config-node-panel.tsx`,
-`infinite-canvas/web/src/components/settings/app-config-modal.tsx`,
-`infinite-canvas/web/src/types/canvas.ts`.
+`canvas/web/src/lib/config-migration.ts`,
+`canvas/web/src/stores/use-config-store.ts`,
+`canvas/web/src/services/api/prompts.ts`,
+`canvas/web/src/components/canvas/canvas-prompt-endpoint-chip.tsx`,
+`canvas/web/src/components/canvas/canvas-node-prompt-panel.tsx`,
+`canvas/web/src/components/canvas/canvas-config-node-panel.tsx`,
+`canvas/web/src/components/settings/app-config-modal.tsx`,
+`canvas/web/src/types/canvas.ts`.
 
 ## 75. Prompts are served by AlayaCore, and one instance belongs to one person
 
@@ -3932,7 +3932,7 @@ has to be updated when upstream moves. And a hash can only be added this way for
 one; a source that offers neither header still needs the bytes downloaded once.
 
 **Where** `resources/index.json`, `workflows/video-h3-ref2va-drama.json`,
-`infinite-canvas/web/src/lib/resource-copy-zh.ts`.
+`canvas/web/src/lib/resource-copy-zh.ts`.
 
 ## 119. Guanlan leaves: an optional download nobody needs
 
@@ -3964,7 +3964,7 @@ convenient to list.
 **Tested** `make check` and the canvas suite (133 tests) both pass; `resource-copy-zh.test.ts` is the gate
 that would have caught a zh dictionary key left pointing at a resource that no longer exists.
 
-**Where** `resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`.
+**Where** `resources/index.json`, `canvas/web/src/lib/resource-copy-zh.ts`.
 
 ## 120. taeh3 stops being a binary of unknown origin
 
@@ -4004,7 +4004,7 @@ only way to take the binary out of the repository without breaking three workflo
 is unaffected because `payloadPath` itself did not change. `resources/payload/` now contains node packs
 only.
 
-**Where** `resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`,
+**Where** `resources/index.json`, `canvas/web/src/lib/resource-copy-zh.ts`,
 `resources/payload/vae_approx/`.
 
 ## 121. Every vendored pack says which commit it is, and which files we changed
@@ -4152,7 +4152,7 @@ re-vendoring a dormant pack and hoping.
 
 **Where** `workflows/registry.json`, `resources/index.json`, `resources/payload/custom_nodes/`,
 `internal/resource/status.go`, `internal/workflow/loaders.go`, `internal/setup/paths.go`,
-`infinite-canvas/web/src/{lib/canvas,components/canvas,pages/canvas,services/api,i18n}`.
+`canvas/web/src/{lib/canvas,components/canvas,pages/canvas,services/api,i18n}`.
 ## 124. The no-VDN path leaves, and takes the last unlicensed pack with it
 
 **Decision** The three `-novdn` workflows, their graph, the LightX2V 8-step LoRA, the SolAttn pack, the
@@ -4194,7 +4194,7 @@ every pack reference resolves, and the 8 payload directories are exactly the 8 v
 
 **Where** `workflows/registry.json`, `workflows/video-h3-ref2va-drama.json` (deleted),
 `resources/index.json`, `resources/payload/custom_nodes/ComfyUI-SolAttn_triton` (deleted),
-`infinite-canvas/web/src/lib/canvas/video-model-mode.ts`, the two node panels, `video-settings-panel.tsx`,
+`canvas/web/src/lib/canvas/video-model-mode.ts`, the two node panels, `video-settings-panel.tsx`,
 `i18n/locales/*`, `lib/resource-copy-zh.ts`, `internal/workflow/media_test.go`.
 
 ## 125. Krea2 leaves: the second text-to-image family nobody opened
@@ -4230,7 +4230,7 @@ resources. `internal/generate`'s "a LoRA outside the family is rejected" fixture
 `krea2/anime.safetensors` to `other-family/anime.safetensors` — it needs a foreign name, not that one.
 
 **Where** `resources/index.json`, `workflows/registry.json`, `workflows/image-krea2-turbo.json` (deleted),
-`infinite-canvas/web/src/lib/resource-copy-zh.ts`, `README.md`, `internal/generate/generate_test.go`.
+`canvas/web/src/lib/resource-copy-zh.ts`, `README.md`, `internal/generate/generate_test.go`.
 ## 126. The node packs are no longer bundled
 
 **Decision** `resources/payload` is gone. All nine node resources install by downloading the
@@ -4278,7 +4278,7 @@ by the panel: the packs were deleted from the reference machine's `custom_nodes`
 exercises the new code.
 
 **Where** `internal/resource/jobs.go`, `internal/resource/install_extract_test.go` (new),
-`resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`, `resources/payload/` (deleted).
+`resources/index.json`, `canvas/web/src/lib/resource-copy-zh.ts`, `resources/payload/` (deleted).
 
 ## 128. `resources/index.json` becomes `catalogue.json` _(the name given in it was wrong, see #129)_
 
@@ -4308,7 +4308,7 @@ returns only #121–#127, which describe history.
 
 **Where** `catalogue.json` (moved), `internal/resource/{resource,jobs,helpers,status}.go`,
 `internal/config/config.go`, `internal/config/config_test.go`, `internal/resource/*_test.go`,
-`infinite-canvas/web/{src,tests}`, `README.md`, `docs/gateway.md`, `docs/known-issues.md`.
+`canvas/web/{src,tests}`, `README.md`, `docs/gateway.md`, `docs/known-issues.md`.
 
 ## 129. The file is `resources.json`, not `catalogue.json`
 
@@ -4333,7 +4333,7 @@ workflow row is called `resources`. Beside `workflows/` at the root it also stat
 **Tested** `gofmt`, `go vet`, `go test ./internal/...`, `tsc --noEmit`, 132 canvas tests. A tree-wide grep for
 `catalogue` now returns only #67, #121, #127 and #128, which are history.
 
-**Where** `resources.json` (moved), `internal/resource/`, `internal/config/`, `infinite-canvas/web/`,
+**Where** `resources.json` (moved), `internal/resource/`, `internal/config/`, `canvas/web/`,
 `README.md`, `docs/gateway.md`, `docs/known-issues.md`.
 
 ## 130. A pack's dependencies are derived from its graphs, not written down three times
@@ -4398,7 +4398,7 @@ count 3, 3, 3 and 20 required items.
 
 **Where** `resources.json`, `internal/resource/{derive.go (new),derive_test.go (new),
 catalogue_test.go (new),resource.go,status.go,helpers.go,jobs.go,bake_test.go,resource_test.go}`,
-`infinite-canvas/web/src/{services/api/resources.ts,components/settings/resource-center-panel.tsx,
+`canvas/web/src/{services/api/resources.ts,components/settings/resource-center-panel.tsx,
 lib/resource-copy-zh.ts}`, `internal/resource/payload_imports_test.go` (deleted).
 
 ## 131. `core` stops being a pack
@@ -4422,8 +4422,8 @@ remaining states are `planned`, `ready` and `missing N`; a pack offering only al
 still renders as a green row with an install checkbox.
 
 **Where** `resources.json`, `internal/resource/status.go`,
-`infinite-canvas/web/src/{components/settings/resource-center-panel.tsx,
-i18n/locales/{en-US,zh-CN}.ts,lib/resource-copy-zh.ts}`, `infinite-canvas/web/tests/resource-copy-zh.test.ts`,
+`canvas/web/src/{components/settings/resource-center-panel.tsx,
+i18n/locales/{en-US,zh-CN}.ts,lib/resource-copy-zh.ts}`, `canvas/web/tests/resource-copy-zh.test.ts`,
 `README.md`.
 
 ## 132. A node pack that is on disk but not loaded is not "missing"
@@ -4452,7 +4452,7 @@ to do it. A half-extracted pack would also read as `待重启`; restarting is th
 `gofmt`, `go vet`, `go test ./internal/...`, `tsc --noEmit`, 132 canvas tests.
 
 **Where** `internal/resource/{resource.go,status.go}`,
-`infinite-canvas/web/src/{services/api/resources.ts,components/settings/resource-center-panel.tsx,
+`canvas/web/src/{services/api/resources.ts,components/settings/resource-center-panel.tsx,
 i18n/locales/{en-US,zh-CN}.ts}`.
 
 ## 133. The tick means "and also download this", so it says so
@@ -4475,7 +4475,7 @@ the same rule that hides the pack's install button, and its tooltip explains tha
 **Tested** `tsc --noEmit`, 132 canvas tests, and the pack rows against the live status payload: five packs
 disabled (nothing left to download), `h3` and `interp` disabled for the restart reason, everything else as before.
 
-**Where** `infinite-canvas/web/src/{components/settings/resource-center-panel.tsx,i18n/locales/{en-US,zh-CN}.ts}`.
+**Where** `canvas/web/src/{components/settings/resource-center-panel.tsx,i18n/locales/{en-US,zh-CN}.ts}`.
 
 ## 134. A blocked mode does not hide the workflow
 
@@ -4504,7 +4504,7 @@ modeProblems: {inpaint: 2}`, every other workflow unchanged. `gofmt`, `go vet`, 
 `tsc --noEmit`, 132 canvas tests.
 
 **Where** `internal/setup/{scan.go,setup.go,scan_test.go}`, `internal/resource/{resource.go,status.go}`,
-`infinite-canvas/web/src/{services/api/{resources,workflows}.ts,lib/gateway-models.ts,stores/use-config-store.ts,
+`canvas/web/src/{services/api/{resources,workflows}.ts,lib/gateway-models.ts,stores/use-config-store.ts,
 components/image-settings-panel.tsx,components/canvas/canvas-image-settings-popover.tsx,
 components/settings/resource-center-panel.tsx,i18n/locales/{en-US,zh-CN}.ts}`.
 
@@ -4541,7 +4541,7 @@ qwenmultiangle]`, `optionalIds = []`, and every pack reporting `present == total
 `go test ./internal/...`, `tsc --noEmit`, 132 canvas tests.
 
 **Where** `internal/resource/{status.go,derive.go}`, `resources.json`,
-`infinite-canvas/web/src/components/settings/resource-center-panel.tsx`.
+`canvas/web/src/components/settings/resource-center-panel.tsx`.
 
 ## 136. The brush ring was behind the dialog it lives in
 
@@ -4567,5 +4567,40 @@ crosshair instead of the feature.
 canvas's own portals (context menu at 80, @-mention list at 120) are out of scope on purpose — the canvas is
 behind the dialog, so those can never be opened from inside one. `tsc --noEmit`, 134 canvas tests.
 
-**Where** `infinite-canvas/web/src/components/canvas/canvas-node-mask-edit-dialog.tsx`,
-`infinite-canvas/web/tests/overlay-z-index.test.ts` (new).
+**Where** `canvas/web/src/components/canvas/canvas-node-mask-edit-dialog.tsx`,
+`canvas/web/tests/overlay-z-index.test.ts` (new).
+
+## 137. `infinite-canvas/` becomes `canvas/`
+
+**Decision** The frontend subtree is now `canvas/`. The upstream project is still credited in the README's
+Credits section and its licence is still kept verbatim at `canvas/LICENSE`; only the directory name changed.
+
+**Why** A directory named after the project it was copied from makes a claim about its contents. This one has
+been reworked far past that claim: the dialogs are Radix instead of antd, the request layer calls a Go gateway
+that did not exist upstream, the editors (mask, outpaint, layout, angle) and their controls are ours, and the
+registry/resource model underneath them was written here. Someone reading the tree would take `infinite-canvas/`
+for a vendored copy that can be updated by re-copying, which is exactly the mistake this session kept paying for
+in other forms — the file that says one thing while the code does another. The name now says what the directory
+is: the canvas.
+
+**Credit stays where credit is read** The README names both upstream repositories, states that the frontend
+started as a copy of that UI and that the Go gateway is a port of the Node gateway, and keeps the MIT text at
+`canvas/LICENSE` unchanged. Renaming a directory is not a claim of authorship.
+
+**What moved** `WEB_DIR` and the three build comments in the `Makefile`, three paths in `start.sh` (vite binary,
+`dist/index.html`, the preview `cd`), four `.gitignore` rules, the README layout tree and Credits paragraph, and
+the "Where" lines in `docs/decisions.md` (#1–#136), which are how a reader follows a decision to its code —
+leaving them pointing at a path that no longer exists would have made the whole log unfollowable. The URLs in
+Credits were checked by hand afterwards, because a mechanical `infinite-canvas/` → `canvas/` is one character
+away from rewriting an upstream link.
+
+**Not renamed on purpose** `canvas/plugins/infinite-canvas/` keeps its name: that is the upstream plugin's *id*,
+declared inside its own `plugin.json` and in the marketplace entry, and it is data rather than a path we own.
+`canvas/web/package.json` still says `"name": "infinite-canvas"` for the same reason — it is the npm project's
+identity inside the subtree, not this repository's name for it.
+
+**Tested** `make web` builds into the new path, `make check`/`tsc`/134 tests pass, and a tree-wide grep for
+`infinite-canvas/` now returns nothing outside `canvas/plugins/infinite-canvas/` itself.
+
+**Where** `canvas/` (moved, 290 tracked files), `Makefile`, `start.sh`, `.gitignore`, `README.md`,
+`docs/{decisions,gateway,known-issues}.md`.

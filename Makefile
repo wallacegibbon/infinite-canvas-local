@@ -11,14 +11,14 @@ BIN_DIR := bin
 BIN     := $(BIN_DIR)/comfyui-gateway
 PKG     := .
 
-# The canvas is a separate npm project under infinite-canvas/web. `build` stays
+# The canvas is a separate npm project under canvas/web. `build` stays
 # Go-only on purpose (one static binary), so the bundle has its own entry points:
 # `web-deps` installs, `web` builds, `web-check` typechecks.
-WEB_DIR   := infinite-canvas/web
+WEB_DIR   := canvas/web
 NPM       ?= npm
 WEB_STAMP := $(WEB_DIR)/node_modules/.package-lock.json
 # Every Go package lives in main.go or under internal/. Listing them keeps the gates
-# off the vendored frontend: `./...` would walk infinite-canvas/web/node_modules, and a
+# off the vendored frontend: `./...` would walk canvas/web/node_modules, and a
 # stray .go file in a future npm package would then break `make check`.
 PKGS    := . ./internal/...
 GO_DIRS := main.go internal
@@ -47,7 +47,7 @@ web-deps: ## Install canvas dependencies when node_modules is missing or stale
 		echo "canvas dependencies up to date"; \
 	fi
 
-web: ## Build the canvas bundle into infinite-canvas/web/dist
+web: ## Build the canvas bundle into canvas/web/dist
 	@$(MAKE) --no-print-directory web-deps
 	cd $(WEB_DIR) && $(NPM) run build
 	@test -f $(WEB_DIR)/dist/index.html || { echo "ERROR: canvas build produced no dist/index.html"; exit 1; }

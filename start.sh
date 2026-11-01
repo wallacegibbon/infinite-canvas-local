@@ -32,9 +32,9 @@ export GATEWAY_PORT="${GATEWAY_PORT:-8190}"
 CANVAS_HOST="${CANVAS_HOST:-127.0.0.1}"
 CANVAS_PORT="${CANVAS_PORT:-3000}"
 
-VITE_BIN="$ROOT/infinite-canvas/web/node_modules/.bin/vite"
+VITE_BIN="$ROOT/canvas/web/node_modules/.bin/vite"
 GATEWAY_BIN="$ROOT/bin/comfyui-gateway"
-DIST_INDEX="$ROOT/infinite-canvas/web/dist/index.html"
+DIST_INDEX="$ROOT/canvas/web/dist/index.html"
 
 command -v node >/dev/null 2>&1 || { echo "node not found; install Node.js first" >&2; exit 1; }
 [ -x "$VITE_BIN" ] || { echo "missing $VITE_BIN; run: make web-deps" >&2; exit 1; }
@@ -56,7 +56,7 @@ esac
   else
     echo "window.__RUNTIME_CONFIG__ = window.__RUNTIME_CONFIG__ || {};"
   fi
-} > "$ROOT/infinite-canvas/web/dist/config.js"
+} > "$ROOT/canvas/web/dist/config.js"
 
 # The gateway accepts a canvas served from its own host already; this covers a canvas on
 # another machine or a name that differs from the address the browser used for the gateway.
@@ -80,7 +80,7 @@ echo "→ gateway   http://${GATEWAY_HOST}:${GATEWAY_PORT}   (ComfyUI at ${COMFY
 ( cd "$ROOT" && exec "$GATEWAY_BIN" ) & pids+=($!)
 
 echo "→ canvas    http://${CANVAS_HOST}:${CANVAS_PORT}"
-( cd "$ROOT/infinite-canvas/web" && exec "$VITE_BIN" preview --host "$CANVAS_HOST" --port "$CANVAS_PORT" ) & pids+=($!)
+( cd "$ROOT/canvas/web" && exec "$VITE_BIN" preview --host "$CANVAS_HOST" --port "$CANVAS_PORT" ) & pids+=($!)
 
 echo
 echo "Both services are up. Ctrl+C stops them."

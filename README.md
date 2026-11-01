@@ -8,10 +8,13 @@ from ComfyUI workflows without touching a cloud API.
 This project started as a fork of
 [1314521gjy/ComfyUI-Local-Infinite-Canvas](https://github.com/1314521gjy/ComfyUI-Local-Infinite-Canvas),
 itself a modified copy of [basketikun/infinite-canvas](https://github.com/basketikun/infinite-canvas).
-Both are MIT; the original license text is kept at [`infinite-canvas/LICENSE`](infinite-canvas/LICENSE).
+Both are MIT; the original license text is kept at [`canvas/LICENSE`](canvas/LICENSE).
 
-The canvas frontend in `infinite-canvas/` comes from those repositories. The Go gateway
-(`main.go`, `internal/`) is a port of the Node gateway that shipped with the fork.
+The canvas frontend in `canvas/` started as a copy of that project's UI, and the Go gateway
+(`main.go`, `internal/`) is a port of the Node gateway that shipped with it. The frontend is no longer a
+copy: it has been reworked far enough that carrying the upstream project's name would have been a
+claim about the code that is not true, so the directory is called what it is. The upstream licence is
+kept verbatim at `canvas/LICENSE`, and the fork this project descends from is named above.
 
 Maintained here: the workflow graphs and `registry.json`, the resource index and installer,
 `docs/`, `tools/` and `start.sh`.
@@ -31,7 +34,7 @@ Maintained here: the workflow graphs and `registry.json`, the resource index and
 ## Layout
 
 The repository root *is* the Go gateway (`main.go` + `internal/` + runtime assets);
-the canvas frontend is a self-contained third-party subtree beside it:
+the canvas frontend is a self-contained subtree beside it (see Credits):
 
 ```text
 .
@@ -42,7 +45,7 @@ the canvas frontend is a self-contained third-party subtree beside it:
 ├── prompts/           # prompt skill files
 ├── data/              # runtime state: tasks.json, resource-lock.json, outputs/ (not tracked)
 ├── bin/               # build output (not tracked)
-├── infinite-canvas/   # canvas frontend (third-party, ships its own web/ and build)
+├── canvas/            # the canvas frontend (from the upstream project, since reworked)
 ├── docs/              # gateway API and env vars, the run protocol, prompt optimization, runtime deps
 ├── tools/             # development scripts
 ├── Makefile           # make build / check / check-full / verify-static / web / web-check
@@ -74,7 +77,7 @@ Everything written for a human is **English**: documentation, code comments, log
 messages and commit messages. Two kinds of text do not follow the rule, and only because they
 are data or user-facing copy rather than prose:
 
-- **UI copy** lives in the i18n dictionaries (`infinite-canvas/web/src/i18n`), never inline in
+- **UI copy** lives in the i18n dictionaries (`canvas/web/src/i18n`), never inline in
   a component, so the same screen can be read in Chinese and English. That includes workflow
   metadata: `workflows/registry.json` is English (it is data the gateway serves) and the canvas
   translates the labels it displays by model id — `web/src/lib/gateway-labels.ts`, decisions
@@ -91,7 +94,7 @@ Chinese prose that still predates the rule is listed in
 
 ```bash
 # Dependencies (first run)
-make web               # installs infinite-canvas/web deps if needed, then vite build
+make web               # installs canvas/web deps if needed, then vite build
 make build             # Go gateway, static binary; start.sh builds it too if missing
 
 # Configure and start
@@ -103,7 +106,7 @@ cp .env.example .env   # adjust COMFY_URL / GATEWAY_HOST for this machine
 Canvas `http://127.0.0.1:3000` · gateway `http://127.0.0.1:8190`
 ComfyUI `http://127.0.0.1:8188` must already be running; the workbench only connects, never starts it.
 
-> The canvas bundle `infinite-canvas/web/dist/` is build output and is not tracked. After changing
+> The canvas bundle `canvas/web/dist/` is build output and is not tracked. After changing
 > `web/src/` run `make web` again (`make web-check` typechecks without emitting); `./start.sh`
 > refuses to start without a bundle and says so.
 

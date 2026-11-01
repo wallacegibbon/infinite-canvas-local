@@ -2,7 +2,7 @@
 
 A local gateway that runs ComfyUI workflows for the Infinite Canvas. It is the repository root: `main.go`, `internal/`, and the runtime
 assets (`workflows/`, `resources/`, `prompts/`) live at the top level, while the canvas
-frontend sits beside them in `infinite-canvas/`.
+frontend sits beside them in `canvas/`.
 
 It is a **single statically linked binary**: no Node runtime, no `node_modules`, no
 Python virtualenv. Configuration comes from the environment; all mutable state lives
@@ -494,7 +494,7 @@ Two things stay Chinese on purpose, because they are _data_ rather than messagin
 make check        # gofmt check + go vet + the suite
 make test-race    # the same suite under the race detector (needs a C toolchain)
 make verify-static
-cd infinite-canvas/web && npm run check && npx vitest run   # the canvas
+cd canvas/web && npm run check && npx vitest run   # the canvas
 ```
 
 The suite covers binding application, LoRA injection, prompt sanitising, registry
