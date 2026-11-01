@@ -586,7 +586,6 @@ export default {
             assetRemoved: "资产已移除",
             filter: { image: "图片", video: "视频", text: "文本", audio: "音频", config: "配置", group: "分组" },
         },
-        assetPicker: { title: "选择资产", insert: "插入", search: "搜索资产", empty: "没有资产" },
         imagePopover: {
             mode: "功能",
             canvasRatio: "画布比例",

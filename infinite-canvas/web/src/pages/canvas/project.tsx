@@ -58,7 +58,6 @@ import { Minimap } from "@/components/canvas/canvas-mini-map";
 import { CanvasNode } from "@/components/canvas/canvas-node";
 import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
-import { AssetPickerModal, type InsertAssetPayload } from "@/components/canvas/asset-picker-modal";
 import { CanvasAgentPanel } from "@/components/canvas/canvas-agent-panel";
 import { CanvasSidePanel } from "@/components/canvas/canvas-side-panel";
 import { CanvasZoomControls } from "@/components/canvas/canvas-zoom-controls";
@@ -117,6 +116,7 @@ import {
     type CanvasNodeTypeId,
     type ConnectionHandle,
     type ContextMenuState,
+    type InsertAssetPayload,
     type Position,
     type SelectionBox,
     type ViewportTransform,
@@ -257,7 +257,6 @@ function InfiniteCanvasPage() {
     const [backgroundMode, setBackgroundMode] = useState<CanvasBackgroundMode>("lines");
     const [showImageInfo, setShowImageInfo] = useState(false);
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
-    const [assetPickerOpen, setAssetPickerOpen] = useState(false);
     const [projectLoaded, setProjectLoaded] = useState(false);
 
     const [toolbarNodeId, setToolbarNodeId] = useState<string | null>(null);
@@ -2347,7 +2346,6 @@ function InfiniteCanvasPage() {
             } else {
                 insertAssistantImage({ id: `asset-${Date.now()}`, prompt: payload.title, dataUrl: payload.dataUrl, storageKey: payload.storageKey });
             }
-            setAssetPickerOpen(false);
         },
         [insertAssistantImage, insertAssistantText, screenToCanvas, size.height, size.width],
     );
@@ -2962,8 +2960,6 @@ function InfiniteCanvasPage() {
                 >
                     <p className="text-sm opacity-60">{t("canvas.runtime.clearDescription")}</p>
                 </Dialog>
-
-                <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={() => setAssetPickerOpen(false)} />
             </section>
         </main>
     );

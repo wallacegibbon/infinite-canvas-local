@@ -577,7 +577,6 @@ export default {
             assetRemoved: "Asset removed",
             filter: { image: "Image", video: "Video", text: "Text", audio: "Audio", config: "Configuration", group: "Group" },
         },
-        assetPicker: { title: "Select assets", insert: "Insert", search: "Search assets", empty: "No assets" },
         imagePopover: {
             mode: "Mode",
             canvasRatio: "Canvas ratio",

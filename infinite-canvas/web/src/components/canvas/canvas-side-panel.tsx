@@ -17,9 +17,7 @@ import { previewUrlFor, subscribeImagePreviews, getImagePreviewRevision, uploadI
 import { useAssetStore, type Asset, type AssetKind } from "@/stores/use-asset-store";
 import { CANVAS_SIDE_PANEL_MAX_WIDTH, CANVAS_SIDE_PANEL_MIN_WIDTH, CANVAS_SIDE_PANEL_MOTION_MS, useCanvasSidePanelStore } from "@/stores/canvas/use-canvas-side-panel-store";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
-
-import type { InsertAssetPayload } from "./asset-picker-modal";
+import { CanvasNodeType, type CanvasNodeData, type InsertAssetPayload } from "@/types/canvas";
 
 /**
  * The panel's open/close animation was `motion` (framer-motion); it is a CSS transition now.

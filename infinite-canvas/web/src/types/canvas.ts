@@ -173,6 +173,16 @@ type CanvasAssistantReference = {
     text?: string;
 };
 
+/**
+ * What an asset becomes when it is put on a canvas. The asset library describes a picture, a video or a
+ * piece of text; a canvas holds nodes. This is the sentence one turns into the other, and the only thing
+ * the library and the canvas have to agree about.
+ */
+export type InsertAssetPayload =
+    | { kind: "text"; content: string; title: string }
+    | { kind: "image"; dataUrl: string; title: string; storageKey?: string }
+    | { kind: "video"; url: string; title: string; storageKey?: string; width?: number; height?: number };
+
 export type CanvasAssistantImage = {
     id: string;
     dataUrl: string;
