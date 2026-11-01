@@ -23,12 +23,14 @@ export function useCanvasAgentTools({
     createNode,
     generateNode,
     setNodePrompt,
+    connectNodes,
 }: {
     nodesRef: RefObject<CanvasNodeData[]>;
     connectionsRef: RefObject<CanvasConnection[]>;
     createNode: CanvasHands["createNode"];
     generateNode: CanvasHands["generateNode"];
     setNodePrompt: CanvasHands["setNodePrompt"];
+    connectNodes: CanvasHands["connectNodes"];
 }) {
     // The refs and callbacks outlive a render, and a tool call can arrive between two of them.
     const hands = useRef<CanvasHands>({
@@ -37,6 +39,7 @@ export function useCanvasAgentTools({
         createNode,
         generateNode,
         setNodePrompt,
+        connectNodes,
     });
     hands.current = {
         nodes: () => nodesRef.current || [],
@@ -44,6 +47,7 @@ export function useCanvasAgentTools({
         createNode,
         generateNode,
         setNodePrompt,
+        connectNodes,
     };
 
     useEffect(
@@ -68,6 +72,7 @@ type CanvasHands = {
     createNode: (type: CanvasNodeTypeId, position?: Position, patch?: CanvasNodeMetadata) => CanvasNodeData;
     generateNode: (nodeId: string, mode: CanvasGenerationMode, prompt: string) => Promise<void>;
     setNodePrompt: (nodeId: string, prompt: string) => void;
+    connectNodes: (firstNodeId: string, secondNodeId: string, firstHandleType: "source" | "target") => boolean;
 };
 
 /** One tool's result: the content blocks the agent reads, and whether it failed rather than did something. */
@@ -88,6 +93,8 @@ async function runTool(name: string, args: unknown, hands: CanvasHands): Promise
             return createNode(hands, args);
         case "read_node":
             return readNode(hands, args);
+        case "connect":
+            return connect(hands, args);
         case "set_prompt":
             return setPrompt(hands, args);
         case "generate":
@@ -117,6 +124,28 @@ function createNode(hands: CanvasHands, args: unknown): ToolAnswer {
 
     const node = hands.createNode(type, centre, patch);
     return { content: [textBlock(`created ${node.id} (${node.type}) at (${Math.round(node.position.x)}, ${Math.round(node.position.y)})`)] };
+}
+
+/**
+ * Connect two nodes, the way dragging from one handle to the other does — a reference bar pick is the same
+ * connection. The pair is stated in order, so the gesture starts from the source handle; the canvas decides
+ * whether those two may be connected at all (a group, or a config into a config, may not).
+ */
+function connect(hands: CanvasHands, args: unknown): ToolAnswer {
+    const input = (typeof args === "object" && args ? args : {}) as { fromNodeId?: unknown; toNodeId?: unknown };
+    const fromNodeId = typeof input.fromNodeId === "string" ? input.fromNodeId.trim() : "";
+    const toNodeId = typeof input.toNodeId === "string" ? input.toNodeId.trim() : "";
+    const nodes = hands.nodes();
+    const from = nodes.find((candidate) => candidate.id === fromNodeId);
+    const to = nodes.find((candidate) => candidate.id === toNodeId);
+    if (!from || !to) return { content: [textBlock(`no node with id "${from ? toNodeId : fromNodeId}" on this canvas`)], isError: true };
+    if (hands.connections().some((connection) => connection.fromNodeId === from.id && connection.toNodeId === to.id)) {
+        return { content: [textBlock(`${from.id} -> ${to.id} is already connected`)], isError: false };
+    }
+    if (!hands.connectNodes(from.id, to.id, "source")) {
+        return { content: [textBlock(`this canvas will not connect ${from.id} (${from.type}) to ${to.id} (${to.type})`)], isError: true };
+    }
+    return { content: [textBlock(`connected ${from.id} -> ${to.id}`)], isError: false };
 }
 
 /**

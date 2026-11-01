@@ -134,6 +134,18 @@ func (s *Server) mcpTools() []mcpTool {
 			"additionalProperties": false
 		}`),
 	}, {
+		Name:        "connect",
+		Description: "Connect two nodes, the way dragging from one handle to the other does: what the source node holds becomes an input to the target — a picture connected into a config node is what makes the next generation a variant of it.",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"fromNodeId": {"type": "string", "description": "The node whose content flows out."},
+				"toNodeId": {"type": "string", "description": "The node that receives it."}
+			},
+			"required": ["fromNodeId", "toNodeId"],
+			"additionalProperties": false
+		}`),
+	}, {
 		Name:        "set_prompt",
 		Description: "Change one node's prompt, in the same field the node's own panel writes it to. Running it again afterwards replaces that node's result (docs/decisions.md #77); a variant is a new node.",
 		InputSchema: json.RawMessage(`{

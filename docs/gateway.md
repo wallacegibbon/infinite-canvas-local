@@ -263,15 +263,17 @@ Tool names are **not** prefixed with `canvas_`: AlayaCore adds the server's name
 `ping` here is `canvas_ping` to the model and arrives back as `ping`. See
 [`decisions.md`](decisions.md) #84.
 
-Six tools: `ping` (how much is on the canvas), `list_nodes` (every node — id, type, title, prompt, position —
-and every connection, the ids being what the other tools act on), `create_node` (make one node the way the
+Seven tools: `ping` (how much is on the canvas), `list_nodes` (every node — id, type, title, prompt, position
+— and every connection, the ids being what the other tools act on), `create_node` (make one node the way the
 user's own button makes one: in the middle of the view, selected, panel open when that is what the button
-does), `set_prompt` (change a node's prompt in the field its own panel writes to), `generate` (press that
-node's generate button: it starts the work and answers at once, and the result replaces what that node held)
-and `read_node` (that node's actual content — its words, or the picture, film or sound it holds). See
+does), `connect` (drag one node onto another: what the source holds becomes the target's input),
+`set_prompt` (change a node's prompt in the field its own panel writes to), `generate` (press that node's
+generate button: it starts the work and answers at once, and the result replaces what that node held) and
+`read_node` (that node's actual content — its words, or the picture, film or sound it holds). See
 [`decisions.md`](decisions.md) #85 for why the page runs them, #86 for what "the way the button does" means,
-#88 for what a tool is allowed to answer with, #89 for why generating is a button and not a wait, and #91 for
-why changing a prompt and re-running are two tools that add up to the manual gesture.
+#88 for what a tool is allowed to answer with, #89 for why generating is a button and not a wait, #91 for why
+changing a prompt and re-running are two tools that add up to the manual gesture, and #92 for why a connection
+is the same call a drag makes.
 
 A music graph needs two texts, and both are ordinary `registry.json` bindings (`prompt`, `lyrics`), so
 a run carries them as inputs like any other parameter. `response_format`-style container selection is

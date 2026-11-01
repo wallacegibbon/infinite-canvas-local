@@ -728,23 +728,32 @@ function InfiniteCanvasPage() {
 
     const hideNodeToolbar = useCallback(() => {}, []);
 
+    /**
+     * Add one connection the way a drag does: normalized by the canvas's own rules, and never twice.
+     *
+     * `firstHandleType` says which handle the gesture started from; a tool states its two nodes in order, so it
+     * starts from the source handle. Returns whether the two nodes may be connected at all — a group, or a
+     * config node into a config node, may not.
+     */
+    const addConnection = useCallback((firstNodeId: string, secondNodeId: string, firstHandleType: "source" | "target"): boolean => {
+        const connection = normalizeConnection(firstNodeId, secondNodeId, nodesRef.current, firstHandleType);
+        if (!connection) return false;
+        const { fromNodeId, toNodeId } = connection;
+        const exists = connectionsRef.current.some((conn) => conn.fromNodeId === fromNodeId && conn.toNodeId === toNodeId);
+        if (!exists) setConnections((prev) => [...prev, { id: `conn-${Date.now()}`, fromNodeId, toNodeId }]);
+        return true;
+    }, []);
+
     const connectNodes = useCallback(
         (current: ConnectionHandle, targetNodeId: string) => {
             if (current.nodeId === targetNodeId) return;
-
-            const connection = normalizeConnection(current.nodeId, targetNodeId, nodesRef.current, current.handleType);
-            if (!connection) {
+            if (!addConnection(current.nodeId, targetNodeId, current.handleType)) {
                 toast.warning(t("canvas.runtime.configConnection"));
                 return;
             }
-            const { fromNodeId, toNodeId } = connection;
-            const exists = connectionsRef.current.some((conn) => conn.fromNodeId === fromNodeId && conn.toNodeId === toNodeId);
-            if (!exists) {
-                setConnections((prev) => [...prev, { id: `conn-${Date.now()}`, fromNodeId, toNodeId }]);
-            }
             setContextMenu(null);
         },
-        [t],
+        [addConnection, t],
     );
 
     const createConnectedNode = useCallback(
@@ -2210,7 +2219,7 @@ function InfiniteCanvasPage() {
     );
 
     // The agent's hands are the same functions the buttons press.
-    useCanvasAgentTools({ nodesRef, connectionsRef, createNode, generateNode: handleGenerateNode, setNodePrompt });
+    useCanvasAgentTools({ nodesRef, connectionsRef, createNode, generateNode: handleGenerateNode, setNodePrompt, connectNodes: addConnection });
 
     const deleteBatchImage = useCallback((nodeId: string, imageId: string) => {
         const node = nodesRef.current.find((item) => item.id === nodeId);

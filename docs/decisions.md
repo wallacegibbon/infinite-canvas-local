@@ -3123,3 +3123,23 @@ copper kettle on a dark stone shelf, candle light」，然后在同一个节点�
 count the canvas is set to), the node's prompt box showed the new words, its picture became the copper kettle
 by candlelight, and the canvas still had **40 nodes** — the same 40 as before. The agent then called
 `read_node` and reported "已直接在原节点上触发生成（没有新建节点）".
+
+## 92. A connection is a drag, so the agent gets the same call
+
+**Decision** `connect(fromNodeId, toNodeId)` adds one connection through the same function a drag adds it with
+(`addConnection`, which `connectNodes` now also calls): the canvas's own `normalizeConnection` decides the
+direction and whether the pair may be connected at all, and an existing connection is never added twice. The
+tool starts from the source handle, because a tool states its two nodes in order; a drag states a gesture, so
+it says which handle it came from. What a connection means is unchanged: it is how one node's content becomes
+another's input — the picture connected into a config node is what makes the next generation a variant of it.
+
+**Why** The variant route (#77) is a connection, and without it the agent could only ever make things from
+nothing: it could not build the "keep this, make another one conditioned on it" gesture the canvas offers. Two
+implementations of "may these connect" would eventually disagree, so the drag and the tool share one.
+
+**Tested** In a browser against a real AlayaCore: "新建一个图片配置节点，把铜壶那张图
+image-1793524968642-jq17f 连到它上面，然后在配置节点上生成一张以它为参考的变体" → `create_node` →
+`created config-1793527710406-y2raf (config) at (1927, 438)`, `connect` →
+`connected image-1793524968642-jq17f -> config-1793527710406-y2raf`, `generate` on the config node → the
+config node's panel showed 参考图 1 张 with the kettle in it, the run went out and succeeded with one artifact,
+and the canvas went from 40 nodes / 29 connections to 42 / 31 — a new image node holding the variant.
