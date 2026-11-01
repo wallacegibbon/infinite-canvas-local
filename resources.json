@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "version": "2026.11.02-35",
+  "version": "2026.11.02-36",
   "channel": "stable",
   "updatedAt": "2026-11-02",
   "packs": [
@@ -12,9 +12,6 @@
         "image-moss-sft-8step",
         "image-moss-balanced-8step",
         "image-moss-sft-int8-8step"
-      ],
-      "alternates": [
-        "moss_image_base_bf16"
       ]
     },
     {

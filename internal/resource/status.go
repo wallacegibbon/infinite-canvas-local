@@ -758,44 +758,26 @@ func (m *Manager) packStatus(pack *Pack, providers *providerIndex, byID map[stri
 	return status
 }
 
-// packResourceSplit answers what a pack must have and what part of it is a choice.
+// packResourceSplit answers what a pack must have and what is merely offered.
 //
-// Required is the intersection over the pack's workflows; everything else it can install — files only
-// some workflows load, plus the alternates no graph names — is optional. A pack with no workflows would
-// require nothing, which is why no such pack exists: a bundle with nothing to download is a row that
-// can only tell the user the panel has nothing to say.
+// Required is everything at least one of its workflows loads, including the inputs a bake merge needs;
+// optional is what no graph names at all — a second precision, another upscale checkpoint. That is the
+// distinction a user makes: "install the pack" has to mean "install what the pack runs", or the button
+// is a half-measure that leaves a mode unable to run and no control that would have added it.
 func (m *Manager) packResourceSplit(pack *Pack, providers *providerIndex) (required, optional []string) {
-	sets := make([]map[string]bool, 0, len(pack.Workflows))
-	union := map[string]bool{}
-	for _, id := range pack.Alternates {
-		union[id] = true
-	}
+	needed := map[string]bool{}
 	for _, workflowID := range pack.Workflows {
-		set := map[string]bool{}
 		for _, id := range providers.entryDeps(m.resolvedWorkflow(workflowID)).Resources {
-			set[id] = true
-			union[id] = true
-		}
-		sets = append(sets, set)
-	}
-
-	requiredSet := map[string]bool{}
-	if len(sets) > 0 {
-		for id := range sets[0] {
-			requiredSet[id] = true
-		}
-		for _, set := range sets[1:] {
-			for id := range requiredSet {
-				if !set[id] {
-					delete(requiredSet, id)
-				}
-			}
+			needed[id] = true
 		}
 	}
-	for id := range requiredSet {
-		delete(union, id)
+	offered := map[string]bool{}
+	for _, id := range pack.Alternates {
+		if !needed[id] {
+			offered[id] = true
+		}
 	}
-	return sortedKeys(requiredSet), sortedKeys(union)
+	return sortedKeys(needed), sortedKeys(offered)
 }
 
 // workflowDependencies builds the per-workflow rows of a pack.

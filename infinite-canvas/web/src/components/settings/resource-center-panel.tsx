@@ -457,6 +457,8 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
 
     const installIds = useMemo(() => {
         if (!status) return [];
+        // "Required" is everything a selected pack runs, so this needs no second rule for the files
+        // only some of its workflows load.
         const required = status.packs.filter((pack) => selectedPacks.has(pack.id) && !pack.planned).flatMap((pack) => pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake" && !item.needsRestart).map((item) => item.id));
         const optional = status.resources.filter((item) => selectedOptional.has(item.id) && item.status !== "present" && item.type !== "bake").map((item) => item.id);
         return [...new Set([...required, ...optional])];
@@ -774,7 +776,11 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                     const extraOptionalMissing = extraOptionalItems.filter((item) => item.status !== "present");
                     const extraOptionalSize = extraOptionalMissing.reduce((sum, item) => sum + (item.size || 0), 0);
                     const selectedOptionalInPack = extraOptionalItems.filter((item) => selectedOptional.has(item.id) && item.status !== "present");
-                    const packInstallIds = [...pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake" && !item.needsRestart).map((item) => item.id), ...selectedOptionalInPack.map((item) => item.id)];
+                    // The gateway calls "required" everything the pack runs and "optional" only what no
+                    // graph names, so the pack button is the whole pack plus whatever alternates were
+                    // ticked — no reconstruction of the dependency set on this side.
+                    const packInstallable = (item: ResourceItem) => item.status !== "present" && item.type !== "bake" && !item.needsRestart;
+                    const packInstallIds = [...pack.requiredItems.filter(packInstallable).map((item) => item.id), ...selectedOptionalInPack.map((item) => item.id)];
                     const expandable = pack.total > 0 || pack.optionalTotal > 0 || workflowDependencies.length > 0;
                     const headerBody = (
                         <>

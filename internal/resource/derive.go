@@ -41,11 +41,15 @@ type providerIndex struct {
 	targets []string
 	// byClass maps a node class to the packs that declare it.
 	byClass map[string][]string
+	// requires maps a resource to the resources that produce it. A bake is the case that matters:
+	// the merge is written down in resources.json, not in a graph, and its inputs are as necessary
+	// as anything a loader names.
+	requires map[string][]string
 }
 
 // newProviderIndex flattens the catalogue into the lookups a graph walk needs.
 func newProviderIndex(index *Index) *providerIndex {
-	builder := &providerIndex{byTarget: map[string][]string{}, byClass: map[string][]string{}}
+	builder := &providerIndex{byTarget: map[string][]string{}, byClass: map[string][]string{}, requires: map[string][]string{}}
 	if index == nil {
 		return builder
 	}
@@ -59,6 +63,9 @@ func newProviderIndex(index *Index) *providerIndex {
 		}
 		for _, class := range resource.Provides {
 			builder.byClass[class] = append(builder.byClass[class], resource.ID)
+		}
+		if len(resource.Requires) > 0 {
+			builder.requires[resource.ID] = resource.Requires
 		}
 	}
 	builder.targets = make([]string, 0, len(builder.byTarget))
@@ -130,7 +137,7 @@ func (p *providerIndex) graphDeps(graph workflow.Graph) DerivedDependency {
 			}
 		}
 	}
-	return DerivedDependency{Resources: sortedKeys(ids), Unresolved: sortedKeys(unresolved)}
+	return DerivedDependency{Resources: p.withRequires(ids), Unresolved: sortedKeys(unresolved)}
 }
 
 // entryDeps unions a workflow's graphs.
@@ -162,7 +169,26 @@ func (p *providerIndex) entryDeps(entry *workflow.Entry) DerivedDependency {
 			collect(variant.Workflow)
 		}
 	}
-	return DerivedDependency{Resources: sortedKeys(ids), Unresolved: sortedKeys(unresolved)}
+	return DerivedDependency{Resources: p.withRequires(ids), Unresolved: sortedKeys(unresolved)}
+}
+
+// withRequires closes a set over "this file is produced from that one".
+//
+// A bake artifact is a merge of two models, and the merge is described in resources.json rather than in
+// a graph, so without this the inputs of a workflow's own model look like things nobody needs.
+func (p *providerIndex) withRequires(ids map[string]bool) []string {
+	for changed := true; changed; {
+		changed = false
+		for id := range ids {
+			for _, required := range p.requires[id] {
+				if !ids[required] {
+					ids[required] = true
+					changed = true
+				}
+			}
+		}
+	}
+	return sortedKeys(ids)
 }
 
 // DerivedDependencies returns what one registered workflow needs, read off its graphs.

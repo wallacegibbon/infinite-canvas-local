@@ -4507,3 +4507,38 @@ modeProblems: {inpaint: 2}`, every other workflow unchanged. `gofmt`, `go vet`, 
 `infinite-canvas/web/src/{services/api/{resources,workflows}.ts,lib/gateway-models.ts,stores/use-config-store.ts,
 components/image-settings-panel.tsx,components/canvas/canvas-image-settings-popover.tsx,
 components/settings/resource-center-panel.tsx,i18n/locales/{en-US,zh-CN}.ts}`.
+
+## 135. "Install this pack" installs the pack
+
+**Decision** A pack's *required* set is now everything at least one of its workflows loads — including a
+bake's inputs, which are described in `resources.json` rather than in a graph. `optional` is only what no graph
+names at all: a second precision, another upscale checkpoint. The pack's install button sends the required set
+plus whatever alternates were ticked, and "#130's intersection rule" is retired.
+
+**Why** The intersection said "required = what every workflow shares", which made the per-mode dependencies
+optional — Qwen's inpaint node pack, its multi-angle node pack, its outpaint LoRA, MOSS's per-workflow base
+models. Two consequences, both reported by the user before the second one was understood:
+
+- the pack header read "已就绪" while inpaint could not run, because `missing` counted only the intersection;
+- "安装此包" shipped required-plus-ticked-alternates and therefore never installed those files. Nothing in the
+  UI could add them: they have no checkbox (they are not alternates) and their only other route is the
+  per-workflow "安装此工作流" button on the row that needs them. The user installed the Qwen pack, saw it turn
+  green, and found inpaint blocked — correctly angry that a pack the panel had described as missing was not
+  installed by the button that says it installs it.
+
+**What a pack reads as now** `qwen21` 7 required / 0 optional, `h3` 21 / 0, `moss` 7 / 0, `music` 3 required
+and 4 alternates (other precisions and text encoders, 44 GiB — the reason alternates are not installed by
+default), `upscale` 1 / 2, `zimage` 3 / 1.
+
+**Also** The bake case needed one more rule: `packResourceSplit` and the installer now close the derived set
+over each resource's `requires`, because a bake artifact's inputs (`moss_image_base_bf16`) are as necessary as
+anything a loader names and are written down outside the graph. `moss_image_base_bf16` was listed as an
+alternate by #130 and no longer is.
+
+**Tested** Live payload from a spare port: `qwen21 requiredIds = [inpaint_cropandstitch, kjnodes,
+qwen21_outpaint_lora, qwen3vl_8b_int8_convrot, qwen_image_2.1_turbo_int8_convrot, qwen_image_2.1_vae_bf16,
+qwenmultiangle]`, `optionalIds = []`, and every pack reporting `present == total`. `gofmt`, `go vet`,
+`go test ./internal/...`, `tsc --noEmit`, 132 canvas tests.
+
+**Where** `internal/resource/{status.go,derive.go}`, `resources.json`,
+`infinite-canvas/web/src/components/settings/resource-center-panel.tsx`.
