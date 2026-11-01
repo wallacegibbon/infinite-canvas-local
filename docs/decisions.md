@@ -3081,3 +3081,23 @@ compass on a marble table」，然后立刻用 canvas_generate 对它按下生�
 with `pressed generate on image-1793524968642-jq17f (image)`, and the gateway straight after logged
 `POST /api/runs 202` and the run in the queue (`image-z-image-turbo running`). The node count went 39 → 40 and
 the new node sits on the canvas with its prompt.
+
+## 90. The transcript follows the newest message only while the reader is at the bottom; `@` points at a node
+
+**Decision** The agent panel keeps itself at the newest message only while the reader is at the bottom. A
+wheel up stops the follow at once; being at the bottom again resumes it, and the position is re-read on every
+message rather than kept as a flag that can drift from where the reader actually is. Typing `@` no longer
+opens a list of node names: it puts the canvas into the same "click a node" state a reference's `+` uses, and
+the node the user clicks becomes the citation, its title replacing the `@` in the draft.
+
+**Why** An answer that streams while the user scrolls up is an answer they cannot read: the follow turns a
+gesture into a tug of war. The list of names was a second, worse copy of the canvas — the nodes are already on
+screen, with their pictures and their layout, and picking one is pointing at it. Both are the same rule as
+everything else here: the surface shows what is there, and the user aims at the thing itself.
+
+**Tested** In a browser, on a real answer long enough to overflow (1279px of transcript in a 290px box):
+while it streamed the panel stayed at the bottom (`gap 0`); after a wheel up and a scroll to the top, two more
+messages grew it to 1360px with `scrollTop` still 0 and `gap 1070` — the reader was not dragged down; after
+scrolling back to the end, the next message put it at 1145 of 1435 with `gap 0` again. `@` in the composer
+showed "点击一个节点来引用 · ESC 取消", clicking the teapot node put `@a brass compass on a marble table` in the
+draft, and the prompt the gateway logged carried `【画布引用】- image-1793524968642-jq17f (image) …`.

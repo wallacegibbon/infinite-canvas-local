@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowUp, Bot, LoaderCircle, Square, Wrench, X } from "lucide-react";
@@ -38,6 +38,8 @@ type Props = {
     canvasId: string;
     nodes: CanvasNodeData[];
     onFocusNode: (nodeId: string) => void;
+    /** Ask the canvas to let the user click the node to cite. Resolves with the node, or null if cancelled. */
+    onPickNode: () => Promise<string | null>;
 };
 
 const NODE_LABEL: Record<string, string> = {
@@ -51,7 +53,7 @@ const NODE_LABEL: Record<string, string> = {
 let messageSeq = 0;
 const nextId = () => `m${Date.now().toString(36)}${(messageSeq++).toString(36)}`;
 
-export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
+export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: Props) {
     const { t } = useTranslation();
     const theme = useCanvasTheme();
     const config = useEffectiveConfig();
@@ -64,7 +66,6 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
     const [draft, setDraft] = useState("");
     const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "closed">("idle");
     const [busy, setBusy] = useState(false);
-    const [mention, setMention] = useState<{ top: number; query: string } | null>(null);
     /** The nodes this draft mentions, by id. They travel with the message as context. */
     const [cited, setCited] = useState<string[]>([]);
 
@@ -156,7 +157,6 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
         setMessages((current) => [...current, { id: nextId(), role: "user", text, reasoning: "", tools: [], streaming: false }, { id: nextId(), role: "assistant", text: "", reasoning: "", tools: [], streaming: true }]);
         setDraft("");
         setCited([]);
-        setMention(null);
         setBusy(true);
         sendAgentMessage(CANVAS_AGENT, { prompt: context + text });
     };
@@ -192,42 +192,57 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
         (event.target as HTMLElement).releasePointerCapture?.(event.pointerId);
     };
 
-    // --- mentions ---------------------------------------------------------------------------------------
-    const candidates = useMemo(() => {
-        if (!mention) return [];
-        const query = mention.query.toLowerCase();
-        return nodes
-            .filter((node) => node.type !== CanvasNodeType.Group)
-            .filter((node) => !query || `${node.title || ""} ${node.id} ${NODE_LABEL[node.type] || node.type}`.toLowerCase().includes(query))
-            .slice(0, 8);
-    }, [mention, nodes]);
+    // --- citations --------------------------------------------------------------------------------------
+    /** The `@` a pick is answering, so the label lands where it was typed. */
+    const pickAtRef = useRef<number>(-1);
 
-    const onChange = (value: string) => {
-        setDraft(value);
-        const caret = inputRef.current?.selectionStart ?? value.length;
-        const upTo = value.slice(0, caret);
-        const at = upTo.lastIndexOf("@");
-        if (at < 0 || /\s/.test(upTo.slice(at + 1))) {
-            setMention(null);
-            return;
-        }
-        setMention({ top: at, query: upTo.slice(at + 1) });
-    };
-
-    const cite = (node: CanvasNodeData) => {
-        if (!mention) return;
-        const label = node.title || node.id;
-        const before = draft.slice(0, mention.top);
-        const after = draft.slice(mention.top + 1 + mention.query.length);
-        setDraft(`${before}@${label} ${after}`);
-        setCited((current) => (current.includes(node.id) ? current : [...current, node.id]));
-        setMention(null);
+    const cite = (nodeId: string) => {
+        const at = pickAtRef.current;
+        pickAtRef.current = -1;
+        if (at < 0) return;
+        const node = nodes.find((candidate) => candidate.id === nodeId);
+        const label = node?.title || nodeId;
+        setDraft((current) => `${current.slice(0, at)}@${label} ${current.slice(at + 1)}`);
+        setCited((current) => (current.includes(nodeId) ? current : [...current, nodeId]));
         inputRef.current?.focus();
     };
 
+    /**
+     * `@` is a request to pick a node on the canvas, the way a reference's + does — the user points at the
+     * thing itself rather than at a name in a list. The character stays in the draft, where the label
+     * replaces it once something is picked; escape leaves the `@` as typed.
+     */
+    const onChange = (value: string) => {
+        const caret = inputRef.current?.selectionStart ?? value.length;
+        const typed = value.length > draft.length && caret > 0 && value[caret - 1] === "@" && (caret === 1 || !/\S/.test(value[caret - 2]));
+        setDraft(value);
+        if (!typed) return;
+        pickAtRef.current = caret - 1;
+        void onPickNode().then((nodeId) => {
+            if (nodeId) cite(nodeId);
+        });
+    };
+
+    /**
+     * Follow the newest message only while the reader is at the bottom.
+     *
+     * Someone who scrolled up to read is not asking to be dragged back down, and someone who scrolls back to
+     * the end is asking for the follow to resume. The position is the truth and is read again on every
+     * message, because a wheel gesture and a scroll event both have to survive a tab that is not drawing —
+     * and because being at the bottom is the whole condition: there is no separate "follow mode" to get out
+     * of step with where the reader actually is.
+     */
+    const followRef = useRef(true);
+    const atBottom = (element: HTMLDivElement) => element.scrollHeight - element.scrollTop - element.clientHeight < 24;
+
     useEffect(() => {
         const element = scrollRef.current;
-        if (element) element.scrollTop = element.scrollHeight;
+        if (!element) return;
+        if (!followRef.current) {
+            if (!atBottom(element)) return;
+            followRef.current = true;
+        }
+        element.scrollTop = element.scrollHeight;
     }, [messages]);
 
     if (!open) return null;
@@ -261,7 +276,19 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
                 </div>
             ) : null}
 
-            <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3 text-sm" data-canvas-scroll="">
+            <div
+                ref={scrollRef}
+                className="flex-1 space-y-3 overflow-y-auto px-3 py-3 text-sm"
+                data-canvas-scroll=""
+                onScroll={(event) => {
+                    followRef.current = atBottom(event.currentTarget);
+                }}
+                onWheel={(event) => {
+                    // A wheel up is the reader taking over, at once: waiting for the scroll position to say so
+                    // would let one more message drag them back down in the middle of the gesture.
+                    if (event.deltaY < 0) followRef.current = false;
+                }}
+            >
                 {messages.length === 0 ? <p className="text-xs opacity-50">{t("canvas.agent.hint")}</p> : null}
                 {messages.map((message) => (
                     <div key={message.id} className={message.role === "user" ? "ml-6 rounded-xl px-3 py-2" : "mr-2"} style={message.role === "user" ? { background: theme.node.fill, border: `1px solid ${theme.node.stroke}` } : undefined}>
@@ -292,16 +319,6 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
             </div>
 
             <div className="relative border-t px-2 py-2" style={{ borderColor: theme.toolbar.border }}>
-                {mention && candidates.length ? (
-                    <div className="absolute bottom-full left-2 right-2 mb-1 overflow-hidden rounded-lg border shadow-xl" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
-                        {candidates.map((node) => (
-                            <button key={node.id} type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:opacity-80" onClick={() => cite(node)}>
-                                <span className="truncate">{node.title || node.id}</span>
-                                <span className="ml-auto shrink-0 opacity-50">{NODE_LABEL[node.type] || node.type}</span>
-                            </button>
-                        ))}
-                    </div>
-                ) : null}
                 <textarea
                     ref={inputRef}
                     value={draft}

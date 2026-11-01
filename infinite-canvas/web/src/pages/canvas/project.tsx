@@ -272,6 +272,9 @@ function InfiniteCanvasPage() {
     const [isNodeResizing, setIsNodeResizing] = useState(false);
     const [dropTargetGroupId, setDropTargetGroupId] = useState<string | null>(null);
     const [referencePickerNodeId, setReferencePickerNodeId] = useState<string | null>(null);
+    // The agent panel asking for a node: the canvas becomes clickable and the answer goes back to the panel.
+    const [pickingForAgent, setPickingForAgent] = useState(false);
+    const agentPickResolve = useRef<((nodeId: string | null) => void) | null>(null);
 
     const nodesRef = useRef(nodes);
     const connectionsRef = useRef(connections);
@@ -1070,6 +1073,35 @@ function InfiniteCanvasPage() {
         setSelectedConnectionId(null);
         setDialogNodeId(null);
     }, []);
+
+    /** Let the user point at a node instead of typing its name. Resolves null when they change their mind. */
+    const pickNodeForAgent = useCallback(
+        () =>
+            new Promise<string | null>((resolve) => {
+                agentPickResolve.current = resolve;
+                setPickingForAgent(true);
+            }),
+        [],
+    );
+
+    const finishAgentPick = useCallback((nodeId: string | null) => {
+        setPickingForAgent(false);
+        const resolve = agentPickResolve.current;
+        agentPickResolve.current = null;
+        resolve?.(nodeId);
+    }, []);
+
+    useEffect(() => {
+        if (!pickingForAgent) return;
+        const cancel = (event: KeyboardEvent) => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            finishAgentPick(null);
+        };
+        window.addEventListener("keydown", cancel, true);
+        return () => window.removeEventListener("keydown", cancel, true);
+    }, [finishAgentPick, pickingForAgent]);
 
     const exitNodeReferenceSelection = useCallback(() => {
         if (!referencePickerNodeId) return;
@@ -2486,7 +2518,7 @@ function InfiniteCanvasPage() {
                 onInsertAsset={handleAssetInsert}
             />
             <section className="relative min-w-0 flex-1 overflow-hidden">
-                <CanvasAgentPanel canvasId={projectId} nodes={nodes} onFocusNode={focusNode} />
+                <CanvasAgentPanel canvasId={projectId} nodes={nodes} onFocusNode={focusNode} onPickNode={pickNodeForAgent} />
                 <CanvasManagerDialog />
                 <AssetsManagerDialog />
                 <CanvasTopBar
@@ -2563,7 +2595,19 @@ function InfiniteCanvasPage() {
                             isFocusRelated={activeNodeId === node.id}
                             isConnectionTarget={connectionTargetNodeId === node.id}
                             isConnecting={Boolean(connectingParams)}
-                            referenceSelectionState={!referencePickerNodeId ? undefined : node.id === referencePickerNodeId ? "target" : referenceConnectedNodeIds.has(node.id) || !isCanvasReferenceNode(node, nodes) ? "disabled" : "available"}
+                            referenceSelectionState={
+                                pickingForAgent
+                                    ? node.type === CanvasNodeType.Group
+                                        ? "disabled"
+                                        : "available"
+                                    : !referencePickerNodeId
+                                      ? undefined
+                                      : node.id === referencePickerNodeId
+                                        ? "target"
+                                        : referenceConnectedNodeIds.has(node.id) || !isCanvasReferenceNode(node, nodes)
+                                          ? "disabled"
+                                          : "available"
+                            }
                             showPanel={!isNodeResizing && dialogNodeId === node.id && !selectionBox && !getNodeDefinition(node.type)?.hidePanel}
                             groupChildCount={groupChildCountById.get(node.id) || 0}
                             isGroupDropTarget={dropTargetGroupId === node.id}
@@ -2593,7 +2637,7 @@ function InfiniteCanvasPage() {
                             onDeleteBatchImage={deleteBatchImage}
                             onRetry={handleNodeRetry}
                             onViewImage={handleNodeViewImage}
-                            onSelectReference={selectNodeReference}
+                            onSelectReference={pickingForAgent ? finishAgentPick : selectNodeReference}
                             onContextMenu={handleNodeContextMenu}
                         />
                     ))}
@@ -2624,6 +2668,17 @@ function InfiniteCanvasPage() {
                         />
                     ) : null}
                 </InfiniteCanvas>
+
+                {pickingForAgent ? (
+                    <button
+                        type="button"
+                        className="absolute left-1/2 top-4 z-[90] -translate-x-1/2 rounded-full border px-4 py-2 text-sm font-medium shadow-lg backdrop-blur"
+                        style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border }}
+                        onClick={() => finishAgentPick(null)}
+                    >
+                        {t("canvas.agent.pickingNode")}
+                    </button>
+                ) : null}
 
                 {referencePickerNodeId ? (
                     <button

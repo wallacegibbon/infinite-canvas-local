@@ -842,6 +842,7 @@ export default {
             thinking: "Thinking…",
             tool: "calling {{name}}",
             contextMarker: "[Canvas references]",
+            pickingNode: "Click a node to cite · ESC to cancel",
             reasoningOff: "No thinking",
             reasoningNormal: "Normal",
             reasoningMax: "Deep",

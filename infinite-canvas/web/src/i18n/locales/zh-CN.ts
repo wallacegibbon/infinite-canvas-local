@@ -850,6 +850,7 @@ export default {
             thinking: "思考中…",
             tool: "调用 {{name}}",
             contextMarker: "【画布引用】",
+            pickingNode: "点击一个节点来引用 · ESC 取消",
             reasoningOff: "不思考",
             reasoningNormal: "普通思考",
             reasoningMax: "深度思考",
