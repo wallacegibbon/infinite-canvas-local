@@ -113,6 +113,25 @@ func (s *Server) mcpTools() []mcpTool {
 		Name:        "list_nodes",
 		Description: "Every node on the canvas — id, type, title, prompt, position — and every connection between them. The ids are what the other tools act on.",
 		InputSchema: noArguments,
+	}, {
+		Name: "create_node",
+		Description: "Make one node on the canvas, the way the user's own button makes one: it appears where the view is looking, selected, with its panel open when that is what pressing the button does. Answers with the new node's id and position.",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"type": {"type": "string", "enum": ["image", "video", "audio", "text", "config"], "description": "What kind of node."},
+				"prompt": {"type": "string", "description": "What the node starts with: a text node's body, or the prompt the node's own panel shows."},
+				"position": {
+					"type": "object",
+					"properties": {"x": {"type": "number"}, "y": {"type": "number"}},
+					"required": ["x", "y"],
+					"additionalProperties": false,
+					"description": "Top-left corner in canvas coordinates. Omit it and the node lands in the middle of the view."
+				}
+			},
+			"required": ["type"],
+			"additionalProperties": false
+		}`),
 	}}
 }
 

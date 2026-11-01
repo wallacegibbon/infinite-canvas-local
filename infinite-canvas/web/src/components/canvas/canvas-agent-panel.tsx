@@ -22,7 +22,7 @@ import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
  * (see `lib/canvas-overlay.ts`), and its position is the window's, not the document's.
  */
 
-type ToolStep = { callId: string; name: string; output?: string };
+type ToolStep = { callId: string; name: string; input?: string; output?: string };
 
 type Message = {
     id: string;
@@ -124,8 +124,19 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
                 const updated = { ...last };
                 if (event.type === "delta") updated.text = last.text + (event.text || "");
                 else if (event.type === "reasoning") updated.reasoning = last.reasoning + (event.text || "");
-                else if (event.type === "tool_call") updated.tools = [...last.tools, { callId: event.callId || "", name: event.name || "tool" }];
-                else updated.tools = last.tools.map((step) => (step.callId === event.callId ? { ...step, output: event.output } : step));
+                else if (event.type === "tool_call") {
+                    // A call arrives in frames, not in one message: the name first, so the step can be
+                    // shown while the tool runs, then the input as it fills in. One step per call,
+                    // updated — a step per frame would show the same call twice.
+                    const callId = event.callId || "";
+                    // A name and an input are each their own fragment; an empty one says nothing.
+                    const merge = (step: ToolStep): ToolStep => ({
+                        ...step,
+                        ...(event.name ? { name: event.name } : {}),
+                        ...(event.input ? { input: event.input } : {}),
+                    });
+                    updated.tools = last.tools.some((step) => step.callId === callId) ? last.tools.map((step) => (step.callId === callId ? merge(step) : step)) : [...last.tools, merge({ callId, name: "tool" })];
+                } else updated.tools = last.tools.map((step) => (step.callId === event.callId ? { ...step, output: event.output } : step));
                 return [...current.slice(0, -1), updated];
             });
         }

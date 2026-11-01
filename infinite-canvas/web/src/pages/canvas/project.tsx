@@ -110,6 +110,7 @@ import {
     type CanvasAssistantSession,
     type CanvasConnection,
     type CanvasNodeData,
+    type CanvasNodeMetadata,
     type CanvasNodeTypeId,
     type ConnectionHandle,
     type ContextMenuState,
@@ -959,9 +960,8 @@ function InfiniteCanvasPage() {
         setNodes,
         setDialogNodeId,
     });
-    useCanvasAgentTools({ nodesRef, connectionsRef });
     const createNode = useCallback(
-        (type: CanvasNodeTypeId, position?: Position) => {
+        (type: CanvasNodeTypeId, position?: Position, patch?: CanvasNodeMetadata): CanvasNodeData => {
             const targetPosition = position || getCanvasCenter();
             const configMetadata =
                 type === CanvasNodeType.Config
@@ -972,7 +972,7 @@ function InfiniteCanvasPage() {
                           ...(recallNodeSettings(type) || {}),
                       }
                     : undefined;
-            const newNode = createCanvasNode(type, targetPosition, configMetadata);
+            const newNode = createCanvasNode(type, targetPosition, { ...configMetadata, ...patch });
 
             setNodes((prev) => [...prev, newNode]);
             setSelectedNodeIds(new Set([newNode.id]));
@@ -989,9 +989,13 @@ function InfiniteCanvasPage() {
                     ? true
                     : isBuiltinType(type) && type !== CanvasNodeType.Text && type !== CanvasNodeType.Audio && type !== CanvasNodeType.Group;
             if (wantsPanel) setDialogNodeId(newNode.id);
+            return newNode;
         },
         [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, getCanvasCenter],
     );
+
+    // The agent's hands are the same function the buttons press.
+    useCanvasAgentTools({ nodesRef, connectionsRef, createNode });
 
     const deleteNodes = useCallback(
         (ids: Set<string>) => {

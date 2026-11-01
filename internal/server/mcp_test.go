@@ -126,9 +126,14 @@ func TestMCPHandshakeIsEnoughToDiscoverTheTools(t *testing.T) {
 	if !ok || len(tools) == 0 {
 		t.Fatalf("tools/list = %v, want at least one tool", answer)
 	}
-	name := tools[0].(map[string]any)["name"]
-	if name != "ping" {
-		t.Fatalf("tool name = %v, want ping", name)
+	// The vocabulary, in the order it is offered: a name that disappears from here is a tool the canvas
+	// can no longer be asked for.
+	var names []string
+	for _, tool := range tools {
+		names = append(names, tool.(map[string]any)["name"].(string))
+	}
+	if strings.Join(names, ",") != "ping,list_nodes,create_node" {
+		t.Fatalf("tools/list = %v, want ping, list_nodes, create_node", names)
 	}
 }
 

@@ -2981,3 +2981,28 @@ the gateway logged `tool answered session=canvas callId=tool-1 isError=false` in
 \"文本\" at (689, 247)\n…"}]}`; the panel's answer named both counts and the shapes it had read. A second
 turn and a page reload repeated it (`callId=tool-2`). The node titles that disagree with their prompts are
 the canvas's own data — a title is a snapshot taken when the node was made.
+
+## 86. A tool makes a node exactly the way the button does
+
+**Decision** `create_node` calls the same function the canvas's own 文本 / 图片 / 视频 buttons call, with the
+same consequences: the node lands in the middle of the view (a tool that states a position gets its
+top-left corner there, which is the coordinate `list_nodes` reports), it is selected, and for the types
+whose button opens a panel the panel opens. A `prompt` becomes a text node's `content` and every other
+node's `prompt` — the field that node's own panel edits. The answer names the new node's id and position.
+
+**Why** The agent must look like a hand the user cannot see, not like a second, quieter way to change the
+canvas: whatever appears has to appear where he is looking, selected, with the panel he would have got by
+pressing the button. Anything else — building the node in a corner, skipping the selection, writing
+metadata the panel would not have written — makes the canvas a different surface depending on who asked,
+and the user would have to learn which one he is looking at.
+
+**What it refuses** Groups (structure, not content) and plugin nodes (the user's own extensions): a tool
+that could make anything the registry knows would be a tool that makes things nobody asked for. The
+refusal names what it can make.
+
+**Tested** In a browser against a real AlayaCore on `:8191`: "用 canvas_create_node 在画布中央新建一个文本节点，
+内容是「第二只手写的字」" → `<< AF {"name":"canvas_create_node"}`, then
+`{"input":{"prompt":"第二只手写的字","type":"text"}}`, `tool answered … isError=false`, and
+`<< UF "created text-1793522100580-liw89 (text) at (1541, 438)"`. The node appeared in the middle of the
+viewport with the text already in it, selected, with the selection toolbar over it — visible in a
+screenshot taken right after — and the panel showed one step, `调用 canvas_create_node`, and the id.
