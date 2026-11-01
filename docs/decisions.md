@@ -4197,3 +4197,38 @@ every pack reference resolves, and the 8 payload directories are exactly the 8 v
 `resources/index.json`, `resources/payload/custom_nodes/ComfyUI-SolAttn_triton` (deleted),
 `infinite-canvas/web/src/lib/canvas/video-model-mode.ts`, the two node panels, `video-settings-panel.tsx`,
 `i18n/locales/*`, `lib/resource-copy-zh.ts`, `internal/workflow/media_test.go`.
+
+## 125. Krea2 leaves: the second text-to-image family nobody opened
+
+**Decision** The `krea2` pack is gone — four resources, the `image-krea2-turbo` workflow and its graph, the
+Chinese copy, and 29.92 GiB of weights. The catalogue is 13 workflows, 49 resources and 8 packs.
+
+**Why** It occupied the same slot as Z-Image Turbo and had never been used. Both are 8-step, CFG-1
+distillation models of the same size class with a text-to-image graph; the difference is which images they
+were trained on. The evidence is one-sided:
+
+| | Z-Image Turbo | Krea2 Turbo |
+|---|---|---|
+| disk | 25.04 GiB (bf16 + int8) | 29.92 GiB (fp8 + int8) |
+| outputs in `output/` | **1030** | **0** |
+
+Sampling five Z-Image artefacts plus the newest one, every embedded graph names
+`z_image_turbo_bf16.safetensors` at 8 steps and CFG 1 — so the int8 variant has never run either, though
+it is the low-VRAM fallback and stays.
+
+**What "another aesthetic" costs** 29.92 GiB resident for a second look, when the pack can be installed
+from the resource panel in a few minutes and removed again. Three of the four files only existed for this
+workflow: `qwen3vl_4b_fp8_scaled` (4.88 GiB, a vision-language encoder used nowhere else),
+`qwen_image_vae`, and the int8 base model that no graph declared a dependency on.
+
+**What is left for images** Z-Image Turbo (fast drafts, the one actually used), Qwen Image 2.1 (edit,
+inpaint, outpaint, multi-angle) and MOSS-Image (the three-recipe photoreal family). Those three do
+different jobs; Krea2 was the only removable duplicate.
+
+**Tested** `make check`, `tsc --noEmit`, 132 canvas tests, and the integrity pass: 13 registry entries all
+point at graphs that exist, every pack reference resolves, 8 payload directories for 8 vendored node
+resources. `internal/generate`'s "a LoRA outside the family is rejected" fixture was renamed from
+`krea2/anime.safetensors` to `other-family/anime.safetensors` — it needs a foreign name, not that one.
+
+**Where** `resources/index.json`, `workflows/registry.json`, `workflows/image-krea2-turbo.json` (deleted),
+`infinite-canvas/web/src/lib/resource-copy-zh.ts`, `README.md`, `internal/generate/generate_test.go`.

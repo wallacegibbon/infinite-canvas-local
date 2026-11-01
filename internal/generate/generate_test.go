@@ -113,7 +113,7 @@ func TestApplyLoraChainSkipsDisabled(t *testing.T) {
 
 func TestApplyLoraChainRejectsForeignLora(t *testing.T) {
 	params := map[string]any{
-		"loras": []any{map[string]any{"name": "krea2/anime.safetensors"}},
+		"loras": []any{map[string]any{"name": "other-family/anime.safetensors"}},
 	}
 	_, _, err := ApplyLoraChain(loraGraph(), params, LoraOptions{Filter: `H3|minimax`})
 	if err == nil {

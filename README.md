@@ -20,7 +20,7 @@ Maintained here: the workflow graphs and `registry.json`, the resource index and
 
 - **Infinite canvas**: text / image / video / group nodes; wiring, box selection, export, autosave.
 - **Workflows are the unit**: the gateway runs ComfyUI workflows (`GET /api/workflows`, `POST /api/runs`) and reports what each accepts; the canvas decides which of them the picker offers.
-- **Images**: Z-Image Turbo, Krea2 Aesthetics, MOSS SFT (8-step, regional layout), Qwen Image 2.1 (multi-image edit, masked inpaint, outpaint).
+- **Images**: Z-Image Turbo, MOSS SFT (8-step, regional layout), Qwen Image 2.1 (multi-image edit, masked inpaint, outpaint).
 - **Video**: MiniMax-H3 text-to-video, first/last-frame and multi-reference, with sampling preview and LoRA cards.
 - **Upscaling**: ESRGAN for images.
 - **Local plugins**: LoRA strength card, ComfyUI parameter card.
