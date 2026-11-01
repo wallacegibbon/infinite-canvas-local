@@ -1,110 +1,21 @@
 package resource
 
 import (
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 
 	"comfyui-gateway/internal/setup"
 	"comfyui-gateway/internal/util"
 	"comfyui-gateway/internal/workflow"
 )
 
-// referencedFilesCache remembers which filenames a workflow graph mentions.
-type referencedFilesCacheEntry struct {
-	stamp string
-	names map[string]bool
-}
-
-var (
-	referencedMu    sync.Mutex
-	referencedFiles = map[string]referencedFilesCacheEntry{}
-)
-
-// workflowReferencedFiles lists the model filenames a graph actually references.
-//
-// resources.json can still declare a bake artifact that the workflow no longer
-// uses (for example after switching to a plain VAE loader). Filtering bake entries
-// through this avoids reporting a phantom "missing" file forever.
-func (m *Manager) workflowReferencedFiles(entry *workflow.Entry) map[string]bool {
-	if entry == nil || entry.FilePath == "" {
-		return nil
-	}
-	info, err := os.Stat(entry.FilePath)
-	if err != nil {
-		return nil
-	}
-	stamp := info.ModTime().String() + ":" + util.Itoa(info.Size())
-
-	referencedMu.Lock()
-	if cached, ok := referencedFiles[entry.FilePath]; ok && cached.stamp == stamp {
-		referencedMu.Unlock()
-		return cached.names
-	}
-	referencedMu.Unlock()
-
-	names := map[string]bool{}
-	for _, id := range entry.Workflow.IDs() {
-		node, ok := entry.Workflow.NodeAt(id)
-		if !ok {
-			continue
-		}
-		for _, value := range node.Inputs() {
-			if text, ok := value.(string); ok {
-				names[filepath.Base(util.NormalizeSlashes(text))] = true
-			}
-		}
-	}
-
-	referencedMu.Lock()
-	referencedFiles[entry.FilePath] = referencedFilesCacheEntry{stamp: stamp, names: names}
-	referencedMu.Unlock()
-	return names
-}
-
-// packReferencedFiles unions the referenced filenames of a pack's workflows.
-func (m *Manager) packReferencedFiles(pack *Pack) map[string]bool {
-	if pack.WorkflowDeps.Len() == 0 {
-		return nil
-	}
-	union := map[string]bool{}
-	for _, workflowID := range pack.WorkflowDeps.Keys {
-		for name := range m.workflowReferencedFiles(m.registry.Resolve(workflowID)) {
-			union[name] = true
-		}
-	}
-	if len(union) == 0 {
-		return nil
-	}
-	return union
-}
-
-// bakeStillReferenced reports whether a bake artifact is still used by the workflows.
-func bakeStillReferenced(item *Item, resource *Resource, referenced map[string]bool) bool {
-	if referenced == nil || resource == nil || item.Type != "bake" {
-		return true
-	}
-	_, file := targetParts(resource.Target)
-	if file == "" {
-		return true
-	}
-	return referenced[file]
-}
-
 // mainModelInfo describes a pack's main-model selector.
-func (m *Manager) mainModelInfo(pack *Pack, installed map[string]bool) *MainModel {
+func (m *Manager) mainModelInfo(pack *Pack, providers *providerIndex, installed map[string]bool) *MainModel {
 	seen := map[string]bool{}
 	var workflowIDs []string
 	for _, id := range pack.Workflows {
-		if !seen[id] {
-			seen[id] = true
-			workflowIDs = append(workflowIDs, id)
-		}
-	}
-	for _, id := range pack.WorkflowDeps.Keys {
 		if !seen[id] {
 			seen[id] = true
 			workflowIDs = append(workflowIDs, id)
@@ -200,7 +111,7 @@ func (m *Manager) mainModelInfo(pack *Pack, installed map[string]bool) *MainMode
 		options = append(options, option)
 	}
 
-	for _, id := range pack.Resources {
+	for _, id := range m.packModelIDs(pack, providers) {
 		resource, ok := resourceByID[id]
 		if !ok || resource.Type == "bake" {
 			continue

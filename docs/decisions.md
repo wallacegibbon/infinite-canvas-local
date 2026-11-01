@@ -4335,3 +4335,68 @@ workflow row is called `resources`. Beside `workflows/` at the root it also stat
 
 **Where** `resources.json` (moved), `internal/resource/`, `internal/config/`, `infinite-canvas/web/`,
 `README.md`, `docs/gateway.md`, `docs/known-issues.md`.
+
+## 130. A pack's dependencies are derived from its graphs, not written down three times
+
+**Decision** `resources.json` no longer says which files a pack needs. A pack is now an id, a label, a
+description, a list of workflow ids, and a list of *alternates*; everything else is read off the
+workflows' graphs. `schema` is 2, and the fields `resources`, `optionalResources` and
+`workflowDependencies` are gone.
+
+**Why the hand-written lists had to go** They were three descriptions of one fact, and all three had
+drifted from the graphs:
+
+- **Six packs declared every resource optional.** `resources == optionalResources`, so
+  `required = resources − optionalResources` was empty: the panel showed "已齐全" for MOSS, H3, Z-Image
+  and upscale packs *even with every weight deleted*, and because `total` was 0 the row had no checkbox,
+  so the pack could not be installed from the panel at all. A pack that says it is complete and cannot
+  be installed is worse than one that says nothing.
+- **Eight of the nine node packs had no entry point.** Only `frame_interpolation_node` appeared in any
+  pack. `qwenmultiangle`, `inpaint_cropandstitch`, `kjnodes` and all five H3 packs were installable only
+  by hand, while their workflows were offered in the canvas — this was true in the initial import too
+  (`925ce37`), so it was never a regression, just a hole nobody's list closed.
+- **The tables missed real dependencies.** No pack listed `kjnodes` for the H3 workflows that run
+  `ModelPreviewOverrideKJ`, and `video-h3-*` omitted all five packs its graphs need. Conversely the
+  Outpaint LoRA was listed for `image-qwen21` (whose default graph is *edit*) only because someone
+  remembered the variant.
+
+**What "derived" means** A graph names files through loader inputs and names nodes through `class_type`.
+The catalogue knows which resource owns a target (`loras/Moss_image/…` is matched as a whole target, not
+as a file name, because two LoRAs can share a name in different folders) and which classes a pack
+provides. Two shapes needed care: `ApplyVDNH3Advanced.vdn_checkpoint` names a *directory*
+(`stage-dmd-step-250`) and is matched as a prefix, and a loader class can be owned by a node pack
+(`SelfLiftH3Sampler`, `ApplyVDNH3Advanced`, `LoraLoaderBypassModelOnly`), so the class lookup runs for
+loader nodes too. Variants are unioned: outpaint's LoRA is a dependency of the workflow even though the
+default mode never loads it.
+
+**What the pack row now says** Required is the intersection over the pack's workflows — a file every one
+of them loads; optional is everything else the pack can install, which includes alternates no graph names
+(the second precision of a base model, the other two RealESRGAN checkpoints). H3 therefore requires 20
+items (including its five node packs) and offers one optional LoRA; MOSS requires three and offers four.
+A pack with no workflows — `core` — requires nothing, which is what makes it informational.
+
+**Two data corrections fell out of the audit**
+
+- `provides` is not "every class this pack registers", it is "every class our graphs need from this pack".
+  `h3_audio_t8_node` claimed `MiniMaxH3SigmaShift`, `ModelAttentionBackend` and
+  `LoraLoaderBypassModelOnly` — all three ship with ComfyUI (`comfy_extras/nodes_minimax_h3.py`,
+  `nodes_model_advanced.py`, `nodes_lora_debug.py`), so the pack was being blamed for the host's own
+  nodes and looked broken on any ComfyUI whose version moved them. `kjnodes` claimed only
+  `DrawMaskOnImage` and now also claims the three classes our H3 and inpaint graphs actually load from it
+  (`ModelPreviewOverrideKJ`, `MiniMaxChunkFeedForward`, `MiniMaxH3MemoryEfficientSageAttentionPatch`);
+  `h3_vhs_node` gained `VHS_LoadVideo`, and is now `vhs_node` because RIFE uses it as well.
+- `resources/payload` imports test (`payload_imports_test.go`) is deleted with the payload it checked.
+
+**Tested** `gofmt`, `go vet`, `go test ./internal/...`, `tsc --noEmit`, 132 canvas tests. New tests:
+`derive_test.go` pins the three matching rules (whole-target, directory prefix, loader class owned by a
+pack) plus unresolved reporting and variant union; `catalogue_test.go` reads the real `resources.json` and
+`workflows/registry.json` and fails if a pack names a workflow the registry lacks, if a graph loads a file
+no resource owns, if a runnable pack requires nothing, if a catalogued resource is in no pack and no graph,
+if a pack claims a core class, or if a node pack is not pinned to a full commit. Verified against the live
+catalogue: no graph resolves to an unresolved name, and the four packs that used to show a false green now
+count 3, 3, 3 and 20 required items.
+
+**Where** `resources.json`, `internal/resource/{derive.go (new),derive_test.go (new),
+catalogue_test.go (new),resource.go,status.go,helpers.go,jobs.go,bake_test.go,resource_test.go}`,
+`infinite-canvas/web/src/{services/api/resources.ts,components/settings/resource-center-panel.tsx,
+lib/resource-copy-zh.ts}`, `internal/resource/payload_imports_test.go` (deleted).

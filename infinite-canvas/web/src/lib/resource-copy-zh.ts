@@ -53,7 +53,7 @@ const RESOURCE_ZH: Record<string, ResourceCopy> = {
     h3_audio_t8_node: { note: "从固定 commit 的 GitHub 归档下载，不跑 pip；节点依赖按 README 处理。" },
     h3_yc_nodes: { note: "从固定 commit 的 GitHub 归档下载，不跑 pip；节点依赖按 README 处理。" },
     h3_selflift_node: { note: "从固定 commit 的 GitHub 归档下载，不跑 pip；节点依赖按 README 处理。", license: "未声明 LICENSE" },
-    h3_vhs_node: { note: "从固定 commit 的 GitHub 归档下载，不跑 pip；节点依赖按 README 处理。" },
+    vhs_node: { note: "从固定 commit 的 GitHub 归档下载，不跑 pip；节点依赖按 README 处理。" },
     h3_tiny_vae: { label: "H3 预览用 TAESD (taeh3)", note: "Kijai 的 H3 2D 微型解码器（MiniMax-H3-TAE，Apache-2.0），张量与上游一致。" },
     frame_interpolation_node: { note: "RIFE 插帧节点，从 GitHub 安装；权重 rife49.pth 由该节点包在首次运行时自行下载到自己的 ckpts 目录，不走 models/，所以没有单独的模型条目。装完重启 ComfyUI。" },
     esrgan_x2plus: { label: "RealESRGAN x2plus（快速放大）", note: "ESRGAN 快速放大默认模型。" },

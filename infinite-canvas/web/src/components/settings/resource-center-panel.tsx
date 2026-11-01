@@ -768,7 +768,6 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                     const selectedOptionalInPack = extraOptionalItems.filter((item) => selectedOptional.has(item.id) && item.status !== "present");
                     const packInstallIds = [...pack.requiredItems.filter((item) => item.status !== "present" && item.type !== "bake").map((item) => item.id), ...selectedOptionalInPack.map((item) => item.id)];
                     const expandable = pack.total > 0 || pack.optionalTotal > 0 || workflowDependencies.length > 0;
-                    const optionalLabel = pack.optionalLabel?.trim() || copy.optionalSection;
                     const headerBody = (
                         <>
                             <div className="flex flex-wrap items-center gap-2">
@@ -783,7 +782,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                 ) : null}
                                 {extraOptionalItems.length ? (
                                     <Tag>
-                                        {optionalLabel} {extraOptionalItems.length}
+                                        {copy.optionalSection} {extraOptionalItems.length}
                                     </Tag>
                                 ) : null}
                                 {pack.missingSize ? (
@@ -957,7 +956,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                             {extraOptionalItems.length ? (
                                                 <>
                                                     <div className="mt-3 mb-1.5 flex items-center justify-between gap-2 text-[11px]">
-                                                        <span className="font-medium text-stone-600 dark:text-stone-300">{optionalLabel}</span>
+                                                        <span className="font-medium text-stone-600 dark:text-stone-300">{copy.optionalSection}</span>
                                                         <span className="text-stone-400 dark:text-stone-500">{`${copy.optionalMissingLabel} ${extraOptionalMissing.length}${extraOptionalSize ? ` · ${formatBytes(extraOptionalSize)}` : ""}`}</span>
                                                     </div>
                                                     <div className="space-y-1.5">
@@ -1008,7 +1007,7 @@ export function ResourceCenterPanel({ compact = false, footer }: { compact?: boo
                                                 </>
                                             ) : null}
                                             <div className={`${pack.requiredItems.length ? "mt-3" : ""} mb-1.5 flex items-center justify-between text-[11px]`}>
-                                                <span className="font-medium text-stone-600 dark:text-stone-300">{optionalLabel}</span>
+                                                <span className="font-medium text-stone-600 dark:text-stone-300">{copy.optionalSection}</span>
                                                 <span className="text-stone-400 dark:text-stone-500">
                                                     {pack.optionalTotal ? `${copy.optionalMissingLabel} ${pack.optionalMissing}${pack.optionalSize ? ` · ${formatBytes(pack.optionalSize)}` : ""}` : copy.optionalHint}
                                                 </span>

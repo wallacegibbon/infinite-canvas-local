@@ -60,6 +60,10 @@ Two directories carry the runtime assets, and the split is deliberate:
   `pinnedCommit`. A `payload/` directory is still honoured as an escape hatch if a file ever has to
   ship inside the release; nothing is staged there today.
 
+  A pack does not list the files it needs: those are read off the graphs under `workflows/`, so the
+  panel and the workflows cannot disagree. The only list a pack writes down is its `alternates` — the
+  second precision of a base model, the other upscale checkpoints — because no graph names them.
+
 What does ship with the installer is the application itself: the gateway binary, the canvas bundle,
 the graphs under `workflows/` and this index. That is the `core` pack, and it is the reason it lists
 no resources.

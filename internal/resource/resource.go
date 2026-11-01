@@ -55,18 +55,22 @@ type Resource struct {
 	LocalPatches []string `json:"localPatches"`
 }
 
-// Pack is one feature bundle: a set of resources plus the workflows they enable.
+// Pack is one feature bundle: a set of workflows, plus the models no workflow names.
+//
+// A pack does not list the files its workflows need. Those are read off the graphs (derive.go), so
+// the two can never disagree: the hand-written list this replaces managed to leave out entire node
+// packs, which made the panel offer a workflow whose nodes nobody could install.
 type Pack struct {
-	ID                string                        `json:"id"`
-	Label             string                        `json:"label"`
-	Description       string                        `json:"description"`
-	Optional          bool                          `json:"optional"`
-	OptionalLabel     string                        `json:"optionalLabel"`
-	Planned           bool                          `json:"planned"`
-	Resources         []string                      `json:"resources"`
-	OptionalResources []string                      `json:"optionalResources"`
-	Workflows         []string                      `json:"workflows"`
-	WorkflowDeps      workflow.OrderedMap[[]string] `json:"workflowDependencies"`
+	ID          string   `json:"id"`
+	Label       string   `json:"label"`
+	Description string   `json:"description"`
+	Optional    bool     `json:"optional"`
+	Planned     bool     `json:"planned"`
+	Workflows   []string `json:"workflows"`
+	// Alternates are resources a pack offers that no graph loads: the second precision of a base
+	// model, the two other RealESRGAN checkpoints. They are installable choices, not dependencies,
+	// so nothing can derive them and they are the only list left to write down.
+	Alternates []string `json:"alternates"`
 }
 
 // Index is the parsed resources.json document.
@@ -173,7 +177,6 @@ type PackStatus struct {
 	Label           string                `json:"label"`
 	Description     string                `json:"description"`
 	Optional        bool                  `json:"optional"`
-	OptionalLabel   string                `json:"optionalLabel"`
 	Recommended     bool                  `json:"recommended"`
 	Planned         bool                  `json:"planned"`
 	Workflows       []string              `json:"workflows"`
@@ -385,8 +388,8 @@ var targetPattern = regexp.MustCompile(`^[^/]+/.+$`)
 
 // validateIndex rejects an index the UI could not render.
 func validateIndex(index *Index) error {
-	if index.Schema != 1 {
-		return fmt.Errorf("resource index is malformed (schema must be 1)")
+	if index.Schema != 2 {
+		return fmt.Errorf("resource index is malformed (schema must be 2)")
 	}
 	seen := map[string]bool{}
 	for _, resource := range index.Resources {
@@ -405,22 +408,18 @@ func validateIndex(index *Index) error {
 	for _, resource := range index.Resources {
 		known[resource.ID] = true
 	}
+	packs := map[string]bool{}
 	for _, pack := range index.Packs {
-		for _, id := range pack.Resources {
+		if pack == nil || pack.ID == "" {
+			return fmt.Errorf("a pack is missing its id")
+		}
+		if packs[pack.ID] {
+			return fmt.Errorf("duplicate pack id: %s", pack.ID)
+		}
+		packs[pack.ID] = true
+		for _, id := range pack.Alternates {
 			if !known[id] {
 				return fmt.Errorf("pack %s references unknown resource %s", pack.ID, id)
-			}
-		}
-		for _, id := range pack.OptionalResources {
-			if !known[id] {
-				return fmt.Errorf("pack %s references unknown resource %s", pack.ID, id)
-			}
-		}
-		for _, mode := range pack.WorkflowDeps.Keys {
-			for _, id := range pack.WorkflowDeps.Values[mode] {
-				if !known[id] {
-					return fmt.Errorf("pack %s workflow %s references unknown resource %s", pack.ID, mode, id)
-				}
 			}
 		}
 	}

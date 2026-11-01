@@ -499,9 +499,9 @@ cd infinite-canvas/web && npm run check && npx vitest run   # the canvas
 
 The suite covers binding application, LoRA injection, prompt sanitising, registry
 loading, the task queue (including cancellation and retention), configuration
-validation, resource index validation, the vendored packs' own relative imports
-(#113), and an end-to-end HTTP test that drives real image generation against an
-in-process fake ComfyUI.
+validation, resource catalogue validation against the real `resources.json` and the
+real workflow graphs (#130), and an end-to-end HTTP test that drives real image
+generation against an in-process fake ComfyUI.
 
 ## Intentional differences from the Node gateway
 

@@ -35,7 +35,7 @@ func decodeIndex(t *testing.T, raw string) *Index {
 
 func TestValidateIndexAcceptsRealisticDocument(t *testing.T) {
 	index := decodeIndex(t, `{
-		"schema": 1,
+		"schema": 2,
 		"version": "2026.10.29-28",
 		"channel": "stable",
 		"resources": [
@@ -43,8 +43,7 @@ func TestValidateIndexAcceptsRealisticDocument(t *testing.T) {
 			{"id": "b", "type": "model", "target": "loras/sub/b.safetensors"}
 		],
 		"packs": [
-			{"id": "core", "resources": ["a"], "optionalResources": ["b"],
-			 "workflowDependencies": {"image-a": ["a"]}}
+			{"id": "core", "workflows": ["image-a"], "alternates": ["b"]}
 		]
 	}`)
 
@@ -58,13 +57,13 @@ func TestValidateIndexAcceptsRealisticDocument(t *testing.T) {
 
 func TestValidateIndexRejects(t *testing.T) {
 	cases := map[string]string{
-		"wrong schema": `{"schema": 2, "resources": [], "packs": []}`,
-		"missing id":   `{"schema": 1, "resources": [{"target": "vae/x"}], "packs": []}`,
-		"duplicate id": `{"schema": 1, "resources": [{"id":"a","target":"vae/x"},{"id":"a","target":"vae/y"}], "packs": []}`,
-		"bad target":   `{"schema": 1, "resources": [{"id":"a","target":"noslash"}], "packs": []}`,
-		"dangling ref": `{"schema": 1, "resources": [], "packs": [{"id":"p","resources":["ghost"]}]}`,
-		"dangling dep": `{"schema": 1, "resources": [], "packs": [{"id":"p","workflowDependencies":{"w":["ghost"]}}]}`,
-		"dangling opt": `{"schema": 1, "resources": [], "packs": [{"id":"p","optionalResources":["ghost"]}]}`,
+		"old schema":        `{"schema": 1, "resources": [], "packs": []}`,
+		"missing id":        `{"schema": 2, "resources": [{"target": "vae/x"}], "packs": []}`,
+		"duplicate id":      `{"schema": 2, "resources": [{"id":"a","target":"vae/x"},{"id":"a","target":"vae/y"}], "packs": []}`,
+		"bad target":        `{"schema": 2, "resources": [{"id":"a","target":"noslash"}], "packs": []}`,
+		"dangling ref":      `{"schema": 2, "resources": [], "packs": [{"id":"p","alternates":["ghost"]}]}`,
+		"pack without id":   `{"schema": 2, "resources": [], "packs": [{"alternates":[]}]}`,
+		"duplicate pack id": `{"schema": 2, "resources": [], "packs": [{"id":"p"},{"id":"p"}]}`,
 	}
 	for name, document := range cases {
 		index := decodeIndex(t, document)

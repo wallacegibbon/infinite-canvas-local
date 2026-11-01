@@ -89,7 +89,6 @@ export type ResourcePack = {
     label: string;
     description: string;
     optional?: boolean;
-    optionalLabel?: string;
     recommended?: boolean;
     planned: boolean;
     workflows: string[];

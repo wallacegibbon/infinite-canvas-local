@@ -533,11 +533,15 @@ func (m *Manager) Status() *Status {
 		}
 	}
 
+	// One flat view of the catalogue: every "which resource owns this name" question below is
+	// answered from it, so the pack rows and the per-workflow rows cannot disagree.
+	providers := newProviderIndex(index)
+
 	// Pack-level main-model selections mark the resources they shadow as present.
 	packMainModels := map[string]*MainModel{}
 	overriddenBy := map[string]string{}
 	for _, pack := range index.Packs {
-		info := m.mainModelInfo(pack, installedModels)
+		info := m.mainModelInfo(pack, providers, installedModels)
 		if info == nil {
 			continue
 		}
@@ -596,7 +600,7 @@ func (m *Manager) Status() *Status {
 
 	packs := make([]*PackStatus, 0, len(index.Packs))
 	for _, pack := range index.Packs {
-		packs = append(packs, m.packStatus(pack, byID, byResourceID, packMainModels[pack.ID]))
+		packs = append(packs, m.packStatus(pack, providers, byID, packMainModels[pack.ID]))
 	}
 
 	workflowResources := m.workflowResources(packs, byID)
@@ -649,31 +653,26 @@ func (m *Manager) Status() *Status {
 }
 
 // packStatus builds one pack's panel row.
-func (m *Manager) packStatus(pack *Pack, byID map[string]*Item, byResourceID map[string]*Resource, mainModel *MainModel) *PackStatus {
-	referenced := m.packReferencedFiles(pack)
+//
+// The required/optional split is derived too: required is what every workflow in the pack loads,
+// optional is what only some of them do. A pack whose three workflows share a text encoder and a
+// VAE but differ in the base model therefore has two required rows — where a hand-written list of
+// "all optional" produced a green tick, no checkbox, and nothing to install.
+func (m *Manager) packStatus(pack *Pack, providers *providerIndex, byID map[string]*Item, mainModel *MainModel) *PackStatus {
+	requiredIDs, optionalIDs := m.packResourceSplit(pack, providers)
 
-	items := make([]*Item, 0, len(pack.Resources))
-	for _, id := range pack.Resources {
-		item, ok := byID[id]
-		if !ok {
-			continue
-		}
-		if !bakeStillReferenced(item, byResourceID[id], referenced) {
-			continue
-		}
-		items = append(items, item)
-	}
-
-	optional := map[string]bool{}
-	for _, id := range pack.OptionalResources {
-		optional[id] = true
-	}
+	items := make([]*Item, 0, len(requiredIDs)+len(optionalIDs))
 	var requiredItems, optionalItems []*Item
-	for _, item := range items {
-		if optional[item.ID] {
-			optionalItems = append(optionalItems, item)
-		} else {
+	for _, id := range requiredIDs {
+		if item, ok := byID[id]; ok {
 			requiredItems = append(requiredItems, item)
+			items = append(items, item)
+		}
+	}
+	for _, id := range optionalIDs {
+		if item, ok := byID[id]; ok {
+			optionalItems = append(optionalItems, item)
+			items = append(items, item)
 		}
 	}
 	requiredItems = nonNilItems(requiredItems)
@@ -696,10 +695,9 @@ func (m *Manager) packStatus(pack *Pack, byID map[string]*Item, byResourceID map
 		Label:           defaultString(pack.Label, pack.ID),
 		Description:     pack.Description,
 		Optional:        pack.Optional,
-		OptionalLabel:   pack.OptionalLabel,
 		Planned:         pack.Planned,
 		Workflows:       nonNilStrings(pack.Workflows),
-		ResourceIDs:     nonNilStrings(pack.Resources),
+		ResourceIDs:     append(append([]string{}, requiredIDs...), optionalIDs...),
 		Resources:       nonNilItems(items),
 		RequiredItems:   requiredItems,
 		OptionalItems:   optionalItems,
@@ -722,10 +720,10 @@ func (m *Manager) packStatus(pack *Pack, byID map[string]*Item, byResourceID map
 		status.OptionalSize += item.Size
 	}
 
-	// Dependencies come from the workflow table when present, so each workflow row
-	// can show its own missing files and install button.
-	if pack.WorkflowDeps.Len() > 0 {
-		status.WorkflowDeps = m.workflowDependencies(pack, byID, byResourceID, mainModel)
+	// One row per workflow, listing only the files that workflow loads, so a user who wants one
+	// of them installs one of them.
+	if len(pack.Workflows) > 0 {
+		status.WorkflowDeps = m.workflowDependencies(pack, providers, byID, mainModel)
 	} else {
 		status.WorkflowDeps = []*WorkflowDependency{}
 	}
@@ -747,23 +745,56 @@ func (m *Manager) packStatus(pack *Pack, byID map[string]*Item, byResourceID map
 	return status
 }
 
+// packResourceSplit answers what a pack must have and what part of it is a choice.
+//
+// Required is the intersection over the pack's workflows; everything else it can install — files only
+// some workflows load, plus the alternates no graph names — is optional. A pack with no workflows has
+// nothing to install, which is how the "core" row stays informational.
+func (m *Manager) packResourceSplit(pack *Pack, providers *providerIndex) (required, optional []string) {
+	sets := make([]map[string]bool, 0, len(pack.Workflows))
+	union := map[string]bool{}
+	for _, id := range pack.Alternates {
+		union[id] = true
+	}
+	for _, workflowID := range pack.Workflows {
+		set := map[string]bool{}
+		for _, id := range providers.entryDeps(m.resolvedWorkflow(workflowID)).Resources {
+			set[id] = true
+			union[id] = true
+		}
+		sets = append(sets, set)
+	}
+
+	requiredSet := map[string]bool{}
+	if len(sets) > 0 {
+		for id := range sets[0] {
+			requiredSet[id] = true
+		}
+		for _, set := range sets[1:] {
+			for id := range requiredSet {
+				if !set[id] {
+					delete(requiredSet, id)
+				}
+			}
+		}
+	}
+	for id := range requiredSet {
+		delete(union, id)
+	}
+	return sortedKeys(requiredSet), sortedKeys(union)
+}
+
 // workflowDependencies builds the per-workflow rows of a pack.
-func (m *Manager) workflowDependencies(pack *Pack, byID map[string]*Item, byResourceID map[string]*Resource, packMainModel *MainModel) []*WorkflowDependency {
-	out := make([]*WorkflowDependency, 0, pack.WorkflowDeps.Len())
-	for _, workflowID := range pack.WorkflowDeps.Keys {
-		entry := m.registry.Resolve(workflowID)
-		referenced := m.workflowReferencedFiles(entry)
+func (m *Manager) workflowDependencies(pack *Pack, providers *providerIndex, byID map[string]*Item, packMainModel *MainModel) []*WorkflowDependency {
+	out := make([]*WorkflowDependency, 0, len(pack.Workflows))
+	for _, workflowID := range pack.Workflows {
+		entry := m.resolvedWorkflow(workflowID)
 
 		var dependencyItems []*Item
-		for _, id := range pack.WorkflowDeps.Values[workflowID] {
-			item, ok := byID[id]
-			if !ok {
-				continue
+		for _, id := range providers.entryDeps(entry).Resources {
+			if item, ok := byID[id]; ok {
+				dependencyItems = append(dependencyItems, item)
 			}
-			if !bakeStillReferenced(item, byResourceID[id], referenced) {
-				continue
-			}
-			dependencyItems = append(dependencyItems, item)
 		}
 
 		var missingItems []*Item

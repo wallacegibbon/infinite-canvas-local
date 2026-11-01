@@ -88,7 +88,7 @@ func TestInstallNeverStartsWithABakeItem(t *testing.T) {
 			{ID: "base", Type: "model", Target: "diffusion_models/base.safetensors"},
 			{ID: "merged", Type: "bake", Target: "diffusion_models/merged.safetensors", Requires: []string{"base"}},
 		},
-		Packs: []*Pack{{ID: "moss", Resources: []string{}, OptionalResources: []string{"base", "merged"}}},
+		Packs: []*Pack{{ID: "moss", Alternates: []string{"base", "merged"}}},
 	}
 
 	job, err := manager.Install(nil, []string{"moss"})

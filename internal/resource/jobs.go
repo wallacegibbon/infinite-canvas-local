@@ -98,15 +98,20 @@ func (m *Manager) Install(ids, packs []string) (*Job, error) {
 	for _, id := range ids {
 		add(id)
 	}
+	// A pack is what its workflows load, plus the alternates it offers: the panel's "install this
+	// pack" is the same rule as its per-workflow rows, so the two cannot drift apart.
+	providers := newProviderIndex(index)
 	for _, packID := range packs {
 		for _, pack := range index.Packs {
 			if pack.ID != packID {
 				continue
 			}
-			for _, id := range pack.Resources {
-				add(id)
+			for _, workflowID := range pack.Workflows {
+				for _, id := range providers.entryDeps(m.resolvedWorkflow(workflowID)).Resources {
+					add(id)
+				}
 			}
-			for _, id := range pack.OptionalResources {
+			for _, id := range pack.Alternates {
 				add(id)
 			}
 		}
