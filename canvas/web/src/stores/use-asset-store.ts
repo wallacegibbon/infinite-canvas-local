@@ -46,7 +46,7 @@ export function assetCoverUrl(asset: Asset) {
     return asset.kind === "image" && cover === own ? previewUrlFor(asset.data.storageKey) || cover : cover;
 }
 
-const ASSET_STORE_KEY = "infinite-canvas:asset_store";
+const ASSET_STORE_KEY = "comfy-loft:asset_store";
 
 async function hydrateSavedAssets(value: string) {
     const state = readAssetPersisted(value);

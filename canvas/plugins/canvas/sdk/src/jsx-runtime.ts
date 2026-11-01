@@ -7,7 +7,7 @@ import type * as React from "react";
 import { getReact } from "./runtime";
 
 // Fragment 哨兵:渲染时才解析为宿主 React.Fragment,避免模块顶层触碰运行时。
-export const Fragment = Symbol.for("infinite-canvas.jsx.fragment") as unknown as React.ExoticComponent<{ children?: React.ReactNode }>;
+export const Fragment = Symbol.for("comfy-loft.jsx.fragment") as unknown as React.ExoticComponent<{ children?: React.ReactNode }>;
 
 function createElement(type: unknown, props: Record<string, unknown> | null, key?: unknown): React.ReactElement {
     const react = getReact();

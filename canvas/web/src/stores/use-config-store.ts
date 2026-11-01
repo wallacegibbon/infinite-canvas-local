@@ -77,7 +77,7 @@ export type AiConfig = {
 
 export type ConfigTabKey = "channels" | "preferences" | "local-storage" | "resources";
 
-const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
+const CONFIG_STORE_KEY = "comfy-loft:ai_config_store";
 const CHANNEL_MODEL_SEPARATOR = "::";
 const localDefaultChannel: ModelChannel = {
     id: LOCAL_GATEWAY_CHANNEL_ID,

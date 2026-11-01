@@ -10,10 +10,10 @@
  */
 
 /** Main database: canvas state, uploaded media, generated images and the logs for both. */
-export const APP_DATABASE = "infinite-canvas";
+export const APP_DATABASE = "comfy-loft";
 
 /** One object store per plugin id, created on demand by the plugin event bus. */
-export const PLUGIN_DATABASE = "infinite-canvas-plugins";
+export const PLUGIN_DATABASE = "comfy-loft-plugins";
 
 /**
  * The object stores in {@link APP_DATABASE}, for anyone who needs the list rather than a single

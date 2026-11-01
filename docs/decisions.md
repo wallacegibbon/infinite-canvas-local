@@ -4786,3 +4786,37 @@ leave no dangling reference: `canvas/plugins/` still builds its five official pl
 in `known-issues.md` was re-measured (55 files, 411 lines).
 
 **Where** `canvas/plugins/infinite-canvas/` (deleted), `docs/known-issues.md`, `docs/decisions.md`, `README.md`.
+
+## 143. The browser keys and the export marker are renamed too
+
+**Decision** The persisted identities now carry this project's name: `comfy-loft:canvas_store`,
+`:asset_store`, `:ai_config_store`, `:plugin_store`, `:theme_store`, `:locale`; the localforage databases
+`comfy-loft` and `comfy-loft-plugins`; the export marker `app: "comfy-loft"` in canvas and asset exports; and the
+SDK's JSX fragment sentinel became `Symbol.for("comfy-loft.jsx.fragment")`.
+
+**Why now, after #140 and #142 said no** Those entries were right about the trade-off and wrong about the
+constraint: they priced a migration nobody asked for. There is no data to migrate. The owner's words: it is
+development stage, nothing here cannot be lost. A ten-second empty app beats a compatibility shim that has to be
+kept, explained and eventually retired — and the shim was the only reason the old name was still in the code.
+
+**What the old code would have needed** Nothing exotic, which is exactly why it was tempting: read the old
+localStorage key, write the new one, keep the old one readable for a release. The IndexedDB half is the part that
+does not fit in a shim — the records have to be copied database by database, and a half-finished copy is a
+half-empty app. Both are skipped: the new databases start empty.
+
+**Export files** The importer never validated `app` — `JSON.parse(...) as CanvasExportFile` and a cast — so files
+written before this commit still import; they simply carry a marker that no longer describes the writer. That is
+the one place the old name survives, in files already on disk, which is where it belongs: they are history, not
+code.
+
+**Left alone** `components/canvas/infinite-canvas.tsx` and its `InfiniteCanvas` export keep their names. That is a
+description of the widget — a canvas that scrolls forever — not the product's name, and renaming it would churn
+every import in the canvas for no gain a reader could see.
+
+**Tested** `tsc --noEmit`, 134 canvas tests, `make web`, and the built bundle contains `comfy-loft:canvas_store`
+and no `infinite-canvas:` key. A fresh browser therefore starts with an empty app, which is the intent.
+
+**Where** `canvas/web/src/{stores/{use-asset-store,use-config-store,use-theme-store,use-storage-recovery-store}.ts,
+stores/canvas/{use-canvas-store,use-plugin-store}.ts,i18n/index.ts,services/localforage-databases.ts,
+types/canvas-export.ts,lib/canvas/canvas-export.ts,components/assets/asset-transfer.ts}`,
+`canvas/plugins/canvas/sdk/src/jsx-runtime.ts`.

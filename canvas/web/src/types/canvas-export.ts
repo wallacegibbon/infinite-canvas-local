@@ -1,7 +1,7 @@
 import type { CanvasProject } from "@/stores/canvas/use-canvas-store";
 
 export type CanvasExportFile = {
-    app: "infinite-canvas";
+    app: "comfy-loft";
     version: 3;
     exportedAt: string;
     projects: CanvasProjectExportItem[];

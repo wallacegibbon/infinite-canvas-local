@@ -46,7 +46,7 @@ type CanvasStore = {
 };
 
 const initialViewport: ViewportTransform = { x: 0, y: 0, k: 1 };
-const CANVAS_STORE_KEY = "infinite-canvas:canvas_store";
+const CANVAS_STORE_KEY = "comfy-loft:canvas_store";
 type PersistedCanvasState = Pick<CanvasStore, "projects" | "deletedProjects" | "lastProjectId">;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let queuedPersistState: PersistedCanvasState | null = null;

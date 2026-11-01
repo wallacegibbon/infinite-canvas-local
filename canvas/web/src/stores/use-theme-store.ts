@@ -48,6 +48,6 @@ export const useThemeStore = create<ThemeStore>()(
             setFishWhipEnabled: (enabled) => set({ fishWhipEnabled: enabled }),
             setFishWhipSide: (side) => set({ fishWhipSide: side }),
         }),
-        { name: "infinite-canvas:theme_store" },
+        { name: "comfy-loft:theme_store" },
     ),
 );
