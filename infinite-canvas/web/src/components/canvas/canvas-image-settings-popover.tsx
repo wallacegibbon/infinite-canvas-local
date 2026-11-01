@@ -50,6 +50,21 @@ function qwenCanvasSize(resolution: string | number, ratio: string) {
     return `${snap(Math.sqrt(area * area * (width / height)))}x${snap(Math.sqrt(area * area * (height / width)))}`;
 }
 
+/**
+ * Which ratio pill the stored size came from, or "" for a size no pill wrote.
+ *
+ * The selected ratio used to be saved as its own param, `editCanvasRatio`, and travelled to the gateway
+ * with every request — where it is not a workflow input, so the run was refused. Only `editCanvasSize` is
+ * the workflow's, and the pill can be read back through the same table that wrote it.
+ */
+function canvasRatioOf(size: string, resolution: string) {
+    if (!size) return "auto";
+    for (const ratio of editRatioOptions) {
+        if (qwenCanvasSize(resolution, ratio) === size) return ratio;
+    }
+    return "";
+}
+
 function mossModelInfo(config: AiConfig) {
     const workflowId = channelModelOf(config, config.model)?.model.workflowId || "";
     if (!workflowId.startsWith("image-moss-sft-")) return null;
@@ -84,14 +99,14 @@ export function CanvasImageSettingsPopover({
     const count = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const activeSize = config.size || "auto";
     const qwen = qwenModelInfo(config);
-    const editCanvasRatio = String((config.params as Record<string, unknown> | undefined)?.editCanvasRatio || "auto");
+    const editCanvasRatio = canvasRatioOf(String((config.params as Record<string, unknown> | undefined)?.editCanvasSize || ""), String((config.params as Record<string, unknown> | undefined)?.resolution ?? 1024));
     // A stored imageMode can outlive the model it was chosen for (switching to Qwen while the
     // config still says "layout"), so an unknown mode reads as plain text-to-image.
     const imageMode = qwen && qwen.modes.includes(String(config.imageMode)) ? String(config.imageMode) : "t2i";
     // The trigger reads `mode · scope`: the mode name, then what the canvas will follow.
     const qwenTriggerLabel = !qwen
         ? ""
-        : `${qwenVariantLabel(imageMode, qwen.labels)}${imageMode === "t2i" ? "" : imageMode === "edit" ? ` · ${editCanvasRatio === "auto" ? t("canvas.imagePopover.followFirst") : editCanvasRatio}` : ` · ${t("canvas.imagePopover.followSource")}`}`;
+        : `${qwenVariantLabel(imageMode, qwen.labels)}${imageMode === "t2i" ? "" : imageMode === "edit" ? ` · ${!editCanvasRatio || editCanvasRatio === "auto" ? t("canvas.imagePopover.followFirst") : editCanvasRatio}` : ` · ${t("canvas.imagePopover.followSource")}`}`;
     const updateOpen = (nextOpen: boolean) => {
         setOpen(nextOpen);
         onOpenChange?.(nextOpen);
@@ -192,7 +207,7 @@ function ImageSettingsPortal({
         outpaint: t("canvas.imagePopover.hints.outpaint"),
     };
     const refResolution = String((config.params as Record<string, unknown> | undefined)?.resolution ?? 1024);
-    const editCanvasRatio = String((config.params as Record<string, unknown> | undefined)?.editCanvasRatio || "auto");
+    const editCanvasRatio = canvasRatioOf(String((config.params as Record<string, unknown> | undefined)?.editCanvasSize || ""), refResolution);
     const width = 356;
     const gap = 8;
     const margin = 12;
@@ -250,11 +265,11 @@ function ImageSettingsPortal({
                                 <div className="space-y-2 rounded-xl border p-3" style={{ borderColor: theme.node.stroke }}>
                                     <SettingTitle color={theme.node.muted}>{t("canvas.imagePopover.canvasRatio")}</SettingTitle>
                                     <div className="grid grid-cols-3 gap-2">
-                                        <OptionPill selected={editCanvasRatio === "auto"} theme={theme} onClick={() => onParamsChange?.({ editCanvasRatio: "auto", editCanvasSize: "" })}>
+                                        <OptionPill selected={editCanvasRatio === "auto"} theme={theme} onClick={() => onParamsChange?.({ editCanvasSize: "" })}>
                                             {t("canvas.imagePopover.followFirst")}
                                         </OptionPill>
                                         {editRatioOptions.map((ratio) => (
-                                            <OptionPill key={ratio} selected={editCanvasRatio === ratio} theme={theme} onClick={() => onParamsChange?.({ editCanvasRatio: ratio, editCanvasSize: qwenCanvasSize(refResolution, ratio) })}>
+                                            <OptionPill key={ratio} selected={editCanvasRatio === ratio} theme={theme} onClick={() => onParamsChange?.({ editCanvasSize: qwenCanvasSize(refResolution, ratio) })}>
                                                 {ratio}
                                             </OptionPill>
                                         ))}
@@ -276,7 +291,7 @@ function ImageSettingsPortal({
                                                 key={value}
                                                 selected={refResolution === value}
                                                 theme={theme}
-                                                onClick={() => onParamsChange?.({ resolution: Number(value), ...(editCanvasRatio !== "auto" ? { editCanvasSize: qwenCanvasSize(value, editCanvasRatio) } : {}) })}
+                                                onClick={() => onParamsChange?.({ resolution: Number(value), ...(editCanvasRatio && editCanvasRatio !== "auto" ? { editCanvasSize: qwenCanvasSize(value, editCanvasRatio) } : {}) })}
                                             >
                                                 {label}
                                             </OptionPill>

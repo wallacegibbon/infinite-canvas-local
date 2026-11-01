@@ -86,6 +86,36 @@ describe("canvas store format", () => {
         expect(only.nodes[2].titleKey).toBe("canvas.superResolve.fastTitle");
     });
 
+    it("drops editCanvasRatio, which the gateway refuses as an input", () => {
+        const raw = JSON.stringify({
+            version: 2,
+            state: {
+                projects: [
+                    project({
+                        nodes: [
+                            {
+                                id: "n1",
+                                type: "image",
+                                title: "Shot",
+                                position: { x: 0, y: 0 },
+                                width: 340,
+                                height: 240,
+                                metadata: { prompt: "a kettle", params: { editCanvasRatio: "16:9", editCanvasSize: "1792x1024", resolution: 1024, seed: 7 } },
+                            },
+                            { id: "n2", type: "image", title: "Other", position: { x: 0, y: 0 }, width: 340, height: 240 },
+                        ],
+                    }),
+                ],
+                deletedProjects: [],
+            },
+        });
+        const [only] = readCanvasPersisted(raw).projects;
+        // The workflow's own inputs are untouched, including the size the pill is read back from.
+        expect(only.nodes[0].metadata.params).toEqual({ editCanvasSize: "1792x1024", resolution: 1024, seed: 7 });
+        // A node with nothing stored is left exactly as it was.
+        expect(only.nodes[1]).toMatchObject({ id: "n2", title: "Other" });
+    });
+
     it("refuses a blob written by a newer build rather than guessing", () => {
         const raw = JSON.stringify({ version: CANVAS_PERSIST_VERSION + 1, state: { projects: [] } });
         expect(() => readCanvasPersisted(raw)).toThrow(/newer|format version/);

@@ -3361,3 +3361,28 @@ word.
 line is left alone; a prompt without a block is returned unchanged. In a browser: the session file was
 edited to carry exactly the block from the report, the page was reloaded, and the panel drew
 `@补全背景 描述一下这张图片的背景。`.
+
+## 102. `editCanvasRatio` was UI state wearing a workflow input's clothes
+
+**Decision** The image settings popover no longer writes `editCanvasRatio`. Which ratio pill is lit is read
+back from `editCanvasSize` — the workflow's own input — through the same table that wrote it
+(`canvasRatioOf`). A format 2 → 3 migration deletes the key from nodes that already carry it.
+
+**Why** Every edit run from a node whose params held that key failed with
+
+```
+unknown input "editCanvasRatio"; workflow image-qwen21 accepts: background, cfg, count, …
+editCanvasSize, layout, …
+```
+
+The key was never a workflow input: it was "which pill did I click" parked next to the real inputs and
+shipped with them. The gateway is right to refuse it — an input it does not know is either a typo or a
+version skew, and guessing which would be worse than saying so. The fix belongs on the side that invented
+the key.
+
+Deriving it beats keeping it somewhere else: the pill _is_ the size, so a second field can only drift from
+the first. Old canvases are repaired on load rather than left to fail, which is what the migration is for.
+
+**Tested** `tests/persist-migration.test.ts`: a version-2 blob whose node params hold
+`{editCanvasRatio, editCanvasSize, resolution, seed}` reads back as
+`{editCanvasSize, resolution, seed}`, and a node with nothing stored is untouched.

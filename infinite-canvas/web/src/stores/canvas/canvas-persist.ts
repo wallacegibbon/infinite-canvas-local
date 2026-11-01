@@ -13,7 +13,7 @@ import type { CanvasProject } from "@/stores/canvas/use-canvas-store";
  * handed to `preserveUnreadable`, which copies it aside, refuses further writes, and tells the
  * user. `version` is still set on the store so that what we *write* is labelled.
  */
-export const CANVAS_PERSIST_VERSION = 2;
+export const CANVAS_PERSIST_VERSION = 3;
 
 type PersistedCanvasState = {
     projects: CanvasProject[];
@@ -49,7 +49,7 @@ export function readCanvasPersisted(raw: string): PersistedCanvasState {
  * over the array.
  */
 function migrateCanvasState(state: unknown, from: number) {
-    if (from !== 0 && from !== 1) throw new Error(`no migration from format version ${from}`);
+    if (from !== 0 && from !== 1 && from !== 2) throw new Error(`no migration from format version ${from}`);
     const source = asRecord(state);
     const projects = Array.isArray(source.projects) ? source.projects : [];
     return {
@@ -69,8 +69,31 @@ function backfillProject(raw: unknown): unknown {
         backgroundMode: typeof project.backgroundMode === "string" ? (project.backgroundMode as CanvasBackgroundMode) : "lines",
         showImageInfo: typeof project.showImageInfo === "boolean" ? project.showImageInfo : false,
         viewport: backfillViewport(project.viewport),
-        nodes: Array.isArray(project.nodes) ? project.nodes.map(backfillNodeTitle) : project.nodes,
+        nodes: Array.isArray(project.nodes) ? project.nodes.map(backfillNode) : project.nodes,
     };
+}
+
+function backfillNode(raw: unknown): unknown {
+    return withoutUiOnlyParams(backfillNodeTitle(raw));
+}
+
+/**
+ * Delete `editCanvasRatio` from a node's params (format 2 → 3).
+ *
+ * It was UI state — which ratio pill is lit — saved next to the workflow's own inputs and sent with every
+ * request. The gateway refuses an input the workflow does not accept, so every edit run from such a node
+ * failed with `unknown input "editCanvasRatio"`. The pill is read back from `editCanvasSize` now, so the
+ * key has no meaning left; dropping it here is what repairs canvases saved before that.
+ */
+function withoutUiOnlyParams(raw: unknown): unknown {
+    const node = asRecord(raw);
+    const metadata = asRecord(node.metadata);
+    const params = metadata.params;
+    if (!params || typeof params !== "object") return raw;
+    const stored = asRecord(params);
+    if (!("editCanvasRatio" in stored)) return raw;
+    const { editCanvasRatio: _dropped, ...rest } = stored;
+    return { ...node, metadata: { ...metadata, params: rest } };
 }
 
 /**
