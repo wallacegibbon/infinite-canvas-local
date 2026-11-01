@@ -117,9 +117,11 @@ CANVAS_PORT=3000
 back to its own loopback) and lists the canvas origin for `CORS_ORIGINS`. Open
 `http://192.168.3.232:3000` from the phone and the canvas talks to `http://192.168.3.232:8190`.
 
-Two things to know when the gateway is reachable from the network: `/api/*` is unauthenticated
-until `GATEWAY_TOKEN` is set (the gateway warns about this at startup), and `CORS_ORIGINS` is
-only needed for a canvas served from a *different* host than the gateway.
+One thing to know when the gateway is reachable from the network: **it has no authentication.** Any
+device that can reach the port can run a workflow, read its artifacts and drive a canvas's agent (the
+gateway warns about this at startup). There is no token to turn on — the browser could not have kept
+one — so the choice is the address you bind and the network it sits on. `CORS_ORIGINS` is only needed
+for a canvas served from a *different* host than the gateway, and it governs browsers only.
 
 Gateway endpoints and environment variables: [`docs/gateway.md`](docs/gateway.md).
 

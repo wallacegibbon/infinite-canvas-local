@@ -312,7 +312,8 @@ unchanged — the built page still emits `class="css-1tzwyuk ant-app"` and
 
 **Decision** The gateway listens on whatever `GATEWAY_HOST` says, loopback or LAN address, with no
 second switch. `ALLOW_REMOTE` is gone, and so is the startup refusal it gated. What remains is
-a warning when the address is reachable from the network and no `GATEWAY_TOKEN` is set.
+a warning when the address is reachable from the network. (The `GATEWAY_TOKEN` this entry still
+mentioned went in #110; the warning is now the only thing that says the port is open.)
 
 **Why** A workbench whose gateway is on `192.168.3.232:8190` so a phone can use it _is_ the
 local setup — calling that "remote" and making the user flip a flag to reach their own machine
@@ -2557,11 +2558,11 @@ of a request.** They are the user's to change — there is no separate operator 
 to read", and a request that could name its own tool list would let the caller undo the one switch
 that decides whether the agent can run commands.
 
-**Security posture, stated plainly** No token is required to enable the agent. `GATEWAY_HOST`
-defaults to loopback and binding anything else already emits a startup warning; `GATEWAY_TOKEN` stays
-the optional, existing knob for an exposed deployment. Built-in tools are off (`--builtin-tools=`)
-unless the operator turns them on — that switch, not the agent itself, is what changes the risk class
-from "uses your quota" to "reads your files and runs your commands".
+**Security posture, stated plainly** No token is required to enable the agent, because there is no
+token at all (#110). `GATEWAY_HOST` defaults to loopback and binding anything else emits a startup
+warning. The one built-in tool the spawn enables is `read_file`, and it is not a field of a request:
+the H3 rewrite loads its `SKILL.md` with it, which is what changes the risk class of an exposed port
+from "uses your quota" to "reads your files".
 
 **Cancel belongs to the agent** Its `CI cancel` command winds a task down on its own terms — it is
 the process that knows what a half-finished step means — so the gateway does not layer its own

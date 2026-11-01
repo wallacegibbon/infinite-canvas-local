@@ -195,51 +195,6 @@ func TestGuardAllowsSameSiteWrite(t *testing.T) {
 	}
 }
 
-func TestGuardRequiresConfiguredToken(t *testing.T) {
-	cfg := testConfig(t)
-	cfg.GatewayToken = "secret"
-	called := false
-	handler := Guard(cfg)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		called = true
-	}))
-
-	request := httptest.NewRequest(http.MethodGet, "/api/resources/status", nil)
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusUnauthorized {
-		t.Errorf("status = %d, want 401 without a token", recorder.Code)
-	}
-	if called {
-		t.Error("handler ran without a token")
-	}
-
-	request = httptest.NewRequest(http.MethodGet, "/api/resources/status", nil)
-	request.Header.Set("X-Gateway-Token", "secret")
-	recorder = httptest.NewRecorder()
-	handler.ServeHTTP(recorder, request)
-	if !called {
-		t.Error("handler did not run with a valid token")
-	}
-}
-
-func TestGuardDoesNotTokenProtectGeneration(t *testing.T) {
-	cfg := testConfig(t)
-	cfg.GatewayToken = "secret"
-	called := false
-	handler := Guard(cfg)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		called = true
-	}))
-
-	// /v1/* is the OpenAI-compatible surface used by the canvas channel; the token
-	// only guards the admin API.
-	request := httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, request)
-	if !called {
-		t.Error("/v1/* must not require the admin token")
-	}
-}
-
 func TestRequestIDIsReusedAndSanitized(t *testing.T) {
 	var seen string
 	handler := WithRequestID(discardLogger())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -123,17 +123,12 @@ func CORS(cfg *config.Config) Middleware {
 	}
 }
 
-// Guard enforces two protections: a token on /api/* when GATEWAY_TOKEN is set, and a
-// block on cross-site browser writes.
+// Guard is the gateway's only protection: a browser may write only from an origin the operator
+// allowed. There is no authentication, by design and by documentation — anybody who can reach the
+// port can run a workflow, read an artifact or drive an agent.
 func Guard(cfg *config.Config) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if cfg.GatewayToken != "" && strings.HasPrefix(r.URL.Path, "/api/") {
-				if r.Header.Get("X-Gateway-Token") != cfg.GatewayToken {
-					writeOkFalse(w, http.StatusUnauthorized, "missing a valid gateway token")
-					return
-				}
-			}
 			switch r.Method {
 			case http.MethodGet, http.MethodHead, http.MethodOptions:
 				// A WebSocket handshake is a GET that becomes a write channel the moment it is accepted,

@@ -63,8 +63,6 @@ type Config struct {
 	MaxWorkflowBytes    int64
 	MaxImageCount       int
 	ResourceConcurrency int
-
-	GatewayToken string
 }
 
 // Option overrides a single field, mirroring the old loadConfig(overrides).
@@ -135,7 +133,6 @@ func Load(opts ...Option) (*Config, error) {
 		MaxWorkflowBytes:    int64(intValue(os.Getenv("MAX_WORKFLOW_BYTES"), 5*1024*1024)),
 		MaxImageCount:       intValue(os.Getenv("MAX_IMAGE_COUNT"), 15),
 		ResourceConcurrency: intValue(os.Getenv("RESOURCE_CONCURRENCY"), 2),
-		GatewayToken:        strings.TrimSpace(os.Getenv("GATEWAY_TOKEN")),
 		AgentBin:            strings.TrimSpace(os.Getenv("ALAYACORE_BIN")),
 		AgentConfigPath:     strings.TrimSpace(os.Getenv("AGENT_CONFIG_PATH")),
 		AgentSkills:         filepath.Join(root, "prompts", "skills"),

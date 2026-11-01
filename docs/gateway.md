@@ -78,11 +78,27 @@ Every variable is optional; the defaults match the previous implementation.
 
 `GATEWAY_HOST` is not a policy switch: `GATEWAY_HOST=192.168.3.232` binds the LAN address exactly
 like `127.0.0.1` binds loopback, and the gateway says so in a startup warning when that address is
-reachable from the network and no `GATEWAY_TOKEN` is set. Browser access is allowed when the
-canvas is served from the same host name as the gateway — the usual `:3000` canvas and `:8190`
-gateway — so a LAN address needs no `CORS_ORIGINS` entry; a canvas on a _different_ host does.
+reachable from the network. Browser access is allowed when the canvas is served from the same host
+name as the gateway — the usual `:3000` canvas and `:8190` gateway — so a LAN address needs no
+`CORS_ORIGINS` entry; a canvas on a _different_ host does.
 
-| `GATEWAY_TOKEN` | _(empty)_ | When set, `/api/*` requires the `X-Gateway-Token` header. |
+### There is no authentication
+
+The gateway has no token, no password and no user account, and the startup warning says so. What it
+does have is one rule enforced by `internal/httpx`: a **browser** may write only from an origin the
+operator allowed (its own host, loopback, or `CORS_ORIGINS`), which is what stops a random page from
+driving the gateway through the user's browser.
+
+That rule does not apply to anything that is not a browser, and it was never the whole surface: a
+client that can reach the port can submit runs (burning GPU time on the machine behind `COMFY_URL`),
+read and delete artifacts under `data/outputs`, and open `/api/agent/socket/{name}` — which spawns
+AlayaCore with `read_file` enabled, so it can also read files on the gateway's host. `POST
+/api/resources/install` is the one dangerous route with its own lock (it refuses to write into
+ComfyUI's folders unless `INSTALL_INTO_COMFY=1`).
+
+So the honest statement is: **bind it to loopback, or put it on a network whose devices you trust.**
+Reaching it from elsewhere is a job for an SSH tunnel or a reverse proxy that terminates
+authentication; there is no configuration in this gateway that makes an untrusted network safe.
 | `REQUEST_TIMEOUT_MS` | `600000` | Image generation timeout. |
 | `VIDEO_TIMEOUT_MS` | `0` | Video timeout; `0` means no limit. |
 | `AUDIO_TIMEOUT_MS` | `0` | Audio/music timeout; `0` means no limit. A song is the same order of work as a short video, so it gets the same default. |
@@ -411,7 +427,8 @@ Where the two differ, and why:
   describes _runnable capabilities_: whether the models and nodes are installed, the modes/variants,
   and the typed inputs — it is computed from `object_info`, but it answers a different question.
 - **Trust boundary.** ComfyUI is single-user and unauthenticated. The gateway has an origin allow
-  list and an optional token, and it is the only surface meant to be reachable from a browser.
+  list and no authentication (see "There is no authentication"), and it is the only surface meant to
+  be reachable from a browser.
 
 The same request, both ways — one image:
 

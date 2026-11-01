@@ -41,8 +41,8 @@ func run() error {
 		return err
 	}
 
-	if !config.IsLoopbackHost(cfg.GatewayHost) && cfg.GatewayToken == "" {
-		logger.Warn("listening on %s without GATEWAY_TOKEN: /api/* is unauthenticated for anyone who can reach this address", cfg.GatewayHost)
+	if !config.IsLoopbackHost(cfg.GatewayHost) {
+		logger.Warn("listening on %s with no authentication: anyone who can reach this address can run workflows, read their artifacts and drive a canvas's agent", cfg.GatewayHost)
 	}
 
 	address := net.JoinHostPort(cfg.GatewayHost, fmt.Sprint(cfg.GatewayPort))
