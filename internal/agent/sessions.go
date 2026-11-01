@@ -163,15 +163,25 @@ func (s *Session) Unwatch() {
 	s.pending = map[string]chan toolAnswer{}
 	s.mu.Unlock()
 	for _, waiting := range pending {
-		deliver(waiting, toolAnswer{text: "the canvas went away", isError: true})
+		deliver(waiting, toolAnswer{content: TextContent("the canvas went away"), isError: true})
 	}
 }
 
-// toolAnswer is what the canvas says about a tool call: the text to hand the agent, and whether the tool
-// failed rather than did something.
+// toolAnswer is what the canvas says about a tool call: the content blocks to hand the agent, and whether
+// the tool failed rather than did something.
 type toolAnswer struct {
-	text    string
+	content json.RawMessage
 	isError bool
+}
+
+// TextContent is a tool result that is only words, which is what the gateway says when it cannot get an
+// answer at all.
+func TextContent(text string) json.RawMessage {
+	content, err := json.Marshal([]map[string]string{{"type": "text", "text": text}})
+	if err != nil {
+		return json.RawMessage(`[{"type":"text","text":"the canvas did not answer"}]`)
+	}
+	return content
 }
 
 // toolTimeout is how long a tool call waits for the canvas. Short of forever is the point: a call that
@@ -181,14 +191,15 @@ const toolTimeout = 30 * time.Second
 // CallTool runs one of the gateway's tools by asking the canvas. The gateway knows the vocabulary, the
 // page knows the nodes, so the call goes down the session's socket and this waits for the answer.
 //
-// Every way of not getting an answer — nobody watching, a canvas that left, a page that never replied —
-// is a tool result with `isError` rather than an error: an agent told "the canvas did not answer" can
-// say so to the user, while an aborted turn just disappears.
-func (s *Session) CallTool(name string, arguments json.RawMessage) (string, bool) {
+// The answer is whatever content blocks the page produced, carried through untouched: the protocol says
+// what they are, so nothing here has to know. Every way of not getting an answer — nobody watching, a
+// canvas that left, a page that never replied — is a text block with `isError` rather than an error: an
+// agent told "the canvas did not answer" can say so to the user, while an aborted turn just disappears.
+func (s *Session) CallTool(name string, arguments json.RawMessage) (json.RawMessage, bool) {
 	s.mu.Lock()
 	if s.sink == nil {
 		s.mu.Unlock()
-		return "no canvas is connected to this session", true
+		return TextContent("no canvas is connected to this session"), true
 	}
 	s.calls++
 	callID := "tool-" + strconv.Itoa(s.calls)
@@ -205,21 +216,21 @@ func (s *Session) CallTool(name string, arguments json.RawMessage) (string, bool
 	s.publish(Event{Type: "tool", CallID: callID, Name: name, Arguments: arguments})
 	select {
 	case answer := <-waiting:
-		return answer.text, answer.isError
+		return answer.content, answer.isError
 	case <-time.After(toolTimeout):
-		return "the canvas did not answer", true
+		return TextContent("the canvas did not answer"), true
 	}
 }
 
 // AnswerTool completes a call the canvas ran, and reports whether anyone was still waiting for it: an
 // answer that arrives after the timeout has nobody left to tell.
-func (s *Session) AnswerTool(callID, text string, isError bool) bool {
+func (s *Session) AnswerTool(callID string, content json.RawMessage, isError bool) bool {
 	s.mu.Lock()
 	waiting, ok := s.pending[callID]
 	delete(s.pending, callID)
 	s.mu.Unlock()
 	if ok {
-		deliver(waiting, toolAnswer{text: text, isError: isError})
+		deliver(waiting, toolAnswer{content: content, isError: isError})
 	}
 	return ok
 }

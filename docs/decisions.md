@@ -3026,3 +3026,34 @@ the generated file. A gateway bound to `192.168.3.232:8192` wrote
 `url: http://192.168.3.232:8192/mcp/probe-lan-8a8315a4` and its agent logged
 `MCP servers initialized: 1 servers, 3 tools loaded`; with the old `127.0.0.1` URL the same setup cannot
 connect at all (`curl http://127.0.0.1:8192/` → connection refused).
+
+## 88. A tool answers with content, and the gateway only carries it
+
+**Decision** A tool's result is a **content array in the protocol's own shape** — `text`, `image` and `audio`
+(each with `data` and `mimeType`), `resource` (`mimeType` + `blob`, which is how a film travels because the
+protocol has no video block of its own), `resource_link`. The page produces the blocks, the session carries
+them as raw JSON, and the gateway puts them in `tools/call` unchanged: it does not resize, transcode,
+truncate, cap, or turn one kind of block into another. `read_node(nodeId)` is the tool that uses this: it
+answers with the node's own words and media, not with a description of them.
+
+**Why raw, and why nothing is inspected** The blocks are self-describing — a block says what it is, and
+`mimeType` says what the bytes are — so every layer between the canvas and the model would be guessing if it
+looked inside. AlayaCore already knows what to do with each kind (`internal/mcp/tool_adapter.go` maps them to
+image/audio/video parts, `internal/llm/providers/openai.go` promotes a tool result's media into a follow-up
+user message because an OpenAI `tool` message holds only a string, and `media_fit.go` shrinks what is too
+large to send). A gateway that "helpfully" downscaled a picture, sent only a video's first frame or rewrote a
+sound as prose would be deciding how much of the canvas the agent is allowed to see — and would break as soon
+as a later protocol revision added a block type, which a raw carrier simply forwards.
+
+**What it costs, and why that is the user's call** A 1024² picture is ~1.3 MB of base64 on the socket and in
+the conversation; a film is more. That is what looking at the real thing costs, and it is charged to whoever
+asked for it (the agent, once per read), not paid preventively by every call.
+
+**Tested** In a browser against a real AlayaCore and a vision model, on a canvas holding two nodes whose
+prompt was "a red ceramic teapot on a wooden table, soft window light": `canvas_list_nodes`, then two
+`canvas_read_node` calls in one turn; each result was `[{"type":"text","text":"a red ceramic teapot…"},
+{"type":"image","uri":"data:image/png;base64,…"}]` (1.27 and 1.30 M runes) and the agent answered that the
+first pot has water droplets on the lid and body, the second does not, spout left and ring handle right, wood
+grain with wear marks, diffuse window light from the left — details that are in the pixels and nowhere in the
+canvas's text. `TestMCPCarriesTheBlocksThePageProduced` holds the carrier property: text, image and resource
+blocks come out of `tools/call` byte-for-byte as the page sent them.

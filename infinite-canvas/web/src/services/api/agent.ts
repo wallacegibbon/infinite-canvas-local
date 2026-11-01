@@ -40,6 +40,15 @@ export type AgentEvent = {
     arguments?: unknown;
 };
 
+/**
+ * One content block of a tool result, in the protocol's own shape.
+ *
+ * A block says what it is — `type`, and `mimeType` for the media ones — so nothing between the canvas and
+ * the agent has to decide what to do with it: text, a picture, a sound, and a `resource` blob (which is how
+ * a film travels, the protocol having no video block of its own).
+ */
+export type ToolContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string } | { type: "audio"; data: string; mimeType: string } | { type: "resource"; resource: { uri: string; mimeType: string; blob: string } };
+
 type AgentMessage = {
     prompt?: string;
     images?: string[];
@@ -47,8 +56,8 @@ type AgentMessage = {
     args?: string;
     cancel?: boolean;
     close?: boolean;
-    /** The canvas answering a `tool` event: what running it did. */
-    toolResult?: { callId: string; text: string; isError?: boolean };
+    /** The canvas answering a `tool` event: what running it found, as content blocks. */
+    toolResult?: { callId: string; content: ToolContent[]; isError?: boolean };
 };
 
 /** What one session is, right now — the agent's own last word about itself. */

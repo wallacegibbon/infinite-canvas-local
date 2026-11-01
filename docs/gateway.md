@@ -246,8 +246,14 @@ the page is the only thing that knows what a node is. Down:
 and up, on the same socket, the answer that the waiting call returns to AlayaCore:
 
 ```json
-{"toolResult":{"callId":"tool-1","text":"pong from the page","isError":false}}
+{"toolResult":{"callId":"tool-1","content":[{"type":"text","text":"pong from the page"}]}}
 ```
+
+`content` is the protocol's content array, carried through untouched: `text`, `image` (`data` + `mimeType`),
+`audio` (`data` + `mimeType`), `resource` (`resource.mimeType` + `blob`, which is how a film travels — the
+protocol has no video block), `resource_link`. Nothing between the page and AlayaCore inspects or converts
+it: the blocks say what they are, and AlayaCore turns them into what its model can look at. See
+[`decisions.md`](decisions.md) #88.
 
 A call waits 30s, and every way of not getting an answer — nobody watching, a canvas that went away, a
 page that never replied — comes back as a tool result with `isError`, not a broken response: the agent can
@@ -257,11 +263,12 @@ Tool names are **not** prefixed with `canvas_`: AlayaCore adds the server's name
 `ping` here is `canvas_ping` to the model and arrives back as `ping`. See
 [`decisions.md`](decisions.md) #84.
 
-Three tools: `ping` (how much is on the canvas), `list_nodes` (every node — id, type, title, prompt,
-position — and every connection, the ids being what the other tools act on) and `create_node` (make one
-node the way the user's own button makes one: in the middle of the view, selected, panel open when that is
-what the button does). See [`decisions.md`](decisions.md) #85 for why the page runs them, and #86 for what
-"the way the button does" means.
+Four tools: `ping` (how much is on the canvas), `list_nodes` (every node — id, type, title, prompt,
+position — and every connection, the ids being what the other tools act on), `create_node` (make one node
+the way the user's own button makes one: in the middle of the view, selected, panel open when that is what
+the button does), and `read_node` (that node's actual content — its words, or the picture, film or sound it
+holds). See [`decisions.md`](decisions.md) #85 for why the page runs them, #86 for what "the way the button
+does" means, and #88 for what a tool is allowed to answer with.
 
 A music graph needs two texts, and both are ordinary `registry.json` bindings (`prompt`, `lyrics`), so
 a run carries them as inputs like any other parameter. `response_format`-style container selection is

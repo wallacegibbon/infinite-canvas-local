@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"comfyui-gateway/internal/agent"
 	"comfyui-gateway/internal/httpx"
 )
 
@@ -33,14 +34,14 @@ type mcpTool struct {
 }
 
 // mcpResult is what `tools/call` answers: content blocks, and whether the tool failed.
+//
+// The blocks are carried as the page produced them — `json.RawMessage` and not a struct, because the
+// protocol's content is self-describing and grows: text, image and audio carry their own `mimeType`,
+// `resource` carries a blob, and a field this gateway has never heard of is still a field the client may
+// need. Nothing here inspects them, and nothing converts one kind into another.
 type mcpResult struct {
-	Content []mcpContent `json:"content"`
-	IsError bool         `json:"isError,omitempty"`
-}
-
-type mcpContent struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Content json.RawMessage `json:"content"`
+	IsError bool            `json:"isError,omitempty"`
 }
 
 // mcpProtocolVersion is what this server speaks. The client announces its own; a mismatch is the
@@ -132,6 +133,17 @@ func (s *Server) mcpTools() []mcpTool {
 			"required": ["type"],
 			"additionalProperties": false
 		}`),
+	}, {
+		Name:        "read_node",
+		Description: "Read one node's actual content: its words, or the image, video or audio it holds. Answers with the content itself — an image, a video, a sound or text — not a description of it.",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"nodeId": {"type": "string", "description": "The id list_nodes reported."}
+			},
+			"required": ["nodeId"],
+			"additionalProperties": false
+		}`),
 	}}
 }
 
@@ -144,13 +156,13 @@ func (s *Server) mcpTools() []mcpTool {
 func (s *Server) callMCPTool(workspace, name string, args json.RawMessage) (mcpResult, error) {
 	session, ok := s.sessionForWorkspace(workspace)
 	if !ok {
-		return mcpResult{Content: []mcpContent{{Type: "text", Text: "no agent is attached to this workspace"}}, IsError: true}, nil
+		return mcpResult{Content: agent.TextContent("no agent is attached to this workspace"), IsError: true}, nil
 	}
 	if !s.hasMCPTool(name) {
-		return mcpResult{Content: []mcpContent{{Type: "text", Text: "no such tool: " + name}}, IsError: true}, nil
+		return mcpResult{Content: agent.TextContent("no such tool: " + name), IsError: true}, nil
 	}
-	text, failed := session.CallTool(name, args)
-	return mcpResult{Content: []mcpContent{{Type: "text", Text: text}}, IsError: failed}, nil
+	content, failed := session.CallTool(name, args)
+	return mcpResult{Content: content, IsError: failed}, nil
 }
 
 // hasMCPTool reports whether the advertised table contains this name: the gateway owns the vocabulary

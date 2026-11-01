@@ -82,6 +82,16 @@ func toolCall(id int, name string, arguments map[string]any) map[string]any {
 	}
 }
 
+// toolAnswerOf wraps content blocks the way the canvas sends them back.
+func toolAnswerOf(callID string, content ...any) map[string]any {
+	return map[string]any{"toolResult": map[string]any{"callId": callID, "content": content}}
+}
+
+// textBlock is one text content block, which is what most tools answer with.
+func textBlock(text string) map[string]any {
+	return map[string]any{"type": "text", "text": text}
+}
+
 // textOfResult is the one text block a tool result carries.
 func textOfResult(t *testing.T, result map[string]any) string {
 	t.Helper()
@@ -134,7 +144,7 @@ func TestMCPHandshakeIsEnoughToDiscoverTheTools(t *testing.T) {
 	for _, tool := range tools {
 		names = append(names, tool.(map[string]any)["name"].(string))
 	}
-	if strings.Join(names, ",") != "ping,list_nodes,create_node" {
+	if strings.Join(names, ",") != "ping,list_nodes,create_node,read_node" {
 		t.Fatalf("tools/list = %v, want ping, list_nodes, create_node", names)
 	}
 }
@@ -168,7 +178,7 @@ func TestMCPToolIsRunByTheCanvas(t *testing.T) {
 		t.Fatalf("arguments = %v, want the call's own", asked["arguments"])
 	}
 
-	send(t, conn, map[string]any{"toolResult": map[string]any{"callId": callID, "text": "pong from the page"}})
+	send(t, conn, toolAnswerOf(callID, textBlock("pong from the page")))
 
 	answer := <-answered
 	if failure, ok := answer["post"]; ok {
@@ -180,6 +190,46 @@ func TestMCPToolIsRunByTheCanvas(t *testing.T) {
 	}
 	if result["isError"] != nil {
 		t.Fatalf("the call is an error: %v", result)
+	}
+}
+
+// TestMCPCarriesTheBlocksThePageProduced is what a read tool needs: the content the canvas sends reaches
+// AlayaCore unchanged. Nothing here inspects it, so a media block — and any field a later revision adds to
+// one — has to survive the trip exactly as written.
+func TestMCPCarriesTheBlocksThePageProduced(t *testing.T) {
+	gateway, _, _ := startMCPGateway(t)
+	conn := openSocket(t, gateway, "canvas-1")
+
+	answered := make(chan map[string]any, 1)
+	go func() {
+		_, answer, err := postMCP(gateway, agentWorkspaceKey("canvas-1"), toolCall(8, "read_node", map[string]any{"nodeId": "image-1"}))
+		if err != nil {
+			answered <- map[string]any{"post": err.Error()}
+			return
+		}
+		answered <- answer
+	}()
+
+	asked := nextEvent(t, conn)
+	// A picture and a sentence, as the page would send a node's picture with its prompt.
+	blocks := []any{
+		textBlock("a red ceramic teapot"),
+		map[string]any{"type": "image", "data": "iVBORw0KGgoAAAANSUhEUg==", "mimeType": "image/png"},
+		map[string]any{"type": "resource", "resource": map[string]any{"uri": "canvas://video-1", "mimeType": "video/mp4", "blob": "AAAAIGZ0eXBpc29t"}},
+	}
+	send(t, conn, toolAnswerOf(asked["callId"].(string), blocks...))
+
+	result := resultOf(t, <-answered)
+	got, err := json.Marshal(result["content"])
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	want, err := json.Marshal(blocks)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("content = %s, want it carried through as %s", got, want)
 	}
 }
 
@@ -201,7 +251,7 @@ func TestMCPToolReportsWhatTheCanvasCalledAFailure(t *testing.T) {
 
 	asked := nextEvent(t, conn)
 	send(t, conn, map[string]any{"toolResult": map[string]any{
-		"callId": asked["callId"], "text": "there is no such node", "isError": true,
+		"callId": asked["callId"], "content": []any{textBlock("there is no such node")}, "isError": true,
 	}})
 
 	result := resultOf(t, <-answered)

@@ -1,7 +1,9 @@
 import { useEffect, useRef, type RefObject } from "react";
 
 import { getNodeSpec } from "@/constant/canvas";
-import { onAnyAgentEvent, sendAgentMessage } from "@/services/api/agent";
+import { resolveMediaUrl } from "@/services/file-storage";
+import { imageToDataUrl } from "@/services/image-storage";
+import { onAnyAgentEvent, sendAgentMessage, type ToolContent } from "@/services/api/agent";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeMetadata, type CanvasNodeTypeId, type Position } from "@/types/canvas";
 
 /**
@@ -32,7 +34,12 @@ export function useCanvasAgentTools({ nodesRef, connectionsRef, createNode }: { 
         () =>
             onAnyAgentEvent((session, event) => {
                 if (event.type !== "tool" || !event.callId) return;
-                sendAgentMessage(session, { toolResult: { callId: event.callId, ...runTool(event.name || "", event.arguments, hands.current) } });
+                const callId = event.callId;
+                const answer = (content: ToolContent[], isError?: boolean) => sendAgentMessage(session, { toolResult: { callId, content, isError } });
+                void runTool(event.name || "", event.arguments, hands.current).then(
+                    (result) => answer(result.content, result.isError),
+                    (error: unknown) => answer([textBlock(error instanceof Error ? error.message : String(error))], true),
+                );
             }),
         [],
     );
@@ -45,22 +52,26 @@ type CanvasHands = {
     createNode: (type: CanvasNodeTypeId, position?: Position, patch?: CanvasNodeMetadata) => CanvasNodeData;
 };
 
-/** One tool's result: the text the agent reads, and whether it failed rather than did something. */
-type ToolAnswer = { text: string; isError?: boolean };
+/** One tool's result: the content blocks the agent reads, and whether it failed rather than did something. */
+type ToolAnswer = { content: ToolContent[]; isError?: boolean };
+
+const textBlock = (text: string): ToolContent => ({ type: "text", text });
 
 /** The node types a tool may make. A group is structure, not content, and plugins are the user's. */
 const CREATE_TYPES: string[] = [CanvasNodeType.Image, CanvasNodeType.Video, CanvasNodeType.Audio, CanvasNodeType.Text, CanvasNodeType.Config];
 
-function runTool(name: string, args: unknown, hands: CanvasHands): ToolAnswer {
+async function runTool(name: string, args: unknown, hands: CanvasHands): Promise<ToolAnswer> {
     switch (name) {
         case "ping":
-            return { text: `listening: ${hands.nodes().length} nodes, ${hands.connections().length} connections` };
+            return { content: [textBlock(`listening: ${hands.nodes().length} nodes, ${hands.connections().length} connections`)] };
         case "list_nodes":
-            return { text: describeCanvas(hands.nodes(), hands.connections()) };
+            return { content: [textBlock(describeCanvas(hands.nodes(), hands.connections()))] };
         case "create_node":
             return createNode(hands, args);
+        case "read_node":
+            return readNode(hands, args);
         default:
-            return { text: `this canvas has no tool called ${name}`, isError: true };
+            return { content: [textBlock(`this canvas has no tool called ${name}`)], isError: true };
     }
 }
 
@@ -74,7 +85,7 @@ function runTool(name: string, args: unknown, hands: CanvasHands): ToolAnswer {
 function createNode(hands: CanvasHands, args: unknown): ToolAnswer {
     const input = (typeof args === "object" && args ? args : {}) as { type?: unknown; prompt?: unknown; position?: unknown };
     const type = typeof input.type === "string" ? input.type.trim() : "";
-    if (!CREATE_TYPES.includes(type)) return { text: `no node type "${type}": this canvas makes ${CREATE_TYPES.join(", ")}`, isError: true };
+    if (!CREATE_TYPES.includes(type)) return { content: [textBlock(`no node type "${type}": this canvas makes ${CREATE_TYPES.join(", ")}`)], isError: true };
 
     const prompt = typeof input.prompt === "string" ? input.prompt : "";
     // A text node holds its words in `content`; every other node holds a prompt, which its own panel edits.
@@ -83,7 +94,72 @@ function createNode(hands: CanvasHands, args: unknown): ToolAnswer {
     const centre = corner ? centreOf(type, corner) : undefined;
 
     const node = hands.createNode(type, centre, patch);
-    return { text: `created ${node.id} (${node.type}) at (${Math.round(node.position.x)}, ${Math.round(node.position.y)})` };
+    return { content: [textBlock(`created ${node.id} (${node.type}) at (${Math.round(node.position.x)}, ${Math.round(node.position.y)})`)] };
+}
+
+/**
+ * Read one node's actual content.
+ *
+ * What comes back is the node's own stuff, not a description of it: the words it holds, and — for a node
+ * that holds a picture, a film or a sound — the media itself, as the block the protocol defines for it.
+ * The block carries its type, so the choice of block is the media's, not ours: an image is an image, a
+ * sound is a sound, and a film travels as a `resource` blob because the protocol has no video block.
+ */
+async function readNode(hands: CanvasHands, args: unknown): Promise<ToolAnswer> {
+    const input = (typeof args === "object" && args ? args : {}) as { nodeId?: unknown };
+    const nodeId = typeof input.nodeId === "string" ? input.nodeId.trim() : "";
+    const node = hands.nodes().find((candidate) => candidate.id === nodeId);
+    if (!node) return { content: [textBlock(`no node with id "${nodeId}" on this canvas`)], isError: true };
+
+    const content: ToolContent[] = [];
+    const words = wordsOf(node);
+    if (words) content.push(textBlock(words));
+
+    const media = await mediaOf(node);
+    if (media) content.push(media);
+    if (!content.length) content.push(textBlock(`${node.id} (${node.type}) holds nothing to read`));
+    return { content };
+}
+
+/** The words a node holds: a text node's body, or the prompt its own panel shows. */
+function wordsOf(node: CanvasNodeData): string {
+    return (node.metadata?.composerContent ?? node.metadata?.prompt ?? node.metadata?.content ?? node.metadata?.texts?.[0]?.content ?? "").trim();
+}
+
+/** The block a node's media travels in — or nothing, for a node that holds no media. */
+async function mediaOf(node: CanvasNodeData): Promise<ToolContent | undefined> {
+    if (!MEDIA_TYPES.includes(node.type)) return undefined;
+    const dataUrl = await dataUrlOf(node);
+    if (!dataUrl) return undefined;
+    const parsed = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl);
+    if (!parsed) return undefined;
+    const mimeType = node.metadata?.mimeType || parsed[1];
+    const data = parsed[2];
+    // A film has no block of its own in the protocol; it travels as a resource whose mimeType says what it is.
+    return node.type === CanvasNodeType.Video ? { type: "resource", resource: { uri: `canvas://${node.id}`, mimeType, blob: data } } : { type: node.type === CanvasNodeType.Audio ? "audio" : "image", data, mimeType };
+}
+
+const MEDIA_TYPES: string[] = [CanvasNodeType.Image, CanvasNodeType.Video, CanvasNodeType.Audio];
+
+/** A node's media as a data URL, however it is stored: an uploaded file in the page's own store, or a URL. */
+async function dataUrlOf(node: CanvasNodeData): Promise<string> {
+    const content = node.metadata?.content || "";
+    const storageKey = node.metadata?.storageKey;
+    if (content.startsWith("data:")) return content;
+    if (node.type === CanvasNodeType.Image) return imageToDataUrl({ url: content, storageKey });
+    const url = await resolveMediaUrl(storageKey, content);
+    if (!url) return "";
+    if (url.startsWith("data:")) return url;
+    return blobToDataUrl(await (await fetch(url)).blob());
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("the file could not be read"));
+        reader.readAsDataURL(blob);
+    });
 }
 
 /** Where the node's centre has to be for its top-left corner to land where the tool asked. */
@@ -107,8 +183,7 @@ function readPosition(value: unknown): Position | undefined {
 function describeCanvas(nodes: CanvasNodeData[], connections: CanvasConnection[]): string {
     const lines = [`${nodes.length} nodes, ${connections.length} connections`];
     for (const node of nodes) {
-        // What the node's own panel shows the user as its prompt, in the same order of preference.
-        const prompt = (node.metadata?.composerContent ?? node.metadata?.prompt ?? node.metadata?.content ?? node.metadata?.texts?.[0]?.content ?? "").trim().slice(0, 300);
+        const prompt = wordsOf(node).slice(0, 300);
         const title = node.title ? ` "${node.title}"` : "";
         const at = ` at (${Math.round(node.position.x)}, ${Math.round(node.position.y)})`;
         lines.push(`- ${node.id} (${node.type})${title}${at}${prompt ? ` prompt: ${prompt}` : ""}`);

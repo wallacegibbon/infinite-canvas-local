@@ -55,11 +55,12 @@ type socketMessage struct {
 	Close bool `json:"close"`
 }
 
-// toolAnswer is one tool's result, on its way from the canvas to the agent.
+// toolAnswer is one tool's result, on its way from the canvas to the agent: the content blocks the page
+// produced, in the protocol's own shape, and whether the tool failed rather than did something.
 type toolAnswer struct {
-	CallID  string `json:"callId"`
-	Text    string `json:"text"`
-	IsError bool   `json:"isError"`
+	CallID  string          `json:"callId"`
+	Content json.RawMessage `json:"content"`
+	IsError bool            `json:"isError"`
 }
 
 // handleAgentSocket implements GET /api/agent/socket/{session}: the conversation.
@@ -154,7 +155,7 @@ func (s *Server) readSocket(conn *ws.Conn, session *agent.Session, send func(age
 			if s.logger != nil {
 				s.logger.Info("agent: tool answered session=%s callId=%s isError=%t", session.ID, message.ToolResult.CallID, message.ToolResult.IsError)
 			}
-			session.AnswerTool(message.ToolResult.CallID, message.ToolResult.Text, message.ToolResult.IsError)
+			session.AnswerTool(message.ToolResult.CallID, message.ToolResult.Content, message.ToolResult.IsError)
 		case message.Close:
 			s.agentSessions.Close(session.ID, "closed by the client")
 			_ = conn.Close()
