@@ -6,6 +6,7 @@ import { ArrowUp, Bot, LoaderCircle, Square, Wrench, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { CANVAS_DIALOG_CONTENT } from "@/lib/canvas-overlay";
+import { referenceBlock, referenceLine, withoutReferences } from "@/lib/canvas/agent-references";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { AgentSettingsControls } from "./agent-settings-controls";
 import { cancelAgentSession, canvasAgent, closeAgentSession, endAgentSession, onAgentEvent, openAgentSession, sendAgentMessage, type AgentEvent } from "@/services/api/agent";
@@ -116,7 +117,8 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
                 (event.history || []).map((entry) => ({
                     id: nextId(),
                     role: entry.role,
-                    text: entry.text,
+                    // What was sent carried the citation block; what is shown is what was typed.
+                    text: entry.role === "user" ? withoutReferences(entry.text) : entry.text,
                     reasoning: "",
                     tools: [],
                     streaming: false,
@@ -174,7 +176,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         } catch {
             return;
         }
-        const context = cited.length ? `${t("canvas.agent.contextMarker")}\n${cited.map((id) => describeNode(nodes.find((node) => node.id === id))).join("\n")}\n\n` : "";
+        const context = referenceBlock(t("canvas.agent.contextMarker"), cited.map((id) => describeNode(nodes.find((node) => node.id === id))).filter(Boolean));
         setMessages((current) => [...current, { id: nextId(), role: "user", text, reasoning: "", tools: [], streaming: false }, { id: nextId(), role: "assistant", text: "", reasoning: "", tools: [], streaming: true }]);
         setDraft("");
         setCited([]);
@@ -467,5 +469,5 @@ function describeNode(node?: CanvasNodeData): string {
     const kind = NODE_LABEL[node.type] || node.type;
     const title = node.title || "";
     const prompt = (node.metadata?.prompt || node.metadata?.texts?.[0]?.content || "").slice(0, 200);
-    return `- ${node.id} (${kind}) ${title}${prompt ? `: ${prompt}` : ""}`;
+    return referenceLine(node.id, kind, title, prompt);
 }
