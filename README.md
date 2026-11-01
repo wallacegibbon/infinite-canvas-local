@@ -38,7 +38,7 @@ the canvas frontend is a self-contained third-party subtree beside it:
 ├── main.go            # gateway entry point
 ├── internal/          # the whole gateway (config/comfy/workflow/generate/resource/prompt/…)
 ├── workflows/         # what the product exposes: graphs + registry.json
-├── catalogue.json     # what has to be installed: models, node packs, runtime deps
+├── resources.json     # what has to be installed: models, node packs, runtime deps
 ├── prompts/           # prompt skill files
 ├── data/              # runtime state: tasks.json, resource-lock.json, outputs/ (not tracked)
 ├── bin/               # build output (not tracked)
@@ -54,7 +54,7 @@ Two directories carry the runtime assets, and the split is deliberate:
 - **`workflows/`** is the outward face: one graph per model, plus `registry.json` describing
   how it is presented (name, type, prompt binding, parameters). Adding a model means dropping
   a `<type>-<slug>.json` here and scanning.
-- **`catalogue.json`** is inward: it lists what has to be present on the machine (models,
+- **`resources.json`** is inward: it lists what has to be present on the machine (models,
   custom nodes, runtime deps). Nothing is bundled with the binary: a model comes from its URLs and a
   node pack comes from its archive, both pinned — a model by `sha256`, a node pack by
   `pinnedCommit`. A `payload/` directory is still honoured as an escape hatch if a file ever has to

@@ -4280,7 +4280,7 @@ exercises the new code.
 **Where** `internal/resource/jobs.go`, `internal/resource/install_extract_test.go` (new),
 `resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`, `resources/payload/` (deleted).
 
-## 128. `resources/index.json` becomes `catalogue.json`
+## 128. `resources/index.json` becomes `catalogue.json` _(the name given in it was wrong, see #129)_
 
 **Decision** The resource index moved from `resources/index.json` to `catalogue.json` at the repository
 root, and `resources/` is gone. Its name says what it is — the catalogue of everything that has to exist on
@@ -4309,3 +4309,29 @@ returns only #121–#127, which describe history.
 **Where** `catalogue.json` (moved), `internal/resource/{resource,jobs,helpers,status}.go`,
 `internal/config/config.go`, `internal/config/config_test.go`, `internal/resource/*_test.go`,
 `infinite-canvas/web/{src,tests}`, `README.md`, `docs/gateway.md`, `docs/known-issues.md`.
+
+## 129. The file is `resources.json`, not `catalogue.json`
+
+**Decision** Renamed. #128 moved the index out of `resources/` and called it `catalogue.json`; the name was
+wrong and this corrects it before anything could depend on it.
+
+**Why "catalogue" was a bad name** It came from prose — #67 calls the thing *the resource catalogue* — and a
+word that reads well in a sentence does not automatically read well as a filename. "Catalogue" suggests a
+browsable collection of products; this file is a list of things that must exist on a machine before a
+workflow can run, with the URL, the hash and the destination for each. It also reads as the British
+spelling of a word software rarely uses at all.
+
+**Why `resources.json`** It is the word the rest of the project already uses for exactly this: the panel is
+the resource centre, the route is `/api/resources`, the Go type is `Resource`, and the payload field on a
+workflow row is called `resources`. Beside `workflows/` at the root it also states the split in one line —
+`workflows/` is what can run, `resources.json` is what has to be there for it to run.
+
+**Cost** One commit, twenty-one replacements, and three places that are not strings: the index path,
+`config.hasMarker` (which identifies the asset root), and the canvas test that reads the file to enforce
+"English everywhere except `target`". No install or layout behaviour changed.
+
+**Tested** `gofmt`, `go vet`, `go test ./internal/...`, `tsc --noEmit`, 132 canvas tests. A tree-wide grep for
+`catalogue` now returns only #67, #121, #127 and #128, which are history.
+
+**Where** `resources.json` (moved), `internal/resource/`, `internal/config/`, `infinite-canvas/web/`,
+`README.md`, `docs/gateway.md`, `docs/known-issues.md`.

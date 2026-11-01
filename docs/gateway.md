@@ -374,7 +374,7 @@ internal/generate        runner, LoRA injection, step planning, previews
 internal/setup           availability scan, model aliases, model path resolution
 internal/task            the run queue: persistence, progress, cancel, multi-output records
 internal/upload          uploaded media: bytes on disk, index, cached ComfyUI reference
-internal/resource        catalogue.json, install jobs, main-model override
+internal/resource        resources.json, install jobs, main-model override
 internal/prompt          H3 prompt rewriting, speaker tags, MOSS layout prompts
 internal/store           skins, workflow visibility, main-model overrides
 internal/sysinfo         ComfyUI's /system_stats, as the panel's units
@@ -508,7 +508,7 @@ in-process fake ComfyUI.
 - **Runtime pip installs are gone.** The gateway used to write into the user's venv
   and regularly corrupted it. `/api/resources/status` now reports `runtimeDeps` and
   the UI shows the exact command to run instead.
-- **No remote resource index.** The panel reads `catalogue.json` only.
+- **No remote resource index.** The panel reads `resources.json` only.
 - **Memory is ComfyUI's, not this host's.** The panel used to read `/proc/meminfo` and shell out to
   `nvidia-smi` on the gateway's machine; since #99 it reports what ComfyUI says about the machine that
   actually does the work, and nothing at all when ComfyUI does not answer.

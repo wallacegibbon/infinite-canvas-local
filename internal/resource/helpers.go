@@ -26,7 +26,7 @@ var (
 
 // workflowReferencedFiles lists the model filenames a graph actually references.
 //
-// catalogue.json can still declare a bake artifact that the workflow no longer
+// resources.json can still declare a bake artifact that the workflow no longer
 // uses (for example after switching to a plain VAE loader). Filtering bake entries
 // through this avoids reporting a phantom "missing" file forever.
 func (m *Manager) workflowReferencedFiles(entry *workflow.Entry) map[string]bool {

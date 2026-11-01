@@ -1,6 +1,6 @@
 // Package resource manages the model and node files the workflows need.
 //
-// It answers one question for the canvas: "given catalogue.json and what is
+// It answers one question for the canvas: "given resources.json and what is
 // actually on disk, what is installed, what is missing, and how do I install it?"
 // Everything here is read-only until an install job is started.
 package resource
@@ -31,7 +31,7 @@ type Source struct {
 	Label string `json:"label,omitempty"`
 }
 
-// Resource is one entry of catalogue.json.
+// Resource is one entry of resources.json.
 type Resource struct {
 	ID       string         `json:"id"`
 	Type     string         `json:"type"`
@@ -46,7 +46,7 @@ type Resource struct {
 	Requires []string       `json:"requires"`
 	Builder  map[string]any `json:"builder"`
 	Files    []string       `json:"files"`
-	// A node pack is vendored source, so the catalogue records which upstream commit the
+	// A node pack is downloaded source, so the catalogue records which upstream commit the
 	// copy came from and which files were changed on top of it. Both are facts about the
 	// tree in payload/, not download instructions: the install still copies the
 	// bundled directory.
@@ -69,7 +69,7 @@ type Pack struct {
 	WorkflowDeps      workflow.OrderedMap[[]string] `json:"workflowDependencies"`
 }
 
-// Index is the parsed catalogue.json document.
+// Index is the parsed resources.json document.
 type Index struct {
 	Schema    int         `json:"schema"`
 	Version   any         `json:"version"`
@@ -283,7 +283,7 @@ func New(opts Options) *Manager {
 		visibility:     opts.Visibility,
 		mainModels:     opts.MainModels,
 		logger:         opts.Logger,
-		indexPath:      filepath.Join(opts.Config.RootDir, "catalogue.json"),
+		indexPath:      filepath.Join(opts.Config.RootDir, "resources.json"),
 		indexCachePath: filepath.Join(opts.Config.DataDir, "resources-index.json"),
 		lockPath:       filepath.Join(opts.Config.DataDir, "resource-lock.json"),
 		lock:           map[string]any{"version": 1, "installed": map[string]any{}},
@@ -331,7 +331,7 @@ func (m *Manager) saveLock() {
 	}
 }
 
-// loadIndex reads catalogue.json, falling back to the last good copy.
+// loadIndex reads resources.json, falling back to the last good copy.
 func (m *Manager) loadIndex() {
 	m.mu.Lock()
 	defer m.mu.Unlock()

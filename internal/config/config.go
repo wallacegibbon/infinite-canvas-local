@@ -179,7 +179,7 @@ func Load(opts ...Option) (*Config, error) {
 }
 
 // resolveRootDir locates the asset root: the directory holding workflows/,
-// catalogue.json and prompts/.
+// resources.json and prompts/.
 //
 // The old implementation used __dirname + "..", which was safe because the
 // source never moved. Once this ships as a single binary that assumption dies,
@@ -218,7 +218,7 @@ func hasMarker(dir string) bool {
 	if info, err := os.Stat(filepath.Join(dir, "workflows", "registry.json")); err == nil && info.Mode().IsRegular() {
 		return true
 	}
-	if info, err := os.Stat(filepath.Join(dir, "catalogue.json")); err == nil && info.Mode().IsRegular() {
+	if info, err := os.Stat(filepath.Join(dir, "resources.json")); err == nil && info.Mode().IsRegular() {
 		return true
 	}
 	return false

@@ -922,7 +922,7 @@ func installHint(err error) string {
 	case strings.Contains(message, "HTTP 403"), strings.Contains(message, "HTTP 401"):
 		return "download rejected: the URL may require authentication; try another source"
 	case strings.Contains(message, "HTTP 404"):
-		return "dead download URL: update this resource's sources in catalogue.json"
+		return "dead download URL: update this resource's sources in resources.json"
 	case strings.Contains(message, "sha256"):
 		return "checksum failed: the download may be truncated, retry"
 	case strings.Contains(message, "no space"):

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Chinese copy for the resource catalogue.
  *
- * `catalogue.json` is data, so it is English (`docs/decisions.md` #8, #66, #67). The Chinese a
+ * `resources.json` is data, so it is English (`docs/decisions.md` #8, #66, #67). The Chinese a
  * reader of the Chinese UI expects lives beside the app, keyed by the resource's stable id — the same
  * arrangement `gateway-labels.ts` uses for workflow labels. These tests pin the two directions that
  * can silently break: Chinese leaking into the English UI, and the Chinese UI falling back to English
@@ -58,10 +58,10 @@ describe("resource-copy-zh", () => {
     });
 });
 
-describe("catalogue.json", () => {
+describe("resources.json", () => {
     it("carries no Chinese copy, only real paths", async () => {
         const { readFile } = await import("node:fs/promises");
-        const raw = await readFile(new URL("../../../catalogue.json", import.meta.url), "utf8");
+        const raw = await readFile(new URL("../../../resources.json", import.meta.url), "utf8");
         const doc = JSON.parse(raw) as {
             packs: Array<Record<string, unknown>>;
             resources: Array<Record<string, unknown>>;
