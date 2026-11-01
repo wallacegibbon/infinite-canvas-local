@@ -217,9 +217,14 @@ an `mcp.conf` written for that session:
 
 ```
 server: canvas
-url: http://127.0.0.1:<GATEWAY_PORT>/mcp/<workspace>
+url: http://<GATEWAY_HOST>:<GATEWAY_PORT>/mcp/<workspace>
 proto-version: 2025-11-25
 ```
+
+The URL is the operator's own address — the one the gateway is listening on, since MCP is a part of the
+gateway and the agent runs beside it. A gateway bound to `192.168.3.232` does not answer on loopback at
+all, so a fixed `127.0.0.1` here is a tool server the agent can never reach; a wildcard bind (`0.0.0.0`)
+is not dialable and becomes loopback. See [`decisions.md`](decisions.md) #87.
 
 The URL is the only thing that says which agent is asking: an MCP call carries no identity of its own,
 and guessing from "the session with a turn in flight" is wrong as soon as two panels ask at once. The

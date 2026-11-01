@@ -2917,7 +2917,8 @@ other half: a session's model does not leak into another's, and asking for words
 
 **Decision** A session's agent is spawned with `--config-path` pointing at a directory of its own,
 `<DATA_DIR>/agent/<sanitised-session>-<hash8>`, holding a copy of the operator's `model.conf` and
-`runtime.conf` plus an `mcp.conf` that points its tool calls at `http://127.0.0.1:<GATEWAY_PORT>/mcp/<workspace>`.
+`runtime.conf` plus an `mcp.conf` that points its tool calls at `http://<GATEWAY_HOST>:<GATEWAY_PORT>/mcp/<workspace>`
+(see #87 for why it is that address and not loopback).
 The workspace name is derived from the session name, so `POST /mcp/{workspace}` finds the session that is
 asking by scanning the sessions that exist rather than through a registry beside them. The directory is
 removed with the process, and every leftover is removed at startup. The endpoint speaks `initialize`,
