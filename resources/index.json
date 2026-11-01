@@ -966,7 +966,6 @@
       "target": "custom_nodes/ComfyUI-SolAttn_triton",
       "upstream": "https://github.com/kijai/ComfyUI-SolAttn_triton",
       "pinnedCommit": "dfc2e31a41afd72bd53dd2137fc8b2931d5ec192",
-      "localPatches": ["_morton_h3.py"],
       "size": 104848,
       "license": "No LICENSE declared",
       "autoInstall": true,
