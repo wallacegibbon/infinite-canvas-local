@@ -237,7 +237,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
                                             ref={previewCanvasRef}
                                             width={image.width}
                                             height={image.height}
-                                            className="absolute inset-0 h-full w-full cursor-none touch-none"
+                                            className={`absolute inset-0 h-full w-full touch-none ${brushPreview ? "cursor-none" : "cursor-crosshair"}`}
                                             style={{ opacity: maskOverlayAlpha }}
                                             onPointerDown={startDraw}
                                             onPointerMove={moveDraw}
@@ -258,7 +258,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
                 {brushPreview
                     ? createPortal(
                           <div
-                              className={`pointer-events-none fixed z-[1100] rounded-full border-2 ${brushPreview.adjusting ? "border-[#fbbf24] bg-black/10" : "border-white/90 bg-black/5"} shadow-[0_0_0_1px_rgba(0,0,0,.8)]`}
+                              className={`pointer-events-none fixed z-[1500] rounded-full border-2 ${brushPreview.adjusting ? "border-[#fbbf24] bg-black/10" : "border-white/90 bg-black/5"} shadow-[0_0_0_1px_rgba(0,0,0,.8)]`}
                               style={{ left: brushPreview.x, top: brushPreview.y, width: Math.max(4, brushPreview.size * viewport.imageScale), aspectRatio: 1, transform: "translate(-50%, -50%)" }}
                           >
                               {brushPreview.adjusting ? <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded bg-black/75 px-1.5 py-0.5 text-xs font-semibold text-white">{brushSize}px</span> : null}

@@ -4542,3 +4542,30 @@ qwenmultiangle]`, `optionalIds = []`, and every pack reporting `present == total
 
 **Where** `internal/resource/{status.go,derive.go}`, `resources.json`,
 `infinite-canvas/web/src/components/settings/resource-center-panel.tsx`.
+
+## 136. The brush ring was behind the dialog it lives in
+
+**Decision** The mask editor's brush ring moved from `z-[1100]` to `z-[1500]`, and the canvas only hides the
+native cursor while that ring is actually rendered — otherwise it shows `cursor-crosshair`. A new test keeps both
+rules: every portalled overlay declared by a component that renders a dialog or drawer must outrank the dialog,
+and `cursor-none` may only appear in the same expression as the ring it stands in for.
+
+**Why** The ring *is* the cursor: the canvas sets `cursor-none` and paints a circle through a portal at the
+pointer's position. At 1100 it sat below the dialog (1300/1301) and was therefore invisible, so the user painted
+with no cursor at all — blind drawing, reported as "看不到光标". The number was correct when the dialog was antd's
+Modal (z-index 1000) and was never revisited when the app moved to Radix and the overlay stack was renumbered.
+Nothing failed loudly: a buried ring throws no error, and the only symptom is the one thing the feature cannot do
+without.
+
+**Why the second rule** A ring that fails to render must degrade to something usable. Hiding the real cursor is a
+promise that a substitute is on screen; keeping that promise conditional means a future regression costs a
+crosshair instead of the feature.
+
+**Tested** `tests/overlay-z-index.test.ts` reads the sources: it takes the highest z-index in
+`kit/dialog.tsx` + `kit/drawer.tsx` as the floor and fails for any `fixed z-[n]` portal in a file that renders a
+`<Dialog`/`<Drawer`. Reverting the ring to 1100 fails with the file and line named, restoring it passes. The
+canvas's own portals (context menu at 80, @-mention list at 120) are out of scope on purpose — the canvas is
+behind the dialog, so those can never be opened from inside one. `tsc --noEmit`, 134 canvas tests.
+
+**Where** `infinite-canvas/web/src/components/canvas/canvas-node-mask-edit-dialog.tsx`,
+`infinite-canvas/web/tests/overlay-z-index.test.ts` (new).
