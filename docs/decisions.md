@@ -4067,3 +4067,46 @@ worse than the admission.
 change.
 
 **Where** `resources/index.json`, `internal/resource/resource.go`.
+
+## 122. Two of the four local patches are gone
+
+**Decision** `minimax-h3-audio-t8` is re-vendored at **v1.79.2** (`93cefbf5d15f`), and
+`ComfyUI-SolAttn_triton/__init__.py` is restored to the bytes upstream publishes at the commit we already
+pin. Four locally modified files became two.
+
+**The audio-t8 one was upstream's fix, written better** Our copy of `multikeyframe_advanced.py` passed
+three extra arguments to `final_layer` because the H3 core changed its signature. v1.75.0 solved the same
+problem with `call_h3_final_layer`, which inspects the model's signature and passes the schedule
+parameters only when the layer accepts them — so it survives both cores instead of ours, which only
+survives the new one. Re-vendoring removes the patch and the reasoning that went with it.
+
+**Why v1.79.2 and not v1.104.0** v1.104.0 is 6,566 files and, at the tag itself, not self-consistent:
+its root `__init__.py` imports modules that live in `h3_t8/`, and `h3_t8/nodes.py` imports
+`sol_attn_minimax_v2`, which lives at the root. `TestVendoredPacksImportOnlyWhatTheyShip` rejects that
+tree, correctly — a pack we ship must be one Python can import. v1.79.2 is the earliest tag after the
+`h3_t8/` reorganisation, resolves all 3,167 relative imports across the packs, and is 25 releases newer
+than the v1.47.0 it replaces. It costs 416 files where we had 179, and 6.8 MB where we had 6.5.
+
+**What was checked before shipping it** The four node classes our graphs actually use
+(`MiniMaxH3AVDecodeT8`, `MiniMaxH3AudioConditioningT8`, `MiniMaxH3SigmaShift`, `ModelAttentionBackend`)
+still exist, and all 62 inputs those graphs pass to them still exist by name. Without that, "it imports" is
+not the same as "it works".
+
+**The SolAttn defaults cost nothing to give back** Upstream's 2026-08-05 commit "update defaults" changed
+three values; our copy kept two and reverted `sink_conditioning` to `exact_kv`, plus set `dense_blocks`
+to `0-5`. The only graph that uses the node, `video-h3-ref2va-drama.json`, passes `"off"` and `""`
+explicitly, so the defaults never reached a render. Restored.
+
+**What is still patched, and why it has to be**
+`ComfyUI-SolAttn_triton/_morton_h3.py` resolves `_forward` on the class at call time so TE-Speed's runtime
+patch stays in the chain — upstream still captures the pointer at patch time. And
+`ComfyUI-SeedVR2_VideoUpscaler/src/common/distributed/basic.py` uses `fp32_precision` where upstream still
+sets `allow_tf32`; that repository has not been touched since 2025-12-24, so there is no upstream fix to
+wait for.
+
+**Tested** `make check` (3,167 relative imports resolved, no bytecode), `tsc --noEmit`, and 133 canvas tests.
+Not tested: a real render — ComfyUI is not running on this machine, and no gate here can replace that. The
+input-name check above is the closest thing available without it.
+
+**Where** `resources/payload/custom_nodes/minimax-h3-audio-t8`, `.../ComfyUI-SolAttn_triton/__init__.py`,
+`resources/index.json`.
