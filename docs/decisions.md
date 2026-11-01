@@ -3215,3 +3215,22 @@ typed. A gesture that refuses to start on the input it was made for is worse tha
 **Tested** In a browser: the draft `看看@` (no space before the `@`) showed "点击一个节点来引用 · ESC 取消";
 clicking the kettle node replaced it with `看看@a rusty copper kettle on a dark  `, focus back in the textarea at
 the end of what was inserted.
+
+## 97. The system menu was four questions in one trench coat
+
+**Decision** The hamburger at the top-left is gone. 我的资产 and 我的画布 became round buttons beside the
+side-panel toggle, where the two "where is my stuff" questions are one click away instead of two. 导出当前画布
+became a button in the bottom dock, right after 上传资产. 删除当前画布 joined the canvas menu behind the title,
+next to 新建画布 and 我的画布. Everything the menu held now has a second home: 新建/重命名/切换 were already in
+the title menu, 撤销/重做 were already in the dock.
+
+**Why** One menu was answering four unrelated questions — where am I, where are my things, what is this canvas
+doing, can I undo that — with the same three dividers. A menu is a place to put what has nowhere else to go;
+once 导入 sat in the dock and 导出 sat only in a menu, the menu was a hiding place, not a home. Deleting it
+costs nothing that is not already within one click of where it belongs, and removes a concept (a menu that
+owns no subject) rather than adding one.
+
+**Tested** In a browser (1717×734): the top-left renders 收起面板 / 我的资产 / 我的画布 as three buttons in one
+row; the dock lists … 上传资产 / 导出当前画布 …, and `导出当前画布` was present in the accessibility tree next to
+`上传资产`. The title menu reads 无限画布 1 (42 个节点) / 重命名 / 新建画布 / 我的画布 / **删除当前画布** (red).
+A grep for `打开画布菜单` in the accessibility tree returns nothing: no hamburger is left.

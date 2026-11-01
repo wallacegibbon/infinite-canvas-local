@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Download, Images, LayoutGrid, Menu, PanelLeftClose, PanelLeftOpen, Plus, Pencil, Redo2, Trash2, Undo2, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Check, ChevronDown, Images, LayoutGrid, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
 
@@ -27,11 +27,7 @@ export function CanvasTopBar({
     onSwitchProject,
     onCreateProject,
     onDeleteProject,
-    onExportProject,
-    onImportImage,
     onOpenPlugins,
-    onUndo,
-    onRedo,
 }: {
     title: string;
     titleDraft: string;
@@ -45,11 +41,7 @@ export function CanvasTopBar({
     onSwitchProject: (id: string) => void;
     onCreateProject: () => void;
     onDeleteProject: () => void;
-    onExportProject: () => void;
-    onImportImage: () => void;
     onOpenPlugins: () => void;
-    onUndo: () => void;
-    onRedo: () => void;
 }) {
     const colorTheme = useThemeStore((state) => state.theme);
     const { t } = useTranslation();
@@ -83,38 +75,15 @@ export function CanvasTopBar({
         <>
             <div className="pointer-events-none absolute left-0 right-0 top-0 z-50 flex h-16 items-center justify-between pl-1 pr-4">
                 <div className="pointer-events-auto flex min-w-0 items-center gap-2">
-                    <Tooltip title={sidePanelOpen ? t("canvas.collapsePanel") : t("canvas.expandPanel")}>
-                        <button
-                            type="button"
-                            onClick={toggleSidePanel}
-                            aria-label={sidePanelOpen ? t("canvas.collapsePanel") : t("canvas.expandPanel")}
-                            className="grid size-7 place-items-center rounded-full transition hover:bg-black/5 dark:hover:bg-white/10"
-                            style={{ color: theme.node.text }}
-                        >
-                            {sidePanelOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
-                        </button>
-                    </Tooltip>
-                    <Dropdown
-                        menu={{
-                            items: [
-                                { key: "assets", icon: <Images className="size-4" />, label: t("navigation.assets"), onClick: () => openAssets(true) },
-                                { key: "projects", icon: <LayoutGrid className="size-4" />, label: t("canvas.projects"), onClick: () => openManager(true) },
-                                { type: "divider" },
-                                { key: "new", icon: <Plus className="size-4" />, label: t("canvas.create"), onClick: onCreateProject },
-                                { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: t("canvas.deleteCurrent"), onClick: onDeleteProject },
-                                { type: "divider" },
-                                { key: "import", icon: <Upload className="size-4" />, label: t("canvas.importAsset"), onClick: onImportImage },
-                                { key: "export", icon: <Download className="size-4" />, label: t("canvas.exportCurrent"), onClick: onExportProject },
-                                { type: "divider" },
-                                { key: "undo", disabled: !canUndo, icon: <Undo2 className="size-4" />, label: <MenuLabel text={t("canvas.undo")} shortcut="⌘ Z" />, onClick: onUndo },
-                                { key: "redo", disabled: !canRedo, icon: <Redo2 className="size-4" />, label: <MenuLabel text={t("canvas.redo")} shortcut="⌘ ⇧ Z / ⌘ Y" />, onClick: onRedo },
-                            ],
-                        }}
-                    >
-                        <button type="button" className="grid size-7 place-items-center rounded-full transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }} aria-label={t("canvas.openMenu")}>
-                            <Menu className="size-4" />
-                        </button>
-                    </Dropdown>
+                    <TopBarButton label={sidePanelOpen ? t("canvas.collapsePanel") : t("canvas.expandPanel")} onClick={toggleSidePanel}>
+                        {sidePanelOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
+                    </TopBarButton>
+                    <TopBarButton label={t("navigation.assets")} onClick={() => openAssets(true)}>
+                        <Images className="size-4" />
+                    </TopBarButton>
+                    <TopBarButton label={t("canvas.projects")} onClick={() => openManager(true)}>
+                        <LayoutGrid className="size-4" />
+                    </TopBarButton>
 
                     <div ref={titleRef} className="flex min-w-0 items-center gap-2">
                         {isTitleEditing ? (
@@ -150,6 +119,7 @@ export function CanvasTopBar({
                                         { key: "rename", icon: <Pencil className="size-4" />, label: t("canvas.project.rename"), onClick: onStartTitleEditing },
                                         { key: "new", icon: <Plus className="size-4" />, label: t("canvas.create"), onClick: onCreateProject },
                                         { key: "all", icon: <Images className="size-4" />, label: t("canvas.projects"), onClick: () => openManager(true) },
+                                        { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: t("canvas.deleteCurrent"), onClick: onDeleteProject },
                                     ],
                                 }}
                             >
@@ -195,12 +165,15 @@ export function CanvasTopBar({
     );
 }
 
-function MenuLabel({ text, shortcut }: { text: string; shortcut: string }) {
+function TopBarButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+
     return (
-        <span className="flex min-w-36 items-center justify-between gap-8">
-            <span>{text}</span>
-            <span className="text-xs opacity-45">{shortcut}</span>
-        </span>
+        <Tooltip title={label}>
+            <button type="button" onClick={onClick} aria-label={label} className="grid size-7 place-items-center rounded-full transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }}>
+                {children}
+            </button>
+        </Tooltip>
     );
 }
 
