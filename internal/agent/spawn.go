@@ -132,7 +132,7 @@ func Spawn(o SpawnOptions) (*Process, error) {
 	// never reaches EOF after the child exits.
 	_ = stderrWrite.Close()
 
-	tail := &stderrTail{}
+	tail := newStderrTail()
 	go tail.drain(stderrRead)
 
 	if o.Log != nil {
@@ -238,11 +238,27 @@ func (p *Process) Release() {
 type stderrTail struct {
 	mu    sync.Mutex
 	lines []string
+	// done is closed when the child's stderr reaches EOF, so a reader that has just seen the process die
+	// can wait for its last words instead of racing the goroutine that is still copying them.
+	done chan struct{}
+}
+
+// newStderrTail builds a tail whose done channel the drain closes.
+func newStderrTail() *stderrTail { return &stderrTail{done: make(chan struct{})} }
+
+// settled waits up to the timeout for the drain to finish. It is only used on the startup-failure path,
+// where the child is already gone and the pipe therefore closes on its own.
+func (t *stderrTail) settled(timeout time.Duration) {
+	select {
+	case <-t.done:
+	case <-time.After(timeout):
+	}
 }
 
 const stderrTailLines = 20
 
 func (t *stderrTail) drain(r *os.File) {
+	defer close(t.done)
 	defer r.Close()
 	buf := make([]byte, 4096)
 	var pending string

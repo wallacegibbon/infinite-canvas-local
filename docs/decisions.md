@@ -3613,3 +3613,23 @@ inline "Register the canvas session…" — went with their files.
 **Tested** `make check`, `make test-race`, `npm run check`, `npx vitest run` (132 cases), and the rebuilt
 bundle in a browser: the canvas loads, and the network log contains no `/api/session/*` request at all
 (where the previous build posted `/api/session/open` and a heartbeat every five seconds).
+
+---
+
+## 111. A session's name becomes a file name, so the readable part is capped
+
+**Decision** `agentWorkspaceKey` cuts its readable prefix at 40 bytes and appends an 8-hex and a `-`:
+49 bytes at most, whatever the client typed.
+
+**Why** The key is both a directory under `DATA_DIR/agent/workspaces/` and the path segment of the MCP URL,
+so it has to survive a file name and a URL. The cap was already written — `if safe.Len() >= 40 { break }`
+— but the `break` sat inside the `switch` that chose between "copy the rune" and "write a dash", so it
+left the switch and the loop kept appending: a long name produced a key as long as the name. Staticcheck's
+SA4011 named it; the fix is to test the length before writing.
+
+**Cost** A canvas id longer than 40 characters is recognisable only by its first 40 and its hash, which is
+what the hash is for. Nothing reads the prefix back.
+
+**Tested** `internal/server/agent_workspace_test.go`: a 500-character name yields a key of at most 49 bytes
+with an 8-hex suffix, deterministically; two names that agree for their first 499 characters still differ;
+and a name carrying `/`, `:`, `*`, `?` and CJK becomes dashes without starting with a dot.

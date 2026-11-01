@@ -30,14 +30,17 @@ import (
 // a workspace without a registry of its own — a name that cannot be mapped back is worse than a name
 // that is ugly.
 func agentWorkspaceKey(session string) string {
+	// 40 bytes of readable prefix, then the hash: long enough to recognise a canvas, short enough that
+	// the file name and the URL stay well inside every limit. The cut is checked before writing, because
+	// a `break` inside the switch would only leave the switch.
 	var safe strings.Builder
 	for _, r := range session {
+		if safe.Len() >= 40 {
+			break
+		}
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
 			safe.WriteRune(r)
-			if safe.Len() >= 40 {
-				break
-			}
 		default:
 			safe.WriteByte('-')
 		}

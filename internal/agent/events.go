@@ -2,7 +2,9 @@ package agent
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
+	"time"
 )
 
 // Event is a frame the canvas may draw, and nothing more. The names are the protocol's, not ours:
@@ -282,11 +284,15 @@ func replayed(frame *Frame) (HistoryEntry, bool) {
 // waitReady reads startup frames until the session accepts input, then hands the collected state to
 // onReady. Everything before that is the agent's own startup broadcast and, when it was started with a
 // session file, the conversation it replayed from it — which is collected into history.
+//
+// An agent that stops before `ready` is an error, not an empty startup: it said nothing about itself, so
+// the only account of why is the last line of its stderr, and a caller told "connected" would show an
+// empty model list over a process that is already gone.
 func waitReady(proc *Process, state *startup, history *[]HistoryEntry, emit func(Event), onReady func() error) error {
 	for {
 		frame, err := proc.Read()
 		if err != nil || frame == nil {
-			return nil
+			return fmt.Errorf("the agent stopped before it was ready: %s", startFailure(proc, err))
 		}
 		if entry, ok := replayed(frame); ok {
 			if history != nil {
@@ -318,4 +324,19 @@ func waitReady(proc *Process, state *startup, history *[]HistoryEntry, emit func
 			state.collect(kind, data)
 		}
 	}
+}
+
+// startFailure is what to tell a caller whose agent died at startup: the read error, and the agent's own
+// last words when it had any. AlayaCore reports a refused config or an unknown model only on stderr, so
+// leaving that out turns "your model name is wrong" into "connection closed".
+func startFailure(proc *Process, err error) string {
+	reason := "the process ended"
+	if err != nil {
+		reason = err.Error()
+	}
+	proc.Stderr.settled(time.Second)
+	if tail := proc.Stderr.Last(); tail != "" {
+		return fmt.Sprintf("%s (stderr: %s)", reason, tail)
+	}
+	return reason
 }
