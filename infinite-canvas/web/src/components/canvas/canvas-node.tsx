@@ -403,9 +403,14 @@ export const CanvasNode = React.memo(function CanvasNode({
                 }}
                 onMouseDown={(event) => {
                     if (!referenceSelectionState) onMouseDown(event, data.id);
-                    else if (event.button === 0 && referenceSelectionState === "available") {
-                        event.stopPropagation();
-                        onSelectReference?.(data.id);
+                    else {
+                        // Picking is a way of typing somewhere else: mousedown's default (move the focus here)
+                        // would take the caret out of the box that asked, so it is not allowed to happen.
+                        event.preventDefault();
+                        if (event.button === 0 && referenceSelectionState === "available") {
+                            event.stopPropagation();
+                            onSelectReference?.(data.id);
+                        }
                     }
                 }}
                 onDoubleClick={(event) => {

@@ -195,6 +195,21 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
     // --- citations --------------------------------------------------------------------------------------
     /** The `@` a pick is answering, so the label lands where it was typed. */
     const pickAtRef = useRef<number>(-1);
+    /** Where the caret belongs once the draft has been rewritten — a pick puts it after the label. */
+    const caretRef = useRef<number | null>(null);
+
+    /** Put the caret in the box at this position, which is also what takes the focus back from the canvas. */
+    const focusAt = (caret: number | null) => {
+        if (caret === null) {
+            caretRef.current = null;
+            return;
+        }
+        const input = inputRef.current;
+        if (!input) return;
+        caretRef.current = null;
+        input.focus();
+        input.setSelectionRange(caret, caret);
+    };
 
     const cite = (nodeId: string) => {
         const at = pickAtRef.current;
@@ -202,24 +217,34 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode, onPickNode }: P
         if (at < 0) return;
         const node = nodes.find((candidate) => candidate.id === nodeId);
         const label = node?.title || nodeId;
+        // The `@` and the space around the label: the next thing typed belongs after it, not inside it.
+        caretRef.current = at + label.length + 2;
         setDraft((current) => `${current.slice(0, at)}@${label} ${current.slice(at + 1)}`);
         setCited((current) => (current.includes(nodeId) ? current : [...current, nodeId]));
-        inputRef.current?.focus();
     };
+
+    // The click happened on the canvas, so the box has to take the focus and the caret back once the draft is
+    // in the DOM — the pick is a way of typing, and typing continues where it left off.
+    useEffect(() => {
+        if (caretRef.current === null) return;
+        focusAt(caretRef.current);
+    }, [draft]);
 
     /**
      * `@` is a request to pick a node on the canvas, the way a reference's + does — the user points at the
      * thing itself rather than at a name in a list. The character stays in the draft, where the label
-     * replaces it once something is picked; escape leaves the `@` as typed.
+     * replaces it once something is picked; a cancelled pick leaves the `@` as typed, and the box focused.
      */
     const onChange = (value: string) => {
         const caret = inputRef.current?.selectionStart ?? value.length;
         const typed = value.length > draft.length && caret > 0 && value[caret - 1] === "@" && (caret === 1 || !/\S/.test(value[caret - 2]));
         setDraft(value);
         if (!typed) return;
-        pickAtRef.current = caret - 1;
+        const at = caret - 1;
+        pickAtRef.current = at;
         void onPickNode().then((nodeId) => {
             if (nodeId) cite(nodeId);
+            else focusAt(at + 1);
         });
     };
 

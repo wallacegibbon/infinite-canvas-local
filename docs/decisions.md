@@ -3143,3 +3143,18 @@ image-1793524968642-jq17f 连到它上面，然后在配置节点上生成一张
 `connected image-1793524968642-jq17f -> config-1793527710406-y2raf`, `generate` on the config node → the
 config node's panel showed 参考图 1 张 with the kettle in it, the run went out and succeeded with one artifact,
 and the canvas went from 40 nodes / 29 connections to 42 / 31 — a new image node holding the variant.
+
+## 93. A pick is a way of typing, so it gives the caret back
+
+**Decision** Choosing a node with `@` puts the focus back in the composer with the caret just after the label it
+inserted; cancelling (escape, or the banner) leaves the `@` as typed and puts the caret back after it. The node's
+own mousedown no longer moves the focus while a pick is in progress: picking is typing somewhere else, and the
+caret belongs to the box that asked.
+
+**Why** Without it the click ends the sentence: the caret stayed wherever the click left it, the next thing
+typed went nowhere, and the user had to click into the box and find the end of the line again. The pick exists
+to save typing, not to interrupt it.
+
+**Tested** In a browser: typing "看看 @" then clicking the kettle node left `看看 @a rusty copper kettle on a
+dark  ` in the box, `document.activeElement` a TEXTAREA, and `selectionStart` 37 — the end of what was
+inserted. Escaping a pick left `看看 @ 再看 @` untouched with the caret at 9, still in the box.
