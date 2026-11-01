@@ -4720,35 +4720,33 @@ risk plugins built before this commit for no visible gain.
 **Where** `canvas/plugins/canvas/**` (48 files), `canvas/web/{package.json,package-lock.json}`,
 `canvas/{CHANGELOG.md,SECURITY.md}` (deleted).
 
-## 141. The README states the incompatibility instead of hinting at it
+## 141. The credits section names the origin and the licence, and stops there
 
-**Decision** The Credits section is now "Credits, and what this is not". It names both upstream repositories and
-keeps the MIT text at `canvas/LICENSE`, then says plainly that upstream changes cannot be merged into this tree and
-nothing here can be dropped back into theirs — with the measurements that make the claim checkable.
+**Decision** `README.md` opens with a short Credits block and nothing more: this is a fork of
+`1314521gjy/ComfyUI-Local-Infinite-Canvas`, itself a modified copy of `basketikun/infinite-canvas`; both are MIT,
+their copyright notices and licence texts are kept verbatim at `canvas/LICENSE`, and this project is MIT too; then
+one sentence saying both halves have been rewritten since, so nothing is compatible upstream. No tables, no counts,
+no inventory of what was added or removed.
 
-**Why a number rather than an adjective** "Heavily modified" is what every fork says, including the ones that are
-three patches ahead of upstream. Measured against the initial import of this repository:
+**Why** That section exists for the licence obligations: say where the code came from, keep their notices, state
+ours. Everything else in the earlier draft was a status report — accurate when written, wrong within a month, and
+not what a reader wants above the fold. The single compatibility sentence stays because it is also licence-adjacent:
+it tells a reader that upstream work may not be merged here.
 
-| | at the import | now | byte-identical | rewritten |
-|---|---|---|---|---|
-| `canvas/web/src` | 167 files | 182 files | 22 (12%) | +13,138 / −15,007 |
-| `internal/` | 64 files | 102 files | 12 (12%) | +11,077 / −5,984, 76 commits |
+**The measurement I had to withdraw** An earlier version of this entry carried a table comparing `canvas/web/src`
+and `internal/` against this repository's **own first commit** — 22 of 182 files byte-identical in the canvas, 12 of
+102 in the gateway, +13,138/−15,007 and +11,077/−5,984 lines. The canvas half measures the right thing: that tree
+was imported from the fork. The gateway half does not. By the time of that first commit the gateway was already Go,
+so those numbers describe our own service evolving, not the distance to the project we forked — upstream shipped
+`comfyui-gateway/` in JavaScript. There is no line-for-line comparison to make, and the honest version is the
+sentence the README now carries.
 
-Twelve per cent of each half survives untouched. That is a rewrite wearing the same directory names.
+**What the licence file needed** Checking the claim "their copyright notices are kept verbatim" showed it was
+false: `canvas/LICENSE` carried only `Copyright (c) 2026 basketikun`. The fork the canvas came from has its own
+`Copyright (c) 2026 1314521gjy`, so both lines are now in that file, with the MIT body unchanged. A README that
+claims a licence file says something it does not is worse than one that says nothing.
 
-**What the section lists** The gateway's own protocol (no `/v1`, nothing OpenAI-compatible) and the parts upstream
-never had — the workflow registry, the resource catalogue and installer, the run queue, the agent socket. The
-canvas's rework (Radix instead of antd, the editors that define the product, the plugin SDK now
-`@comfy-loft/plugin-sdk`). And the feature set diverging both ways: MOSS/Qwen/Z-Image/H3/music added, SeedVR2,
-Krea2, the Moss portrait LoRA and the three no-VDN paths removed.
+**Tested** `git diff` on `canvas/LICENSE` (one line added), README reads in ten lines, and the language rule still
+holds — a Chinese check over the file returns the one pre-existing protocol example.
 
-**The three surviving old names are named there too** — browser storage keys, the export marker, and the
-third-party agent plugin — because a reader who finds `infinite-canvas:*` in the code deserves to know it is
-deliberate (#140) rather than assume the rename was half done.
-
-**Tested** Prose only, but the numbers were re-derived for it: file counts and blob comparison against the root
-commit (`git ls-tree` on both trees), and `git diff --numstat` on the same paths. The README still passes the
-project's own language rule — a Chinese check over the file returns one hit, the pre-existing example in the
-Language section.
-
-**Where** `README.md`.
+**Where** `README.md`, `canvas/LICENSE`, `docs/decisions.md`.
