@@ -63,12 +63,3 @@ func (s *Server) handleProgress(ctx *httpx.Ctx) error {
 func (s *Server) handleFile(ctx *httpx.Ctx) error {
 	return s.serveFile(ctx.W, ctx.R, ctx.R.PathValue("name"))
 }
-
-// promptImageURLs turns uploaded files into the data URLs the agent accepts.
-func promptImageURLs(files []httpx.File) []string {
-	images := make([]string, 0, len(files))
-	for _, file := range files {
-		images = append(images, "data:"+defaultMime(file.Mimetype)+";base64,"+base64.StdEncoding.EncodeToString(file.Bytes))
-	}
-	return images
-}

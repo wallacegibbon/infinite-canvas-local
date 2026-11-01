@@ -1,21 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The chat request the canvas sends for text.
+ * The one-shot request the canvas sends for text.
  *
- * A text node's body is one answer that nothing follows, so it goes to `/api/agent/once`: a process of
- * its own, released when the answer ends. It is deliberately not `/api/agent/chat`, which writes into
- * the agent a canvas holds — a shortcut must never be able to spend that agent's history.
+ * A text node's body is one answer that nothing follows, so it goes to `/api/agent/once` — a socket
+ * that carries one question and dies with the answer. It is deliberately not the conversation's socket,
+ * which names a canvas and keeps the agent's history: a shortcut must never be able to spend that.
  */
 vi.mock("@/i18n", () => ({ default: { t: (key: string) => key } }));
 vi.mock("@/services/api/gateway-status", () => ({ noteGatewayError: () => undefined }));
 
 // Media conversion is a browser concern; these tests are about the request the canvas builds.
 vi.mock("@/services/image-storage", () => ({ imageToDataUrl: async () => "data:image/png;base64,AAAA" }));
-vi.mock("@/lib/image-utils", () => ({
-    dataUrlToFile: (image: { name?: string }) => new File([new Uint8Array([1, 2, 3])], image.name || "reference.png", { type: "image/png" }),
-    readFileAsDataUrl: async () => "data:image/png;base64,BBBB",
-}));
 
 const { requestPromptChat } = await import("@/services/api/prompts");
 type Config = Parameters<typeof requestPromptChat>[0];
@@ -28,72 +24,107 @@ const config = (overrides: Record<string, unknown> = {}) =>
         models: [],
         model: "text-qwen",
         systemPrompt: "",
-        promptBaseUrl: "http://127.0.0.1:8099/v1",
-        promptApiKey: "nokey",
-        promptModel: "qwen3.8-27b",
         ...overrides,
     }) as unknown as Config;
 
 const reference = (name: string) => ({ id: name, name, dataUrl: "data:image/png;base64,AAAA" }) as never;
 
-type Call = { url: string; method: string; body: unknown; headers: Record<string, string> };
+/**
+ * The socket the client opens, standing in for the browser's. It records what was sent and lets a test
+ * play the agent.
+ */
+class FakeSocket {
+    static last: FakeSocket | null = null;
 
-/** The agent answers with an event stream, so a stub that speaks that framing is what these need. */
-function stubGateway(input: { body?: string; json?: unknown; status?: number } = {}) {
-    const status = input.status ?? 200;
-    const calls: Call[] = [];
-    vi.stubGlobal(
-        "fetch",
-        vi.fn(async (url: string, init: RequestInit = {}) => {
-            calls.push({ url, method: String(init.method || "GET"), body: init.body, headers: (init.headers || {}) as Record<string, string> });
-            if (input.body !== undefined) return new Response(input.body, { status, headers: { "Content-Type": "text/event-stream" } });
-            return new Response(JSON.stringify(input.json ?? {}), { status, headers: { "Content-Type": "application/json" } });
-        }),
-    );
-    return calls;
+    url: string;
+    sent: string[] = [];
+    readyState = 0;
+    onopen: (() => void) | null = null;
+    onmessage: ((event: { data: string }) => void) | null = null;
+    onerror: (() => void) | null = null;
+    onclose: (() => void) | null = null;
+
+    constructor(url: string) {
+        this.url = url;
+        FakeSocket.last = this;
+        // Opening is asynchronous in a browser, and the client sends on `open`.
+        queueMicrotask(() => {
+            this.readyState = 1;
+            this.onopen?.();
+        });
+    }
+
+    send(data: string) {
+        this.sent.push(data);
+    }
+
+    close() {
+        this.readyState = 3;
+    }
+
+    /** Say something as the agent. */
+    emit(event: unknown) {
+        this.onmessage?.({ data: JSON.stringify(event) });
+    }
 }
 
-/** The one POST's form, which is the whole request contract of this route. */
-function formOf(calls: Call[]) {
-    const call = calls.find((item) => item.method === "POST");
-    if (!call) throw new Error("no POST was sent");
-    return { call, form: call.body as FormData };
-}
+/** Let the client's open handler (which awaits image conversion) run. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 beforeEach(() => {
     vi.unstubAllGlobals();
+    FakeSocket.last = null;
+    vi.stubGlobal("WebSocket", FakeSocket);
 });
 
 describe("requestPromptChat", () => {
-    it("asks the one-shot route, and does not carry an endpoint of its own", async () => {
-        const calls = stubGateway({ body: 'data: {"type":"delta","text":"an "}\n\ndata: {"type":"delta","text":"answer"}\n\ndata: {"type":"done","text":"an answer"}\n\n' });
+    it("opens the one-shot socket and names no session", async () => {
+        const pending = requestPromptChat(config(), { prompt: "describe a teapot" });
+        await settle();
 
-        await expect(requestPromptChat(config(), { prompt: "describe a teapot" })).resolves.toBe("an answer");
-
-        const { call, form } = formOf(calls);
-        expect(call.url).toBe("http://127.0.0.1:8190/api/agent/once");
-        expect(form.get("prompt")).toBe("describe a teapot");
+        const socket = FakeSocket.last;
+        if (!socket) throw new Error("no socket was opened");
+        expect(socket.url).toBe("ws://127.0.0.1:8190/api/agent/once");
+        const sent = JSON.parse(socket.sent[0]) as Record<string, unknown>;
+        expect(sent.prompt).toBe("describe a teapot");
         // No session, ever: the whole point of the route is that it cannot reach a canvas's agent.
-        expect(form.get("session")).toBeNull();
-        // The model, the key and the base URL are the agent's own configuration now: a question
-        // carries a question.
-        for (const field of ["promptBaseUrl", "promptApiKey", "promptModel", "system", "command"]) {
-            expect(form.get(field)).toBeNull();
-        }
+        expect(sent.session).toBeUndefined();
+
+        socket.emit({ type: "delta", text: "an answer" });
+        socket.emit({ type: "done", text: "an answer" });
+        await expect(pending).resolves.toBe("an answer");
+    });
+
+    it("sends a reference image as the data URL it already is", async () => {
+        const pending = requestPromptChat(config(), { prompt: "what is this", images: [reference("a.png")] });
+        await settle();
+
+        const sent = JSON.parse(FakeSocket.last!.sent[0]) as { images?: string[] };
+        expect(sent.images).toEqual(["data:image/png;base64,AAAA"]);
+
+        FakeSocket.last!.emit({ type: "done", text: "" });
+        await pending.catch(() => undefined);
     });
 
     it("reports the answer as it arrives", async () => {
-        stubGateway({ body: 'data: {"type":"delta","text":"half "}\n\ndata: {"type":"delta","text":"way"}\n\n' });
-
         const seen: string[] = [];
-        await requestPromptChat(config(), { prompt: "hi" }, { onDelta: (text) => seen.push(text) });
+        const pending = requestPromptChat(config(), { prompt: "hi" }, { onDelta: (text) => seen.push(text) });
+        await settle();
 
+        FakeSocket.last!.emit({ type: "delta", text: "half " });
+        FakeSocket.last!.emit({ type: "delta", text: "way" });
+        FakeSocket.last!.emit({ type: "done", text: "half way" });
+
+        await expect(pending).resolves.toBe("half way");
         expect(seen).toEqual(["half ", "half way"]);
     });
 
     it("relays the agent's own error", async () => {
-        stubGateway({ body: 'data: {"type":"error","message":"model_set: model not found: 9"}\n\ndata: {"type":"done"}\n\n' });
+        const pending = requestPromptChat(config(), { prompt: "hi" });
+        await settle();
 
-        await expect(requestPromptChat(config(), { prompt: "hi" })).rejects.toThrow("model_set: model not found: 9");
+        FakeSocket.last!.emit({ type: "error", message: "model_set: model not found: 9" });
+
+        await expect(pending).rejects.toThrow("model_set: model not found: 9");
     });
 });

@@ -6,8 +6,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -349,14 +347,22 @@ func TestSocketReportsADeadProcess(t *testing.T) {
 func TestAgentOnceSpawnsAProcessAndReleasesIt(t *testing.T) {
 	gateway, spawnLog := startAgentGateway(t)
 
-	response := postOnce(t, gateway, map[string]string{"prompt": "hi"})
-	if response != http.StatusOK {
-		t.Fatalf("status = %d", response)
+	once := openOnce(t, gateway)
+	send(t, once, map[string]any{"prompt": "hi"})
+	seen := until(t, once, "done")
+	if last := seen[len(seen)-1]; last["text"] != "hello world" {
+		t.Fatalf("one-shot answered %v", last)
 	}
-	// The process was started for this request and is gone by the time the answer is complete, which is
+	// The process was started for this socket and is gone by the time the answer is complete, which is
 	// what "released when the answer ends" means — and it never touched a session.
 	if got := spawns(t, spawnLog); got != 1 {
 		t.Fatalf("spawned %d agents for one one-shot request, want 1", got)
+	}
+	// And the socket is closed for it: the answer is the end of the connection.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := once.ReadMessage(ctx); err == nil {
+		t.Fatal("the one-shot socket stayed open after its answer")
 	}
 }
 
@@ -366,8 +372,11 @@ func TestAgentOnceNeverSpeaksToAConversation(t *testing.T) {
 	gateway, spawnLog := startAgentGateway(t)
 	conn := openSocket(t, gateway, "canvas-1")
 
-	// Whatever the one-shot carries, it names no conversation: the route has no session field.
-	postOnce(t, gateway, map[string]string{"prompt": "hi", "session": "canvas-1"})
+	// Whatever the one-shot carries, it names no conversation: the route reads no session field, and the
+	// socket it opens is not the conversation's.
+	once := openOnce(t, gateway)
+	send(t, once, map[string]any{"prompt": "hi", "session": "canvas-1"})
+	until(t, once, "done")
 
 	// The conversation is untouched and still answering.
 	send(t, conn, map[string]any{"prompt": "hi"})
@@ -379,25 +388,15 @@ func TestAgentOnceNeverSpeaksToAConversation(t *testing.T) {
 	}
 }
 
-// postOnce sends a one-shot question and returns the status, draining the stream.
-func postOnce(t *testing.T, gateway *httptest.Server, fields map[string]string) int {
+// openOnce opens the one-shot socket. It has no startup broadcast — the question is the first thing
+// said on it — so unlike a conversation there is nothing to drain.
+func openOnce(t *testing.T, gateway *httptest.Server) *comfy.WSConn {
 	t.Helper()
-	var body strings.Builder
-	boundary := "test-boundary"
-	for key, value := range fields {
-		fmt.Fprintf(&body, "--%s\r\nContent-Disposition: form-data; name=%q\r\n\r\n%s\r\n", boundary, key, value)
-	}
-	fmt.Fprintf(&body, "--%s--\r\n", boundary)
-	response, err := http.Post(gateway.URL+"/api/agent/once", "multipart/form-data; boundary="+boundary, strings.NewReader(body.String()))
+	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/once"
+	conn, err := comfy.DialWS(context.Background(), url)
 	if err != nil {
-		t.Fatalf("post: %v", err)
+		t.Fatalf("dial once: %v", err)
 	}
-	defer response.Body.Close()
-	buffer := make([]byte, 4096)
-	for {
-		if _, err := response.Body.Read(buffer); err != nil {
-			break
-		}
-	}
-	return response.StatusCode
+	t.Cleanup(func() { _ = conn.Close() })
+	return conn
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,16 +15,15 @@ import (
 
 // routesAgent registers two things that are two kinds of thing.
 //
-// A conversation is a socket: one connection per canvas, open for as long as the user keeps it, both
-// directions, for as long as the agent keeps working. A prompt rewrite or a caption is one answer that
-// nothing follows, so it is a plain POST that spawns a process and releases it.
+// A conversation is a socket that names itself and stays open: one per canvas, for as long as the user
+// keeps it. A prompt rewrite or a caption is one answer that nothing follows, so it is a socket that
+// dies with the answer and names nothing.
 //
-// The separation is the point, not an accident of routing. A one-shot question is handed a process of
-// its own and no socket at all, so a button that rewrites a prompt cannot reach — let alone spend — the
-// agent the user is working with.
+// The difference is lifetime, and the route says which. Both speak the same messages in both
+// directions, because there is one transport here: a frame is a frame whatever is listening.
 func (s *Server) routesAgent(mux *http.ServeMux) {
 	s.route(mux, "GET /api/agent/socket/{session}", s.handleAgentSocket)
-	s.route(mux, "POST /api/agent/once", s.handleAgentOnce)
+	s.route(mux, "GET /api/agent/once", s.handleAgentOnce)
 }
 
 // agentOptions is what every spawn needs. The wording (skills) and the tools are passed through from
@@ -157,54 +157,75 @@ func (s *Server) readSocket(conn *ws.Conn, session *agent.Session, send func(age
 	}
 }
 
-// handleAgentOnce implements POST /api/agent/once: one question, one process, released when the
-// answer ends.
+// handleAgentOnce implements GET /api/agent/once: one question, one process, released when the answer
+// ends.
 //
-// There is no session on this route and no way to name one. What it is for — a rewritten prompt, a
-// caption — is a single answer that nothing follows, so the process that produces it belongs to the
-// request and dies with it. Naming a session here would be meaningless, and reading one would be worse
-// than meaningless: it is the one way a shortcut could take the agent a canvas is holding.
+// The socket exists for exactly one answer. Nothing on this route names a session and nothing reads
+// one, which is the whole point: what it is for — a rewritten prompt, a caption — must not be able to
+// reach, let alone spend, the agent a canvas is holding. A spawn that fails is a message like any
+// other, because after the upgrade there is no status code left to be honest with.
 func (s *Server) handleAgentOnce(ctx *httpx.Ctx) error {
-	body, err := bodyOrEmpty(ctx)
+	conn, err := ws.Accept(ctx.W, ctx.R)
 	if err != nil {
-		return err
+		// Nothing has been hijacked, so this is still an ordinary failed request.
+		return httpx.NewError(http.StatusBadRequest, "not_a_websocket", err.Error())
 	}
-	request := agentRequest(body, ctx.Files())
+	defer conn.Close()
+
+	send := func(event agent.Event) {
+		payload, err := json.Marshal(event)
+		if err != nil {
+			return
+		}
+		_ = conn.WriteText(payload)
+	}
+
+	// The question is the first message. A socket that opens and says nothing is a client mistake, not
+	// something to answer.
+	raw, err := conn.ReadMessage()
+	if err != nil {
+		return nil
+	}
+	var message socketMessage
+	if err := json.Unmarshal(raw, &message); err != nil {
+		send(agent.Event{Type: "error", Message: "无法解析这条消息"})
+		return nil
+	}
+	request := agent.Request{Prompt: message.Prompt, Images: message.Images, Command: message.Command, Args: message.Args}
 	started := time.Now()
 	s.logger.Info("agent: once command=%q args=%q prompt=%q images=%d", request.Command, request.Args, truncateText(request.Prompt, 120), len(request.Images))
 
+	// A client that walks away — or says `cancel` — ends the work: the process belongs to this socket and
+	// goes with it.
+	runCtx, cancel := context.WithCancel(ctx.R.Context())
+	defer cancel()
+	go func() {
+		for {
+			raw, err := conn.ReadMessage()
+			if err != nil {
+				cancel()
+				return
+			}
+			var next socketMessage
+			if json.Unmarshal(raw, &next) == nil && next.Cancel {
+				cancel()
+				return
+			}
+		}
+	}()
+
 	counts := map[string]int{}
-	emit := startEventStream(ctx.W)
-	runErr := agent.Run(ctx.R.Context(), s.agentOptions(), request, func(event agent.Event) {
+	runErr := agent.Run(runCtx, s.agentOptions(), request, func(event agent.Event) {
 		counts[event.Type]++
-		emit(event)
+		send(event)
 	})
-	return s.finishAgent(ctx, started, counts, runErr)
-}
-
-// agentRequest is the body as one request: the words to send, the images before them, and optionally
-// one of AlayaCore's own commands.
-func agentRequest(body map[string]any, files []httpx.File) agent.Request {
-	return agent.Request{
-		Prompt:  httpx.String(body, "prompt"),
-		Images:  promptImageURLs(orderedPromptImages(files)),
-		Command: httpx.String(body, "command"),
-		Args:    httpx.String(body, "args"),
-	}
-}
-
-// finishAgent logs how a request ended, which is what a reader needs to tell a finished answer from a
-// refusal without scrolling the transcript.
-func (s *Server) finishAgent(ctx *httpx.Ctx, started time.Time, counts map[string]int, err error) error {
 	elapsed := time.Since(started).Milliseconds()
 	switch {
-	case err != nil:
-		s.logger.Warn("agent: request failed after %dms: %v", elapsed, err)
-		return err
-	case ctx.R.Context().Err() != nil:
-		s.logger.Info("agent: request cancelled after %dms (events: %s)", elapsed, eventCounts(counts))
+	case runErr != nil:
+		s.logger.Warn("agent: once failed after %dms: %v", elapsed, runErr)
+		send(agent.Event{Type: "error", Message: runErr.Error()})
 	default:
-		s.logger.Info("agent: request done in %dms (events: %s)", elapsed, eventCounts(counts))
+		s.logger.Info("agent: once done in %dms (events: %s)", elapsed, eventCounts(counts))
 	}
 	return nil
 }
@@ -222,30 +243,6 @@ func eventCounts(counts map[string]int) string {
 		return "none"
 	}
 	return strings.Join(parts, " ")
-}
-
-// startEventStream answers with an event stream and returns the function that writes one event.
-//
-// A prompt can take a while and says things as it goes, so the response is flushed per event: an
-// event that is still in a buffer is an event the user cannot see. The stream is the whole response —
-// there is no envelope, no status to return afterwards.
-func startEventStream(w http.ResponseWriter) func(agent.Event) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Accel-Buffering", "no")
-	w.WriteHeader(http.StatusOK)
-
-	flusher, _ := w.(http.Flusher)
-	return func(event agent.Event) {
-		payload, err := json.Marshal(event)
-		if err != nil {
-			return
-		}
-		_, _ = w.Write(append(append([]byte("data: "), payload...), '\n', '\n'))
-		if flusher != nil {
-			flusher.Flush()
-		}
-	}
 }
 
 // truncateText keeps a prompt's head for the log: a full one can be a page long, and the first line is

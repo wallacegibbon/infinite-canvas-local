@@ -1,5 +1,4 @@
 import i18n from "@/i18n";
-import { dataUrlToFile } from "@/lib/image-utils";
 import { gatewayProtocolRoot } from "@/services/api/runs";
 import { apiErrorMessage } from "@/services/api/http";
 import { imageToDataUrl } from "@/services/image-storage";
@@ -175,51 +174,60 @@ export function endAgentConversation(): void {
 /**
  * Ask for one answer that nothing follows: a text node's body, a rewritten prompt, a caption.
  *
- * A plain POST to `/api/agent/once`. There is no session here and no way to name one, which is the
- * whole point: this must not be able to reach the agent a canvas is holding.
+ * A socket that carries one question and dies with the answer. It names no session and never reads
+ * one, which is the whole point: this must not be able to reach the agent a canvas is holding. The
+ * conversation and the one-shot speak the same messages, because there is one transport here — only
+ * the lifetime differs, and the route says which.
  */
-export async function requestAgentOnce(config: AiConfig, request: { prompt: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
-    const root = gatewayProtocolRoot(config.baseUrl);
-    const formData = new FormData();
-    formData.set("prompt", request.prompt);
-    const files = await Promise.all((request.images || []).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
-    files.forEach((file, index) => formData.append(index === 0 ? "image" : `image${index + 1}`, file));
-
-    let answer = "";
-    let failure = "";
-    try {
-        const response = await fetch(`${root}/api/agent/once`, { method: "POST", headers: { Authorization: `Bearer ${config.apiKey}` }, body: formData, signal: options?.signal });
-        if (!response.ok) throw new Error(apiText("requestFailed"));
-        if (!response.body) throw new Error(apiText("requestFailed"));
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        for (;;) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            // EventSource framing: one `data: {...}` per line, a blank line between events.
-            for (;;) {
-                const index = buffer.indexOf("\n\n");
-                if (index < 0) break;
-                const block = buffer.slice(0, index);
-                buffer = buffer.slice(index + 2);
-                const payload = block.replace(/^data: /, "").trim();
-                if (!payload) continue;
-                const event = JSON.parse(payload) as AgentEvent;
-                rememberAgentEvent(event);
-                if (event.type === "delta") answer += event.text || "";
-                // The agent's own sentence is the failure: relaying it is all this layer does.
-                if (event.type === "error" && event.message) failure = event.message;
-                options?.onEvent?.(event);
-            }
+export function requestAgentOnce(config: AiConfig, request: { prompt: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
+    const url = `${gatewayProtocolRoot(config.baseUrl).replace(/^http/i, "ws")}/api/agent/once`;
+    return new Promise((resolve, reject) => {
+        let socket: WebSocket;
+        try {
+            socket = new WebSocket(url);
+        } catch (error) {
+            reject(new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout")));
+            return;
         }
-        if (!answer && failure) throw new Error(failure);
-        return answer;
-    } catch (error) {
-        throw new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout"));
-    }
+        let answer = "";
+        let failure = "";
+        let settled = false;
+        const finish = (error?: Error) => {
+            if (settled) return;
+            settled = true;
+            socket.onmessage = null;
+            socket.onerror = null;
+            socket.onclose = null;
+            socket.close();
+            if (error) reject(error);
+            else resolve(answer);
+        };
+
+        options?.signal?.addEventListener("abort", () => finish(new Error(apiText("requestFailed"))), { once: true });
+
+        socket.onopen = async () => {
+            const images = await Promise.all((request.images || []).map((image) => imageToDataUrl(image)));
+            if (settled) return;
+            socket.send(JSON.stringify({ prompt: request.prompt, images }));
+        };
+        socket.onmessage = (message) => {
+            let event: AgentEvent;
+            try {
+                event = JSON.parse(message.data as string) as AgentEvent;
+            } catch {
+                return;
+            }
+            rememberAgentEvent(event);
+            if (event.type === "delta") answer += event.text || "";
+            // The agent's own sentence is the failure: relaying it is all this layer does.
+            if (event.type === "error" && event.message) failure = event.message;
+            options?.onEvent?.(event);
+            if (event.type === "error") finish(new Error(failure || apiText("requestFailed")));
+            if (event.type === "done") finish();
+        };
+        socket.onerror = () => finish(new Error(apiText("requestFailed")));
+        socket.onclose = () => finish(new Error(failure || apiText("requestFailed")));
+    });
 }
 
 /**

@@ -156,7 +156,7 @@ endpoints. `/v1/...` in this repository belongs to the model provider AlayaCore 
 |---|---|
 | `/api/runs`, `/api/uploads` | Produce media (submit, poll, download, cancel) and stage its inputs |
 | `/api/workflows/*`, `/api/setup/*` | Workflow metadata, schemas, ComfyUI scanning |
-| `/api/agent/socket/{session}`, `/api/agent/once` | The agent: a WebSocket per canvas, and a one-shot question as a POST |
+| `/api/agent/socket/{session}`, `/api/agent/once` | The agent: a WebSocket per canvas, and a one-shot socket that dies with its answer |
 | `/api/resources/*` | Download models, install custom nodes |
 | `/api/system/*`, `/api/loras`, `/api/tasks`, `/files/:name`, `/health` | System status and artifacts |
 

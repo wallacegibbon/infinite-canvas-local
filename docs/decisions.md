@@ -2826,7 +2826,9 @@ itself (`lived=14886ms`) — a one-shot agent does not outlive its answer.
 **Decision** The canvas agent is a WebSocket, one per canvas, at `GET /api/agent/socket/{session}`. Both
 directions are messages on it: prompts, settings commands, `cancel`, `close` up; the agent's own frames
 down. `POST /api/agent/connect`, `/api/agent/chat` and `DELETE /api/agent/session/{id}` are gone. The
-one-shot route keeps its own shape — a POST that streams, and a process released when the answer ends.
+one-shot is a socket too, at `GET /api/agent/once`: it takes its question as the first message, answers
+once, and closes. The lifetime still differs and the route still says which — what went away is the
+second *transport*.
 
 **Why this and not SSE** Three shapes of SSE were proposed and each one added a concept instead of
 removing one: a stream per turn needed "when does a turn end" and "which request owns the stream"; a
@@ -2841,7 +2843,17 @@ instead of asked for, masked frames read, unmasked written, fragmentation reasse
 `internal/comfy` already spoke the same framing as a client, and the tests drive the new server with
 that client — an independent implementation rather than the server's own reflection.
 
-**What it cost** `curl -N` no longer watches a conversation; `websocat` does. Two things had to be fixed
+**One transport, two lifetimes** The one-shot was a POST returning `text/event-stream`, which is the
+natural shape for one request and one stream — but it meant the repository kept two streaming mechanisms
+for one feature, two client readers, two framing formats, and a question ("why are these different?")
+with no better answer than "one of them is a single answer". With a socket client already in place,
+moving it cost one route, one client function, and the SSE machinery it had needed: `startEventStream`,
+the multipart body, and the file-to-data-URL helpers that only existed to fill that body — images now
+travel as the data URLs the canvas already holds. What is genuinely lost is `curl` for a one-shot: a
+`websocat` and `websocat -n1` are needed now, and a spawn failure is an `error` message rather than a 502,
+because after an upgrade there is no status code left to be honest with.
+
+**What it cost** `curl -N` no longer watches anything; `websocat` does. Two things had to be fixed
 to make the upgrade possible at all, and both were silent bugs: `statusRecorder` in `internal/httpx`
 wrapped the response writer without forwarding `Hijack`, so every upgrade failed with a 400, and without
 forwarding `Flush` — which meant the SSE that `/api/agent/once` still uses had *never* actually flushed:

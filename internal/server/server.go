@@ -273,56 +273,6 @@ func matchesImageField(field string) bool {
 	return strings.Contains(lowered, "image") || strings.Contains(lowered, "frame")
 }
 
-// orderedPromptImages puts prompt images into a deterministic order.
-func orderedPromptImages(files []httpx.File) []httpx.File {
-	byName := map[string]httpx.File{}
-	for _, file := range files {
-		if len(file.Bytes) == 0 {
-			continue
-		}
-		if _, exists := byName[file.Field]; !exists {
-			byName[file.Field] = file
-		}
-	}
-	var ordered []httpx.File
-	take := func(name string) {
-		file, ok := byName[name]
-		if !ok {
-			return
-		}
-		delete(byName, name)
-		ordered = append(ordered, file)
-	}
-	take("image")
-	take("image1")
-	take("images")
-	for index := 2; index <= 15; index++ {
-		take("image" + strconv.Itoa(index))
-	}
-	for _, file := range files {
-		if len(ordered) >= 15 {
-			break
-		}
-		if len(file.Bytes) == 0 || !matchesImageField(file.Field) {
-			continue
-		}
-		already := false
-		for _, chosen := range ordered {
-			if chosen.Field == file.Field && len(chosen.Bytes) == len(file.Bytes) {
-				already = true
-				break
-			}
-		}
-		if !already {
-			ordered = append(ordered, file)
-		}
-	}
-	if len(ordered) > 15 {
-		ordered = ordered[:15]
-	}
-	return ordered
-}
-
 func defaultMime(value string) string {
 	if value == "" {
 		return "image/png"
