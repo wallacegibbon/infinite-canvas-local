@@ -72,8 +72,9 @@ func TestRunStreamsTheAnswerAndKeepsKeysHome(t *testing.T) {
 	if text.String() != "hello world" {
 		t.Errorf("deltas = %q, want %q", text.String(), "hello world")
 	}
-	if done == nil || done.Text != "hello world" {
-		t.Errorf("done = %v, want the whole answer", done)
+	// `done` marks the end of the turn; the answer is the deltas, and only the deltas.
+	if done == nil || done.Text != "" {
+		t.Errorf("done = %v, want a marker rather than the answer again", done)
 	}
 
 	// The prompt went out as one user message, and nothing else was sent.

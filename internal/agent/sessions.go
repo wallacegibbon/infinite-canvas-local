@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"strings"
 	"sync"
 
 	"comfyui-gateway/internal/logx"
@@ -155,7 +154,6 @@ func (s *Session) publish(event Event) {
 
 // pump is the session's one reader, for the whole life of the process.
 func (s *Session) pump() {
-	var answer strings.Builder
 	for {
 		frame, err := s.proc.Read()
 		if err != nil || frame == nil {
@@ -163,12 +161,10 @@ func (s *Session) pump() {
 			s.gone("exited")
 			return
 		}
-		ended := turnStep(&s.state, frame, true, func(event Event) {
-			collect(&answer, event, s.publish)
-		})
-		if ended {
-			s.publish(Event{Type: "done", Text: answer.String()})
-			answer.Reset()
+		// The end of a turn is a marker, not a second copy of the answer: the deltas already carried it,
+		// and two strings that agree until they do not are worse than one.
+		if turnStep(&s.state, frame, true, s.publish) {
+			s.publish(Event{Type: "done"})
 		}
 	}
 }

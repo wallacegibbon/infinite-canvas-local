@@ -41,16 +41,13 @@ var ErrGone = errors.New("agent: the process ended")
 func Run(ctx context.Context, opts SpawnOptions, req Request, emit func(Event)) error {
 	return withAgent(ctx, opts, func(proc *Process, state *startup, emit func(Event)) error {
 		started := time.Now()
-		var answer strings.Builder
 		if err := waitReady(proc, state, emit, func() error { return writeRequest(proc, req) }); err != nil {
 			return err
 		}
-		if err := readTurn(ctx, proc, state, req.HasPrompt(), func(event Event) {
-			collect(&answer, event, emit)
-		}); err != nil {
+		if err := readTurn(ctx, proc, state, req.HasPrompt(), emit); err != nil {
 			return err
 		}
-		return finish(answer.String(), started, emit)
+		return finish(started, emit)
 	}, emit)
 }
 
@@ -199,20 +196,15 @@ func turnStep(state *startup, frame *Frame, hasPrompt bool, emit func(Event)) (e
 	return false
 }
 
-// collect accumulates the answer as it arrives, so `done` can carry the whole of it: a client that only
-// started reading at the end still gets the text.
-func collect(answer *strings.Builder, event Event, emit func(Event)) {
-	if event.Type == "delta" {
-		answer.WriteString(event.Text)
-	}
-	emit(event)
-}
-
 // commandID tags the command this request carries, so its CO is told apart from anything else.
 const commandID = "1"
 
-// finish closes the stream with what arrived.
-func finish(answer string, started time.Time, emit func(Event)) error {
-	emit(Event{Type: "done", Text: answer, ElapsedMs: time.Since(started).Milliseconds()})
+// finish marks the end of the turn.
+//
+// It carries the elapsed time and no text: the answer is what the deltas built, and a second copy of it
+// would be a second truth — two strings that agree until the day they do not, with nothing to say which
+// one the user actually saw.
+func finish(started time.Time, emit func(Event)) error {
+	emit(Event{Type: "done", ElapsedMs: time.Since(started).Milliseconds()})
 	return nil
 }

@@ -108,6 +108,17 @@ func nextEvent(t *testing.T, conn *comfy.WSConn) map[string]any {
 	return event
 }
 
+// textOf is the answer as a client assembles it: the deltas, in order.
+func textOf(events []map[string]any) string {
+	var text string
+	for _, event := range events {
+		if event["type"] == "delta" {
+			text += event["text"].(string)
+		}
+	}
+	return text
+}
+
 // until reads messages until one of this type arrives, and returns everything it saw.
 func until(t *testing.T, conn *comfy.WSConn, kind string) []map[string]any {
 	t.Helper()
@@ -168,17 +179,12 @@ func TestSocketAnswersAPrompt(t *testing.T) {
 	send(t, conn, map[string]any{"prompt": "hi"})
 	seen := until(t, conn, "done")
 
-	var text string
-	for _, event := range seen {
-		if event["type"] == "delta" {
-			text += event["text"].(string)
-		}
-	}
-	if text != "hello world" {
+	if text := textOf(seen); text != "hello world" {
 		t.Fatalf("deltas = %q, want the answer", text)
 	}
-	if seen[len(seen)-1]["text"] != "hello world" {
-		t.Fatalf("done = %v, want the whole answer", seen[len(seen)-1])
+	// And the end of the turn carries no second copy of it.
+	if last := seen[len(seen)-1]; last["text"] != nil {
+		t.Fatalf("done = %v, want a marker rather than the answer again", last)
 	}
 }
 
@@ -190,10 +196,8 @@ func TestSocketAnswersAgainOnTheSameConnection(t *testing.T) {
 
 	for turn := 1; turn <= 2; turn++ {
 		send(t, conn, map[string]any{"prompt": "hi"})
-		seen := until(t, conn, "done")
-		last := seen[len(seen)-1]
-		if last["text"] != "hello world" {
-			t.Fatalf("turn %d done = %v", turn, last)
+		if seen := until(t, conn, "done"); textOf(seen) != "hello world" {
+			t.Fatalf("turn %d = %v", turn, seen)
 		}
 	}
 	if got := spawns(t, spawnLog); got != 1 {
@@ -221,8 +225,8 @@ func TestSocketIsOnePerCanvas(t *testing.T) {
 
 	// The first connection is unaffected: it is still the one being answered.
 	send(t, first, map[string]any{"prompt": "hi"})
-	if last := until(t, first, "done"); last[len(last)-1]["text"] != "hello world" {
-		t.Fatalf("first connection stopped working: %v", last)
+	if seen := until(t, first, "done"); textOf(seen) != "hello world" {
+		t.Fatalf("first connection stopped working: %v", seen)
 	}
 }
 
@@ -350,8 +354,8 @@ func TestAgentOnceSpawnsAProcessAndReleasesIt(t *testing.T) {
 	once := openOnce(t, gateway)
 	send(t, once, map[string]any{"prompt": "hi"})
 	seen := until(t, once, "done")
-	if last := seen[len(seen)-1]; last["text"] != "hello world" {
-		t.Fatalf("one-shot answered %v", last)
+	if text := textOf(seen); text != "hello world" {
+		t.Fatalf("one-shot answered %q", text)
 	}
 	// The process was started for this socket and is gone by the time the answer is complete, which is
 	// what "released when the answer ends" means — and it never touched a session.
@@ -380,8 +384,8 @@ func TestAgentOnceNeverSpeaksToAConversation(t *testing.T) {
 
 	// The conversation is untouched and still answering.
 	send(t, conn, map[string]any{"prompt": "hi"})
-	if last := until(t, conn, "done"); last[len(last)-1]["text"] != "hello world" {
-		t.Fatalf("the conversation stopped working: %v", last)
+	if seen := until(t, conn, "done"); textOf(seen) != "hello world" {
+		t.Fatalf("the conversation stopped working: %v", seen)
 	}
 	if got := spawns(t, spawnLog); got != 2 {
 		t.Fatalf("spawned %d agents, want the conversation's one and the one-shot's one", got)
