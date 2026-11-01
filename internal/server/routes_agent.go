@@ -1,29 +1,24 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"comfyui-gateway/internal/agent"
 	"comfyui-gateway/internal/httpx"
 	"comfyui-gateway/internal/ws"
 )
 
-// routesAgent registers two things that are two kinds of thing.
+// routesAgent registers the one agent route.
 //
-// A conversation is a socket that names itself and stays open: one per canvas, for as long as the user
-// keeps it. A prompt rewrite or a caption is one answer that nothing follows, so it is a socket that
-// dies with the answer and names nothing.
-//
-// The difference is lifetime, and the route says which. Both speak the same messages in both
-// directions, because there is one transport here: a frame is a frame whatever is listening.
+// A session is one agent process with one name, and the name is the client's — the canvas panel calls
+// its own `canvas`, a node's panel calls its own `node:<id>`. The lifetimes differ (the canvas's agent
+// lives until it is closed, a node's while its panel is open) and the client owns both, because the
+// client is what knows when a surface went away. The gateway only files processes under names.
 func (s *Server) routesAgent(mux *http.ServeMux) {
 	s.route(mux, "GET /api/agent/socket/{session}", s.handleAgentSocket)
-	s.route(mux, "GET /api/agent/once", s.handleAgentOnce)
 }
 
 // agentOptions is what every spawn needs. The wording (skills) and the tools are passed through from
@@ -155,79 +150,6 @@ func (s *Server) readSocket(conn *ws.Conn, session *agent.Session, send func(age
 			}
 		}
 	}
-}
-
-// handleAgentOnce implements GET /api/agent/once: one question, one process, released when the answer
-// ends.
-//
-// The socket exists for exactly one answer. Nothing on this route names a session and nothing reads
-// one, which is the whole point: what it is for — a rewritten prompt, a caption — must not be able to
-// reach, let alone spend, the agent a canvas is holding. A spawn that fails is a message like any
-// other, because after the upgrade there is no status code left to be honest with.
-func (s *Server) handleAgentOnce(ctx *httpx.Ctx) error {
-	conn, err := ws.Accept(ctx.W, ctx.R)
-	if err != nil {
-		// Nothing has been hijacked, so this is still an ordinary failed request.
-		return httpx.NewError(http.StatusBadRequest, "not_a_websocket", err.Error())
-	}
-	defer conn.Close()
-
-	send := func(event agent.Event) {
-		payload, err := json.Marshal(event)
-		if err != nil {
-			return
-		}
-		_ = conn.WriteText(payload)
-	}
-
-	// The question is the first message. A socket that opens and says nothing is a client mistake, not
-	// something to answer.
-	raw, err := conn.ReadMessage()
-	if err != nil {
-		return nil
-	}
-	var message socketMessage
-	if err := json.Unmarshal(raw, &message); err != nil {
-		send(agent.Event{Type: "error", Message: "无法解析这条消息"})
-		return nil
-	}
-	request := agent.Request{Prompt: message.Prompt, Images: message.Images, Command: message.Command, Args: message.Args}
-	started := time.Now()
-	s.logger.Info("agent: once command=%q args=%q prompt=%q images=%d", request.Command, request.Args, truncateText(request.Prompt, 120), len(request.Images))
-
-	// A client that walks away — or says `cancel` — ends the work: the process belongs to this socket and
-	// goes with it.
-	runCtx, cancel := context.WithCancel(ctx.R.Context())
-	defer cancel()
-	go func() {
-		for {
-			raw, err := conn.ReadMessage()
-			if err != nil {
-				cancel()
-				return
-			}
-			var next socketMessage
-			if json.Unmarshal(raw, &next) == nil && next.Cancel {
-				cancel()
-				return
-			}
-		}
-	}()
-
-	counts := map[string]int{}
-	runErr := agent.Run(runCtx, s.agentOptions(), request, func(event agent.Event) {
-		counts[event.Type]++
-		send(event)
-	})
-	elapsed := time.Since(started).Milliseconds()
-	switch {
-	case runErr != nil:
-		s.logger.Warn("agent: once failed after %dms: %v", elapsed, runErr)
-		send(agent.Event{Type: "error", Message: runErr.Error()})
-	default:
-		s.logger.Info("agent: once done in %dms (events: %s)", elapsed, eventCounts(counts))
-	}
-	return nil
 }
 
 // eventCounts renders what was relayed, which is what a reader needs to tell a finished answer from a

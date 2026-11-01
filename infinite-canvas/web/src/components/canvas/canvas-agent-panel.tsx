@@ -9,7 +9,6 @@ import { CANVAS_DIALOG_CONTENT } from "@/lib/canvas-overlay";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { cancelAgentTurn, closeAgentSocket, connectAgentSocket, endAgentConversation, onAgentEvent, sendAgentMessage, type AgentEvent } from "@/services/api/agent";
 import { useCanvasAgentStore } from "@/stores/canvas/use-canvas-agent-store";
-import { AgentSettingsControls } from "./agent-settings-controls";
 import { useEffectiveConfig } from "@/stores/use-config-store";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 
@@ -243,14 +242,6 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
                     <X className="size-3.5" />
                 </button>
             </div>
-
-            {/* The agent's own two settings live here and only here: there is one agent per canvas, so
-                they are not a per-node choice. */}
-            {status === "connected" ? (
-                <div className="border-b px-2 py-1.5" style={{ borderColor: theme.toolbar.border }}>
-                    <AgentSettingsControls className="flex min-w-0 items-center gap-1" />
-                </div>
-            ) : null}
 
             <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3 text-sm" data-canvas-scroll="">
                 {messages.length === 0 ? <p className="text-xs opacity-50">{t("canvas.agent.hint")}</p> : null}

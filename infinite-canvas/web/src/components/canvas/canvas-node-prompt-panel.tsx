@@ -15,11 +15,12 @@ import { isPlainEnterKey } from "@/lib/keyboard-event";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
+import { AgentSettingsControls } from "./agent-settings-controls";
 import { SentPromptDisclosure } from "./sent-prompt-disclosure";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { resolveCanvasReferenceImages } from "@/lib/canvas/canvas-resource-references";
-import { requestAgentOnce } from "@/services/api/agent";
+import { connectAgentSocket, requestAgentOnce } from "@/services/api/agent";
 import type { PromptOptimizeMode } from "@/services/api/prompts";
 import { videoModelForWorkflow, videoModelModePatch, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasNodeReferenceBar } from "./canvas-node-reference-bar";
@@ -107,6 +108,8 @@ export function CanvasNodePromptPanel({
     const imageModeValue = String(config.imageMode || "").trim();
     const textOnlyImageMode = isImage && (imageModeValue === "t2i" || (!imageModeValue && workflowId === "image-qwen21"));
     const usesImageReferences = textOnlyImageMode ? false : imageInputLimit === undefined ? !isH3T2V : imageInputLimit > 0;
+    const agentSession = useConfigStore((state) => state.agentSession);
+    const [connecting, setConnecting] = useState(false);
     const optimizeStatus = node.metadata?.promptOptimizeStatus;
     const optimizeRunning = optimizeStatus === "running";
     const optimizeResult = node.metadata?.promptOptimizePrompt || "";
@@ -255,6 +258,18 @@ export function CanvasNodePromptPanel({
     // ✨ starts immediately: there is nothing to configure first — the agent has its own model and
     // its own skills, and the instruction below is all this button has to say.
     const startOptimize = (run: () => void) => void run();
+
+    // The first click starts an agent so its model list can be shown; the next asks the question.
+    const connectAgent = async () => {
+        setConnecting(true);
+        try {
+            await connectAgentSocket(config, canvasId);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
+        } finally {
+            setConnecting(false);
+        }
+    };
 
     const optimizePrompt = async () => {
         const text = draft.trim();
@@ -508,7 +523,11 @@ export function CanvasNodePromptPanel({
                             <ModelPicker config={config} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} capability="audio" onMissingConfig={() => openConfigDialog(true)} className="max-w-[190px]" />
                             <CanvasAudioSettingsPopover config={config} buttonClassName="!h-10 !max-w-[170px] !justify-start !rounded-full !px-3" onConfigChange={(key, value) => onConfigChange(node.id, audioConfigPatch(key, value))} />
                         </>
-                    ) : null}
+                    ) : (
+                        <>
+                            <AgentSettingsControls className="flex min-w-0 items-center gap-2" />
+                        </>
+                    )}
                 </div>
                 {mode === "text" ? (
                     <Tooltip title={canCaption ? t("canvas.promptPanel.captionHint") : t("canvas.promptPanel.captionNeedsImage")}>
@@ -527,17 +546,21 @@ export function CanvasNodePromptPanel({
                 ) : null}
                 <Button
                     type="primary"
-                    className={`${mode === "text" ? "" : "ml-auto"} !h-10 shrink-0 !rounded-full ${isRunning ? "!min-w-10 !px-2" : "!min-w-16 !px-3"}`}
+                    className={`${mode === "text" ? "" : "ml-auto"} !h-10 shrink-0 !rounded-full ${isRunning || connecting ? "!min-w-10 !px-2" : "!min-w-16 !px-3"}`}
                     danger={isRunning}
-                    disabled={!isRunning && !draft.trim()}
+                    disabled={!isRunning && !connecting && (mode === "text" && !agentSession ? false : !draft.trim())}
                     title={isRunning ? t("canvas.promptPanel.stop") : undefined}
                     onClick={() => {
                         if (isRunning) return onStop(node.id);
+                        // Text: the first click starts an agent (so the model list appears), the next asks.
+                        if (mode === "text" && !agentSession) return void connectAgent();
                         submit();
                     }}
-                    aria-label={t(isRunning ? "canvas.promptPanel.stop" : "canvas.promptPanel.generate")}
+                    aria-label={t(isRunning ? "canvas.promptPanel.stop" : mode === "text" && !agentSession ? "canvas.agent.connect" : "canvas.promptPanel.generate")}
                 >
-                    <span className="flex items-center gap-1.5">{isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}</span>
+                    <span className="flex items-center gap-1.5">
+                        {isRunning || connecting ? <LoaderCircle className="size-4 animate-spin" /> : mode === "text" && !agentSession ? <span className="text-xs">{t("canvas.agent.connect")}</span> : <ArrowUp className="size-4" />}
+                    </span>
                 </Button>
             </div>
             <SentPromptDisclosure sent={node.metadata?.sentPrompt} current={draft} />
