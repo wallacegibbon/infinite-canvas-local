@@ -419,17 +419,6 @@ func (h *Hub) GetProgress(promptID string) *Progress {
 	return record
 }
 
-// GetByRequest returns the progress record for a gateway request id.
-func (h *Hub) GetByRequest(requestID string) *Progress {
-	h.mu.RLock()
-	promptID, ok := h.promptByRequest[requestID]
-	h.mu.RUnlock()
-	if !ok {
-		return nil
-	}
-	return h.GetProgress(promptID)
-}
-
 // reapLoop closes idle sockets and drops expired records.
 func (h *Hub) reapLoop() {
 	ticker := time.NewTicker(time.Minute)

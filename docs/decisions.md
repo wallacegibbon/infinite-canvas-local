@@ -3496,3 +3496,52 @@ keeping a format that reads well for the agent, and it was not worth a second ma
 picker, sent the message, and the mention drew in the accent colour inside otherwise plain text; pressing
 "reset view" moved the canvas to `translate(858.5px, 367px)`, and clicking the mention put it back at
 `translate(-827.5px, -173px)` — the same transform a side-panel click produces — with the node selected.
+
+---
+
+## 107. A route nobody calls is not an API
+
+**Decision** Twelve routes are gone: `GET /api/tasks`, `GET /api/tasks/{id}`, `GET /api/setup/status`,
+`POST /api/setup/model-alias`, `POST /api/resources/packs/{id}/main-model`, `POST /api/requests/{id}/cancel`,
+`GET /api/session/status`, `GET /api/previews/{promptId}`, `GET /api/progress/{requestId}`,
+`GET /api/workflows/{id}`, `DELETE /api/workflows/{id}` and `GET /api/uploads`.
+
+**Why** Every one of them was reachable and none of them had a caller: the canvas, the plugins, `start.sh`
+and the tests never asked for them, so they were a surface maintained for a client that does not exist —
+the exact thing [`protocol.md`](protocol.md) argues against ("every compatibility branch we do not need is
+code we would maintain forever"). They are also where the tree kept its dead weight: `task.PublicTask`,
+`upload.List`, `registry.Remove` + `writeRegistry`'s sibling, `resource.SetMainModel`,
+`generate.Hub.GetByRequest`, `Server.requests` with `withCancel`/`cancelRequest`, and the session
+`activeTasks` count were used by these handlers and by nothing else. `POST /api/requests/{id}/cancel` was
+not merely unused: nothing ever registered a cancel function, so it could only answer `cancelled: false`.
+
+What each one duplicated, and what answers the same question now:
+
+| Removed | The client already does this |
+| --- | --- |
+| `GET /api/tasks[/{id}]` | `GET /api/runs` — one projection of a run, on the route the canvas uses |
+| `GET /api/previews/{promptId}`, `GET /api/progress/{requestId}` | the run's own `preview` and `progress` fields |
+| `GET /api/setup/status` | `GET /api/resources/status`, which embeds the scan's result |
+| `POST /api/setup/model-alias` | `POST /api/resources/replacement` (the same alias write, from the panel) |
+| `POST /api/resources/packs/{id}/main-model` | nothing — the panel stopped offering the picker (decisions #37) |
+| `GET`/`DELETE /api/workflows/{id}` | `GET /api/workflows` and `POST /api/workflows/{id}/visibility` |
+| `GET /api/uploads` | upload ids travel in the run that references them |
+| `GET /api/session/status` | nothing; see the cost below |
+
+**Cost** The main-model override store (`internal/store/preferences.go`) still loads and is still read by
+the registry and the resource status, but after this its write path has no production caller — the panel
+cannot set an override, so "already using a chosen model" can only come from a file edited by hand. Either
+the feature comes back with a picker or the store goes; that is a product decision, not this one (the same
+one #37 left open). The session tracker is now write-only for the same reason: `POST /api/session/*` keeps
+counting heartbeats that `GET /api/session/status` used to report, and nothing reads the count — the next
+step is deleting the tracker, its four (now three) routes and `web/src/lib/local-session.ts` together.
+
+**Tested** `make check` and `make test-race`. Each deleted path answers `404 not_found` from the mux's
+catch-all rather than a handler's error, while `/health`, `/api/workflows`, `/api/workflows/{id}/schema`,
+`/api/runs`, `/api/resources/status`, `/api/loras` and the `/api/agent/socket/...` upgrade answered as
+before (the upgrade relaying a real agent's `models` and `history` frames). In a browser against that
+build, the canvas loaded its 42 nodes and the complete request log was `/api/workflows`,
+`/api/resources/status`, `/api/skin-unlocks`, `/api/system/stats` and `/api/session/{open,heartbeat}` —
+every one `200`, and not a single `404`: the client really did not call any of the twelve.
+`TestSetupReportsToolWorkflowProblems` kept its scan assertions and lost the HTTP half that pointed at the
+deleted route; `TestTaskNotFoundShape` went with the route it tested.

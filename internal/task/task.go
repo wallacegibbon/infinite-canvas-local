@@ -741,44 +741,6 @@ func (s *Store) Cleanup(retentionDays, maxTasks int) (removed int, filesDeleted 
 	return removed, filesDeleted
 }
 
-// PublicTask returns the wire projection of a task.
-func PublicTask(task *Task) map[string]any {
-	if task == nil {
-		return nil
-	}
-	return map[string]any{
-		"id":          task.ID,
-		"object":      normalizeObject(task.Object),
-		"status":      task.Status,
-		"progress":    task.Progress,
-		"model":       task.Model,
-		"request":     task.Request,
-		"createdAt":   task.CreatedAt,
-		"startedAt":   task.StartedAt,
-		"updatedAt":   task.UpdatedAt,
-		"completedAt": task.CompletedAt,
-		"promptId":    task.PromptID,
-		"url":         task.URL,
-		"file":        task.File,
-		"mimeType":    task.MimeType,
-		"bytes":       task.Bytes,
-		"outputs":     nonNilOutputs(task.Outputs),
-		"error":       task.Error,
-		"errorCode":   task.ErrorCode,
-		"errorDetail": task.ErrorDetails,
-		"errorStatus": task.ErrorStatus,
-	}
-}
-
-// nonNilOutputs keeps the wire projection an array even for a record written before the
-// field existed.
-func nonNilOutputs(outputs []TaskOutput) []TaskOutput {
-	if outputs == nil {
-		return []TaskOutput{}
-	}
-	return outputs
-}
-
 func taskTime(task *Task) time.Time {
 	for _, value := range []*string{task.CompletedAt, &task.UpdatedAt, &task.CreatedAt} {
 		if value == nil || *value == "" {

@@ -6,7 +6,7 @@ shape looks like this.
 
 - Done: one execution core (`internal/server/runs.go`) over the task store. Video and audio both
   submit through it; an audio request is now a queued run that the `/v1/audio/speech` adapter waits
-  on, so the song survives a dead connection, is listed in `/api/tasks`, and keeps its ComfyUI
+  on, so the song survives a dead connection, is listed in `GET /api/runs`, and keeps its ComfyUI
   error code and details when it fails.
 - Done: the media half of the contract is data. `accepts` / `frameMode` / `mode` /
   `promptInject` / `promptReorder` / `sourceVideoFrames` live in `registry.json` and are resolved by
@@ -47,7 +47,7 @@ did. A run stays "one workflow, one job", which is what keeps `status`, `progres
 `outputs` honest; chaining is the client's business.
 
 The routes below are the contract to build against; where a route already exists with the same
-name (`/api/workflows`, `/api/tasks`), it is the real thing.
+name (`/api/workflows`, `/api/runs`), it is the real thing.
 
 The canvas is the only client. A protocol aimed at one known caller can describe *our* domain
 instead of imitating someone else's API, and every compatibility branch we do not need is code
@@ -84,7 +84,7 @@ three runs of three workflows, not three families of endpoints.
 | `DELETE` | `/api/runs/{id}` | Cancel. Idempotent; also interrupts ComfyUI. |
 | `GET` | `/api/runs` | List/filter runs (`status`, `workflow`), newest first. |
 
-`/health`, `/api/resources/*`, `/api/setup/*`, `/api/system/*`, `/api/session/*` are unchanged:
+`/health`, `/api/resources/*`, `/api/system/*` are unchanged:
 they manage the gateway, they do not run workflows.
 
 ## Submitting a run

@@ -55,17 +55,6 @@ func TestSetupReportsToolWorkflowProblems(t *testing.T) {
 	if !found {
 		t.Fatalf("the tool workflow's missing node is not reported: %+v", status.Missing)
 	}
-
-	// The same fact over HTTP, because that is what the panel reads.
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-	code, payload := doJSON(t, gateway.Client(), http.MethodGet, gateway.URL+"/api/setup/status", nil)
-	if code != http.StatusOK {
-		t.Fatalf("status endpoint = %d", code)
-	}
-	if _, ok := payload["status"].(map[string]any)["missing"]; !ok {
-		t.Errorf("payload has no missing section: %v", payload)
-	}
 }
 
 // A workflow row no longer carries a presentation flag: the client decides what to offer.

@@ -298,7 +298,6 @@ interpolation included, as a run of the `video-rife` workflow):
 | Method   | Path                             | Purpose                                                           |
 | -------- | -------------------------------- | ----------------------------------------------------------------- |
 | `POST`   | `/api/uploads`                   | Upload one media file. Returns an id a run can reference by role. |
-| `GET`    | `/api/uploads`                   | Uploads that have not expired, newest first.                      |
 | `POST`   | `/api/runs`                      | Submit a run. Always `202` with the run, never blocks.            |
 | `GET`    | `/api/runs`                      | Runs, newest first; `?status=` and `?workflow=` filter.           |
 | `GET`    | `/api/runs/{id}`                 | Status, progress, preview frame, outputs, error.                  |
@@ -315,15 +314,11 @@ Metadata and management:
 | `GET`  | `/api/resources/status`  | Model and node install status.                                                                                                                                                                                                                                              |
 | `POST` | `/api/resources/install` | Start an install job.                                                                                                                                                                                                                                                       |
 | `POST` | `/api/resources/refresh` | The only rescan: reloads the resource index, re-scans ComfyUI (nodes, models, availability, new workflow graphs) and returns the resource status. This is the panel's refresh button.                                                                                       |
-| `GET`  | `/api/tasks`             | Every run the gateway has queued or finished, newest first.                                                                                                                                                                                                                 |
-| `GET`  | `/api/tasks/{id}`        | One run by id.                                                                                                                                                                                                                                                              |
-| `GET`  | `/api/setup/status`      | Last scan result.                                                                                                                                                                                                                                                           |
 | `GET`  | `/api/system/stats`      | VRAM and RAM **of the machine running ComfyUI** (read from ComfyUI's own `/system_stats`), plus the last OOM. `available: false` when ComfyUI does not report its devices — the panel then shows nothing, because the gateway host's own memory is somebody else's machine. |
 
-`/api/previews/{promptId}` and `/api/progress/{requestId}` serve in-flight preview
-frames and step counts; both are best-effort and never fail a generation. A run also carries its own
-`preview` (`{url, mime}` with a timestamp) in the payload, so a client polling a run needs no second
-endpoint to show one.
+A run carries its own `preview` (`{url, mime}` with a timestamp) and its own `progress` in the
+payload, so a client polling a run needs no second endpoint for either — there is no `/api/previews`
+and no `/api/progress`, and the socket that feeds them stays inside the gateway.
 
 `loras` is the one input the engine applies itself rather than a binding. Everything else a run
 carries reaches a node.
@@ -380,7 +375,7 @@ it: a caller names a **workflow** and its inputs and never sees a node graph.
 | `POST /prompt` with a full API-format graph              | `POST /api/runs` with `{workflow, inputs, media}`                                                |
 | `prompt_id`                                              | `run.id`                                                                                         |
 | `POST /upload/image` → file name                         | `POST /api/uploads` → upload id, referenced by role                                              |
-| `GET /queue` (running/pending)                           | `GET /api/runs?status=`, `GET /api/tasks`                                                        |
+| `GET /queue` (running/pending)                           | `GET /api/runs?status=`                                                                          |
 | `GET /history/{prompt_id}`                               | `GET /api/runs/{id}`                                                                             |
 | `GET /view?filename=&subfolder=&type=`                   | `GET /api/runs/{id}/outputs/{index}`                                                             |
 | `POST /interrupt` + queue deletion                       | `DELETE /api/runs/{id}` (idempotent, reports `cancelled` at once)                                |

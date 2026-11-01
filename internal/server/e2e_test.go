@@ -409,19 +409,3 @@ func TestWorkflowVisibilityToggles(t *testing.T) {
 		t.Error("a hidden workflow must report enabled: false")
 	}
 }
-
-func TestTaskNotFoundShape(t *testing.T) {
-	fake := newFakeComfy(t)
-	srv := newTestGateway(t, fake)
-	gateway := httptest.NewServer(srv.Handler())
-	defer gateway.Close()
-
-	status, payload := doJSON(t, gateway.Client(), http.MethodGet, gateway.URL+"/api/tasks/nope", nil)
-	if status != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404", status)
-	}
-	errorBody, _ := payload["error"].(map[string]any)
-	if errorBody["code"] != "task_not_found" {
-		t.Errorf("code = %v", errorBody["code"])
-	}
-}

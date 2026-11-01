@@ -30,7 +30,6 @@ import (
 
 func (s *Server) routesRuns(mux *http.ServeMux) {
 	s.route(mux, "POST /api/uploads", s.handleUploadCreate)
-	s.route(mux, "GET /api/uploads", s.handleUploadList)
 	s.route(mux, "POST /api/runs", s.handleRunCreate)
 	s.route(mux, "GET /api/runs", s.handleRunList)
 	s.route(mux, "GET /api/runs/{id}", s.handleRunGet)
@@ -89,17 +88,6 @@ func (s *Server) handleUploadCreate(ctx *httpx.Ctx) error {
 		s.logger.Warn("upload %s stored but not copied to ComfyUI yet: %s", stored.ID, err)
 	}
 	okJSON(ctx.W, map[string]any{"upload": uploadPayload(s.uploads.Get(stored.ID))})
-	return nil
-}
-
-// handleUploadList implements GET /api/uploads.
-func (s *Server) handleUploadList(ctx *httpx.Ctx) error {
-	files := s.uploads.List()
-	rows := make([]map[string]any, 0, len(files))
-	for _, file := range files {
-		rows = append(rows, uploadPayload(file))
-	}
-	okJSON(ctx.W, map[string]any{"uploads": rows})
 	return nil
 }
 

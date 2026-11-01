@@ -803,34 +803,6 @@ func (r *Registry) Scan() (*ScanSummary, error) {
 	return summary, nil
 }
 
-// Remove deletes a workflow from the registry. The graph file is left on disk so
-// that a scan can re-import it, matching the old behaviour.
-func (r *Registry) Remove(id string) (bool, error) {
-	rawEntries, err := r.readRegistryRaw()
-	if err != nil {
-		return false, err
-	}
-	next := make([]json.RawMessage, 0, len(rawEntries))
-	removed := false
-	for _, raw := range rawEntries {
-		var header struct {
-			ID string `json:"id"`
-		}
-		if err := json.Unmarshal(raw, &header); err == nil && header.ID == id {
-			removed = true
-			continue
-		}
-		next = append(next, raw)
-	}
-	if !removed {
-		return false, nil
-	}
-	if err := r.writeRegistry(next); err != nil {
-		return false, err
-	}
-	return true, r.Load()
-}
-
 // writeRegistry persists the workflow list atomically.
 func (r *Registry) writeRegistry(entries []json.RawMessage) error {
 	var buffer strings.Builder

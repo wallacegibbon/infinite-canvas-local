@@ -11,7 +11,6 @@ import (
 	"comfyui-gateway/internal/httpx"
 	"comfyui-gateway/internal/store"
 	"comfyui-gateway/internal/sysinfo"
-	"comfyui-gateway/internal/task"
 	"comfyui-gateway/internal/util"
 	"comfyui-gateway/internal/workflow"
 )
@@ -29,9 +28,6 @@ func (s *Server) routes(mux *http.ServeMux) {
 func (s *Server) routesAdmin(mux *http.ServeMux) {
 	s.route(mux, "GET /health", s.handleHealth)
 
-	s.route(mux, "GET /api/setup/status", s.handleSetupStatus)
-	s.route(mux, "POST /api/setup/model-alias", s.handleSetupModelAlias)
-
 	s.route(mux, "GET /api/resources/status", s.handleResourcesStatus)
 	s.route(mux, "POST /api/resources/refresh", s.handleResourcesRefresh)
 	s.route(mux, "POST /api/resources/install", s.handleResourcesInstall)
@@ -39,13 +35,10 @@ func (s *Server) routesAdmin(mux *http.ServeMux) {
 	s.route(mux, "POST /api/resources/jobs/{id}/cancel", s.handleResourceJobCancel)
 	s.route(mux, "POST /api/resources/pick-replacement", s.handleResourcePickReplacement)
 	s.route(mux, "POST /api/resources/replacement", s.handleResourceReplacement)
-	s.route(mux, "POST /api/resources/packs/{id}/main-model", s.handlePackMainModel)
 
 	s.route(mux, "GET /api/workflows", s.handleWorkflows)
-	s.route(mux, "GET /api/workflows/{id}", s.handleWorkflowGet)
 	s.route(mux, "GET /api/workflows/{id}/schema", s.handleWorkflowSchema)
 	s.route(mux, "POST /api/workflows/{id}/visibility", s.handleWorkflowVisibility)
-	s.route(mux, "DELETE /api/workflows/{id}", s.handleWorkflowDelete)
 
 	s.route(mux, "GET /api/loras", s.handleLoras)
 	s.route(mux, "GET /api/skin-unlocks", s.handleSkinUnlocksGet)
@@ -57,11 +50,6 @@ func (s *Server) routesAdmin(mux *http.ServeMux) {
 	s.route(mux, "POST /api/session/open", s.handleSessionTouch)
 	s.route(mux, "POST /api/session/heartbeat", s.handleSessionTouch)
 	s.route(mux, "POST /api/session/close", s.handleSessionClose)
-	s.route(mux, "GET /api/session/status", s.handleSessionStatus)
-
-	s.route(mux, "POST /api/requests/{id}/cancel", s.handleRequestCancel)
-	s.route(mux, "GET /api/tasks", s.handleTasks)
-	s.route(mux, "GET /api/tasks/{id}", s.handleTaskGet)
 }
 
 // handleHealth implements GET /health, the canvas's liveness probe.
@@ -101,29 +89,6 @@ func (s *Server) handleHealth(ctx *httpx.Ctx) error {
 		},
 		"uptimeSeconds": int64(time.Since(s.startedAt).Seconds()),
 	})
-	return nil
-}
-
-// handleSetupStatus implements GET /api/setup/status.
-func (s *Server) handleSetupStatus(ctx *httpx.Ctx) error {
-	okJSON(ctx.W, map[string]any{
-		"status":   s.setup.Status(),
-		"comfyUrl": s.cfg.ComfyURL,
-	})
-	return nil
-}
-
-// handleSetupModelAlias implements POST /api/setup/model-alias.
-func (s *Server) handleSetupModelAlias(ctx *httpx.Ctx) error {
-	body, err := bodyOrEmpty(ctx)
-	if err != nil {
-		return err
-	}
-	status, err := s.setup.SetModelAlias(body)
-	if err != nil {
-		return err
-	}
-	okJSON(ctx.W, map[string]any{"status": status})
 	return nil
 }
 
@@ -211,20 +176,6 @@ func (s *Server) handleResourceReplacement(ctx *httpx.Ctx) error {
 	return nil
 }
 
-// handlePackMainModel implements POST /api/resources/packs/{id}/main-model.
-func (s *Server) handlePackMainModel(ctx *httpx.Ctx) error {
-	body, err := bodyOrEmpty(ctx)
-	if err != nil {
-		return err
-	}
-	status, err := s.resources.SetMainModel(ctx.R.PathValue("id"), httpx.String(body, "file"))
-	if err != nil {
-		return err
-	}
-	okJSON(ctx.W, map[string]any{"status": status})
-	return nil
-}
-
 // handleWorkflows implements GET /api/workflows.
 //
 // One row per workflow, carrying everything a client needs to offer it: the media kind, the typed
@@ -288,19 +239,6 @@ func (s *Server) workflowModels() map[string][]map[string]any {
 	return rows
 }
 
-// handleWorkflowGet implements GET /api/workflows/{id}.
-func (s *Server) handleWorkflowGet(ctx *httpx.Ctx) error {
-	entry := s.registry.Resolve(ctx.R.PathValue("id"))
-	if entry == nil {
-		return httpx.NotFound("workflow_not_found", "workflow not found")
-	}
-	httpx.OK(ctx.W, map[string]any{
-		"workflow": workflow.PublicProjection(entry),
-		"schema":   s.registry.Schema(entry),
-	})
-	return nil
-}
-
 // handleWorkflowSchema implements GET /api/workflows/{id}/schema.
 func (s *Server) handleWorkflowSchema(ctx *httpx.Ctx) error {
 	found := s.registry.ResolveModel(ctx.R.PathValue("id"), s.setup.LoaderOptions())
@@ -332,19 +270,6 @@ func (s *Server) handleWorkflowVisibility(ctx *httpx.Ctx) error {
 	}
 	s.logger.Info("workflow visibility %s -> %s", entry.ID, map[bool]string{true: "enabled", false: "hidden"}[enabled])
 	okJSON(ctx.W, map[string]any{"id": entry.ID, "enabled": enabled})
-	return nil
-}
-
-// handleWorkflowDelete implements DELETE /api/workflows/{id}.
-func (s *Server) handleWorkflowDelete(ctx *httpx.Ctx) error {
-	removed, err := s.registry.Remove(ctx.R.PathValue("id"))
-	if err != nil {
-		return err
-	}
-	if !removed {
-		return httpx.NotFound("workflow_not_found", "workflow not found")
-	}
-	okJSON(ctx.W, nil)
 	return nil
 }
 
@@ -521,50 +446,6 @@ func (s *Server) handleSessionClose(ctx *httpx.Ctx) error {
 	}
 	status := s.sessions.Close(httpx.String(body, "id"))
 	okJSON(ctx.W, sessionPayload(status))
-	return nil
-}
-
-// handleSessionStatus implements GET /api/session/status.
-func (s *Server) handleSessionStatus(ctx *httpx.Ctx) error {
-	active := 0
-	for _, stored := range s.tasks.List() {
-		if stored.Status == "queued" || stored.Status == "running" {
-			active++
-		}
-	}
-	payload := sessionPayload(s.sessions.Status())
-	payload["activeTasks"] = active
-	okJSON(ctx.W, payload)
-	return nil
-}
-
-// handleRequestCancel implements POST /api/requests/{id}/cancel.
-func (s *Server) handleRequestCancel(ctx *httpx.Ctx) error {
-	okJSON(ctx.W, map[string]any{"cancelled": s.cancelRequest(ctx.R.PathValue("id"))})
-	return nil
-}
-
-// handleTaskGet implements GET /api/tasks/{id}.
-func (s *Server) handleTaskGet(ctx *httpx.Ctx) error {
-	stored := s.tasks.Get(ctx.R.PathValue("id"))
-	if stored == nil {
-		return httpx.NewError(http.StatusNotFound, "task_not_found", "task not found")
-	}
-	httpx.OK(ctx.W, task.PublicTask(stored))
-	return nil
-}
-
-// handleTasks implements GET /api/tasks.
-func (s *Server) handleTasks(ctx *httpx.Ctx) error {
-	list := s.tasks.List()
-	if len(list) > 50 {
-		list = list[:50]
-	}
-	rows := make([]map[string]any, 0, len(list))
-	for _, stored := range list {
-		rows = append(rows, task.PublicTask(stored))
-	}
-	httpx.OK(ctx.W, map[string]any{"tasks": rows})
 	return nil
 }
 

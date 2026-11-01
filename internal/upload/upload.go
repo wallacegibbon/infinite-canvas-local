@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -149,18 +148,6 @@ func (s *Store) Get(id string) *File {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.files[id]
-}
-
-// List returns every upload, newest first.
-func (s *Store) List() []*File {
-	s.mu.RLock()
-	out := make([]*File, 0, len(s.files))
-	for _, file := range s.files {
-		out = append(out, file)
-	}
-	s.mu.RUnlock()
-	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
-	return out
 }
 
 // SetComfyReference records where the file landed in ComfyUI, so the next run reuses it.

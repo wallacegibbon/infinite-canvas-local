@@ -292,68 +292,6 @@ func stripExtension(file string) string {
 	return strings.TrimSuffix(base, filepath.Ext(base))
 }
 
-// SetMainModel records a pack's main-model override.
-func (m *Manager) SetMainModel(packID, file string) (*Status, error) {
-	m.mu.Lock()
-	index := m.index
-	m.mu.Unlock()
-
-	if index == nil {
-		return nil, httpxBadRequest("index_unavailable", "resource index unavailable")
-	}
-	var pack *Pack
-	for _, candidate := range index.Packs {
-		if candidate.ID == packID {
-			pack = candidate
-			break
-		}
-	}
-	if pack == nil {
-		return nil, httpxBadRequest("pack_not_found", "pack not found")
-	}
-	if m.mainModels == nil {
-		return nil, httpxBadRequest("main_model_disabled", "main-model selection is not enabled")
-	}
-
-	installed := map[string]bool{}
-	for _, name := range m.setup.LoaderOptions()["UNETLoader"] {
-		installed[name] = true
-	}
-	info := m.mainModelInfo(pack, installed)
-	if info == nil {
-		return nil, httpxBadRequest("no_main_model", "this pack has no switchable main model")
-	}
-
-	raw := strings.TrimSpace(file)
-	value := raw
-	if raw == info.DefaultFile {
-		value = ""
-	}
-
-	bakeFiles := map[string]bool{}
-	for _, resource := range index.Resources {
-		if resource.Type != "bake" {
-			continue
-		}
-		if _, name := targetParts(resource.Target); name != "" {
-			bakeFiles[name] = true
-		}
-	}
-	if value != "" && bakeFiles[value] {
-		return nil, httpxBadRequest("bake_not_allowed", "a baked artifact cannot be used as the main model")
-	}
-	if value != "" && !installed[value] {
-		return nil, httpxBadRequest("not_installed", "the selected main model is not installed")
-	}
-	if err := m.mainModels.Set(pack.ID, value, info.WorkflowIDs); err != nil {
-		return nil, err
-	}
-	if _, err := m.setup.Scan(); err != nil {
-		m.logger.Warn("scan after switching the main model failed: %s", err)
-	}
-	return m.Status(), nil
-}
-
 // SetResourceReplacement points a resource at an already installed file.
 func (m *Manager) SetResourceReplacement(resourceID, file string) (*Status, error) {
 	m.mu.Lock()

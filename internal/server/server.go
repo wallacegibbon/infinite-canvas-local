@@ -48,8 +48,6 @@ type Server struct {
 	setup         *setup.Manager
 	resources     *resource.Manager
 
-	requests sync.Map // request id -> context.CancelFunc
-
 	startedAt   time.Time
 	lastOOM     sync.Mutex
 	lastOOMAt   string
@@ -237,34 +235,6 @@ func bodyOrEmpty(ctx *httpx.Ctx) (map[string]any, error) {
 		return map[string]any{}, nil
 	}
 	return body, nil
-}
-
-// withCancel derives a cancellable context registered under the request id, so that
-// POST /api/requests/:id/cancel can stop an in-flight generation.
-func (s *Server) withCancel(r *http.Request, id string) (context.Context, func()) {
-	ctx, cancel := context.WithCancel(r.Context())
-	if id != "" {
-		s.requests.Store(id, cancel)
-	}
-	return ctx, func() {
-		if id != "" {
-			s.requests.Delete(id)
-		}
-		cancel()
-	}
-}
-
-// cancelRequest aborts a running request by id.
-func (s *Server) cancelRequest(id string) bool {
-	value, ok := s.requests.Load(id)
-	if !ok {
-		return false
-	}
-	if cancel, ok := value.(context.CancelFunc); ok {
-		cancel()
-		return true
-	}
-	return false
 }
 
 // matchesImageField reports whether a form field carries an image or a video frame.

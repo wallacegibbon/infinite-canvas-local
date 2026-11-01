@@ -240,8 +240,8 @@ func TestAudioTaskStoresMp3AndReconciles(t *testing.T) {
 	if done.File == nil || filepath.Ext(*done.File) != ".mp3" {
 		t.Fatalf("file = %v, want a .mp3 path", done.File)
 	}
-	if public := PublicTask(done); public["object"] != ObjectAudio {
-		t.Errorf("public object = %v, want audio", public["object"])
+	if done.Object != ObjectAudio {
+		t.Errorf("object = %v, want audio", done.Object)
 	}
 
 	// A record that never stored its path (older format) must be found by extension.
@@ -327,7 +327,7 @@ func TestTaskStoresEveryOutput(t *testing.T) {
 	if store.OutputPath(created.ID, 5) != "" {
 		t.Error("an out-of-range index returned a path")
 	}
-	if public := PublicTask(done); len(public["outputs"].([]TaskOutput)) != 2 {
-		t.Errorf("public outputs = %v", public["outputs"])
+	if len(done.Outputs) != 2 {
+		t.Errorf("outputs = %v", done.Outputs)
 	}
 }
