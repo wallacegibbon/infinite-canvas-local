@@ -1,6 +1,6 @@
 package resource
 
-// The vendored node packs under `resources/payload/custom_nodes` are installed by copying a directory
+// The vendored node packs under `payload/custom_nodes` are installed by copying a directory
 // into ComfyUI, so a pack that is missing a file is a pack that fails to import — and ComfyUI then reports
 // the node classes as missing, which the panel shows as "this workflow cannot run" with no reason.
 //
@@ -87,7 +87,7 @@ func dirExists(path string) bool {
 // Every relative import inside every vendored pack has to name something that is in the pack. This is the
 // check that would have caught the missing `src/data/` before an install did.
 func TestVendoredPacksImportOnlyWhatTheyShip(t *testing.T) {
-	root := filepath.Join("..", "..", "resources", "payload", "custom_nodes")
+	root := filepath.Join("..", "..", "payload", "custom_nodes")
 	if !dirExists(root) {
 		t.Skipf("vendored packs not available at %s", root)
 	}

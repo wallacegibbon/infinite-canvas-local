@@ -1,6 +1,6 @@
 // Package resource manages the model and node files the workflows need.
 //
-// It answers one question for the canvas: "given resources/index.json and what is
+// It answers one question for the canvas: "given catalogue.json and what is
 // actually on disk, what is installed, what is missing, and how do I install it?"
 // Everything here is read-only until an install job is started.
 package resource
@@ -31,7 +31,7 @@ type Source struct {
 	Label string `json:"label,omitempty"`
 }
 
-// Resource is one entry of resources/index.json.
+// Resource is one entry of catalogue.json.
 type Resource struct {
 	ID       string         `json:"id"`
 	Type     string         `json:"type"`
@@ -48,7 +48,7 @@ type Resource struct {
 	Files    []string       `json:"files"`
 	// A node pack is vendored source, so the catalogue records which upstream commit the
 	// copy came from and which files were changed on top of it. Both are facts about the
-	// tree in resources/payload, not download instructions: the install still copies the
+	// tree in payload/, not download instructions: the install still copies the
 	// bundled directory.
 	Upstream     string   `json:"upstream"`
 	PinnedCommit string   `json:"pinnedCommit"`
@@ -69,7 +69,7 @@ type Pack struct {
 	WorkflowDeps      workflow.OrderedMap[[]string] `json:"workflowDependencies"`
 }
 
-// Index is the parsed resources/index.json document.
+// Index is the parsed catalogue.json document.
 type Index struct {
 	Schema    int         `json:"schema"`
 	Version   any         `json:"version"`
@@ -283,7 +283,7 @@ func New(opts Options) *Manager {
 		visibility:     opts.Visibility,
 		mainModels:     opts.MainModels,
 		logger:         opts.Logger,
-		indexPath:      filepath.Join(opts.Config.RootDir, "resources", "index.json"),
+		indexPath:      filepath.Join(opts.Config.RootDir, "catalogue.json"),
 		indexCachePath: filepath.Join(opts.Config.DataDir, "resources-index.json"),
 		lockPath:       filepath.Join(opts.Config.DataDir, "resource-lock.json"),
 		lock:           map[string]any{"version": 1, "installed": map[string]any{}},
@@ -331,7 +331,7 @@ func (m *Manager) saveLock() {
 	}
 }
 
-// loadIndex reads resources/index.json, falling back to the last good copy.
+// loadIndex reads catalogue.json, falling back to the last good copy.
 func (m *Manager) loadIndex() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -430,12 +430,13 @@ func validateIndex(index *Index) error {
 // payloadPath is where a resource that ships with the gateway is staged.
 //
 // The layout mirrors the target, so "bundled" is a convention rather than a field in the
-// index: resources/payload/custom_nodes/<node> for a node, resources/payload/<type>/<file>
-// for a model. One rule, and the payload can be shipped or embedded without the installer
-// knowing which.
+// index: payload/custom_nodes/<node> for a node, payload/<type>/<file> for a model. One
+// rule, and the payload can be shipped or embedded without the installer knowing which.
+// Nothing is staged there today — every model and node pack downloads — but the rule stays
+// so that a file which has to ship inside a release needs no new mechanism.
 func (m *Manager) payloadPath(target string) string {
 	normalized := util.NormalizeSlashes(target)
-	return filepath.Join(m.cfg.RootDir, "resources", "payload", filepath.FromSlash(normalized))
+	return filepath.Join(m.cfg.RootDir, "payload", filepath.FromSlash(normalized))
 }
 
 // targetParts splits a target into its directory and file components.

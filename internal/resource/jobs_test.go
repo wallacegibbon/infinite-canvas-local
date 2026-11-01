@@ -297,8 +297,8 @@ func TestCancelJobUsesPanelVocabulary(t *testing.T) {
 
 func TestInstallJobFinishesWithDoneStatus(t *testing.T) {
 	root := t.TempDir()
-	// Payload layout: resources/payload/<target>, so the installer needs no bundleDir field.
-	bundle := filepath.Join(root, "resources", "payload", "custom_nodes", "node-a")
+	// Payload layout: payload/<target>, so the installer needs no bundleDir field.
+	bundle := filepath.Join(root, "payload", "custom_nodes", "node-a")
 	if err := os.MkdirAll(bundle, 0o755); err != nil {
 		t.Fatal(err)
 	}

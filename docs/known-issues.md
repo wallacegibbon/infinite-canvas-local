@@ -61,7 +61,7 @@ to the dialog's cancel button in `onPointerDown` of the trigger. Not done: both 
 
 ## 4. `ComfyUI-MiniMaxH3-TimelineDirector` is unaccounted for
 
-The directory exists in ComfyUI's `custom_nodes`, but no resource in `resources/index.json` references it
+The directory exists in ComfyUI's `custom_nodes`, but no resource in `catalogue.json` references it
 (0 matches), so the panel neither installs nor removes it and its origin is unverified. Either add it to the
 index or leave a note about where it came from.
 

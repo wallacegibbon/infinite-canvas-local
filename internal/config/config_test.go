@@ -199,14 +199,14 @@ func TestResolveRootDirPrefersMarker(t *testing.T) {
 	}
 
 	resourcesRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(resourcesRoot, "resources"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(resourcesRoot, "payload"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(resourcesRoot, "resources", "index.json"), []byte("{}"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(resourcesRoot, "catalogue.json"), []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if !hasMarker(resourcesRoot) {
-		t.Fatal("resources/index.json must be recognized as the marker")
+		t.Fatal("catalogue.json must be recognized as the marker")
 	}
 }
 

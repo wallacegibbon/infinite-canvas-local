@@ -68,6 +68,10 @@ function WithHint({ hint, children }: { hint?: string; children: React.ReactNode
 
 function packState(pack: ResourcePack, copy: Copy) {
     if (pack.planned) return <Tag>{copy.planned}</Tag>;
+    // A pack with nothing to install is not the same as a pack that is installed. `core` is the
+    // canvas, the gateway and the base workflows: they ship with the installer, so its resource
+    // list is empty by design and the green "ready" tag read as "you already installed this".
+    if (pack.total === 0 && pack.optionalTotal === 0) return <Tag>{copy.noResources}</Tag>;
     if (!pack.missing) return <Tag color="green">{copy.ready}</Tag>;
     return (
         <Tag color="orange">

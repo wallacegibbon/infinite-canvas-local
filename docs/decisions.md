@@ -4279,3 +4279,33 @@ exercises the new code.
 
 **Where** `internal/resource/jobs.go`, `internal/resource/install_extract_test.go` (new),
 `resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`, `resources/payload/` (deleted).
+
+## 128. `resources/index.json` becomes `catalogue.json`
+
+**Decision** The resource index moved from `resources/index.json` to `catalogue.json` at the repository
+root, and `resources/` is gone. Its name says what it is — the catalogue of everything that has to exist on
+a machine — instead of "index", which described its position rather than its job. The project already calls
+it "the resource catalogue" in #67, so the file now matches the word.
+
+**Why the directory had to go with it** `resources/` held two things: the index and `payload/`. The payload
+half was deleted in #126 when every node pack started downloading, so the directory was a wrapper around one
+file. A directory that exists to hold one file is a place to look for things that are not there.
+
+**What had to move with the file** Three things depended on the old path, and only one was a path:
+
+- `Manager.indexPath`, obviously.
+- `config.hasMarker`, which decides whether a directory really is the gateway's asset root. It probes for
+  `workflows/registry.json` and `resources/index.json`; a wrong answer there would leave the gateway without
+  workflows, so `catalogue.json` is now the second marker.
+- `payloadPath`, whose convention was `resources/payload/<target>`. Since nothing is staged there any more
+  and the directory is gone, the rule is now `payload/<target>`. The mechanism and its comments stay; only
+  the location changed, and the comment says plainly that nothing is staged there today.
+
+**Tested** `gofmt`, `go vet`, `go test ./internal/...`, `tsc --noEmit`, 132 canvas tests — the canvas test
+that reads the index (`resource-copy-zh.test.ts`, which enforces "the index is English except in `target`")
+follows the file to its new path. A tree-wide grep for `resources/index.json` and `resources/payload` now
+returns only #121–#127, which describe history.
+
+**Where** `catalogue.json` (moved), `internal/resource/{resource,jobs,helpers,status}.go`,
+`internal/config/config.go`, `internal/config/config_test.go`, `internal/resource/*_test.go`,
+`infinite-canvas/web/{src,tests}`, `README.md`, `docs/gateway.md`, `docs/known-issues.md`.

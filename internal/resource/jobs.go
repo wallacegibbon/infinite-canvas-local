@@ -453,7 +453,7 @@ func (m *Manager) installOne(ctx context.Context, resource *Resource, item *JobI
 	target := m.targetPath(resource, root)
 	m.logger.Info("%s install target: %s", item.Label, m.displayPath(target, root))
 
-	// A file staged under resources/payload/<target> ships with the gateway: it is copied
+	// A file staged under payload/<target> ships with the gateway: it is copied
 	// in-process, nothing is downloaded and no command runs. This is a convention, not a
 	// field, so "bundled" can only ever mean one thing.
 	if payload := m.payloadPath(resource.Target); util.Exists(payload) {
@@ -480,7 +480,7 @@ func (m *Manager) installOne(ctx context.Context, resource *Resource, item *JobI
 		}
 		failures.add(hostOf(reference), err)
 	}
-	return failures.err("not shipped with this release (resources/payload/" + resource.Target + ") and no download URL works")
+	return failures.err("not shipped with this release (payload/" + resource.Target + ") and no download URL works")
 }
 
 // installNodeLike installs a custom-node directory or an extracted archive.
@@ -492,7 +492,7 @@ func (m *Manager) installNodeLike(ctx context.Context, resource *Resource, item 
 	destination := filepath.Join(customNodes, file)
 	m.logger.Info("%s install target: %s", item.Label, m.displayPath(destination, root))
 
-	// Same convention as models: a node directory staged under resources/payload/<target>
+	// Same convention as models: a node directory staged under payload/<target>
 	// ships with the gateway and is copied as-is.
 	if payload := m.payloadPath(resource.Target); util.DirExists(payload) {
 		if util.DirExists(destination) {
@@ -539,7 +539,7 @@ func (m *Manager) installNodeLike(ctx context.Context, resource *Resource, item 
 		}
 		return nil
 	}
-	return failures.err("not shipped with this release (resources/payload/" + resource.Target + ") and no download URL works")
+	return failures.err("not shipped with this release (payload/" + resource.Target + ") and no download URL works")
 }
 
 // targetPath picks the install destination for a resource.
@@ -922,7 +922,7 @@ func installHint(err error) string {
 	case strings.Contains(message, "HTTP 403"), strings.Contains(message, "HTTP 401"):
 		return "download rejected: the URL may require authentication; try another source"
 	case strings.Contains(message, "HTTP 404"):
-		return "dead download URL: update this resource's sources in resources/index.json"
+		return "dead download URL: update this resource's sources in catalogue.json"
 	case strings.Contains(message, "sha256"):
 		return "checksum failed: the download may be truncated, retry"
 	case strings.Contains(message, "no space"):

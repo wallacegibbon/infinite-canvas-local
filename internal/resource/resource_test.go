@@ -90,15 +90,15 @@ func TestSourceURLsAcceptsOnlyRealDownloads(t *testing.T) {
 	}
 }
 
-// A resource staged under resources/payload/<target> is "bundled" by convention: no field,
+// A resource staged under payload/<target> is "bundled" by convention: no field,
 // and the panel shows no download source because there is nothing to download.
 func TestPayloadPathMirrorsTheTarget(t *testing.T) {
 	manager := &Manager{cfg: &config.Config{RootDir: "/gw"}}
 
-	if got := manager.payloadPath("custom_nodes/comfyui-kjnodes"); got != filepath.Join("/gw", "resources", "payload", "custom_nodes", "comfyui-kjnodes") {
+	if got := manager.payloadPath("custom_nodes/comfyui-kjnodes"); got != filepath.Join("/gw", "payload", "custom_nodes", "comfyui-kjnodes") {
 		t.Errorf("payloadPath = %q", got)
 	}
-	if got := manager.payloadPath("vae_approx/taeh3.safetensors"); got != filepath.Join("/gw", "resources", "payload", "vae_approx", "taeh3.safetensors") {
+	if got := manager.payloadPath("vae_approx/taeh3.safetensors"); got != filepath.Join("/gw", "payload", "vae_approx", "taeh3.safetensors") {
 		t.Errorf("payloadPath = %q", got)
 	}
 

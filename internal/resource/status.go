@@ -458,7 +458,7 @@ func (m *Manager) itemStatus(resource *Resource, root string, byID map[string]*I
 
 // sourcesFor lists the download URLs of a resource.
 //
-// Payload resources (those staged under resources/payload) have none: they are copied from
+// Payload resources (those staged under payload/) have none: they are copied from
 // disk, so the panel shows no sources rather than a button that cannot work.
 func (m *Manager) sourcesFor(resource *Resource) []string {
 	return sourceURLs(resource)

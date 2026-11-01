@@ -38,7 +38,7 @@ the canvas frontend is a self-contained third-party subtree beside it:
 ├── main.go            # gateway entry point
 ├── internal/          # the whole gateway (config/comfy/workflow/generate/resource/prompt/…)
 ├── workflows/         # what the product exposes: graphs + registry.json
-├── resources/         # what it needs installed: index.json + payload/
+├── catalogue.json     # what has to be installed: models, node packs, runtime deps
 ├── prompts/           # prompt skill files
 ├── data/              # runtime state: tasks.json, resource-lock.json, outputs/ (not tracked)
 ├── bin/               # build output (not tracked)
@@ -54,11 +54,15 @@ Two directories carry the runtime assets, and the split is deliberate:
 - **`workflows/`** is the outward face: one graph per model, plus `registry.json` describing
   how it is presented (name, type, prompt binding, parameters). Adding a model means dropping
   a `<type>-<slug>.json` here and scanning.
-- **`resources/`** is inward: `index.json` lists what has to be present on the machine (models
-  to download, custom nodes, runtime deps), and `payload/` holds the files that ship with the
-  gateway instead of being downloaded. The layout mirrors the install target, so a payload
-  resource needs no field of its own — `resources/payload/custom_nodes/<name>` is a node and
-  `resources/payload/<type>/<file>` is a model; anything without a payload comes from its URLs.
+- **`catalogue.json`** is inward: it lists what has to be present on the machine (models,
+  custom nodes, runtime deps). Nothing is bundled with the binary: a model comes from its URLs and a
+  node pack comes from its archive, both pinned — a model by `sha256`, a node pack by
+  `pinnedCommit`. A `payload/` directory is still honoured as an escape hatch if a file ever has to
+  ship inside the release; nothing is staged there today.
+
+What does ship with the installer is the application itself: the gateway binary, the canvas bundle,
+the graphs under `workflows/` and this index. That is the `core` pack, and it is the reason it lists
+no resources.
 
 ## Language
 

@@ -5,7 +5,7 @@ import { gatewayFetch } from "@/services/api/gateway-status";
 const gatewayBase = LOCAL_GATEWAY_BASE_URL;
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
-/** A download URL. Resources staged under resources/payload have none. */
+/** A download URL. Resources staged under payload/ have none. */
 type ResourceSource = string;
 
 export type ResourceItem = {
