@@ -4649,3 +4649,37 @@ separate decision with its own consequences, not a rename.
 `Infinite Canvas`/`ComfyUI Local` now finds nothing outside `canvas/` (upstream strings) and this log.
 
 **Where** `README.md`, `docs/gateway.md`, `main.go`.
+
+## 139. The old product names leave the canvas shell too
+
+**Decision** The browser tab says `Comfy Loft` in both languages, the canvas manager is titled `Canvas` /
+`画布`, a new canvas is `Canvas {{count}}` / `画布 {{count}}`, the export default is `Canvas` / `画布`, and the
+storage page's database labels name Comfy Loft. Three upstream names are gone from user-visible text:
+`无界工作台` (the shell's `<title>` and `meta.title`), `Boundless Workbench` (its English counterpart), and
+`Infinite Canvas` (the English board title, export name and storage labels).
+
+**Why they were still there** They were never removed. `git log -S "无界工作台" -- canvas/web/index.html` returns
+exactly one commit — #137, the directory rename — and that is a path change, not a content change. The string
+has been in the tree since the initial import; it surfaced in #138's review, where it was listed as "user-visible,
+your call" instead of being changed. That was the wrong call: a name that is on screen is not a decision to defer
+when the decision to rename has already been made.
+
+**What the tab actually reads from** Two places, and both had to change: `canvas/web/index.html`'s static
+`<title>` (what a cold load shows) and `meta.title` in the i18n dictionaries, which `app-providers.tsx` and
+`project.tsx` write into `document.title` at runtime. Changing only the HTML would have been overwritten a frame
+later; that is worth remembering the next time a "title" looks like markup.
+
+**Board titles became words, not a brand** "Infinite Canvas 3" was the upstream product name used as a document
+name. `Canvas 3` / `画布 3` says the same thing without pretending each board is the product.
+
+**Still upstream, deliberately** `canvas/plugins/**`: the plugin id `infinite-canvas`, the SDK package
+`@infinite-canvas/plugin-sdk`, every plugin's `package.json`/`README`/`build.mjs`, the Codex/ZCode plugin manifests
+and `canvas/plugins/infinite-canvas/skills/**`. Those are an interface — the host loads plugins by id and the
+packages resolve by name — so renaming them means renaming the SDK, every import of it and every marketplace
+declaration in one move. That is a project of its own, not a string edit.
+
+**Tested** `npx tsc --noEmit`, `npm run check:i18n` (1018 zh keys, 1004 en, no dead or missing keys), 134 canvas
+tests, `go test ./internal/...`, and a rebuilt bundle whose `<title>` is `Comfy Loft`. A grep for the three old
+names now returns nothing outside `canvas/plugins/**`.
+
+**Where** `canvas/web/{index.html,src/i18n/locales/{zh-CN,en-US}.ts}`.

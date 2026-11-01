@@ -1,7 +1,7 @@
 export default {
     meta: {
-        title: "Boundless Workbench",
-        description: "A local AI creation workbench",
+        title: "Comfy Loft",
+        description: "Comfy Loft — a local AI creation workbench",
     },
     theme: { toggle: "Toggle theme" },
     gateway: {
@@ -397,8 +397,8 @@ export default {
             freeDone: "Freed {{vram}} MB VRAM · {{ram}} GB RAM in {{seconds}}s (process kept running).",
             freeFailed: "Failed to free VRAM",
         },
-        defaultTitle: "Infinite Canvas {{count}}",
-        title: "Infinite Canvas",
+        defaultTitle: "Canvas {{count}}",
+        title: "Canvas",
         fishWhip: { bubble: "I will guard your process." },
         imported: "Imported {{count}} canvases",
         importFailed: "Import failed. Select a valid canvas package.",
@@ -463,7 +463,7 @@ export default {
             deleteTitle: "Delete canvases?",
             deleteDescription: "This will delete {{count}} canvases along with their nodes and connections.",
         },
-        export: { defaultProjectName: "Infinite Canvas", defaultNodesName: "Canvas elements", item: "Element" },
+        export: { defaultProjectName: "Canvas", defaultNodesName: "Canvas elements", item: "Element" },
         createMenu: {
             fromNode: "Generate from this node",
             close: "Close",
@@ -954,7 +954,7 @@ export default {
         },
         localStorage: {
             title: "IndexedDB storage usage",
-            description: "View browser data saved by Infinite Canvas, grouped by object store.",
+            description: "View browser data saved by Comfy Loft, grouped by object store.",
             indexedDbUsage: "IndexedDB usage",
             siteUsage: "Total site usage",
             quota: "Available quota",
@@ -963,8 +963,8 @@ export default {
             quotaHint: "Allocated dynamically by the browser",
             quotaUnavailable: "Quota estimation is unavailable in this browser",
             quotaProgress: "Site quota usage",
-            mainDatabase: "Infinite Canvas data",
-            pluginDatabase: "Infinite Canvas plugin data",
+            mainDatabase: "Comfy Loft data",
+            pluginDatabase: "Comfy Loft plugin data",
             records: "{{count}} records",
             refresh: "Refresh usage",
             readFailed: "Failed to read local storage",

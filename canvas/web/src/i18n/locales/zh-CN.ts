@@ -1,7 +1,7 @@
 export default {
     meta: {
-        title: "无界工作台",
-        description: "一个本地 AI 创作工作台",
+        title: "Comfy Loft",
+        description: "Comfy Loft —— 本地 AI 创作工作台",
     },
     theme: { toggle: "切换主题" },
     gateway: {
@@ -411,8 +411,8 @@ export default {
             freeDone: "已清理：释放显存 {{vram}} MB · 内存 {{ram}} GB，用时 {{seconds}} 秒（进程未停止）。",
             freeFailed: "清理显存失败",
         },
-        defaultTitle: "无限画布 {{count}}",
-        title: "无限画布",
+        defaultTitle: "画布 {{count}}",
+        title: "画布",
         fishWhip: { bubble: "我将守护你的进程" },
         imported: "已导入 {{count}} 个画布",
         importFailed: "导入失败，请选择有效的画布压缩包",
@@ -477,7 +477,7 @@ export default {
             deleteTitle: "删除画布？",
             deleteDescription: "将删除 {{count}} 个画布，里面的节点和连线也会一起移除。",
         },
-        export: { defaultProjectName: "无限画布", defaultNodesName: "画布元素", item: "元素" },
+        export: { defaultProjectName: "画布", defaultNodesName: "画布元素", item: "元素" },
         createMenu: {
             fromNode: "引用该节点生成",
             close: "关闭",
@@ -950,7 +950,7 @@ export default {
         },
         localStorage: {
             title: "IndexedDB 存储使用情况",
-            description: "查看 Infinite Canvas 在浏览器中保存的数据量，并按对象仓库统计内容体积。",
+            description: "查看 Comfy Loft 在浏览器中保存的数据量，并按对象仓库统计内容体积。",
             indexedDbUsage: "IndexedDB 占用",
             siteUsage: "站点总占用",
             quota: "可用配额",
@@ -959,8 +959,8 @@ export default {
             quotaHint: "由浏览器动态分配",
             quotaUnavailable: "当前浏览器不提供配额估算",
             quotaProgress: "站点配额使用率",
-            mainDatabase: "Infinite Canvas 主数据",
-            pluginDatabase: "Infinite Canvas 插件数据",
+            mainDatabase: "Comfy Loft 主数据",
+            pluginDatabase: "Comfy Loft 插件数据",
             records: "{{count}} 条",
             refresh: "刷新统计",
             readFailed: "读取本地存储失败",
