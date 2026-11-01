@@ -3057,3 +3057,27 @@ first pot has water droplets on the lid and body, the second does not, spout lef
 grain with wear marks, diffuse window light from the left — details that are in the pixels and nowhere in the
 canvas's text. `TestMCPCarriesTheBlocksThePageProduced` holds the carrier property: text, image and resource
 blocks come out of `tools/call` byte-for-byte as the page sent them.
+
+## 89. Generating is the button, not a second way to run
+
+**Decision** `generate(nodeId)` calls the same `handleGenerateNode` the node's own panel calls, with the mode
+that panel would use — a content node generates what it is, a config node generates the kind its composer is
+set to — and the words the node already holds. It is not awaited: it answers at once that the button was
+pressed, and the node shows its own progress and holds the result. A group has nothing to generate and is
+refused.
+
+**Why not awaited** A picture takes minutes and a film longer. The tool's job is to start the work, not to be
+the progress bar for it: an agent holding a tool call open for five minutes blocks its own turn, and the place
+the user is watching is the node.
+
+**Why it is allowed at all** The agent may ask before pressing — that is a decision about the conversation —
+but if the user says do it, doing it cannot be something only a human hand can reach. A canvas the agent can
+build but not run is a canvas where every resulting step is still the user's.
+
+**Tested** In a browser against a real AlayaCore: "用 canvas_create_node 建一个图片节点，prompt 是「a brass
+compass on a marble table」，然后立刻用 canvas_generate 对它按下生成" →
+`<< AF {"name":"canvas_create_node"}` → `created image-1793524968642-jq17f (image) at (1541, 438)` →
+`<< AF {"name":"canvas_generate"}` with `{"nodeId":"image-1793524968642-jq17f"}` → `tool answered … isError=false`
+with `pressed generate on image-1793524968642-jq17f (image)`, and the gateway straight after logged
+`POST /api/runs 202` and the run in the queue (`image-z-image-turbo running`). The node count went 39 → 40 and
+the new node sits on the canvas with its prompt.

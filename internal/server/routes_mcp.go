@@ -134,6 +134,17 @@ func (s *Server) mcpTools() []mcpTool {
 			"additionalProperties": false
 		}`),
 	}, {
+		Name:        "generate",
+		Description: "Press one node's generate button — the same thing the node's own panel does. It starts the work and answers at once; the node shows its own progress and holds the result.",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"nodeId": {"type": "string", "description": "The id list_nodes reported."}
+			},
+			"required": ["nodeId"],
+			"additionalProperties": false
+		}`),
+	}, {
 		Name:        "read_node",
 		Description: "Read one node's actual content: its words, or the image, video or audio it holds. Answers with the content itself — an image, a video, a sound or text — not a description of it.",
 		InputSchema: json.RawMessage(`{

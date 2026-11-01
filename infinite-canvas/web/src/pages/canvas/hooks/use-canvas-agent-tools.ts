@@ -4,7 +4,7 @@ import { getNodeSpec } from "@/constant/canvas";
 import { resolveMediaUrl } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
 import { onAnyAgentEvent, sendAgentMessage, type ToolContent } from "@/services/api/agent";
-import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeMetadata, type CanvasNodeTypeId, type Position } from "@/types/canvas";
+import { CanvasNodeType, type CanvasConnection, type CanvasGenerationMode, type CanvasNodeData, type CanvasNodeMetadata, type CanvasNodeTypeId, type Position } from "@/types/canvas";
 
 /**
  * The canvas's hands.
@@ -17,17 +17,29 @@ import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type Canvas
  * It answers every session, not just the canvas panel's: the canvas is one, and a node's agent asking to
  * see it is the same question as the panel's agent asking.
  */
-export function useCanvasAgentTools({ nodesRef, connectionsRef, createNode }: { nodesRef: RefObject<CanvasNodeData[]>; connectionsRef: RefObject<CanvasConnection[]>; createNode: CanvasHands["createNode"] }) {
+export function useCanvasAgentTools({
+    nodesRef,
+    connectionsRef,
+    createNode,
+    generateNode,
+}: {
+    nodesRef: RefObject<CanvasNodeData[]>;
+    connectionsRef: RefObject<CanvasConnection[]>;
+    createNode: CanvasHands["createNode"];
+    generateNode: CanvasHands["generateNode"];
+}) {
     // The refs and callbacks outlive a render, and a tool call can arrive between two of them.
     const hands = useRef<CanvasHands>({
         nodes: () => [],
         connections: () => [],
         createNode,
+        generateNode,
     });
     hands.current = {
         nodes: () => nodesRef.current || [],
         connections: () => connectionsRef.current || [],
         createNode,
+        generateNode,
     };
 
     useEffect(
@@ -45,11 +57,12 @@ export function useCanvasAgentTools({ nodesRef, connectionsRef, createNode }: { 
     );
 }
 
-/** What the page lends a tool: its state to read, and the one way it makes a node. */
+/** What the page lends a tool: its state to read, the way it makes a node, and the button that runs one. */
 type CanvasHands = {
     nodes: () => CanvasNodeData[];
     connections: () => CanvasConnection[];
     createNode: (type: CanvasNodeTypeId, position?: Position, patch?: CanvasNodeMetadata) => CanvasNodeData;
+    generateNode: (nodeId: string, mode: CanvasGenerationMode, prompt: string) => Promise<void>;
 };
 
 /** One tool's result: the content blocks the agent reads, and whether it failed rather than did something. */
@@ -70,6 +83,8 @@ async function runTool(name: string, args: unknown, hands: CanvasHands): Promise
             return createNode(hands, args);
         case "read_node":
             return readNode(hands, args);
+        case "generate":
+            return pressGenerate(hands, args);
         default:
             return { content: [textBlock(`this canvas has no tool called ${name}`)], isError: true };
     }
@@ -96,6 +111,31 @@ function createNode(hands: CanvasHands, args: unknown): ToolAnswer {
     const node = hands.createNode(type, centre, patch);
     return { content: [textBlock(`created ${node.id} (${node.type}) at (${Math.round(node.position.x)}, ${Math.round(node.position.y)})`)] };
 }
+
+/**
+ * Press one node's generate button — the same function the node's own panel presses.
+ *
+ * It is not waited on: a picture takes minutes, and the tool's job is to start it, not to be the progress
+ * bar. The node itself shows what is happening, which is where the user will look anyway.
+ *
+ * The mode is the one the node's own panel would use: a content node generates what it is, and a config node
+ * generates the kind its composer is set to (that is what pressing its button does).
+ */
+function pressGenerate(hands: CanvasHands, args: unknown): ToolAnswer {
+    const input = (typeof args === "object" && args ? args : {}) as { nodeId?: unknown };
+    const nodeId = typeof input.nodeId === "string" ? input.nodeId.trim() : "";
+    const node = hands.nodes().find((candidate) => candidate.id === nodeId);
+    if (!node) return { content: [textBlock(`no node with id "${nodeId}" on this canvas`)], isError: true };
+
+    // A content node generates what it is; a config node generates the kind its composer is set to.
+    const mode: string = node.type === CanvasNodeType.Config ? node.metadata?.generationMode || "image" : node.type;
+    if (!GENERATE_MODES.includes(mode)) return { content: [textBlock(`a ${node.type} node has nothing to generate`)], isError: true };
+
+    void hands.generateNode(node.id, mode as CanvasGenerationMode, wordsOf(node));
+    return { content: [textBlock(`pressed generate on ${node.id} (${mode}): the node shows its own progress`)], isError: false };
+}
+
+const GENERATE_MODES: string[] = [CanvasNodeType.Text, CanvasNodeType.Image, CanvasNodeType.Video, CanvasNodeType.Audio];
 
 /**
  * Read one node's actual content.

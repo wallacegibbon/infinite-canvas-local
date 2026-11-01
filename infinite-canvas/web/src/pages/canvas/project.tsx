@@ -995,7 +995,6 @@ function InfiniteCanvasPage() {
     );
 
     // The agent's hands are the same function the buttons press.
-    useCanvasAgentTools({ nodesRef, connectionsRef, createNode });
 
     const deleteNodes = useCallback(
         (ids: Set<string>) => {
@@ -2161,6 +2160,9 @@ function InfiniteCanvasPage() {
     useEffect(() => {
         generateNodeRef.current = handleGenerateNode;
     }, [handleGenerateNode]);
+
+    // The agent's hands are the same functions the buttons press.
+    useCanvasAgentTools({ nodesRef, connectionsRef, createNode, generateNode: handleGenerateNode });
 
     const deleteBatchImage = useCallback((nodeId: string, imageId: string) => {
         const node = nodesRef.current.find((item) => item.id === nodeId);
