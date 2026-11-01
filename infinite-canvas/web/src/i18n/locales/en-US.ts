@@ -834,7 +834,7 @@ export default {
             stop: "Stop",
             close: "Close",
             thinking: "Thinking…",
-            steeringQueued: "Queued · used after the current step",
+            steeringQueued: "{{count}} queued · used together after the current step",
             tool: "calling {{name}}",
             contextMarker: "[Canvas references]",
             pickingNode: "Click a node to cite · ESC to cancel",

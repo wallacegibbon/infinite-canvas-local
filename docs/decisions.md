@@ -3440,11 +3440,11 @@ as it streamed — while nothing was added by the submit handler.
 
 ## 105. Sending is never blocked, and the queue is visible
 
-**Decision** The panel no longer refuses to send while a turn is in flight, and it shows the agent's steering
-queue above the input: `消息已排队,会在当前步骤之后插入`. The gateway relays AlayaCore's `SM steering` frames
-as `{type:"steering", phase:"queued"|"delivered"}`, and the panel repeats the last phase it heard — a state,
-not a count, because the frame carries a phase and nothing else. The "End conversation" button in the header
-is gone, and with it `canvas.agent.end`.
+**Decision** The panel no longer refuses to send while a turn is in flight, and it shows how many messages are
+waiting in the agent's queue above the input: `2 条消息已排队,会在当前步骤之后一起插入`. The gateway relays
+AlayaCore's `SM steering` frames as `{type:"steering", phase:"queued"|"delivered"}`; the panel adds one per
+`queued` and **zeroes** on `delivered`. The "End conversation" button in the header is gone, and with it
+`canvas.agent.end`.
 
 **Why** AlayaCore has its own queue. A message sent into a running task is inserted between the agent's steps
 — that is in the gateway's own reading loop, which explicitly may not assume one prompt equals one answer —
@@ -3456,10 +3456,11 @@ looks exactly like a message that was lost. AlayaCore already announces both end
 (`phase: queued` when it takes the message, `phase: delivered` when it works it in), so the panel says so,
 where the message was sent from.
 
-It says it as a state rather than a number. The first version counted queued minus delivered, which is the
-panel keeping a tally of a queue it does not own — and every field AlayaCore actually sends was checked for a
-length first: `SM steering` carries `phase` and a fixed sentence, and no other frame carries a queue size. A
-count that can drift is worse than a state that cannot.
+The number is counted from the `queued` frames, and the frame that clears it is the one that arrives once.
+AlayaCore inserts a whole batch at the same time and says `delivered` **once** for it — measured with three
+messages sent into one running task: `queued`, `queued`, `queued`, `delivered`. Decrementing on delivery (the
+first version) therefore left a queue on screen that no longer existed, which is the one thing worse than not
+showing it at all: the message looks stuck. The panel zeroes instead.
 
 The End conversation button promised something that stopped being true when conversations moved into session
 files: it closed the socket and released the process, and the next open replayed the conversation anyway. A
