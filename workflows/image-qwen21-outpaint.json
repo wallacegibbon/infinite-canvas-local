@@ -56,7 +56,7 @@
         "7",
         0
       ],
-      "lora_name": "Qwen-功能2.1/Qwen21-图像扩展qwen-image-2.1-outpaint-v2.safetensors",
+      "lora_name": "qwen-image-2.1-outpaint-v2.safetensors",
       "strength_model": 1
     }
   },

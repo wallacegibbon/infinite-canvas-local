@@ -2177,7 +2177,7 @@ submitted a run, and produced a 4096×4096 PNG node.
 `infinite-canvas/web/src/services/api/image.ts`,
 `infinite-canvas/web/src/components/canvas/canvas-node-super-resolve-dialog.tsx`.
 
-## 66. Everything under `workflows/` is English
+## 66. Everything under `workflows/` is English _(the one path it kept was not the author's, see #117)_
 
 **Decision** The graphs, `registry.json` and their defaults contain no Chinese. Chinese for a shipped
 workflow lives in `i18n/locales/zh-CN.ts` under `gateway.models.<id>.label`, keyed by the id the
@@ -2207,7 +2207,7 @@ alone.
 
 **Where** `workflows/*.json`, `workflows/registry.json`, `infinite-canvas/web/src/i18n/locales/zh-CN.ts`.
 
-## 67. The resource catalogue is English; its Chinese lives beside the app
+## 67. The resource catalogue is English; its Chinese lives beside the app _(one of the two paths was not upstream's, see #117)_
 
 **Decision** `resources/index.json` carries no Chinese copy — pack `label`/`description`, resource
 `label`/`note`/`license` are English. The Chinese sits in
@@ -3860,3 +3860,149 @@ would also be indistinguishable from the leftovers, which is why the pattern is 
 `tasks.json` stay). End to end on `:8191`: a planted `setup-status.json.<nanos>.tmp` and
 `agent/canvas-legacy01/` were gone after the restart, `data/agent/` held only `sessions/`, and `/health`
 answered.
+
+## 117. One of the two Chinese paths was not the author's after all _(the other path is gone too, see #119)_
+
+**Decision** `image-qwen21-outpaint.json` loads its LoRA as `qwen-image-2.1-outpaint-v2.safetensors`, and
+`resources/index.json` installs it at `loras/qwen-image-2.1-outpaint-v2.safetensors`. The
+`loras/Qwen-功能2.1/Qwen21-图像扩展…` path is gone, directory and all.
+
+**Why #66 and #67 were wrong about it** Both kept that path on the stated grounds that it is "a filename
+on disk, not copy" and "a file the upstream authors published in Chinese". The first half is true — the
+graph resolves `lora_name` literally, and whatever it says has to exist. The second half is false, and the
+index said so itself: all three sources it lists (ausboss on ModelScope and AIFastHub, bozoyan on
+ModelScope) publish `qwen-image-2.1-outpaint-v2.safetensors`, ASCII. The Chinese folder and the `Qwen21-图像
+扩展` prefix were the local filing habit of the machine the graph was drawn on, and the installer faithfully
+reproduced the rename. `KOOK-MOSS-SFT-观澜.safetensors` is the one that really is upstream's name — its
+ModelScope dataset URL is percent-encoded 观澜 — and it stays.
+
+**What the old path was costing** A `/` separator frozen into the graph, while `folder_paths.recursive_search`
+builds names with `os.path.relpath`. On Windows that same directory lists as `Qwen-功能2.1\Qwen21-…`, so the
+string the graph carries would not resolve there. Nothing else read the path: the index, the graph and one
+parser fixture were its only mentions.
+
+**Why now and not later** No user has installed this yet, and the file on disk was already byte-identical
+under both names (sha256 `3611a5cc…`, the hash the index declares). Later this would be a rename on every
+machine or a 152 MiB re-download.
+
+**Tested** `make check` (gofmt, `go vet`, `go test . ./internal/...`) passes. The LoRA still reaches the
+workflow's dropdown: `internal/generate/lora.go` compiles the filter with `(?i)`, so
+`Qwen21|qwen_image_2.1|Qwen-Image-2.1` matches the new name through its last alternative.
+`tests/resource-copy-zh.test.ts` passes and now has one Chinese `target` to police instead of two — it
+caught the first draft of the new index `note`, which had quoted the old folder name.
+
+**Where** `workflows/image-qwen21-outpaint.json`, `resources/index.json`, #66, #67.
+
+## 118. The H3 pack stops being the one we cannot check
+
+**Decision** Every resource in the `h3` pack now carries a `sha256`, and
+`h3_lightx2v_8step_lora` installs as `minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors` — the
+name its two sources publish, without the `768p` a local hand had inserted.
+
+**Why the pack had none** Thirteen entries — the H3 text encoder, both VAEs, two LoRAs, and the whole VDN
+stage — were declared with a `size` and no hash. The files were already on the reference machine before
+the catalogue described them, so the entry recorded what was observed, not what would be downloaded:
+`downloadFile` skips verification when `expectedSha` is empty, and a note was the only thing asserting
+that the renamed LoRA was the same artifact. That is the one shape a catalogue must not have — an install
+that reports success without ever comparing bytes.
+
+**How the hashes were obtained without downloading 40 GB** Both hosts publish the digest of the stored
+object, so a `HEAD` is enough:
+
+- **Hugging Face (and `hf-mirror`)** — `x-linked-etag` on the `resolve/main/...` response *is* the
+  sha256 of the LFS object, and `x-linked-size` its length.
+- **ModelScope** — `GET /api/v1/models/<repo>/repo/files?Revision=master&Recursive=true` returns
+  `Sha256` and `Size` per file, LFS or not.
+
+All thirteen were then checked against the files already on disk: **13/13 match**, including the two
+`adapters/*/adapter_spec.json` files the index had been writing as `adapter_config.json`, which is now
+proof rather than a claim in a note. A full sweep of the catalogue — every resource that declares a hash
+and is installed — reports 43 files, 180.9 GiB, zero mismatches.
+
+**Why the rename went with it** The old `target` carried a `768p` its own `sources` do not, so the
+installer renamed on every download and the note had to explain why. `x-linked-size: 1956193000` matching
+the local file's size, and the hash matching byte for byte, is what the rename was asserting; with the
+target equal to the published name the assertion is no longer needed. `video-h3-ref2va-drama.json` and
+the Chinese note in `resource-copy-zh.ts` carried the old spelling and were updated with it.
+
+**Cost** The hashes pin the catalog to the current revision of `Comfy-Org/MiniMax-H3`, `OpenVDN/vdn-minimax-h3`
+and `akatz-ai/MiniMax-H3-Character-Swap-LoRA`. If any of them replaces a file in place, the install fails
+its checksum instead of silently installing something else — the intended failure, but it means the index
+has to be updated when upstream moves. And a hash can only be added this way for a host that publishes
+one; a source that offers neither header still needs the bytes downloaded once.
+
+**Where** `resources/index.json`, `workflows/video-h3-ref2va-drama.json`,
+`infinite-canvas/web/src/lib/resource-copy-zh.ts`.
+
+## 119. Guanlan leaves: an optional download nobody needs
+
+**Decision** `moss_guanlan_lora` is gone from `resources/index.json` — the resource, its entry in the
+moss pack's `resources` and `optionalResources`, and its line in the Chinese copy table. The 145 MB file
+is deleted from `models/loras/Moss_image/`. The catalogue went from 59 resources to 58.
+
+**What it was** A style/aesthetic LoRA for MOSS-Image SFT, which the index could only describe as
+`license: Unknown (community LoRA)`. The weights say the rest: ai-toolkit 1.18.9, internal name
+`MOSS-SFT-2027`, `ss_base_model_version: moss_image`, 5000 steps over 70 epochs, version 1.0, and no
+trigger word or dataset metadata at all. Nothing in the repository knows what it does to an image.
+
+**Why it went** Three things together, none fatal alone:
+
+- **No workflow names it.** Nothing in `workflows/` references the file; the only reason it was visible
+  was the `Moss_image|MOSS|moss` filter putting it in the LoRA dropdown of the three MOSS graphs. A
+  dropdown entry is not a dependency.
+- **No license.** `Unknown (community LoRA)` is a license we cannot ship against, and unlike the other
+  third-party weights it was not even a mirror of something we could point at.
+- **The note was wrong.** It said the ModelScope collection is private and signing in may be required.
+  The file answers `302 → cdn-lfs 200` with a full `content-length`, no credential — so the entry was
+  also the reason a user could not tell what they were agreeing to.
+
+**What this is not** Not a statement that community LoRAs are unwelcome: `moss_image_sft_8steps_lora`
+stays, because a shipped graph loads it and it has a hash. The rule the pack now follows is the one the
+`upscale` pack already used: a resource exists because a workflow needs it, not because a download was
+convenient to list.
+
+**Tested** `make check` and the canvas suite (133 tests) both pass; `resource-copy-zh.test.ts` is the gate
+that would have caught a zh dictionary key left pointing at a resource that no longer exists.
+
+**Where** `resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`.
+
+## 120. taeh3 stops being a binary of unknown origin
+
+**Decision** `h3_tiny_vae` is downloaded, not bundled: `resources/payload/vae_approx/` is gone and the
+index entry carries two sources plus the correct license. The three H3 graphs still say
+`tiny_vae: taeh3.safetensors` — the upstream file has exactly that name, so nothing in `workflows/` moved.
+
+**What was wrong with it** It was the only model in the catalogue with `sources: []`, which is why it was
+staged under `resources/payload/` in the first place — a 9.8 MB safetensors in git that nothing in the
+repository could describe beyond "preview VAE". Its `license` was declared as *MiniMax H3 Community
+License*, which is not what it is.
+
+**What it actually is** Byte-identical to `Kijai/MiniMax-H3-TAE → vae_approx/taeh3.safetensors`
+(`x-linked-etag` `f0f60fa0…`, `x-linked-size` 9791388), Apache-2.0, and Kijai is the author of the KJNodes
+node that consumes it. A re-publisher, `t8star/Taeh3-Comfy`, records the same hash in a `provenance.json`
+with `"modifications": "filename only; tensors unchanged"` and carries the upstream revision
+(`a213ac8b…`). The file had a paper trail all along; we simply had not written it down.
+
+**Why the file cannot just be dropped instead** Because a missing `vae_approx` entry does not degrade, it
+fails twice:
+
+- `internal/setup/scan.go` validates every loader input against ComfyUI's option list and turns any miss
+  into a `Problem`, which makes `available` false — the canvas then filters the workflow out of the model
+  list (`web/src/lib/gateway-models.ts`), so the H3 graphs vanish from the picker entirely.
+- If one is submitted anyway, ComfyUI rejects the prompt: `tiny_vae` is a combo whose options are
+  enumerated from disk at validation time (`nodes/preview_override_node.py`), so the hard-coded filename
+  fails `value_not_in_list` in `execution.py` before any node runs.
+
+The graceful path exists — `load_tiny_vae_decoder` returns `None` with a warning when the file is absent,
+and the node falls back to the default previewer — but validation never lets execution reach it. So the
+only way to take the binary out of the repository without breaking three workflows was to give it a URL.
+
+**Why "now it needs the network" is not a cost** The `h3` pack already pulls roughly 60 GB on install.
+9.8 MB against that is noise, and it buys a verified hash the bundled path never had.
+
+**Tested** `make check`, `tsc --noEmit`, and the canvas suite (133 tests) pass; the payload path unit test
+is unaffected because `payloadPath` itself did not change. `resources/payload/` now contains node packs
+only.
+
+**Where** `resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`,
+`resources/payload/vae_approx/`.
