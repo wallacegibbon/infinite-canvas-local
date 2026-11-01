@@ -176,28 +176,27 @@ back what AlayaCore says. The gateway owns no wording, no model choice and no st
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/agent/socket/{session}` | The conversation: one per canvas, both directions, alive until the client closes it. |
-| `GET` | `/api/agent/once` | One answer that nothing follows, on a socket that dies with it. |
+| `GET` | `/api/agent/socket/{session}` | One agent process, named by the client, both directions. |
 
-Both are WebSockets and both speak the same messages in both directions, because there is one transport
-here: a frame is a frame whatever is listening. Down: `models`, `delta`, `reasoning`, `model`,
-`reasoning_level`, `command`, `tool_call`, `tool_result`, `done`, `error`. Up: `{"prompt":…}` (with
-optional `images` as data URLs), `{"command":…,"args":…}` for one of AlayaCore's own settings,
-`{"cancel":true}` to wind the current task down, and `{"close":true}` to end a conversation.
+A session is one `alayacore --rawio` process with one socket, filed under a name the **client** chooses:
+the canvas agent panel calls its own `canvas`, a node's panel calls its own `node:<id>`. The gateway does
+not know what a canvas or a node is — it files processes under strings, and asking for a name twice
+returns the same process, which is how a reloaded page finds the conversation it left.
 
-The conversation sends the agent's startup broadcast first — that is where the model list comes from —
-and stays open. Changing a model or a reasoning level is a message on it, not a question that spends
-anything. `/api/agent/once` takes its question as the first message, answers once, and closes: the route
-names no session and reads none, which is what keeps a prompt rewrite or a caption from spending the
-history of the agent the user is working with.
+The lifetimes differ and the client owns both, because the client is what knows when a surface went
+away. The canvas's session lives until it says `{"close":true}`; a node panel's ends when the panel does,
+so a node nobody is working on holds no process. Nothing expires on the gateway's side — see
+[`decisions.md`](decisions.md) #80 for the cost of that.
 
-The name on the conversation's socket is the client's to choose (the canvas id, in practice). Opening it
-again with the same name returns the same process, which is how a reloaded page finds the conversation it
-left, and it means the gateway can stay ignorant of what a canvas is. Nothing expires: a process lives
-until the client closes the conversation, says `{"close":true}`, or the process dies — see
-[`decisions.md`](decisions.md) #80 for the cost of that and #82 for the transport.
+Down the socket: `models`, `delta`, `reasoning`, `model`, `reasoning_level`, `command`, `tool_call`,
+`tool_result`, `done`, `error`, `closed`. The first message is the agent's startup broadcast, which is
+where the model list comes from. Up: `{"prompt":…}` (with optional `images` as data URLs),
+`{"command":…,"args":…}` for one of AlayaCore's own settings, `{"cancel":true}`, and `{"close":true}`.
 
-A second connection to the same name is refused with an `error` message: one conversation has one set of
+`done` marks the end of a turn and carries the elapsed time only: the answer is what the deltas built,
+and a second copy of it would be a second truth.
+
+A second connection to the same name is refused with an `error` message: one session has one set of
 eyes, and two readers would take half the frames each.
 
 A built-in tool (`read_file`, enabled for the skills the agent loads) runs inside AlayaCore, so the call

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, type Dispatch, type MutableRefObject, 
 import { useTranslation } from "react-i18next";
 
 import { requestEdit, requestGeneration } from "@/services/api/image";
+import { endAgentSession } from "@/services/api/agent";
 import { requestPromptChat } from "@/services/api/prompts";
 import { resolveMediaUrl } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
@@ -80,10 +81,17 @@ export function usePluginHost(params: PluginHostParams) {
                 return { url: file.url, storageKey: file.storageKey, mimeType: file.mimeType, width: file.width, height: file.height, durationMs: file.durationMs };
             },
             generateText: async (prompt, options) => {
-                // Words come from the agent; no workflow stands behind them and the canvas has nothing
-                // to configure for it.
-                const text = await requestPromptChat(buildGenerationConfig(effectiveConfig, undefined, "text"), { prompt }, { signal: options?.signal, onDelta: options?.onDelta });
-                return { text };
+                // Words come from the agent; no workflow stands behind them. A plugin call has no panel
+                // and so no session of its own, so it opens one for the answer and releases it after —
+                // the same mechanism, with the shortest lifetime there is.
+                const name = `plugin:${Math.random().toString(36).slice(2, 10)}`;
+                const config = buildGenerationConfig(effectiveConfig, undefined, "text");
+                try {
+                    const text = await requestPromptChat(name, config, { prompt }, { signal: options?.signal, onDelta: options?.onDelta });
+                    return { text };
+                } finally {
+                    endAgentSession(name);
+                }
             },
             // List configured models for a capability; labels use the model name without the channel prefix.
             listModels: (capability) => selectableModelsByCapability(effectiveConfig, capability as ModelCapability | undefined).map((value) => ({ value, label: decodeChannelModel(value)?.model || value })),

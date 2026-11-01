@@ -152,25 +152,8 @@ const RETIRED_CONFIG_KEYS = new Set([
 
 const withoutRetiredKeys = (config: Partial<AiConfig>): Partial<AiConfig> => Object.fromEntries(Object.entries(config).filter(([key]) => !RETIRED_CONFIG_KEYS.has(key))) as Partial<AiConfig>;
 
-/**
- * What the agent last said about itself (`SM model_list`, `SM model`, `SM reasoning_level`).
- *
- * The gateway keeps no state, so this is the canvas's memory of the last stream it read: the list a
- * select offers, which entry is in effect, and the reasoning level. It is display data — changing a
- * setting sends the agent's own command and this fills in again from what it answers.
- */
-export type AgentModel = { id: number; name: string; protocolType?: string; contextLimit?: number };
-type AgentState = { models: AgentModel[]; active?: AgentModel; level?: number; coreVersion?: string };
-
-/** The canvas whose agent is connected. The gateway keeps the process; this names it. */
-type AgentSession = string | null;
-
 type ConfigStore = {
     config: AiConfig;
-    agent: AgentState;
-    updateAgent: (patch: Partial<AgentState>) => void;
-    agentSession: AgentSession;
-    setAgentSession: (session: AgentSession) => void;
     isConfigOpen: boolean;
     configTab: ConfigTabKey;
     shouldPromptContinue: boolean;
@@ -295,12 +278,6 @@ export const useConfigStore = create<ConfigStore>()(
     persist(
         (set, get) => ({
             config: defaultConfig,
-            agent: { models: [] },
-            updateAgent: (patch) => set((state) => ({ agent: { ...state.agent, ...patch } })),
-            agentSession: null,
-            // The list belongs to a connection: without one there is nothing to show, and a stale list
-            // would offer a model the user cannot reach (the button says Connect).
-            setAgentSession: (agentSession) => set((state) => ({ agentSession, agent: agentSession ? state.agent : { models: [] } })),
             isConfigOpen: false,
             configTab: "channels",
             shouldPromptContinue: false,

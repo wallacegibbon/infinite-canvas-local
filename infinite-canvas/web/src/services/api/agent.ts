@@ -2,18 +2,25 @@ import i18n from "@/i18n";
 import { gatewayProtocolRoot } from "@/services/api/runs";
 import { apiErrorMessage } from "@/services/api/http";
 import { imageToDataUrl } from "@/services/image-storage";
-import { useConfigStore, type AgentModel, type AiConfig } from "@/stores/use-config-store";
+import type { AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
+/** One entry of the agent's own model list (`SM model_list`). */
+type AgentModel = { id: number; name: string; protocolType?: string; contextLimit?: number };
+
 /**
- * The agent, as two routes with very different lifetimes.
+ * The agent, as sessions.
  *
- * A conversation is a socket: one connection per canvas, both directions, open for as long as the panel
- * is. A one-shot question — a text node's body, a rewritten prompt, a caption — is a plain POST that
- * spawns a process of its own and releases it when the answer ends, which is why it cannot name a
- * session and never reaches the agent a canvas is holding.
+ * A session is one agent process with one socket, named by whatever surface owns it: the canvas panel
+ * owns `canvas`, a node's panel owns `node:<id>`. Everything the agent knows about itself — which models
+ * exist, which one this session is on, how hard it is thinking — belongs to that process and is only
+ * ever read back from what it announces. Nothing here mirrors it, and nothing is shared between two
+ * sessions: the processes are independent, they are small, and there are as many as there are surfaces.
+ *
+ * That is why there is a `connect` step at all: a session has to exist before its model can be chosen,
+ * because the list of models comes from the agent itself.
  */
 export type AgentEvent = {
     type: "models" | "delta" | "reasoning" | "model" | "reasoning_level" | "command" | "tool_call" | "tool_result" | "done" | "error" | "closed";
@@ -31,7 +38,6 @@ export type AgentEvent = {
     output?: string;
 };
 
-/** What the canvas says on the socket. One of them per message. */
 type AgentMessage = {
     prompt?: string;
     images?: string[];
@@ -41,63 +47,109 @@ type AgentMessage = {
     close?: boolean;
 };
 
-/**
- * The one open conversation.
- *
- * A module-level value rather than React state on purpose: the socket is a resource with a lifetime,
- * and a re-render that closed and reopened it would drop whatever the agent said in between.
- */
-type Conversation = {
-    url: string;
-    socket: WebSocket;
+/** What one session is, right now — the agent's own last word about itself. */
+export type AgentSession = {
+    name: string;
+    connected: boolean;
+    models: AgentModel[];
+    active?: AgentModel;
+    level?: number;
 };
 
-let conversation: Conversation | null = null;
+type Turn = { answer: string; resolve: () => void; reject: (error: Error) => void };
+
+type Live = {
+    name: string;
+    socket: WebSocket;
+    opened: boolean;
+    session: AgentSession;
+    waiting?: Turn;
+    opening: Promise<AgentSession>;
+};
+
+const sessions = new Map<string, Live>();
 
 /**
- * Who is listening. Module-level and not per-connection on purpose: a panel subscribes when it mounts,
- * which is *before* any socket exists, and a subscription that died with a connection would have to be
- * re-made by every component at a moment it cannot know about.
- */
-const listeners = new Set<(event: AgentEvent) => void>();
-
-/** Where a canvas's conversation lives. The canvas id is the name the gateway files the agent under. */
-function agentSocketUrl(config: AiConfig, canvasId: string): string {
-    const root = gatewayProtocolRoot(config.baseUrl);
-    return `${root.replace(/^http/i, "ws")}/api/agent/socket/${encodeURIComponent(canvasId)}`;
-}
-
-/** Subscribe to everything the agent says. Returns the unsubscribe. */
-export function onAgentEvent(listener: (event: AgentEvent) => void): () => void {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-}
-
-/**
- * Open the conversation, or return the one already open.
+ * Who is listening, by session name.
  *
- * Resolves on the agent's startup broadcast, which is where the model list comes from, so a caller that
- * awaits this can show the models it may ask about.
+ * Module-level and not held by the socket, because a panel subscribes when it mounts — before its
+ * session exists, since the session is what the connect button starts. A registry that lived on the
+ * socket would have nothing to attach to at that moment, and the panel would sit on a turn forever.
  */
-export function connectAgentSocket(config: AiConfig, canvasId: string): Promise<void> {
-    const url = agentSocketUrl(config, canvasId);
-    if (conversation?.url === url && conversation.socket.readyState <= WebSocket.OPEN) {
-        return Promise.resolve();
+const listeners = new Map<string, Set<(event: AgentEvent) => void>>();
+function listenersOf(name: string) {
+    let set = listeners.get(name);
+    if (!set) {
+        set = new Set();
+        listeners.set(name, set);
     }
-    closeAgentSocket();
+    return set;
+}
+const watchers = new Set<() => void>();
+let revision = 0;
 
-    return new Promise((resolve, reject) => {
-        let socket: WebSocket;
-        try {
-            socket = new WebSocket(url);
-        } catch (error) {
-            reject(new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout")));
-            return;
-        }
-        const opened: Conversation = { url, socket };
-        conversation = opened;
+// A session that has never been opened must hand React the *same* object every time it is asked, or a
+// snapshot comparison sees a change on every check and re-renders forever.
+const blanks = new Map<string, AgentSession>();
+function blank(name: string): AgentSession {
+    const existing = blanks.get(name);
+    if (existing) return existing;
+    const created: AgentSession = { name, connected: false, models: [] };
+    blanks.set(name, created);
+    return created;
+}
 
-        let greeted = false;
+function notify() {
+    revision++;
+    for (const watcher of watchers) watcher();
+}
+
+/** React reads sessions through this: any change anywhere bumps the revision. */
+export function subscribeAgentSessions(watcher: () => void): () => void {
+    watchers.add(watcher);
+    return () => watchers.delete(watcher);
+}
+
+/** What a session looks like now, or a disconnected one that has never been opened. */
+export function agentSession(name: string): AgentSession {
+    return sessions.get(name)?.session || blank(name);
+}
+
+/** The canvas panel's session, and one per node panel. */
+export const CANVAS_AGENT = "canvas";
+export const nodeAgent = (nodeId: string) => `node:${nodeId}`;
+
+function socketUrl(config: AiConfig, name: string): string {
+    const root = gatewayProtocolRoot(config.baseUrl);
+    return `${root.replace(/^http/i, "ws")}/api/agent/socket/${encodeURIComponent(name)}`;
+}
+
+/**
+ * Open a session, or return the one already open under this name.
+ *
+ * Resolves on the agent's startup broadcast, which is where the model list comes from — the caller
+ * needs it before it can show, or let the user choose, a model for this session.
+ */
+export function openAgentSession(config: AiConfig, name: string): Promise<AgentSession> {
+    const existing = sessions.get(name);
+    if (existing) return existing.opening;
+
+    let socket: WebSocket;
+    try {
+        socket = new WebSocket(socketUrl(config, name));
+    } catch (error) {
+        return Promise.reject(new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout")));
+    }
+    const live: Live = {
+        name,
+        socket,
+        opened: false,
+        session: blank(name),
+        opening: Promise.resolve(blank(name)),
+    };
+    sessions.set(name, live);
+
+    live.opening = new Promise<AgentSession>((resolve, reject) => {
         socket.onmessage = (message) => {
             let event: AgentEvent;
             try {
@@ -105,148 +157,156 @@ export function connectAgentSocket(config: AiConfig, canvasId: string): Promise<
             } catch {
                 return;
             }
-            rememberAgentEvent(event);
-            for (const listener of listeners) listener(event);
-            const id = canvasId;
-            if (!greeted && event.type === "models") {
-                greeted = true;
-                useConfigStore.getState().setAgentSession(id);
-                resolve();
+            adopt(live, event);
+
+            // The turn a caller is waiting for, whichever surface asked.
+            if (event.type === "delta" && live.waiting) live.waiting.answer += event.text || "";
+            if (event.type === "done" && live.waiting) {
+                const turn = live.waiting;
+                live.waiting = undefined;
+                turn.resolve();
             }
-            if (event.type === "error" && event.message) {
-                if (!greeted) {
-                    greeted = true;
-                    reject(new Error(event.message));
+            if (event.type === "error" && live.waiting) {
+                const turn = live.waiting;
+                live.waiting = undefined;
+                turn.reject(new Error(event.message || apiText("requestFailed")));
+            }
+
+            if (!live.opened) {
+                live.opened = true;
+                if (event.type === "models") {
+                    live.session.connected = true;
+                    resolve(live.session);
+                } else if (event.type === "error") {
+                    sessions.delete(name);
+                    socket.close();
+                    reject(new Error(event.message || apiText("requestFailed")));
+                    return;
                 }
             }
+            for (const listener of listenersOf(name)) listener(event);
+            notify();
         };
         socket.onerror = () => {
-            if (!greeted) {
-                greeted = true;
-                reject(new Error(apiText("requestFailed")));
-            }
+            if (live.opened) return;
+            live.opened = true;
+            sessions.delete(name);
+            reject(new Error(apiText("requestFailed")));
         };
         socket.onclose = () => {
-            if (conversation === opened) conversation = null;
-            useConfigStore.getState().setAgentSession(null);
-            for (const listener of listeners) listener({ type: "closed" });
-            if (!greeted) {
-                greeted = true;
-                reject(new Error(apiText("requestFailed")));
-            }
+            const wasOpen = live.opened;
+            live.opened = false;
+            live.session = blank(name);
+            if (sessions.get(name) === live) sessions.delete(name);
+            live.waiting?.reject(new Error(apiText("requestFailed")));
+            live.waiting = undefined;
+            for (const listener of listenersOf(name)) listener({ type: "closed" });
+            notify();
+            if (!wasOpen) reject(new Error(apiText("requestFailed")));
         };
     });
-}
-
-/** Say something on the conversation. Silently does nothing when there is none — a message with no
- * connection is not an error to report, it is a panel that has not been opened. */
-export function sendAgentMessage(message: AgentMessage): void {
-    if (!conversation || conversation.socket.readyState !== WebSocket.OPEN) return;
-    conversation.socket.send(JSON.stringify(message));
-}
-
-/** Stop the answer that is being written. The agent keeps its history; it only stops working. */
-export function cancelAgentTurn(): void {
-    sendAgentMessage({ cancel: true });
-}
-
-/** Close the socket but keep the agent: this is the tab going away, not the user giving up. */
-export function closeAgentSocket(): void {
-    const open = conversation;
-    conversation = null;
-    if (open) {
-        open.socket.onclose = null;
-        open.socket.close();
-    }
-    useConfigStore.getState().setAgentSession(null);
+    return live.opening;
 }
 
 /**
- * End the conversation for good: the agent is released, history and all.
+ * Keep the session's own picture current: the agent announces these, nobody else sets them.
  *
- * The socket is not closed here — the gateway closes it after releasing the process, and closing it
- * locally first would race the message out of the buffer, leaving an agent with nothing to end it.
+ * The object is replaced rather than mutated, because its identity is what tells React something
+ * changed. A mutation would update the display of whoever read it first and nobody else.
  */
-export function endAgentConversation(): void {
-    sendAgentMessage({ close: true });
-}
-
-/**
- * Ask for one answer that nothing follows: a text node's body, a rewritten prompt, a caption.
- *
- * A socket that carries one question and dies with the answer. It names no session and never reads
- * one, which is the whole point: this must not be able to reach the agent a canvas is holding. The
- * conversation and the one-shot speak the same messages, because there is one transport here — only
- * the lifetime differs, and the route says which.
- */
-export function requestAgentOnce(config: AiConfig, request: { prompt: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
-    const url = `${gatewayProtocolRoot(config.baseUrl).replace(/^http/i, "ws")}/api/agent/once`;
-    return new Promise((resolve, reject) => {
-        let socket: WebSocket;
-        try {
-            socket = new WebSocket(url);
-        } catch (error) {
-            reject(new Error(apiErrorMessage(error, apiText("requestFailed"), "imageTimeout")));
-            return;
-        }
-        let answer = "";
-        let failure = "";
-        let settled = false;
-        const finish = (error?: Error) => {
-            if (settled) return;
-            settled = true;
-            socket.onmessage = null;
-            socket.onerror = null;
-            socket.onclose = null;
-            socket.close();
-            if (error) reject(error);
-            else resolve(answer);
-        };
-
-        options?.signal?.addEventListener("abort", () => finish(new Error(apiText("requestFailed"))), { once: true });
-
-        socket.onopen = async () => {
-            const images = await Promise.all((request.images || []).map((image) => imageToDataUrl(image)));
-            if (settled) return;
-            socket.send(JSON.stringify({ prompt: request.prompt, images }));
-        };
-        socket.onmessage = (message) => {
-            let event: AgentEvent;
-            try {
-                event = JSON.parse(message.data as string) as AgentEvent;
-            } catch {
-                return;
-            }
-            rememberAgentEvent(event);
-            if (event.type === "delta") answer += event.text || "";
-            // The agent's own sentence is the failure: relaying it is all this layer does.
-            if (event.type === "error" && event.message) failure = event.message;
-            options?.onEvent?.(event);
-            if (event.type === "error") finish(new Error(failure || apiText("requestFailed")));
-            if (event.type === "done") finish();
-        };
-        socket.onerror = () => finish(new Error(apiText("requestFailed")));
-        socket.onclose = () => finish(new Error(failure || apiText("requestFailed")));
-    });
-}
-
-/**
- * Keep the canvas's picture of the agent current: the list, the active model, the level.
- *
- * The agent announces these itself, so there is nothing to fetch and nothing to cache on the gateway;
- * whatever it last said is what the selects show.
- */
-function rememberAgentEvent(event: AgentEvent) {
-    const { updateAgent } = useConfigStore.getState();
+function adopt(live: Live, event: AgentEvent) {
     switch (event.type) {
         case "models":
-            updateAgent({ models: event.models || [], active: event.active, level: event.level, coreVersion: event.coreVersion });
+            live.session = { ...live.session, connected: true, models: event.models || [], active: event.active, level: event.level };
             break;
         case "model":
-            if (event.active) updateAgent({ active: event.active });
+            if (event.active) live.session = { ...live.session, active: event.active };
             break;
         case "reasoning_level":
-            if (typeof event.level === "number") updateAgent({ level: event.level });
+            if (typeof event.level === "number") live.session = { ...live.session, level: event.level };
             break;
     }
 }
+
+/** Subscribe to one session's events. Works before the session exists, which is the point. */
+export function onAgentEvent(name: string, listener: (event: AgentEvent) => void): () => void {
+    const set = listenersOf(name);
+    set.add(listener);
+    return () => {
+        set.delete(listener);
+    };
+}
+
+/** Say something on a session. */
+export function sendAgentMessage(name: string, message: AgentMessage): boolean {
+    const live = sessions.get(name);
+    if (!live || live.socket.readyState !== WebSocket.OPEN) return false;
+    live.socket.send(JSON.stringify(message));
+    return true;
+}
+
+/**
+ * Ask one question on a session and wait for the turn to end, keeping the answer the deltas built.
+ *
+ * This is what a rewrite, a caption and a text node's body all are: one question on the session the
+ * surface already has. Nothing here opens a second connection or a second process.
+ */
+export async function askAgentSession(name: string, request: { prompt: string; images?: ReferenceImage[] }, options?: { signal?: AbortSignal; onEvent?: (event: AgentEvent) => void }): Promise<string> {
+    const live = sessions.get(name);
+    if (!live || live.socket.readyState !== WebSocket.OPEN) throw new Error(apiText("requestFailed"));
+
+    const images = await Promise.all((request.images || []).map((image) => imageToDataUrl(image)));
+    const listener = options?.onEvent;
+    const registry = listener ? listenersOf(name) : undefined;
+    if (listener && registry) registry.add(listener);
+
+    try {
+        return await new Promise<string>((resolve, reject) => {
+            const turn: Turn = { answer: "", resolve: () => resolve(turn.answer), reject };
+            live.waiting = turn;
+            options?.signal?.addEventListener(
+                "abort",
+                () => {
+                    if (live.waiting === turn) live.waiting = undefined;
+                    cancelAgentSession(name);
+                    reject(new Error(apiText("requestFailed")));
+                },
+                { once: true },
+            );
+            if (!sendAgentMessage(name, { prompt: request.prompt, images })) {
+                live.waiting = undefined;
+                reject(new Error(apiText("requestFailed")));
+            }
+        });
+    } finally {
+        if (listener && registry) registry.delete(listener);
+    }
+}
+
+/** Stop the answer being written. The session keeps its history. */
+export function cancelAgentSession(name: string): void {
+    sendAgentMessage(name, { cancel: true });
+}
+
+/** Close the socket and keep the agent: the window went away, not the conversation. */
+export function closeAgentSession(name: string): void {
+    const live = sessions.get(name);
+    if (!live) return;
+    sessions.delete(name);
+    live.socket.onclose = null;
+    live.socket.close();
+    live.session = blank(name);
+    notify();
+}
+
+/** End the session for good: the agent is released, history and all. */
+export function endAgentSession(name: string): void {
+    if (!sendAgentMessage(name, { close: true })) {
+        closeAgentSession(name);
+        return;
+    }
+    // The gateway closes the socket after releasing. Drop this side shortly after either way, so a dead
+    // session cannot be mistaken for a live one.
+    setTimeout(() => closeAgentSession(name), 1000);
+}
+

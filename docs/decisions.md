@@ -2823,12 +2823,11 @@ itself (`lived=14886ms`) — a one-shot agent does not outlive its answer.
 
 ## 82. The conversation is a socket; a shortcut stays a POST
 
-**Decision** The canvas agent is a WebSocket, one per canvas, at `GET /api/agent/socket/{session}`. Both
-directions are messages on it: prompts, settings commands, `cancel`, `close` up; the agent's own frames
-down. `POST /api/agent/connect`, `/api/agent/chat` and `DELETE /api/agent/session/{id}` are gone. The
-one-shot is a socket too, at `GET /api/agent/once`: it takes its question as the first message, answers
-once, and closes. The lifetime still differs and the route still says which — what went away is the
-second *transport*.
+**Decision** The agent is one WebSocket per session, at `GET /api/agent/socket/{session}`, both directions
+as messages: prompts, settings commands, `cancel`, `close` up; the agent's own frames down.
+`POST /api/agent/connect`, `/api/agent/chat` and `DELETE /api/agent/session/{id}` are gone. So is
+`GET /api/agent/once`: a second route for a shorter lifetime was a second mechanism for the same thing,
+and the lifetime is the client's to decide (see #83).
 
 **Why this and not SSE** Three shapes of SSE were proposed and each one added a concept instead of
 removing one: a stream per turn needed "when does a turn end" and "which request owns the stream"; a
@@ -2843,15 +2842,13 @@ instead of asked for, masked frames read, unmasked written, fragmentation reasse
 `internal/comfy` already spoke the same framing as a client, and the tests drive the new server with
 that client — an independent implementation rather than the server's own reflection.
 
-**One transport, two lifetimes** The one-shot was a POST returning `text/event-stream`, which is the
-natural shape for one request and one stream — but it meant the repository kept two streaming mechanisms
-for one feature, two client readers, two framing formats, and a question ("why are these different?")
-with no better answer than "one of them is a single answer". With a socket client already in place,
-moving it cost one route, one client function, and the SSE machinery it had needed: `startEventStream`,
-the multipart body, and the file-to-data-URL helpers that only existed to fill that body — images now
-travel as the data URLs the canvas already holds. What is genuinely lost is `curl` for a one-shot: a
-`websocat` and `websocat -n1` are needed now, and a spawn failure is an `error` message rather than a 502,
-because after an upgrade there is no status code left to be honest with.
+**One transport** The one-shot was a POST returning `text/event-stream`, which is the natural shape for
+one request and one stream — but it meant two streaming mechanisms for one feature: two client readers,
+two framing formats, and a question ("why are these different?") whose only answer was "one of them is a
+single answer". Moving it cost one route and the SSE machinery it had needed (`startEventStream`, the
+multipart body, the file-to-data-URL helpers that existed only to fill that body — images now travel as
+the data URLs the canvas already holds). #83 finished the job by deleting the route itself, because a
+session's lifetime is the client's to decide, not the route's to declare.
 
 **What it cost** `curl -N` no longer watches anything; `websocat` does. Two things had to be fixed
 to make the upgrade possible at all, and both were silent bugs: `statusRecorder` in `internal/httpx`
@@ -2879,3 +2876,35 @@ still remembered "新开". Dragging the panel moved it and left the canvas viewp
 it did not zoom. The Go tests cover the same ground without a model: idempotent open, one watcher per
 name, second turn on one socket, tool relay, `close` releasing, a dropped socket keeping the agent, a
 killed process reporting itself, and the one-shot never reaching a conversation.
+
+## 83. One session per surface, and the model is the session's
+
+**Decision** Every agent use is a session: one process, one socket, one name chosen by the client — the
+canvas panel's is `canvas`, a node panel's is `node:<id>`. A session is created by pressing connect in
+that panel, announces its own model list, is told which model it is on, and answers on it. Nothing about
+a session is stored in the application: `agentSession` and the `agent` blob are gone from the config
+store, and there is no per-node model field either. The canvas panel's session lives until it is closed;
+a node panel's is released when the panel goes away. `GET /api/agent/once` is deleted with the last of
+the nameless one-question processes.
+
+**Why** The application had been keeping a mirror of state the agent already owns — which models exist,
+which one is in effect, how hard it is thinking — in a single global slot. One slot for many processes
+can only be wrong: the first node to connect made every other node think it was connected, and choosing
+a model for one node changed the model everywhere. Every bug in this area was the same bug: two owners
+for one fact. A session's own process is the owner, and the client only ever reads back what it says.
+
+**Why this is the simple shape, not the big one** The processes are small and there can be as many as
+there are panels open. Refusing to start one per panel is what produced the shared slot in the first
+place; the alternative — one agent shared by every node — is not cheaper, it is a different and wrong
+product. A node that is not being worked on holds no process, and the canvas's own agent is the one thing
+that outlives its socket, because the user asked for that.
+
+**What it fixes** Pressing connect on a second node now shows connect, because that node has asked
+nothing of anyone yet; the model select in each panel shows *that session's* model; and text generation
+asks the session of the node whose button was pressed, not a new node's name.
+
+**Tested** In a browser against a real AlayaCore: two config nodes in text mode, the first connected
+(`socket open session=node:config-1793445940295-nk65u spawned=true`, model list shown, button became
+send) while the second still read 未连接 / 连接; pressing send on the first logged
+`socket in session=node:config-…` and the answer landed in a new text node. The client tests hold the
+other half: a session's model does not leak into another's, and asking for words opens no second socket.

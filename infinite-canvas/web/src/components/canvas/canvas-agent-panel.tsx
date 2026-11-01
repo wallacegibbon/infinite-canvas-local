@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { CANVAS_DIALOG_CONTENT } from "@/lib/canvas-overlay";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
-import { cancelAgentTurn, closeAgentSocket, connectAgentSocket, endAgentConversation, onAgentEvent, sendAgentMessage, type AgentEvent } from "@/services/api/agent";
+import { AgentSettingsControls } from "./agent-settings-controls";
+import { CANVAS_AGENT, cancelAgentSession, closeAgentSession, endAgentSession, onAgentEvent, openAgentSession, sendAgentMessage, type AgentEvent } from "@/services/api/agent";
 import { useCanvasAgentStore } from "@/stores/canvas/use-canvas-agent-store";
 import { useEffectiveConfig } from "@/stores/use-config-store";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
@@ -76,7 +77,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
     const connect = useCallback(async () => {
         setStatus((current) => (current === "connected" ? current : "connecting"));
         try {
-            await connectAgentSocket(config, canvasId);
+            await openAgentSession(config, CANVAS_AGENT);
             setStatus("connected");
         } catch (error) {
             setStatus("closed");
@@ -95,10 +96,10 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
         void connectRef.current();
         // Closing the panel closes the socket and leaves the agent: the tab going away is not the user
         // giving up on the conversation, and reopening it finds the same history.
-        return () => closeAgentSocket();
+        return () => closeAgentSession(CANVAS_AGENT);
     }, [open]);
 
-    useEffect(() => onAgentEvent(applyEvent), []);
+    useEffect(() => onAgentEvent(CANVAS_AGENT, applyEvent), []);
 
     const applyEvent = (event: AgentEvent) => {
         if (event.type === "closed") {
@@ -146,11 +147,11 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
         setCited([]);
         setMention(null);
         setBusy(true);
-        sendAgentMessage({ prompt: context + text });
+        sendAgentMessage(CANVAS_AGENT, { prompt: context + text });
     };
 
     const closeSession = () => {
-        endAgentConversation();
+        endAgentSession(CANVAS_AGENT);
         setStatus("closed");
         setBusy(false);
         setMessages([]);
@@ -243,6 +244,12 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
                 </button>
             </div>
 
+            {status === "connected" ? (
+                <div className="border-b px-2 py-1.5" style={{ borderColor: theme.toolbar.border }}>
+                    <AgentSettingsControls session={CANVAS_AGENT} className="flex min-w-0 items-center gap-1" />
+                </div>
+            ) : null}
+
             <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3 text-sm" data-canvas-scroll="">
                 {messages.length === 0 ? <p className="text-xs opacity-50">{t("canvas.agent.hint")}</p> : null}
                 {messages.map((message) => (
@@ -301,7 +308,7 @@ export function CanvasAgentPanel({ canvasId, nodes, onFocusNode }: Props) {
                 />
                 <div className="flex items-center justify-end gap-1">
                     {busy ? (
-                        <button type="button" className="rounded-full p-2 hover:opacity-80" onClick={() => cancelAgentTurn()} title={t("canvas.agent.stop")} aria-label={t("canvas.agent.stop")}>
+                        <button type="button" className="rounded-full p-2 hover:opacity-80" onClick={() => cancelAgentSession(CANVAS_AGENT)} title={t("canvas.agent.stop")} aria-label={t("canvas.agent.stop")}>
                             <Square className="size-3.5" />
                         </button>
                     ) : null}

@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Image as ImageIcon, LoaderCircle, MessageSquare, Play, Settings2, Square, Video } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
@@ -9,7 +9,7 @@ import { Segmented } from "@/components/kit/segmented";
 import { BaseModelPicker, WorkflowModelPicker } from "@/components/model-picker";
 import { defaultConfig, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 
-import { connectAgentSocket } from "@/services/api/agent";
+import { endAgentSession, nodeAgent, openAgentSession } from "@/services/api/agent";
 import { useCanvasTheme } from "@/lib/canvas/use-canvas-theme";
 import { videoModelForWorkflow, videoModelModePatch, videoWorkflowId, isNoVdnWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -38,7 +38,10 @@ export function CanvasConfigNodePanel({ node, canvasId, isRunning, inputSummary,
     const { t } = useTranslation();
     const globalConfig = useEffectiveConfig();
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
-    const agentSession = useConfigStore((state) => state.agentSession);
+    // This panel's own agent, like a text node's: connecting starts it, and the panel going away
+    // releases it.
+    const agentName = nodeAgent(node.id);
+    const [agentConnected, setAgentConnected] = useState(false);
     const [connecting, setConnecting] = useState(false);
     const theme = useCanvasTheme();
     const mode = node.metadata?.generationMode || "image";
@@ -48,13 +51,16 @@ export function CanvasConfigNodePanel({ node, canvasId, isRunning, inputSummary,
     const connectAgent = async () => {
         setConnecting(true);
         try {
-            await connectAgentSocket(config, canvasId);
+            await openAgentSession(config, agentName);
+            setAgentConnected(true);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
         } finally {
             setConnecting(false);
         }
     };
+    useEffect(() => () => endAgentSession(agentName), [agentName]);
+
     const frameMode: "first" | "last" | "both" = node.metadata?.frameMode === "last" || node.metadata?.frameMode === "both" || node.metadata?.frameMode === "first" ? node.metadata.frameMode : inputSummary.imageCount >= 2 ? "both" : "first";
     const changeVideoMode = (value: "text" | "frames" | "reference") => {
         const baseId = value === "reference" ? "video-h3-ref2va" : value === "frames" ? "video-h3-frames" : "video-h3-t2v";
@@ -124,7 +130,7 @@ export function CanvasConfigNodePanel({ node, canvasId, isRunning, inputSummary,
                     {/* Text is answered by the prompt endpoint, not by a workflow: there is no text
                         model to pick, only that endpoint's model to go and configure. */}
                     {mode === "text" ? (
-                        <AgentSettingsControls className="flex min-w-0 flex-col gap-1" />
+                        <AgentSettingsControls session={agentName} className="flex min-w-0 flex-col gap-1" />
                     ) : (
                         <>
                             <WorkflowModelPicker
@@ -177,12 +183,12 @@ export function CanvasConfigNodePanel({ node, canvasId, isRunning, inputSummary,
                 type="primary"
                 className="mt-auto !h-9 !w-full !cursor-pointer !rounded-lg"
                 danger={isRunning}
-                disabled={!isRunning && !canGenerate && !(mode === "text" && !agentSession)}
+                disabled={!isRunning && !canGenerate && !(mode === "text" && !agentConnected)}
                 onMouseDown={(event) => event.stopPropagation()}
                 onClick={() => {
                     if (isRunning) return onStop(node.id);
                     // Text is answered by an agent, so the first click starts one and the second asks.
-                    if (mode === "text" && !agentSession) return void connectAgent();
+                    if (mode === "text" && !agentConnected) return void connectAgent();
                     onGenerate(node.id);
                 }}
             >
@@ -196,7 +202,7 @@ export function CanvasConfigNodePanel({ node, canvasId, isRunning, inputSummary,
                     ) : (
                         <>
                             <Play className="size-4" />
-                            <span>{t(mode === "text" && !agentSession ? "canvas.agent.connect" : "canvas.configNode.generate")}</span>
+                            <span>{t(mode === "text" && !agentConnected ? "canvas.agent.connect" : "canvas.configNode.generate")}</span>
                         </>
                     )}
                 </span>

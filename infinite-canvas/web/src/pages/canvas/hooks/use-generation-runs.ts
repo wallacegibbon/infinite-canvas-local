@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { toast } from "@/components/kit/toast";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
 import { isGatewayImageModel, requestEdit, requestGeneration } from "@/services/api/image";
+import { nodeAgent } from "@/services/api/agent";
 import { requestPromptChat } from "@/services/api/prompts";
 import { downloadRunOutput, downloadRunOutputs, waitForRun, type Run, type RunProgress } from "@/services/api/runs";
 import { isVideoTaskFailed } from "@/services/api/video";
@@ -533,6 +534,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                     try {
                         // The agent answers as it goes, so the node fills in while it talks.
                         const content = await requestPromptChat(
+                            nodeAgent(nodeId),
                             generationConfig,
                             { prompt: effectivePrompt, images: generationContext.referenceImages },
                             {
@@ -696,6 +698,7 @@ export function useGenerationRuns(deps: GenerationRunDeps) {
                 if (node.type === CanvasNodeType.Text) {
                     if (!context) return;
                     const answer = await requestPromptChat(
+                        nodeAgent(node.id),
                         generationConfig,
                         { prompt, images: context.referenceImages },
                         {

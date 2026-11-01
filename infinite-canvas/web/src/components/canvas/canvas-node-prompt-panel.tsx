@@ -20,7 +20,7 @@ import { SentPromptDisclosure } from "./sent-prompt-disclosure";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { resolveCanvasReferenceImages } from "@/lib/canvas/canvas-resource-references";
-import { connectAgentSocket, requestAgentOnce } from "@/services/api/agent";
+import { askAgentSession, endAgentSession, nodeAgent, openAgentSession } from "@/services/api/agent";
 import type { PromptOptimizeMode } from "@/services/api/prompts";
 import { videoModelForWorkflow, videoModelModePatch, baseVideoWorkflowId } from "@/lib/canvas/video-model-mode";
 import { CanvasNodeReferenceBar } from "./canvas-node-reference-bar";
@@ -108,7 +108,10 @@ export function CanvasNodePromptPanel({
     const imageModeValue = String(config.imageMode || "").trim();
     const textOnlyImageMode = isImage && (imageModeValue === "t2i" || (!imageModeValue && workflowId === "image-qwen21"));
     const usesImageReferences = textOnlyImageMode ? false : imageInputLimit === undefined ? !isH3T2V : imageInputLimit > 0;
-    const agentSession = useConfigStore((state) => state.agentSession);
+    // This panel's own agent. Connecting starts it; the panel going away releases it, so a node that is
+    // not being worked on holds no process at all.
+    const agentName = nodeAgent(node.id);
+    const [agentConnected, setAgentConnected] = useState(false);
     const [connecting, setConnecting] = useState(false);
     const optimizeStatus = node.metadata?.promptOptimizeStatus;
     const optimizeRunning = optimizeStatus === "running";
@@ -255,6 +258,10 @@ export function CanvasNodePromptPanel({
         return { selectedRefs, referenceNote, taskType, duration: isCharacterSwap ? (sourceVideoDurationSeconds ?? (Number(config.videoSeconds) || 5)) : Number(config.videoSeconds) || 5 };
     };
 
+    // The panel going away ends that node's agent: it was started for this panel, and nothing else is
+    // reading it. (The canvas's own agent is the opposite case and lives until it is closed by hand.)
+    useEffect(() => () => endAgentSession(agentName), [agentName]);
+
     // ✨ starts immediately: there is nothing to configure first — the agent has its own model and
     // its own skills, and the instruction below is all this button has to say.
     const startOptimize = (run: () => void) => void run();
@@ -263,7 +270,8 @@ export function CanvasNodePromptPanel({
     const connectAgent = async () => {
         setConnecting(true);
         try {
-            await connectAgentSocket(config, canvasId);
+            await openAgentSession(config, agentName);
+            setAgentConnected(true);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : t("canvas.agent.connectFailed"));
         } finally {
@@ -283,8 +291,8 @@ export function CanvasNodePromptPanel({
             const images = defaults.selectedRefs.length ? await resolveCanvasReferenceImages(defaults.selectedRefs, nodes) : [];
             const note = defaults.referenceNote ? `\n参考素材说明：${defaults.referenceNote}` : "";
             const instruction = `把下面这段需求改写成一条 MiniMax H3 视频生成提示词。任务类型：${defaults.taskType}；时长：${defaults.duration} 秒；输出语言：${optimizeLanguage === "en" ? "英文" : "中文"}。${note}\n\n${text}`;
-            const result = await requestAgentOnce(
-                config,
+            const result = await askAgentSession(
+                agentName,
                 { prompt: instruction, images },
                 {
                     signal: controller.signal,
@@ -312,8 +320,8 @@ export function CanvasNodePromptPanel({
         onConfigChange(node.id, { promptOptimizeStatus: "running", promptOptimizeKind: "image", promptOptimizeSource: text, promptOptimizePrompt: undefined, promptOptimizeError: undefined });
         try {
             const instruction = `把下面这段需求改写为一条可直接用于生图模型的提示词，只输出提示词本身。输出语言：${optimizeLanguage === "en" ? "英文" : "中文"}。${selectedRefs.length ? `参考图片 ${selectedRefs.length} 张。` : ""}\n\n${text}`;
-            const result = await requestAgentOnce(
-                config,
+            const result = await askAgentSession(
+                agentName,
                 { prompt: instruction },
                 {
                     signal: controller.signal,
@@ -364,8 +372,8 @@ export function CanvasNodePromptPanel({
         try {
             const images = await resolveCanvasReferenceImages(imageReferences.slice(0, 1), nodes);
             if (!images.length) throw new Error(t("canvas.promptPanel.captionNoImage"));
-            const result = await requestAgentOnce(
-                config,
+            const result = await askAgentSession(
+                agentName,
                 { prompt: "用一段话描述这张图片，输出可以直接当作生图提示词的描述，只输出描述本身。", images },
                 {
                     signal: controller.signal,
@@ -525,7 +533,7 @@ export function CanvasNodePromptPanel({
                         </>
                     ) : (
                         <>
-                            <AgentSettingsControls className="flex min-w-0 items-center gap-2" />
+                            <AgentSettingsControls session={agentName} className="flex min-w-0 items-center gap-2" />
                         </>
                     )}
                 </div>
@@ -548,18 +556,18 @@ export function CanvasNodePromptPanel({
                     type="primary"
                     className={`${mode === "text" ? "" : "ml-auto"} !h-10 shrink-0 !rounded-full ${isRunning || connecting ? "!min-w-10 !px-2" : "!min-w-16 !px-3"}`}
                     danger={isRunning}
-                    disabled={!isRunning && !connecting && (mode === "text" && !agentSession ? false : !draft.trim())}
+                    disabled={!isRunning && !connecting && (mode === "text" && !agentConnected ? false : !draft.trim())}
                     title={isRunning ? t("canvas.promptPanel.stop") : undefined}
                     onClick={() => {
                         if (isRunning) return onStop(node.id);
                         // Text: the first click starts an agent (so the model list appears), the next asks.
-                        if (mode === "text" && !agentSession) return void connectAgent();
+                        if (mode === "text" && !agentConnected) return void connectAgent();
                         submit();
                     }}
-                    aria-label={t(isRunning ? "canvas.promptPanel.stop" : mode === "text" && !agentSession ? "canvas.agent.connect" : "canvas.promptPanel.generate")}
+                    aria-label={t(isRunning ? "canvas.promptPanel.stop" : mode === "text" && !agentConnected ? "canvas.agent.connect" : "canvas.promptPanel.generate")}
                 >
                     <span className="flex items-center gap-1.5">
-                        {isRunning || connecting ? <LoaderCircle className="size-4 animate-spin" /> : mode === "text" && !agentSession ? <span className="text-xs">{t("canvas.agent.connect")}</span> : <ArrowUp className="size-4" />}
+                        {isRunning || connecting ? <LoaderCircle className="size-4 animate-spin" /> : mode === "text" && !agentConnected ? <span className="text-xs">{t("canvas.agent.connect")}</span> : <ArrowUp className="size-4" />}
                     </span>
                 </Button>
             </div>
