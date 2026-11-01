@@ -509,6 +509,11 @@ func (m *Manager) installNodeLike(ctx context.Context, resource *Resource, item 
 		return nil
 	}
 
+	if util.DirExists(destination) {
+		m.logger.Info("%s directory already exists, skipping", item.Label)
+		return nil
+	}
+
 	failures := &sourceErrors{}
 	for _, reference := range sourceURLs(resource) {
 		if err := os.MkdirAll(customNodes, 0o755); err != nil {
@@ -526,8 +531,8 @@ func (m *Manager) installNodeLike(ctx context.Context, resource *Resource, item 
 		// is involved, so a missing tool can never fail an install.
 		m.setItemStatus(item, "extracting")
 		m.logger.Info("%s extracting %s -> %s (in-process, no external command)",
-			item.Label, filepath.Base(archive), m.displayPath(customNodes, root))
-		extractErr := extractArchive(archive, customNodes)
+			item.Label, filepath.Base(archive), m.displayPath(destination, root))
+		extractErr := extractNodeArchive(ctx, archive, destination)
 		_ = os.Remove(archive)
 		if extractErr != nil {
 			return fmt.Errorf("extraction failed: %w", extractErr)
@@ -743,6 +748,44 @@ func copyDir(ctx context.Context, source, target string) (int64, error) {
 		return nil
 	})
 	return total, err
+}
+
+// extractNodeArchive unpacks a node pack into destination, dropping the single top-level
+// directory every GitHub archive wraps its contents in.
+//
+// ComfyUI does not care what a pack's directory is called; the catalogue does. Install state is read
+// from custom_nodes/<target name>, so a pack that landed in custom_nodes/<repo>-<sha> would look
+// uninstalled for ever and every click on Install would download it again. This is why the wrapper
+// is removed here rather than at the call site.
+func extractNodeArchive(ctx context.Context, archive, destination string) error {
+	staging, err := os.MkdirTemp("", "node-extract-")
+	if err != nil {
+		return targetError(err)
+	}
+	defer os.RemoveAll(staging)
+
+	if err := extractArchive(archive, staging); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(staging)
+	if err != nil {
+		return targetError(err)
+	}
+	if len(entries) == 0 {
+		return fmt.Errorf("archive is empty: %s", filepath.Base(archive))
+	}
+	source := staging
+	if len(entries) == 1 && entries[0].IsDir() {
+		source = filepath.Join(staging, entries[0].Name())
+	}
+	if util.DirExists(destination) {
+		return nil
+	}
+	if _, err := copyDir(ctx, source, destination); err != nil {
+		_ = os.RemoveAll(destination)
+		return err
+	}
+	return nil
 }
 
 // extractArchive unpacks a .zip or .tar.gz into a directory.

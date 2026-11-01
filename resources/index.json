@@ -430,9 +430,9 @@
       "upstream": "https://github.com/jtydhr88/ComfyUI-qwenmultiangle",
       "pinnedCommit": "bf8d032a36f1b78296568cda939418b88f0950b3",
       "autoInstall": true,
-      "size": 4559537,
+      "size": 1392332,
       "license": "MIT",
-      "note": "Restart ComfyUI after installing. The primary source is a bundled zip, the fallback is a public GitHub archive.",
+      "note": "Restart ComfyUI after installing. Downloaded from a public GitHub archive pinned to the vendored commit.",
       "provides": [
         "QwenMultiangleCameraNode"
       ],
@@ -463,7 +463,7 @@
       "upstream": "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch",
       "pinnedCommit": "e2727a26c0a0cff082ef679c51b6a1f95b7b38a4",
       "autoInstall": true,
-      "size": 161835,
+      "size": 12504619,
       "license": "GPL-3.0",
       "note": "Required for inpaint; restart ComfyUI after installing.",
       "provides": [
@@ -482,7 +482,7 @@
       "upstream": "https://github.com/kijai/ComfyUI-KJNodes",
       "pinnedCommit": "d7641533d6634eb05f8570c980fce8fc8528dc7b",
       "autoInstall": true,
-      "size": 2634717,
+      "size": 1131805,
       "license": "GPL-3.0",
       "note": "Only outpaint's DrawMaskOnImage uses it; no extra pip dependency; restart ComfyUI after installing.",
       "provides": [
@@ -762,13 +762,13 @@
       "target": "custom_nodes/ComfyUI-VDN-H3",
       "upstream": "https://github.com/Saganaki22/ComfyUI-VDN-H3",
       "pinnedCommit": "7271c648d7c2ff61ae1a7342dd9761e4545a34c3",
-      "size": 7313853,
+      "size": 6894880,
       "license": "Apache-2.0",
       "autoInstall": true,
       "provides": [
         "ApplyVDNH3Advanced"
       ],
-      "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
+      "note": "Downloaded from the pinned GitHub archive; pip is not run — handle the node's dependencies as its README says.",
       "sources": [
         "https://github.com/Saganaki22/ComfyUI-VDN-H3/archive/7271c648d7c2ff61ae1a7342dd9761e4545a34c3.zip"
       ]
@@ -780,7 +780,7 @@
       "target": "custom_nodes/minimax-h3-audio-t8",
       "upstream": "https://github.com/T8mars/comfyui-minimax-h3-audio-T8",
       "pinnedCommit": "93cefbf5d15ff8e263fa707b8a55c19454459431",
-      "size": 6800287,
+      "size": 6435363,
       "license": "GPL-3.0-or-later",
       "autoInstall": true,
       "provides": [
@@ -790,7 +790,7 @@
         "ModelAttentionBackend",
         "LoraLoaderBypassModelOnly"
       ],
-      "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
+      "note": "Downloaded from the pinned GitHub archive; pip is not run — handle the node's dependencies as its README says.",
       "sources": [
         "https://github.com/T8mars/comfyui-minimax-h3-audio-T8/archive/93cefbf5d15ff8e263fa707b8a55c19454459431.zip"
       ]
@@ -802,13 +802,13 @@
       "target": "custom_nodes/ComfyUI-YCNodes-MiniMax-H3",
       "upstream": "https://github.com/yichengup/ComfyUI-YCNodes-MiniMax-H3",
       "pinnedCommit": "efbe83f69ffa97a251a575ce42edc7bf8005da0c",
-      "size": 94573,
+      "size": 48138,
       "license": "MIT",
       "autoInstall": true,
       "provides": [
         "H3SigmaRefiner"
       ],
-      "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
+      "note": "Downloaded from the pinned GitHub archive; pip is not run — handle the node's dependencies as its README says.",
       "sources": [
         "https://github.com/yichengup/ComfyUI-YCNodes-MiniMax-H3/archive/efbe83f69ffa97a251a575ce42edc7bf8005da0c.zip"
       ]
@@ -820,13 +820,13 @@
       "target": "custom_nodes/comfyui-SelfLift",
       "upstream": "https://github.com/facok/comfyui-SelfLift",
       "pinnedCommit": "835c3cf7919410f71f414688f049c6ca497789d0",
-      "size": 330000,
+      "size": 33961,
       "license": "No LICENSE declared",
       "autoInstall": true,
       "provides": [
         "SelfLiftH3Sampler"
       ],
-      "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
+      "note": "Downloaded from the pinned GitHub archive; pip is not run — handle the node's dependencies as its README says.",
       "sources": [
         "https://github.com/facok/comfyui-SelfLift/archive/835c3cf7919410f71f414688f049c6ca497789d0.zip"
       ]
@@ -838,13 +838,13 @@
       "target": "custom_nodes/ComfyUI-VideoHelperSuite",
       "upstream": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
       "pinnedCommit": "4d907bee61e92c2e65af3bd6383a4e4d356126d1",
-      "size": 414305,
+      "size": 116108,
       "license": "GPL-3.0",
       "autoInstall": true,
       "provides": [
         "VHS_VideoCombine"
       ],
-      "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
+      "note": "Downloaded from the pinned GitHub archive; pip is not run — handle the node's dependencies as its README says.",
       "sources": [
         "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite/archive/4d907bee61e92c2e65af3bd6383a4e4d356126d1.zip"
       ]
@@ -869,10 +869,11 @@
       "label": "Frame Interpolation (RIFE)",
       "target": "custom_nodes/ComfyUI-Frame-Interpolation",
       "upstream": "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation",
+      "size": 16848085,
       "provides": [
         "RIFE VFI"
       ],
-      "note": "The RIFE interpolation node, installed from GitHub (not copied with the pack); on first run the pack downloads rife49.pth into its own ckpts folder, not models/, which is why there is no separate model entry. Restart ComfyUI afterwards.",
+      "note": "The RIFE interpolation node, installed from GitHub; on first run the pack downloads rife49.pth into its own ckpts folder, not models/, which is why there is no separate model entry. Restart ComfyUI afterwards.",
       "sources": [
         "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation/archive/refs/heads/main.zip"
       ]

@@ -4232,3 +4232,51 @@ resources. `internal/generate`'s "a LoRA outside the family is rejected" fixture
 
 **Where** `resources/index.json`, `workflows/registry.json`, `workflows/image-krea2-turbo.json` (deleted),
 `infinite-canvas/web/src/lib/resource-copy-zh.ts`, `README.md`, `internal/generate/generate_test.go`.
+## 126. The node packs are no longer bundled
+
+**Decision** `resources/payload` is gone. All nine node resources install by downloading the
+`archive/<pinnedCommit>.zip` their entry names, the catalogue's `size` now describes that download rather
+than a directory in this repository, and the "the pre-extracted folder is copied with the pack" wording is
+gone from the index and from the Chinese table.
+
+**Why** Two reasons, and one of them was us:
+
+1. **The vendored copies were not what upstream ships.** They were hand-trimmed — `ComfyUI-Inpaint-CropAndStitch`
+   kept 7 of 50 files, `minimax-h3-audio-t8` kept 416 of 1,570 — so "the tree we tested" and "the tree a
+   user gets" were never the same tree, for no reason anybody asked for. Once the packs are downloaded that
+   difference disappears on its own.
+2. **The imports gate existed to catch our own vendoring mistakes.** `TestVendoredPacksImportOnlyWhatTheyShip`
+   was written because the SeedVR2 pack lost `src/data/` on the way into git (#113). Downloading upstream's
+   own tree removes that failure mode, so a second gate that verifies downloaded trees would be protecting
+   against a risk we just deleted — upstream's archive is the tree its author runs.
+
+**The bug this exposed, which had to be fixed first** `extractZip` keeps the wrapper directory every GitHub
+archive contains, while install state is read from `custom_nodes/<target name>`. Only
+`ComfyUI-Frame-Interpolation` had ever taken the download path, and it landed as
+`ComfyUI-Frame-Interpolation-main` — so the panel could never see it as installed and every click on
+Install would download it again, silently. Shipping nine packs down that path would have made the bug the
+normal case.
+
+`extractNodeArchive` now unpacks to a staging directory and copies the wrapper's *contents* onto the target
+name, and the download path skips when the target already exists (the bundled path always did). The new
+`TestExtractNodeArchiveDropsTheWrapperDirectory` pins both halves: the files arrive, the wrapper does not.
+
+**Cost** Installing a node pack now needs the network and depends on GitHub being reachable — models already
+did, and node packs have no mirror. What lands is upstream's full tree: Inpaint brings its 20 test images,
+audio-t8 its 1,570 files. That is 43 MB across nine packs, against 11 MB of hand-trimmed copies, and the
+extra weight is the price of not shipping a tree we edited by accident.
+
+**The first attempt broke a size, and the audit caught it** Rewriting nine `size` fields line by line
+walked past `frame_interpolation_node`, which had no `size` field at all, and wrote its archive size onto
+the next entry — `esrgan_x2plus`, whose 67 MB download became 16.8 MB. The check that found it compares
+every declared `size` against the file on disk for installed resources, and every changed `size` against
+the previous revision; both are now part of how this file gets edited. `esrgan_x2plus` is back to
+67,061,725 and `frame_interpolation_node` finally has the size it never had.
+
+**Tested** `make check`, `tsc --noEmit`, 132 canvas tests, and the integrity pass (13 registry entries, 49
+resources, no dangling references, every workflow's graph present). The install path itself is best proven
+by the panel: the packs were deleted from the reference machine's `custom_nodes` so the next Install click
+exercises the new code.
+
+**Where** `internal/resource/jobs.go`, `internal/resource/install_extract_test.go` (new),
+`resources/index.json`, `infinite-canvas/web/src/lib/resource-copy-zh.ts`, `resources/payload/` (deleted).
