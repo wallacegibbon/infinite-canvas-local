@@ -41,7 +41,7 @@ var ErrGone = errors.New("agent: the process ended")
 func Run(ctx context.Context, opts SpawnOptions, req Request, emit func(Event)) error {
 	return withAgent(ctx, opts, func(proc *Process, state *startup, emit func(Event)) error {
 		started := time.Now()
-		if err := waitReady(proc, state, emit, func() error { return writeRequest(proc, req) }); err != nil {
+		if err := waitReady(proc, state, nil, emit, func() error { return writeRequest(proc, req) }); err != nil {
 			return err
 		}
 		if err := readTurn(ctx, proc, state, req.HasPrompt(), emit); err != nil {

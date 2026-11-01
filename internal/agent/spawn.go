@@ -53,6 +53,10 @@ type SpawnOptions struct {
 	// configuration, and the `mcp.conf` that points its tool calls at this gateway. Empty means the
 	// agent shares one directory with everyone else, which is only right for a one-shot.
 	WorkDir string
+	// Session is the file AlayaCore keeps this conversation in. It is not work: the workspace above is
+	// thrown away with the process, while this file is what lets the next process replay what was said.
+	// Empty means the conversation dies with the process, which is what a one-shot wants.
+	Session string
 	// Log records what happened in terms someone who knows AlayaCore can follow: the command line,
 	// every frame in both directions, and how the process ended.
 	Log *logx.Logger
@@ -68,6 +72,11 @@ func (o SpawnOptions) args() []string {
 	}
 	if o.Skills != "" {
 		args = append(args, "--skill", o.Skills)
+	}
+	// The conversation's own file: AlayaCore loads it and replays it before it is ready, and saves each
+	// turn as it ends. That file, not this process, is what remembers a conversation.
+	if o.Session != "" {
+		args = append(args, "--session", o.Session)
 	}
 	return args
 }

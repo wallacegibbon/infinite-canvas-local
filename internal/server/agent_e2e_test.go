@@ -16,12 +16,25 @@ import (
 	"comfyui-gateway/internal/comfy"
 )
 
+// The fake agent speaks AlayaCore's wire, including the part that matters for a reload: `--session <file>`
+// is the conversation. It replays that file before it says it is ready, and appends each finished turn to
+// it, which is the contract the gateway is written against.
 const fakeAgentScript = `#!/bin/sh
 printf '%s\n' "$$" >> "$FAKE_SPAWN_LOG"
+SESSION=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --session) SESSION="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
 printf 'SM{"type":"version","data":{"message_version":18,"core_version":"fake-1"}}\n'
 printf 'SM{"type":"model_list","data":{"models":[{"id":1,"name":"Fake / one","protocol_type":"openai","base_url":"http://127.0.0.1:1/v1","api_key":"secret-key","model_name":"m","context_limit":1000},{"id":2,"name":"Fake / two","protocol_type":"openai","base_url":"http://127.0.0.1:1/v1","api_key":"secret-key-2","model_name":"m2","context_limit":2000}]}}\n'
 printf 'SM{"type":"model","data":{"active_id":1,"active_name":"Fake / one","context_limit":1000}}\n'
 printf 'SM{"type":"reasoning_level","data":{"level":1}}\n'
+if [ -n "$SESSION" ] && [ -f "$SESSION" ]; then
+  cat "$SESSION"
+fi
 printf 'SM{"type":"session","data":{"state":"ready"}}\n'
 while IFS= read -r line; do
   case "$line" in
@@ -35,6 +48,8 @@ while IFS= read -r line; do
       esac ;;
     UX*'die'*)
       exit 0 ;;
+    UX*text*)
+      if [ -n "$SESSION" ]; then printf '%s\n' "$line" >> "$SESSION"; fi ;;
     UE)
       printf 'SM{"type":"task","data":{"in_progress":true,"current_step":1,"context_tokens":5}}\n'
       printf 'AF{"call_id":"call-1","name":"read_file","id":"3"}\n'
@@ -42,7 +57,8 @@ while IFS= read -r line; do
       printf 'UF{"call_id":"call-1","output":[{"type":"text","text":"a file"}],"id":"4"}\n'
       printf 'Ax{"id":"2","type":"text","text":"hello "}\n'
       printf 'Ax{"id":"2","type":"text","text":"world"}\n'
-      printf 'SM{"type":"task","data":{"in_progress":false,"context_tokens":9}}\n' ;;
+      printf 'SM{"type":"task","data":{"in_progress":false,"context_tokens":9}}\n'
+      if [ -n "$SESSION" ]; then printf 'AX{"type":"text","text":"hello world"}\n' >> "$SESSION"; fi ;;
   esac
 done
 `
@@ -88,6 +104,10 @@ func openSocket(t *testing.T, gateway *httptest.Server, session string) *comfy.W
 	t.Cleanup(func() { _ = conn.Close() })
 	if first := nextEvent(t, conn); first["type"] != "models" {
 		t.Fatalf("first message = %v, want the agent's startup broadcast", first)
+	}
+	// Then the conversation the agent replayed, always — empty for a fresh one.
+	if second := nextEvent(t, conn); second["type"] != "history" {
+		t.Fatalf("second message = %v, want the replayed history", second)
 	}
 	return conn
 }
@@ -312,21 +332,53 @@ func TestSocketCloseReleasesTheAgent(t *testing.T) {
 	}
 }
 
-// TestSocketGoingAwayKeepsTheAgent is the other half: a connection that simply drops is not the user
-// closing the conversation, so the process — and its history — is still there for the next one.
-func TestSocketGoingAwayKeepsTheAgent(t *testing.T) {
+// TestSocketGoingAwayReplaysTheConversation: a dropped connection takes the process with it, and the next
+// connection gets a new process that replays what was said from the session file. That is what makes a
+// reloaded page show the conversation it left, and it is the reason the process may be this short-lived.
+func TestSocketGoingAwayReplaysTheConversation(t *testing.T) {
 	gateway, spawnLog := startAgentGateway(t)
 	conn := openSocket(t, gateway, "canvas-1")
 	if got := spawns(t, spawnLog); got != 1 {
 		t.Fatalf("spawned %d agents, want 1", got)
 	}
 
+	send(t, conn, map[string]any{"prompt": "remember the violet"})
+	until(t, conn, "done")
 	_ = conn.Close()
-	time.Sleep(200 * time.Millisecond)
-
-	openSocket(t, gateway, "canvas-1")
+	time.Sleep(300 * time.Millisecond)
 	if got := spawns(t, spawnLog); got != 1 {
-		t.Fatalf("spawned %d agents after a dropped connection, want the same one", got)
+		t.Fatalf("spawned %d agents, want 1", got)
+	}
+
+	// A new connection: a new process, and the words from the file — not an empty conversation.
+	url := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/api/agent/socket/canvas-1"
+	next, err := comfy.DialWS(context.Background(), url)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer next.Close()
+	t.Cleanup(func() { _ = next.Close() })
+	if first := nextEvent(t, next); first["type"] != "models" {
+		t.Fatalf("first message = %v, want the startup broadcast", first)
+	}
+	history := nextEvent(t, next)
+	if history["type"] != "history" {
+		t.Fatalf("second message = %v, want history", history)
+	}
+	replayed, _ := history["history"].([]any)
+	if len(replayed) != 2 {
+		t.Fatalf("replayed %v, want the question and the answer", history["history"])
+	}
+	said := replayed[0].(map[string]any)
+	if said["role"] != "user" || !strings.Contains(said["text"].(string), "violet") {
+		t.Fatalf("first replayed entry = %v, want the user's words", said)
+	}
+	answered := replayed[1].(map[string]any)
+	if answered["role"] != "assistant" || answered["text"] != "hello world" {
+		t.Fatalf("second replayed entry = %v, want the answer", answered)
+	}
+	if got := spawns(t, spawnLog); got != 2 {
+		t.Fatalf("spawned %d agents, want a fresh one on the new connection", got)
 	}
 }
 

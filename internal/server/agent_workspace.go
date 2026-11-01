@@ -9,6 +9,10 @@ package server
 // the session, because an MCP call carries no identity of its own.
 //
 // The directory is removed with the process: see `agent.SpawnOptions.WorkDir`.
+//
+// The conversation is a different thing and lives in a different place. It is a file AlayaCore writes
+// for `--session`, it outlives the process on purpose, and it is what a reloaded page gets replayed
+// into its panel: see `agent.SpawnOptions.Session`.
 
 import (
 	"crypto/sha1"
@@ -42,10 +46,13 @@ func agentWorkspaceKey(session string) string {
 	return fmt.Sprintf("%s-%x", safe.String(), sum[:4])
 }
 
+// workspacesRoot holds one config directory per session; sessionsRoot holds their conversations.
+func workspacesRoot(dataDir string) string { return filepath.Join(dataDir, "agent", "workspaces") }
+func sessionsRoot(dataDir string) string   { return filepath.Join(dataDir, "agent", "sessions") }
+
 // prepareAgentWorkspace lays out one session's config directory and returns it.
 func (s *Server) prepareAgentWorkspace(session string) (string, error) {
-	root := filepath.Join(s.cfg.DataDir, "agent")
-	dir := filepath.Join(root, agentWorkspaceKey(session))
+	dir := filepath.Join(workspacesRoot(s.cfg.DataDir), agentWorkspaceKey(session))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
@@ -86,22 +93,40 @@ func (s *Server) mcpURL(workspace string) string {
 	return fmt.Sprintf("http://%s:%d/mcp/%s", host, s.cfg.GatewayPort, workspace)
 }
 
-// clearAgentWorkspaces removes whatever a previous run left behind: sessions do not survive a restart,
-// so neither should their directories.
+// clearAgentWorkspaces removes the config copies a previous run left behind: they are rebuilt from the
+// operator's configuration on the next spawn.
+//
+// Conversations are not removed. They are the user's words, they cost a few kilobytes, and the whole
+// point of the file is that reopening a canvas finds what was said in it — a gateway restart is not a
+// reason to forget.
 func clearAgentWorkspaces(dataDir string) {
-	_ = os.RemoveAll(filepath.Join(dataDir, "agent"))
+	_ = os.RemoveAll(workspacesRoot(dataDir))
 }
 
-// agentOptionsFor is what one session's spawn needs, which is the shared options plus a workspace of
-// its own.
+// sessionFile is where this session's conversation is kept, created if this is the first time.
+func (s *Server) sessionFile(session string) (string, error) {
+	root := sessionsRoot(s.cfg.DataDir)
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return "", err
+	}
+	return filepath.Join(root, agentWorkspaceKey(session)+".session"), nil
+}
+
+// agentOptionsFor is what one session's spawn needs, which is the shared options plus a workspace and a
+// conversation file of its own.
 func (s *Server) agentOptionsFor(session string) (agent.SpawnOptions, error) {
 	opts := s.agentOptions()
 	dir, err := s.prepareAgentWorkspace(session)
 	if err != nil {
 		return opts, err
 	}
+	file, err := s.sessionFile(session)
+	if err != nil {
+		return opts, err
+	}
 	opts.ConfigPath = dir
 	opts.WorkDir = dir
+	opts.Session = file
 	return opts, nil
 }
 

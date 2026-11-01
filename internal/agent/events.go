@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"strings"
 )
 
 // Event is a frame the canvas may draw, and nothing more. The names are the protocol's, not ours:
@@ -39,6 +40,18 @@ type Event struct {
 
 	// error: the agent's own words
 	Message string `json:"message,omitempty"`
+
+	// history: the conversation the agent loaded from its session file and replayed before it was
+	// ready. A reloaded page draws this instead of an empty panel, and replaces whatever it had.
+	History []HistoryEntry `json:"history,omitempty"`
+}
+
+// HistoryEntry is one thing that was said, as the agent replayed it. Only the words are kept: the
+// reasoning blocks and the empty end-of-message markers are AlayaCore's own bookkeeping, and a picture
+// is its own content item, which this does not draw yet.
+type HistoryEntry struct {
+	Role string `json:"role"`
+	Text string `json:"text"`
 }
 
 // Model is what `SM model_list` and `SM model` say, minus the two fields that must not travel: the
@@ -240,13 +253,47 @@ func withAgent(ctx context.Context, opts SpawnOptions, body func(*Process, *star
 	return body(proc, &startup{}, emit)
 }
 
+// replayed reads a frame that arrived before the agent was ready as part of the conversation it loaded
+// from its session file. Live turns send the same tags — `UX` echo and a textless `AX` marker — so this
+// is only ever asked about frames from the startup window: a `AX` that carries text is a replayed
+// message, and one that carries none is the end of a message already sent as deltas.
+func replayed(frame *Frame) (HistoryEntry, bool) {
+	role := ""
+	switch frame.Tag {
+	case TagUserX:
+		role = "user"
+	case TagAssistantX:
+		role = "assistant"
+	default:
+		return HistoryEntry{}, false
+	}
+	var item struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if json.Unmarshal([]byte(frame.Value), &item) != nil {
+		return HistoryEntry{}, false
+	}
+	if item.Type != "text" || strings.TrimSpace(item.Text) == "" {
+		return HistoryEntry{}, false
+	}
+	return HistoryEntry{Role: role, Text: item.Text}, true
+}
+
 // waitReady reads startup frames until the session accepts input, then hands the collected state to
-// onReady. Everything before that is the agent's own startup broadcast.
-func waitReady(proc *Process, state *startup, emit func(Event), onReady func() error) error {
+// onReady. Everything before that is the agent's own startup broadcast and, when it was started with a
+// session file, the conversation it replayed from it — which is collected into history.
+func waitReady(proc *Process, state *startup, history *[]HistoryEntry, emit func(Event), onReady func() error) error {
 	for {
 		frame, err := proc.Read()
 		if err != nil || frame == nil {
 			return nil
+		}
+		if entry, ok := replayed(frame); ok {
+			if history != nil {
+				*history = append(*history, entry)
+			}
+			continue
 		}
 		if frame.Tag != TagSystemMsg {
 			continue

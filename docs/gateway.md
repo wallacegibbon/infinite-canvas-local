@@ -176,13 +176,19 @@ back what AlayaCore says. The gateway owns no wording, no model choice and no st
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/agent/socket/{session}` | One agent process, named by the client, both directions. |
+| `GET` | `/api/agent/socket/{session}` | One agent process, named by the client, both directions. Its conversation is kept in a session file. |
 | `POST` | `/mcp/{workspace}` | The agent's tools, spoken to AlayaCore. One workspace per session. |
 
 A session is one `alayacore --rawio` process with one socket, filed under a name the **client** chooses:
-the canvas agent panel calls its own `canvas`, a node's panel calls its own `node:<id>`. The gateway does
-not know what a canvas or a node is — it files processes under strings, and asking for a name twice
-returns the same process, which is how a reloaded page finds the conversation it left.
+the canvas agent panel calls its own `canvas:<canvasId>`, a node's panel calls its own `node:<id>`. The
+gateway does not know what a canvas or a node is — it files processes under strings.
+
+Each name also owns a **session file**: `DATA_DIR/agent/sessions/<name>-<hash>.session`, passed to
+AlayaCore as `--session`. That file, not the process, is the conversation. The process lives exactly as
+long as its socket, and the next connection starts a new one that replays the file before it says it is
+ready — which the gateway relays as one `history` event, so a reloaded page draws what was said instead
+of an empty panel. The file is not deleted at startup the way the per-session config copies are: it is
+the user's words.
 
 The lifetimes differ and the client owns both, because the client is what knows when a surface went
 away. The canvas's session lives until it says `{"close":true}`; a node panel's ends when the panel does,

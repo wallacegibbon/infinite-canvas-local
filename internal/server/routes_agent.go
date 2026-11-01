@@ -123,15 +123,25 @@ func (s *Server) handleAgentSocket(ctx *httpx.Ctx) error {
 	if err := send(connected.Startup); err != nil {
 		return nil
 	}
+	// Then the conversation it replayed from its session file — always, even when empty: a page that
+	// opens this socket is drawing the agent's conversation, and the agent has just said what that is.
+	// An empty list is the honest answer for a conversation that has not started yet.
+	if err := send(agent.Event{Type: "history", History: connected.History}); err != nil {
+		return nil
+	}
 
 	// One goroutine, and it is the reading half of the conversation: what the agent says reaches this
 	// socket through the pump, and what the user says is applied here until the socket ends.
 	s.readSocket(conn, session, send)
 
 	// The socket is gone. The agent has nobody reading it any more, so its current turn is asked to wind
-	// down — otherwise it would write into a pipe until it blocked. The process itself stays: closing a
-	// tab is not closing the agent.
+	// down — otherwise it would write into a pipe until it blocked — and then the process goes too.
+	//
+	// The conversation is not lost with it: AlayaCore keeps it in the session file, and the next connect
+	// starts a process that replays it. That is why the process may be this short-lived: a page that was
+	// reloaded is a new reader of the same file, not a stranger.
 	_ = session.Cancel()
+	s.agentSessions.Close(session.ID, "socket closed")
 	if s.logger != nil {
 		s.logger.Info("agent: socket closed session=%s", session.ID)
 	}

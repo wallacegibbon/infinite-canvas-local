@@ -263,8 +263,8 @@ func TestMCPToolReportsWhatTheCanvasCalledAFailure(t *testing.T) {
 	}
 }
 
-// TestMCPToolSaysWhenNoCanvasIsWatching: the session outlives its socket (that is what makes coming back
-// a continuation), so a call can arrive with nobody to run it — and has to be answered anyway.
+// TestMCPToolSaysWhenNoCanvasIsWatching: a session lives as long as its socket, so a call that arrives after
+// the page is gone has nobody to run it — and has to be answered anyway, in words a reader can act on.
 func TestMCPToolSaysWhenNoCanvasIsWatching(t *testing.T) {
 	gateway, _, _ := startMCPGateway(t)
 	conn := openSocket(t, gateway, "canvas-1")
@@ -276,8 +276,8 @@ func TestMCPToolSaysWhenNoCanvasIsWatching(t *testing.T) {
 	if result["isError"] != true {
 		t.Fatalf("a call with no canvas behind it is not an error: %v", result)
 	}
-	if text := textOfResult(t, result); !strings.Contains(text, "no canvas") {
-		t.Fatalf("answer = %q, want it to say no canvas is connected", text)
+	if text := textOfResult(t, result); !strings.Contains(text, "no agent") {
+		t.Fatalf("answer = %q, want it to say no agent is attached", text)
 	}
 }
 
@@ -332,7 +332,7 @@ func TestMCPWorkspaceIsTheSessionsOwnConfig(t *testing.T) {
 	conn := openSocket(t, gateway, "canvas-1")
 
 	key := agentWorkspaceKey("canvas-1")
-	dir := filepath.Join(server.cfg.DataDir, "agent", key)
+	dir := filepath.Join(workspacesRoot(server.cfg.DataDir), key)
 
 	// The operator's models, copied rather than shared: choosing one must not change the default.
 	copied, err := os.ReadFile(filepath.Join(dir, "model.conf"))
@@ -379,7 +379,7 @@ func TestMCPWorkspaceIsNotReused(t *testing.T) {
 	gateway, server, _ := startMCPGateway(t)
 	conn := openSocket(t, gateway, "canvas-1")
 	key := agentWorkspaceKey("canvas-1")
-	dir := filepath.Join(server.cfg.DataDir, "agent", key)
+	dir := filepath.Join(workspacesRoot(server.cfg.DataDir), key)
 
 	// Something the agent itself would have written: a model chosen in that session.
 	if err := os.WriteFile(filepath.Join(dir, "runtime.conf"), []byte("chosen in the last session\n"), 0o644); err != nil {

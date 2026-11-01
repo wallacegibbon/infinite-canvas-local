@@ -12,12 +12,12 @@ import (
 	"comfyui-gateway/internal/logx"
 )
 
-// Session is one agent process, held for as long as the canvas that owns it is open.
+// Session is one agent process, held for as long as the connection that owns it is open.
 //
-// Its life is the client's, not the gateway's: a socket starts one, everything the user says goes into
-// the same process, and it is released only when that client says so. There is no idle timer and no
-// expiry — an agent that forgot its conversation while the user was thinking would be worse than no
-// agent, and the history is the whole reason the process exists.
+// Its life is the connection's: a socket starts one, everything the user says goes into the same
+// process, and it is released when that socket ends. Nothing is lost by that, because the conversation
+// is not in the process — AlayaCore keeps it in the file named by `--session`, and the next process
+// replays it. Memory lives in the file; the process is only the hands that work on it.
 //
 // The key is whatever the client called it (the canvas id, in practice). The gateway does not know or
 // care what it means: it is a name a process is filed under, and the same name always finds the same
@@ -56,6 +56,9 @@ type Session struct {
 type Connected struct {
 	Session *Session
 	Startup Event
+	// History is the conversation the new process replayed from its session file, oldest first. It is
+	// empty when the agent was already running (there was nothing to replay) and when there was no file.
+	History []HistoryEntry
 	Spawned bool
 }
 
@@ -71,8 +74,8 @@ func NewSessions(log *logx.Logger) *Sessions {
 }
 
 // Connect returns the agent filed under this name, starting one if there is none. Connecting twice is
-// the same as connecting once: a canvas has one agent, and asking for it again is how a reloaded page
-// finds the conversation it left.
+// the same as connecting once: a canvas has one agent. A page that comes back after its socket went
+// away does not find the same process — it finds the same conversation file, replayed into a new one.
 //
 // The spawn happens under the same lock as the lookup. It is the only way two simultaneous connects
 // cannot both decide the name is free and start two processes — and the cost is that a canvas waiting
@@ -92,7 +95,7 @@ func (s *Sessions) Connect(ctx context.Context, id string, opts SpawnOptions) (C
 	if err != nil {
 		return Connected{}, err
 	}
-	state, err := readStartup(proc)
+	state, history, err := readStartup(proc)
 	if err != nil {
 		proc.Release()
 		return Connected{}, err
@@ -105,7 +108,7 @@ func (s *Sessions) Connect(ctx context.Context, id string, opts SpawnOptions) (C
 	if s.Log != nil {
 		s.Log.Info("agent: connected session=%s pid=%d models=%d active=%q", id, proc.Cmd.Process.Pid, len(state.models), activeName(state))
 	}
-	return Connected{Session: session, Startup: state.event(), Spawned: true}, nil
+	return Connected{Session: session, Startup: state.event(), History: history, Spawned: true}, nil
 }
 
 // List is every connected session. The MCP route uses it to find the session that owns a workspace,
@@ -150,9 +153,9 @@ func (s *Session) Watch(sink func(Event) error) bool {
 	return true
 }
 
-// Unwatch detaches the connection. The pump keeps reading: the process is not going anywhere, and a
-// reader that stopped with its socket could not be restarted without losing whatever the agent said in
-// between.
+// Unwatch detaches the connection. The pump keeps reading until the process is released — a reader that
+// stopped with its socket could not be restarted, and whatever the agent says while it winds down still
+// belongs in its log.
 //
 // Any tool call still waiting is answered here rather than left to time out: the page that would have
 // run it is gone, and that is the answer.
@@ -284,7 +287,7 @@ func (s *Session) Send(req Request) error {
 }
 
 // Cancel asks the agent to wind its current task down. A turn is the agent's to finish, so this is a
-// request rather than a kill; the process stays, and its history stays with it.
+// request rather than a kill; what it already said is in the session file either way.
 func (s *Session) Cancel() error {
 	s.write.Lock()
 	defer s.write.Unlock()
@@ -309,9 +312,11 @@ func activeName(state startup) string {
 	return state.active.Name
 }
 
-// readStartup reads the frames an agent emits before it accepts input.
-func readStartup(proc *Process) (startup, error) {
+// readStartup reads the frames an agent emits before it accepts input: its own startup broadcast, and
+// the conversation it replayed from its session file.
+func readStartup(proc *Process) (startup, []HistoryEntry, error) {
 	state := startup{}
-	err := waitReady(proc, &state, func(Event) {}, func() error { return nil })
-	return state, err
+	history := []HistoryEntry{}
+	err := waitReady(proc, &state, &history, func(Event) {}, func() error { return nil })
+	return state, history, err
 }

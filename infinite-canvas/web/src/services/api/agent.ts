@@ -23,7 +23,7 @@ type AgentModel = { id: number; name: string; protocolType?: string; contextLimi
  * because the list of models comes from the agent itself.
  */
 export type AgentEvent = {
-    type: "models" | "delta" | "reasoning" | "model" | "reasoning_level" | "command" | "tool_call" | "tool_result" | "tool" | "done" | "error" | "closed";
+    type: "models" | "delta" | "reasoning" | "model" | "reasoning_level" | "command" | "tool_call" | "tool_result" | "tool" | "history" | "done" | "error" | "closed";
     text?: string;
     elapsedMs?: number;
     models?: AgentModel[];
@@ -38,7 +38,12 @@ export type AgentEvent = {
     output?: string;
     /** `tool`: what the agent wants run, as it sent it. The canvas is what runs it. */
     arguments?: unknown;
+    /** `history`: the conversation the agent replayed from its session file. Replaces what the panel has. */
+    history?: AgentHistoryEntry[];
 };
+
+/** One thing that was said in a conversation that already existed. */
+type AgentHistoryEntry = { role: "user" | "assistant"; text: string };
 
 /**
  * One content block of a tool result, in the protocol's own shape.
@@ -130,8 +135,14 @@ export function agentSession(name: string): AgentSession {
     return sessions.get(name)?.session || blank(name);
 }
 
-/** The canvas panel's session, and one per node panel. */
-export const CANVAS_AGENT = "canvas";
+/**
+ * A session's name: the canvas panel's, one per canvas, and one per node panel.
+ *
+ * The canvas's name carries the canvas id because the agent's conversation is kept in a file named after
+ * it. One name for every canvas meant one conversation for every canvas — what was said on one showed up
+ * on the next, and now it would also be replayed there.
+ */
+export const canvasAgent = (canvasId: string) => `canvas:${canvasId}`;
 export const nodeAgent = (nodeId: string) => `node:${nodeId}`;
 
 function socketUrl(config: AiConfig, name: string): string {

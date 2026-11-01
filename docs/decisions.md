@@ -3295,3 +3295,44 @@ account buttons: no readout, no zeros. `POST /api/system/free-memory` there retu
 `503 comfy_unreachable`. Go: `TestSystemStatsReportComfysMachine`,
 `TestSystemStatsAreAbsentWhenComfyReportsNoDevices`, `TestSystemStatsAreAbsentWhenComfyIsGone`, and the
 `sysinfo.FromComfy` unit tests (units, `nil` for no device, index fallback).
+
+## 100. The conversation is a file, and the process is only what works on it
+
+**Decision** Every agent session is spawned with `alayacore --session <file>`, one file per session name,
+in `DATA_DIR/agent/sessions/`. The process now lives exactly as long as its socket instead of outliving it,
+and the conversation comes back the way AlayaCore offers it: a new process replays the file before it says
+`session ready`, and the gateway relays that as one `history` event. The panel draws `history` by
+**replacing** its messages, not appending. The canvas panel's session name became `canvas:<canvasId>` —
+it was the bare `"canvas"` for every canvas, one conversation shared by all of them.
+
+**Why** The panel kept its transcript in `useState`, so a reload showed an empty panel while the agent, in
+a process that had survived the reload, still remembered everything: a blank screen answering from
+invisible context. That was the worst of both worlds — worse than either side forgetting.
+
+The fix is not in the page. AlayaCore already keeps a conversation when told where to put it, and already
+replays it on start (a 733-byte file for one turn, `context_tokens: 222` restored before `ready`). What was
+missing was the two things that let it happen: a file to write to, and a process short-lived enough to
+have to read it. Keeping the process alive across reloads was the very thing that prevented the replay.
+
+Two frames made this safe to wire, and both were checked against the real binary: replayed content arrives
+as **complete** `UX`/`AX` frames carrying text, while a live turn ends its messages with `AX` frames that
+carry **no** text at all — so "text present" is the whole difference between history and a full stop, and
+nothing is drawn twice. `UX` echoes exist in both cases, which is why history is defined by *when* it
+arrives (before `ready`), not by its tag.
+
+The name had to change with the file. One name for every canvas meant one file for every canvas: what was
+said on one canvas would be replayed on the next.
+
+**Tested** In a browser against a real AlayaCore (`gateway :8191` → `Test / qwen3.8-27b`): asked the panel
+to remember a code word, got `好的`; the session file `canvas-UyrJZS8t68LWjeruICYOR-bb5c104f.session`
+appeared (744 bytes) and the live process's command line carried
+`--session /tmp/gw8191/data/agent/sessions/canvas-UyrJZS8t68LWjeruICYOR-bb5c104f.session`. Reloaded the
+page, reopened the panel: both messages were there. Asked "刚才让你记的暗号是什么?" and the answer was
+`紫罗兰` — the context, not just the text, had come back in a new process. Closing and reopening the panel
+inside the same page showed the same four messages and no duplicates, so a replay replaces. The gateway log
+for the whole sequence: `released session=… reason=socket closed`, then `spawn … spawned=true`.
+
+Go: `TestSocketGoingAwayReplaysTheConversation` (fake agent that keeps its own session file: prompt, drop
+the socket, reconnect, and the new process replays the question and the answer); `TestMCPToolSaysWhenNoCanvasIsWatching`
+now reports the session's disappearance; the workspace tests read the new `agent/workspaces/` path.
+`make check`, `make test-race`, `npm run check`, `vitest 125` green.
