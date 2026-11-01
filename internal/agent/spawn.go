@@ -51,11 +51,12 @@ type SpawnOptions struct {
 	Tools string
 	// WorkDir is a directory this agent owns and removes when it is released: its copy of the operator's
 	// configuration, and the `mcp.conf` that points its tool calls at this gateway. Empty means the
-	// agent shares one directory with everyone else, which is only right for a one-shot.
+	// agent shares one directory with everyone else.
 	WorkDir string
 	// Session is the file AlayaCore keeps this conversation in. It is not work: the workspace above is
 	// thrown away with the process, while this file is what lets the next process replay what was said.
-	// Empty means the conversation dies with the process, which is what a one-shot wants.
+	// Empty means the conversation dies with the process, which is what a node's single question wants:
+	// one file per node would outlive the node that asked.
 	Session string
 	// Log records what happened in terms someone who knows AlayaCore can follow: the command line,
 	// every frame in both directions, and how the process ended.

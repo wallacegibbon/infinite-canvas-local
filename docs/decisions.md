@@ -3545,3 +3545,28 @@ build, the canvas loaded its 42 nodes and the complete request log was `/api/wor
 every one `200`, and not a single `404`: the client really did not call any of the twelve.
 `TestSetupReportsToolWorkflowProblems` kept its scan assertions and lost the HTTP half that pointed at the
 deleted route; `TestTaskNotFoundShape` went with the route it tested.
+
+---
+
+## 108. The conversation is the socket, so the one-shot run has no caller
+
+**Decision** `agent.Run`, `readTurn`, `withAgent` and `finish` are gone, with the three tests that drove
+them. Reading an agent now has exactly one shape: a session (`Sessions.Connect`) whose pump feeds the
+socket's watcher.
+
+**Why** `Run` spawned a process, wrote one request, read until the turn ended and released — the shape of
+`POST /api/agent/chat`, which was deleted in #74/#82 when prompts became the socket's. After that the only
+caller was `run_test.go`: golangci's `unused` stayed quiet because the test counted as a caller, and the
+suite looked green on a route that no longer exists. `turnStep` is what both paths actually shared, and it
+stayed — `Session.pump` is now its only caller, which is the honest count.
+
+**Cost** The tests could not simply be deleted with the code: `turnStep` and `writeRequest` are live (the
+pump and `Session.Send`), and they were only ever exercised through `Run`. They were ported instead:
+`internal/agent/session_test.go` opens a real session against the same fake agent and asserts the same
+three things through it — the answer arrives as deltas with `done` as a bare marker, the agent's `api_key`
+and `base_url` never reach an event, and a command's `CO` (ok or rejected) is relayed without a `UE` being
+flushed. One test is new: a detached watcher makes the pump drop events rather than fail.
+
+**How verified** `make check` and `make test-race`. The ported tests run the live path
+(`Connect` → `Watch` → `Send` → events), so a regression in the translation fails the suite exactly where
+it would fail in a browser.

@@ -1,13 +1,10 @@
 package agent
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
-	"sync/atomic"
-	"time"
 )
 
 // Request is what one message carries, and the only two kinds of thing a user does: change a setting,
@@ -29,27 +26,9 @@ func (r Request) HasPrompt() bool {
 	return strings.TrimSpace(r.Prompt) != "" || len(r.Images) > 0
 }
 
-// ErrGone is the process ending. A one-shot agent ends by itself and that is the answer; a connected
-// one that stops has nothing left to write to, and the canvas has to be told rather than left waiting
-// on a socket that cannot speak.
+// ErrGone is the process ending: there is nothing left to write to, and the canvas has to be told
+// rather than left waiting on a socket that cannot speak.
 var ErrGone = errors.New("agent: the process ended")
-
-// Run performs one request against one agent process and releases it.
-//
-// It decides nothing about the content: a delta is a delta, a command's answer is the agent's own
-// sentence, and the answer ends where the agent's task ends. It only decides when to stop reading.
-func Run(ctx context.Context, opts SpawnOptions, req Request, emit func(Event)) error {
-	return withAgent(ctx, opts, func(proc *Process, state *startup, emit func(Event)) error {
-		started := time.Now()
-		if err := waitReady(proc, state, nil, emit, func() error { return writeRequest(proc, req) }); err != nil {
-			return err
-		}
-		if err := readTurn(ctx, proc, state, req.HasPrompt(), emit); err != nil {
-			return err
-		}
-		return finish(started, emit)
-	}, emit)
-}
 
 // writeRequest puts one request on the agent's stdin.
 //
@@ -101,44 +80,8 @@ func splitForPrompt(prompt string) []string {
 	return []string{prompt}
 }
 
-// readTurn reads until the agent says the turn ended.
-//
-// There is no timer and no quorum here: the agent decides when it is done, and the one frame that says
-// so is `SM task in_progress:false`. A step boundary is not the end of a turn — a hundred-step loop is
-// still one turn, and a message the user sends mid-loop is inserted by the agent between those steps,
-// which is why nothing in this function may assume one prompt equals one answer.
-func readTurn(ctx context.Context, proc *Process, state *startup, hasPrompt bool, emit func(Event)) error {
-	// A client that goes away is the agent's own `cancel`, not a kill. The frames that arrive while it
-	// winds down are still read and dropped, so nothing is attributed to the turn after this one.
-	var cancelled atomic.Bool
-	stopped := make(chan struct{})
-	defer close(stopped)
-	go func() {
-		select {
-		case <-ctx.Done():
-			cancelled.Store(true)
-			_ = proc.Write(TagCmdInput, `{"command_id":"cancel","name":"cancel"}`)
-		case <-stopped:
-		}
-	}()
-
-	for {
-		frame, err := proc.Read()
-		if err != nil || frame == nil {
-			return ErrGone
-		}
-		if turnStep(state, frame, hasPrompt, func(event Event) {
-			if !cancelled.Load() {
-				emit(event)
-			}
-		}) {
-			return nil
-		}
-	}
-}
-
 // turnStep applies one frame and reports whether it ended the turn. It is the whole of what reading an
-// agent means, shared by the one-shot loop and the socket's: a frame is a frame whatever is listening.
+// agent means: a frame is a frame, whatever asked for it.
 func turnStep(state *startup, frame *Frame, hasPrompt bool, emit func(Event)) (ended bool) {
 	switch frame.Tag {
 	case TagUserX:
@@ -212,13 +155,3 @@ func turnStep(state *startup, frame *Frame, hasPrompt bool, emit func(Event)) (e
 
 // commandID tags the command this request carries, so its CO is told apart from anything else.
 const commandID = "1"
-
-// finish marks the end of the turn.
-//
-// It carries the elapsed time and no text: the answer is what the deltas built, and a second copy of it
-// would be a second truth — two strings that agree until the day they do not, with nothing to say which
-// one the user actually saw.
-func finish(started time.Time, emit func(Event)) error {
-	emit(Event{Type: "done", ElapsedMs: time.Since(started).Milliseconds()})
-	return nil
-}

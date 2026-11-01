@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 )
@@ -233,28 +232,6 @@ func systemError(data json.RawMessage) Event {
 	}
 	_ = json.Unmarshal(data, &payload)
 	return Event{Type: "error", Message: payload.Text}
-}
-
-// withAgent spawns, runs body, and releases. One agent, one action.
-func withAgent(ctx context.Context, opts SpawnOptions, body func(*Process, *startup, func(Event)) error, emit func(Event)) error {
-	proc, err := Spawn(opts)
-	if err != nil {
-		return err
-	}
-	defer proc.Release()
-
-	// A client that goes away is the agent's own `cancel`, not a kill.
-	stopped := make(chan struct{})
-	defer close(stopped)
-	go func() {
-		select {
-		case <-ctx.Done():
-			_ = proc.Write(TagCmdInput, `{"command_id":"cancel","name":"cancel"}`)
-		case <-stopped:
-		}
-	}()
-
-	return body(proc, &startup{}, emit)
 }
 
 // userContent is a `UX` frame's words: what the canvas sent, as the agent echoes it back.

@@ -54,9 +54,9 @@ func (s *Server) handleAgentSessionDelete(ctx *httpx.Ctx) error {
 // agentOptions is what every spawn needs. The wording (skills) and the tools are passed through from
 // configuration: the gateway has no opinion about either.
 //
-// Both routes get the same options. A one-shot question needs `read_file` as much as a conversation
-// does — the H3 prompt rewrite works by reading a `SKILL.md` — so the difference between the two is
-// lifetime, not capability.
+// Every spawn gets the same options, and `read_file` is the only tool: the H3 prompt rewrite works by
+// reading a `SKILL.md`, and an agent that could not read one could not load a skill at all. Nothing
+// here can hand itself a shell.
 func (s *Server) agentOptions() agent.SpawnOptions {
 	return agent.SpawnOptions{
 		Binary:     s.cfg.AgentBin,

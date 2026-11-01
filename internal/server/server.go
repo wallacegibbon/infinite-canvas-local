@@ -43,7 +43,7 @@ type Server struct {
 	registry   *workflow.Registry
 	tasks      *task.Store
 	uploads    *upload.Store
-	// agentSessions holds agents a connect started, waiting for their one prompt.
+	// agentSessions holds the agents a socket started, one per client-chosen name.
 	agentSessions *agent.Sessions
 	setup         *setup.Manager
 	resources     *resource.Manager

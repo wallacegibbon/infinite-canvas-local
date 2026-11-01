@@ -25,8 +25,8 @@ import (
 	"time"
 )
 
-// maxMessage bounds one reassembled message. The socket carries text — prompts and frames — so this is
-// generous; images travel on the one-shot route, which is a plain POST.
+// maxMessage bounds one reassembled message. The socket carries text — prompts and frames — and a
+// prompt may carry reference images as data URLs, so the bound is generous on purpose.
 const maxMessage = 8 << 20
 
 // pingInterval is how often the server pokes the client. A canvas tab that has been asleep for hours
