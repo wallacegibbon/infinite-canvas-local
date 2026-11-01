@@ -23,6 +23,9 @@ import { agentSession, sendAgentMessage, subscribeAgentSessions, type AgentSessi
  */
 const OVER_CANVAS = {
     "data-canvas-no-zoom": "",
+    // Above the canvas's own chrome (the panel itself is z-95) and above every floating layer it can open
+    // beside: a dropdown the user cannot see is a dropdown that "does not work".
+    className: "z-[1500]",
     onPointerDown: (event: PointerEvent) => event.stopPropagation(),
     onMouseDown: (event: MouseEvent) => event.stopPropagation(),
 } as const;

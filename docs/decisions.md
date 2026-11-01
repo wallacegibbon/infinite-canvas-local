@@ -3178,3 +3178,22 @@ part of the canvas's chrome rather than as "the assistant is over there".
 opened the panel; closing the panel showed the button again in the same corner. Dragging the new corner grip
 took the panel from 380×480 to 536×446, and a drag towards the top-left clamped it at 320×360 (the minimum
 width), with the size in the panel's own inline style rather than the class list.
+
+## 95. A popup over the canvas has to say so twice: the marker, and the height
+
+**Decision** A dropdown opened from inside the canvas carries `data-canvas-no-zoom` (so the canvas does not read
+the click on an option as a click on its background), stops pointer events, **and** sets a z-index above the
+canvas's own chrome — `z-[1500]` for the agent panel's two selects, whose card sits at `z-95`. That is the same
+recipe `model-picker` uses (`z-[1200]`), and the marker-only version was not enough.
+
+**Why** The first fix was the marker alone, and it was incomplete in a way only a person could see: radix renders
+the popup in a portal at the document root with the component's own `z-50`, so the dropdown opened *underneath*
+the panel that owns the trigger. Nothing threw, the accessibility tree listed the options, and a synthetic click
+aimed at the element still changed the model — so it looked fixed. A real mouse click lands on whatever is on
+top, which was the panel. A floating layer over the canvas is therefore two things, not one: told apart from the
+canvas, and above it.
+
+**Tested** In a browser, with `elementFromPoint` at the centre of an option: before, the option measured
+`z-50` against a card at `z-95`; after, `z-1500` and the option is the topmost element at its own centre. Clicking
+它 changed the panel to `Test / qwen3.8-27b` and the gateway logged `command="model_set"`; the level select
+showed 不思考/普通思考/深度思考, and picking 不思考 logged `command="reasoning_level_set"`.
