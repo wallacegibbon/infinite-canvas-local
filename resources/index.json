@@ -497,7 +497,7 @@
         "QwenMultiangleCameraNode"
       ],
       "sources": [
-        "https://github.com/jtydhr88/ComfyUI-qwenmultiangle/archive/refs/heads/master.zip"
+        "https://github.com/jtydhr88/ComfyUI-qwenmultiangle/archive/bf8d032a36f1b78296568cda939418b88f0950b3.zip"
       ]
     },
     {
@@ -531,7 +531,7 @@
         "InpaintStitchImproved"
       ],
       "sources": [
-        "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch/archive/refs/heads/main.zip"
+        "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch/archive/e2727a26c0a0cff082ef679c51b6a1f95b7b38a4.zip"
       ]
     },
     {
@@ -549,7 +549,7 @@
         "DrawMaskOnImage"
       ],
       "sources": [
-        "https://github.com/kijai/ComfyUI-KJNodes/archive/refs/heads/main.zip"
+        "https://github.com/kijai/ComfyUI-KJNodes/archive/d7641533d6634eb05f8570c980fce8fc8528dc7b.zip"
       ]
     },
     {
@@ -898,7 +898,7 @@
       ],
       "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
       "sources": [
-        "https://github.com/Saganaki22/ComfyUI-VDN-H3/archive/refs/heads/main.zip"
+        "https://github.com/Saganaki22/ComfyUI-VDN-H3/archive/7271c648d7c2ff61ae1a7342dd9761e4545a34c3.zip"
       ]
     },
     {
@@ -920,7 +920,7 @@
       ],
       "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
       "sources": [
-        "https://github.com/T8mars/comfyui-minimax-h3-audio-T8/archive/refs/heads/main.zip"
+        "https://github.com/T8mars/comfyui-minimax-h3-audio-T8/archive/93cefbf5d15ff8e263fa707b8a55c19454459431.zip"
       ]
     },
     {
@@ -937,7 +937,9 @@
         "H3SigmaRefiner"
       ],
       "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
-      "sources": []
+      "sources": [
+        "https://github.com/yichengup/ComfyUI-YCNodes-MiniMax-H3/archive/efbe83f69ffa97a251a575ce42edc7bf8005da0c.zip"
+      ]
     },
     {
       "id": "h3_selflift_node",
@@ -954,7 +956,7 @@
       ],
       "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
       "sources": [
-        "https://github.com/facok/comfyui-SelfLift/archive/refs/heads/main.zip"
+        "https://github.com/facok/comfyui-SelfLift/archive/835c3cf7919410f71f414688f049c6ca497789d0.zip"
       ]
     },
     {
@@ -972,7 +974,9 @@
         "SolAttnPatch"
       ],
       "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
-      "sources": []
+      "sources": [
+        "https://github.com/kijai/ComfyUI-SolAttn_triton/archive/dfc2e31a41afd72bd53dd2137fc8b2931d5ec192.zip"
+      ]
     },
     {
       "id": "h3_vhs_node",
@@ -989,7 +993,7 @@
       ],
       "note": "The pre-extracted folder is copied with the pack and pip is not run; handle the node's dependencies as its README says.",
       "sources": [
-        "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite/archive/refs/heads/main.zip"
+        "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite/archive/4d907bee61e92c2e65af3bd6383a4e4d356126d1.zip"
       ]
     },
     {
