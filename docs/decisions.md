@@ -4058,10 +4058,9 @@ drop those four fixes. That does not make vendoring right — it makes the trade
 `localPatches` is for.
 
 **Cost** A pin is only useful while upstream keeps the commit. If a repository is deleted or force-pushed
-past it, the SHA stops resolving — the copy in `resources/payload` remains the artifact, which is the point
-of vendoring in the first place. `frame_interpolation_node` has `upstream` and no pin: it is downloaded at
-install time, so what lands on a machine is whatever `main` was that day, and pretending otherwise would be
-worse than the admission.
+past it, the SHA stops resolving. `frame_interpolation_node` had no pin when this was written — it is
+downloaded rather than vendored, so there was no frozen copy to read a commit off — and has since been
+pinned to `26545cc2dd95`, the commit `main` pointed at. All nine node URLs name a commit; see #126.
 
 **Tested** `make check`, `tsc --noEmit` and the canvas suite (133 tests) pass; `gofmt` clean after the struct
 change.

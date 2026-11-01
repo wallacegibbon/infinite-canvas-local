@@ -870,12 +870,13 @@
       "target": "custom_nodes/ComfyUI-Frame-Interpolation",
       "upstream": "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation",
       "size": 16848085,
+      "pinnedCommit": "26545cc2dd95bc3d27f056016300673bdeee78f5",
       "provides": [
         "RIFE VFI"
       ],
       "note": "The RIFE interpolation node, installed from GitHub; on first run the pack downloads rife49.pth into its own ckpts folder, not models/, which is why there is no separate model entry. Restart ComfyUI afterwards.",
       "sources": [
-        "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation/archive/refs/heads/main.zip"
+        "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation/archive/26545cc2dd95bc3d27f056016300673bdeee78f5.zip"
       ]
     },
     {
