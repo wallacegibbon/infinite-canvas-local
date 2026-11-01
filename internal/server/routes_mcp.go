@@ -98,17 +98,21 @@ func (s *Server) handleMCP(ctx *httpx.Ctx) error {
 	}
 }
 
-// mcpTools is the list the agent is offered. One entry, for now: what it proves is the pipe, not the
-// vocabulary.
+// mcpTools is the list the agent is offered. The names are the vocabulary; running one is the canvas's.
 //
 // A tool's name here is not the name the model sees: AlayaCore prefixes it with the server's name, so
 // this `ping` is the model's `canvas_ping`, and calling it arrives here again as `ping`. Naming a tool
 // `canvas_ping` would show the model `canvas_canvas_ping` (measured, not guessed).
 func (s *Server) mcpTools() []mcpTool {
+	noArguments := json.RawMessage(`{"type":"object","properties":{},"additionalProperties":false}`)
 	return []mcpTool{{
 		Name:        "ping",
-		Description: "Check that the canvas is listening. Answers with the session's own name.",
-		InputSchema: json.RawMessage(`{"type":"object","properties":{},"additionalProperties":false}`),
+		Description: "Check that the canvas is listening. Answers with how much is on it.",
+		InputSchema: noArguments,
+	}, {
+		Name:        "list_nodes",
+		Description: "Every node on the canvas — id, type, title, prompt, position — and every connection between them. The ids are what the other tools act on.",
+		InputSchema: noArguments,
 	}}
 }
 

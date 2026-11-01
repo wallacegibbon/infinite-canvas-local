@@ -252,6 +252,10 @@ Tool names are **not** prefixed with `canvas_`: AlayaCore adds the server's name
 `ping` here is `canvas_ping` to the model and arrives back as `ping`. See
 [`decisions.md`](decisions.md) #84.
 
+Two tools, both read-only: `ping` (how much is on the canvas) and `list_nodes` (every node — id, type,
+title, prompt, position — and every connection, the ids being what a later tool acts on). See
+[`decisions.md`](decisions.md) #85 for why the page runs them and why nothing writes yet.
+
 A music graph needs two texts, and both are ordinary `registry.json` bindings (`prompt`, `lyrics`), so
 a run carries them as inputs like any other parameter. `response_format`-style container selection is
 `outputs.formats` in the registry: the encoder writes `mp3`, `flac` or `opus`, and anything else is

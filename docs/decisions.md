@@ -2954,3 +2954,30 @@ first version offered `canvas_ping` and the model was shown `canvas_canvas_ping`
 rest: the handshake and tool list, a call run by the canvas and answered with what it said, a tool the
 canvas called a failure, a session nobody is watching, a name the gateway never advertised, a notification
 accepted with no body, and a session's directory built for it and removed with it.
+
+## 85. A tool runs in the page, once, for whichever agent asked
+
+**Decision** The canvas answers the gateway's `tool` events itself: one hook mounted where the nodes are
+(`useCanvasAgentTools`), subscribed to **every** session's events (`onAnyAgentEvent`) rather than to the
+canvas panel's name, and replying `{"toolResult":{…}}` on the session the call arrived on. The vocabulary
+starts read-only — `ping` (how much is on the canvas) and `list_nodes` (every node with the id a later tool
+can act on, and every connection), the second written as one line per node.
+
+**Why every session and not just the panel's** The canvas is one, and a node's agent asking to see it is
+the same question as the panel's asking. Subscribing per name would have to be done for sessions that do
+not exist yet — a node's session exists only after its connect is pressed — and would then need a rule
+saying which agents have hands. One subscription for the page, answering on the name it was given, has no
+such rule: whatever agent asks, the page is what runs it.
+
+**Why read-only to begin with** Reading is the only thing that cannot be wrong in a way the user has to
+undo, and it proves the whole pipe — agent decides, gateway routes, page answers, agent reads — with real
+canvas state. Anything that changes the canvas comes after, through the same functions the buttons call,
+so a tool can never be a second way to do something.
+
+**Tested** In a browser against a real AlayaCore on `:8191`, on a canvas with 38 nodes and 29 connections:
+opening 画布助手 connected the session, a prompt asking for `canvas_list_nodes` made the agent call it,
+the gateway logged `tool answered session=canvas callId=tool-1 isError=false` in 3ms, and AlayaCore logged
+`<< UF {"output":[{"type":"text","text":"38 nodes, 29 connections\n- text-1793432616807-5rz7o (text)
+\"文本\" at (689, 247)\n…"}]}`; the panel's answer named both counts and the shapes it had read. A second
+turn and a page reload repeated it (`callId=tool-2`). The node titles that disagree with their prompts are
+the canvas's own data — a title is a snapshot taken when the node was made.

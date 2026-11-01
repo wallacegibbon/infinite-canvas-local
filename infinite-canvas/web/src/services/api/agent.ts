@@ -23,7 +23,7 @@ type AgentModel = { id: number; name: string; protocolType?: string; contextLimi
  * because the list of models comes from the agent itself.
  */
 export type AgentEvent = {
-    type: "models" | "delta" | "reasoning" | "model" | "reasoning_level" | "command" | "tool_call" | "tool_result" | "done" | "error" | "closed";
+    type: "models" | "delta" | "reasoning" | "model" | "reasoning_level" | "command" | "tool_call" | "tool_result" | "tool" | "done" | "error" | "closed";
     text?: string;
     elapsedMs?: number;
     models?: AgentModel[];
@@ -36,6 +36,8 @@ export type AgentEvent = {
     name?: string;
     input?: string;
     output?: string;
+    /** `tool`: what the agent wants run, as it sent it. The canvas is what runs it. */
+    arguments?: unknown;
 };
 
 type AgentMessage = {
@@ -45,6 +47,8 @@ type AgentMessage = {
     args?: string;
     cancel?: boolean;
     close?: boolean;
+    /** The canvas answering a `tool` event: what running it did. */
+    toolResult?: { callId: string; text: string; isError?: boolean };
 };
 
 /** What one session is, right now — the agent's own last word about itself. */
@@ -85,6 +89,8 @@ function listenersOf(name: string) {
     }
     return set;
 }
+/** Whoever wants every session's events, tools being the one thing that does not care who asked. */
+const everyone = new Set<(name: string, event: AgentEvent) => void>();
 const watchers = new Set<() => void>();
 let revision = 0;
 
@@ -185,6 +191,7 @@ export function openAgentSession(config: AiConfig, name: string): Promise<AgentS
                 }
             }
             for (const listener of listenersOf(name)) listener(event);
+            for (const listener of everyone) listener(name, event);
             notify();
         };
         socket.onerror = () => {
@@ -234,6 +241,20 @@ export function onAgentEvent(name: string, listener: (event: AgentEvent) => void
     set.add(listener);
     return () => {
         set.delete(listener);
+    };
+}
+
+/**
+ * Subscribe to every session's events, with the name they arrived on.
+ *
+ * The canvas is one, and a tool call is the page doing something to itself, so the surfaces that run
+ * tools do not care which agent asked — they answer on the name they were given. A subscription per
+ * session would have to be made for sessions that do not exist yet, and for the ones that never will.
+ */
+export function onAnyAgentEvent(listener: (name: string, event: AgentEvent) => void): () => void {
+    everyone.add(listener);
+    return () => {
+        everyone.delete(listener);
     };
 }
 
